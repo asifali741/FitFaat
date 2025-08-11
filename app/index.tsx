@@ -1,10 +1,14 @@
-import { View, Text } from 'react-native'
+import { Text, TouchableOpacity } from 'react-native'
 import React from 'react'
+import { useRouter } from 'expo-router'
 
 export default function HomeScreen() {
+  const router = useRouter()
   return (
-    <View>
+    <TouchableOpacity
+   onPress={() => router.push("/DietPlanScreen")}
+    >
       <Text>HomeScreen</Text>
-    </View>
+    </TouchableOpacity>
   )
 }
