@@ -1,22 +1,11 @@
-import { View, Text, StyleSheet } from 'react-native'
+import { View, Text} from 'react-native'
 import React from 'react'
+import {DietPlanScreenstyle} from "./DietPlanScreenstyle"
 
 export default function DietPlanScreen() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.text}>DietPlanScreen</Text>
+    <View style={DietPlanScreenstyle.container}>
+      <Text style={DietPlanScreenstyle.text}>DietPlanScreen</Text>
     </View>
   )
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    marginTop: 30,
-    padding: 20,
-  },
-  text: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  }
-})

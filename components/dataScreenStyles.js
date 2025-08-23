@@ -172,4 +172,10 @@ export const dataScreenStyles = StyleSheet.create({
     marginTop: hp(1),
     borderRadius: hp(1),
   },
+  mappingRow: {
+    flexDirection: "column",
+    alignSelf: "center",
+    width: wp(65),
+    marginTop: hp(0.2),
+  },
 });
