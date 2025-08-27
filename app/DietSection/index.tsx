@@ -1,14 +1,18 @@
-import { Text, TextInput, TouchableOpacity, View, Image } from "react-native";
-import React from "react";
-//import { useRouter } from "expo-router";
-//import { useClerk } from "@clerk/clerk-expo";
-import { dataScreenStyles } from "@/components/dataScreenStyles";
+//This Screen has the Instructions on how to fill Information Form
+//            This Screen Redirects to app/DietSection/InformationForm.tsx
+//
 import { Ionicons } from "@expo/vector-icons";
-import { heightPercentageToDP as hp } from "react-native-responsive-screen";
 import { useFonts } from "expo-font";
 import { useRouter } from "expo-router";
+import React from "react";
+import { Image, Text, TouchableOpacity, View } from "react-native";
+import {
+  heightPercentageToDP as hp
+} from "react-native-responsive-screen";
+import { getStarted } from "../../components/getStarted";
 
-const data = [
+
+const mission = [
   {
     id: 1,
     name: "Weight Loss",
@@ -34,121 +38,83 @@ const data = [
 
 export default function Index() {
   const router = useRouter();
+
   const [fontsLoaded] = useFonts({
     Pacifico: require("../../assets/fonts/Pacifico-Regular.ttf"),
     LoraItalic: require("../../assets/fonts/static/Lora-Italic.ttf"),
     LoraRegular: require("../../assets/fonts/static/Lora-Regular.ttf"),
   });
+
   if (!fontsLoaded) {
     return null;
   }
+
   return (
-    <View style={dataScreenStyles.container}>
-      <View style={dataScreenStyles.headingandlogo}>
-        <Text style={dataScreenStyles.mainHeading}>FitFaat</Text>
+    <View style={getStarted.container}>
+      <View style={getStarted.logoText}>
+        <Text style={getStarted.mainHeading}>FitFaat</Text>
         <Image
           source={require("../../assets/images/logo.png")}
-          style={dataScreenStyles.logoImage}
-        ></Image>
+          style={getStarted.logoSize}
+        />
       </View>
-      <View style={dataScreenStyles.mainBox}>
-        <Text style={dataScreenStyles.personalizedText}>
-          Enter your information to create a personalized meal plan
+      <View style={getStarted.instructionBox}>
+        <Text style={getStarted.instructionText}>Instructions</Text>
+        <Text style={getStarted.instructionFont}>
+          Follow the steps below to get started:
         </Text>
-        <Text style={dataScreenStyles.subHeading}>Name</Text>
-        <TextInput
-          placeholderTextColor={"black"}
-          style={dataScreenStyles.mainTextInput}
-        ></TextInput>
-        <View style={dataScreenStyles.subContainer}>
-          <View>
-            {/* height */}
-            <Text style={dataScreenStyles.subsubHeading}>Height(ft)</Text>
-            <TextInput
-              style={dataScreenStyles.miniTextInput}
-              placeholder="e.g. 5.66"
-              keyboardType="numeric"
-              maxLength={4}
-            ></TextInput>
-          </View>
-          <View>
-            {/* weight */}
-            <Text style={dataScreenStyles.subsubHeading}>Weight(kg)</Text>
-            <TextInput
-              style={dataScreenStyles.miniTextInput}
-              placeholder="e.g. 77.4"
-              keyboardType="numeric"
-              maxLength={4}
-            ></TextInput>
-          </View>
-        </View>
-        <View>
-          <Text style={dataScreenStyles.genderHeading}>Gender</Text>
-          <View style={dataScreenStyles.subContainer}>
-            <TouchableOpacity style={dataScreenStyles.genderSelection}>
-              <Ionicons name="male-outline" size={32} color="#2563eb" />
-            </TouchableOpacity>
-            <TouchableOpacity style={dataScreenStyles.genderSelection}>
-              <Ionicons name="female-outline" size={32} color="#db2777" />
-            </TouchableOpacity>
-            <TouchableOpacity style={dataScreenStyles.genderSelection}>
-              <Ionicons name="male-female-outline" size={32} color="purple" />
-            </TouchableOpacity>
-          </View>
-        </View>
-        <View>
-          <Text style={dataScreenStyles.subHeading}>Date of Birth</Text>
-          <View style={dataScreenStyles.dob}>
-            <TextInput
-              style={dataScreenStyles.dobInput}
-              placeholder="Date"
-              keyboardType="numeric"
-              maxLength={2}
-            />
-            <Text style={dataScreenStyles.dobText}>:</Text>
-            <TextInput
-              style={dataScreenStyles.dobInput}
-              placeholder="Month"
-              keyboardType="numeric"
-              maxLength={2}
-            />
-            <Text style={dataScreenStyles.dobText}>:</Text>
-            <TextInput
-              style={dataScreenStyles.dobInput}
-              placeholder="Year"
-              keyboardType="numeric"
-              maxLength={4}
-            />
-          </View>
-        </View>
-        <Text style={dataScreenStyles.subHeading}>What&apos;s your Goal?</Text>
-        <View style={dataScreenStyles.mappingCol}>
-          {data.map((item) => (
-            <TouchableOpacity key={item.id} style={dataScreenStyles.mapping}>
-              {/* Icon */}
-              <Ionicons
-                name={item.icon}
-                size={26}
-                color={item.color}
-                style={{ marginRight: hp(1) }}
-              />
+        <Text style={getStarted.instructionFont}>1. Create an account</Text>
+        <Text style={getStarted.instructionFont}>
+          2. Set your fitness goals
+        </Text>
+        <Text style={getStarted.instructionFont}>• Enter your full name</Text>
+        <Text style={getStarted.instructionFont}>
+          • Provide your current height
+        </Text>
+        <Text style={getStarted.instructionFont}>
+          • Provide your current weight
+        </Text>
+        <Text style={getStarted.instructionFont}>
+          • Select Gender e.g. male , female , custom etc
+        </Text>
+        <Text style={getStarted.instructionFont}>
+          • Select date of Birth(dob)
+        </Text>
+        <Text style={getStarted.instructionFont}>• Select your goal</Text>
+        <Text style={getStarted.instructionFont}>
+          4. Begin your personalized diet and fitness plan
+        </Text>
+      </View>
 
-              {/* Text content */}
-              <View style={{ flexDirection: "column" }}>
-                <Text style={dataScreenStyles.mappingHeading}>{item.name}</Text>
-                <Text style={dataScreenStyles.mappingHeadingName}>
-                  {item.description}
-                </Text>
-              </View>
-            </TouchableOpacity>
+      <View style={getStarted.missionContainer}>
+        <Text style={getStarted.missionText}>Our Mission</Text>
+        <View style={getStarted.iconsDesign}>
+          {mission.map((item) => (
+            <Ionicons
+              key={item.id}
+              name={item.icon as keyof typeof Ionicons.glyphMap}
+              size={hp(5)}
+              color={item.color}
+            />
           ))}
         </View>
+        <Text style={getStarted.tagLine}>
+          Together, we can achieve your fitness goals!
+        </Text>
+      </View>
+
+      <View style={getStarted.getStartedButtonDesign}>
         <TouchableOpacity
-          style={dataScreenStyles.generateButton}
-          onPress={() => router.push("/DietSection/DietPlanScreen")}
+          style={getStarted.getStartedButtonText}
+          onPress={() => router.push('/DietSection/InformationForm')}
         >
-          <Text style={{ color: "white", fontSize: hp(2.2) }}>Generate</Text>
+          <Text style={{ color: "white", fontSize: 18, fontWeight: "600" }}>
+            Get Started with Diet Plan
+          </Text>
         </TouchableOpacity>
+        <Text style={getStarted.copyRightText}>
+          © 2025 FitFaat. Empowering your fitness journey. All rights reserved.
+        </Text>
       </View>
     </View>
   );
