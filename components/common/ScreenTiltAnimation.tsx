@@ -1,3 +1,4 @@
+import { colorsSheet as color } from "@/app/(main)/(settings)/ui_elements";
 import { useDrawerProgress } from "@react-navigation/drawer";
 import React, { ReactNode } from "react";
 import { View } from "react-native";
@@ -27,9 +28,10 @@ export const ScreenSceneWrapper = ({ children }: { children: ReactNode }) => {
     borderRadius: interpolate(smoothProgress.value, [0, 1], [0, 20]), //smoothen edges
   }));
   // dont remove flex 1 or it will no occupy full space
-  return <View style={{backgroundColor: "#fa9579ff"}}>
-            <Animated.View style={[animatedStyle, { flex: 1, backgroundColor: '#EDCCC2' }]}>
+  return <View style={{backgroundColor: color.background}}>
+            <Animated.View style={[animatedStyle, { flex: 1, backgroundColor: color.screenColor }]}>
                 {children}
             </Animated.View>
         </View>;
 };
+

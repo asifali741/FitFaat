@@ -1,3 +1,4 @@
+import { colorsSheet as color } from "@/app/(main)/(settings)/ui_elements";
 import { useAuth } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -13,9 +14,8 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
-
 type DrawerSceneWrapperProps = DrawerContentComponentProps;
-const userName = 'NAME' //Fetch from Authentication Token
+const userName = 'NAME' // fetch from Authentication Token
 export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "transparent" }}>
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     padding: 16,
-    backgroundColor: '#EDCCC2',
+    backgroundColor: color.screenColor, //ui_elements.tsx screenColor
     borderBottomWidth: 1,
     borderBottomColor: "#ddd",
     borderRadius: 40
@@ -141,12 +141,12 @@ const styles = StyleSheet.create({
     padding: 16,
     marginHorizontal: 16,
     marginVertical: 20,
-    backgroundColor: "#e63946", // red tone
+    backgroundColor: color.logoutBtnColor, //ui_elements.tsx logoutBtnColor
     borderRadius: 12,
     justifyContent: "center",
   },
   logoutText: {
-    color: "#fff",
+    color: color.logoutBtnTextColor, //ui_elements.tsx logoutBtnTextColor
     fontSize: 16,
     fontWeight: "600",
     marginLeft: 8,

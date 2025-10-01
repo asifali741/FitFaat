@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import { Drawer } from "expo-router/drawer";
 import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { colorsSheet as color } from "./(settings)/ui_elements";
 type DrawerSceneWrapperProps = DrawerContentComponentProps;
 
 export default function MainLayout() {
@@ -22,13 +23,13 @@ export default function MainLayout() {
             drawerContent={(props)=><DrawerSceneWrapper {...props}/>}
             screenOptions={{
                 headerShown: false,
-                drawerActiveBackgroundColor: "#33b3a6",
+                drawerActiveBackgroundColor: color.drawerActiveTabColor, // && "#33b3a6",
                 drawerInactiveBackgroundColor: "transparent",
                 drawerActiveTintColor: "#FFFFFF",
                 drawerInactiveTintColor: "#FFFFFF",
                 overlayColor: "transparent",
                 drawerStyle: {
-                    backgroundColor: "#fa9579ff",
+                    backgroundColor: color.background ,//"#fa9579ff",
                     width: "60%",
                     paddingTop: 40,
                 },
