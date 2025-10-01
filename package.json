@@ -16,6 +16,7 @@
     "@babel/preset-react": "^7.27.1",
     "@clerk/clerk-expo": "^2.14.16",
     "@expo/vector-icons": "^14.1.0",
+    "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-navigation/bottom-tabs": "^7.3.10",
     "@react-navigation/drawer": "^7.5.7",
     "@react-navigation/elements": "^2.3.8",
@@ -48,6 +49,7 @@
     "react-native-safe-area-context": "^5.4.0",
     "react-native-screens": "~4.11.1",
     "react-native-svg": "^15.12.1",
+    "react-native-vector-icons": "^10.3.0",
     "react-native-web": "~0.20.0",
     "react-native-webview": "13.13.5",
     "tailwindcss": "^3.4.17"

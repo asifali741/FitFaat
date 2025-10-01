@@ -48,9 +48,9 @@ export const Topbar = () => {
     // |-3Bar menu----FitFaat----------()-()|
     return(<>
     <View style={[dynamicStyles.bar, styles.bar]}>
-        <TouchableOpacity onPress={()=>{
-                                        navigation.dispatch(DrawerActions.toggleDrawer())
-                                    }} style={styles.image}>
+        <TouchableOpacity onPress={()=>{navigation.dispatch(DrawerActions.toggleDrawer())
+                                        }} 
+                                    style={styles.image}>
             <Ionicons name="menu" size={30} color="#000" />
         </TouchableOpacity>      
         <Text style={styles.Logo}>FitFaat</Text>

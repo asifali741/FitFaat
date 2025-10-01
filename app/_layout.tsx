@@ -19,28 +19,38 @@ export default function RootLayout() {
   );
 }
 function AuthGate() {
-  const { isLoaded, isSignedIn } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!isLoaded) return;
-
-    if (isSignedIn) {
-      //console.log("User signed in, navigating to dashboard");
-      router.replace("/(main)/(dashboard)");
-    } else {
-      //console.log("User not signed in, navigating to auth");
-      router.replace("/(auth)");
+  //try {
+    const router = useRouter();
+    const { isLoaded, isSignedIn } = useAuth();
+    useEffect(() => {
+      if (!isLoaded) return;
+  
+      if (isSignedIn) {
+        //console.log("User signed in, navigating to dashboard");
+        router.replace("/(main)/(dashboard)");
+      } else {
+        //console.log("User not signed in, navigating to auth");
+        router.replace("/(auth)");
+      }
+    }, [isLoaded, isSignedIn]);
+  
+    if (!isLoaded) {
+      return (
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <ActivityIndicator size="large" />
+        </View>
+      );
     }
-  }, [isLoaded, isSignedIn]);
+  
+    return <Slot />; 
+    
+  //} catch (error) {
+  //  console.log(error)
+  //}
+  //finally{
+  //  return(<View>
+  //    <h2>NO Internet!!!</h2>
+  //  </View>)
 
-  if (!isLoaded) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
-  }
-
-  return <Slot />; 
+  //}
 }
