@@ -37,6 +37,9 @@ yarn-error.*
 *.tsbuildinfo
 
 app-example
-.env
 node_modules
+<<<<<<< HEAD
 app/(main)/(dashboard)/circle.tsx
+=======
+.env
+>>>>>>> 9c9c6d49c85197ff121435639ba01c94204dc9f1
