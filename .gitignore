@@ -39,3 +39,4 @@ yarn-error.*
 app-example
 .env
 node_modules
+app/(main)/(dashboard)/circle.tsx
