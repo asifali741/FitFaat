@@ -15,10 +15,6 @@ export default function App() {
       height: height,
     }
   };
-  const temp = {
-    radius: 50,
-    progress: 60
-  }
   console.log("Width: "+width + " Height: "+ height);
   return (
     <ScreenSceneWrapper>

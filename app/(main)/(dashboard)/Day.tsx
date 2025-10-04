@@ -1,18 +1,24 @@
 import { useFonts } from "expo-font";
 import { useEffect } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, {
   useAnimatedProps,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
 import Svg, { Circle, Image as SvgImage, Text as SvgText } from "react-native-svg";
+import { DashFonts, colorsSheet as color, rs } from "../(settings)/ui_elements";
 import { Day } from "./DayPlan";
-
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 //const finalProgress = 55; // percent
-const radius = 30;
+const { width } = Dimensions.get("window");
+function clamp(min: number, preferred: number, max: number) {
+  const scaled = width * preferred; // e.g., 0.05 = 5% of width
+  return Math.min(Math.max(scaled, min), max);
+}
+
+const radius = clamp(20, 0.07, 50); // radius between 30 and 40 pixels
 const circumference = 2 * Math.PI * radius;
 
 export const Days = ({props, onDayPress}: {props: Day, onDayPress: (dayNo : number) => void}) => {
@@ -23,6 +29,7 @@ export const Days = ({props, onDayPress}: {props: Day, onDayPress: (dayNo : numb
     return <FinishedDay info={props} Press={onDayPress}/>;
   }
   else{
+    console.log("Radius: " + radius + " Width of Window: " + width )
     return <ActiveDay info={props} Press={onDayPress}/>;
   }
 }
@@ -58,7 +65,6 @@ if (info.duration != null && typeof info.duration === "number") {
       strokeDashoffset,
     };
   });
-
   return (
     <View style={styles.activeItem /**Columnize the box */}>
     <View style={styles.topHeader  /**Row of Circle, DayDate, Button */}>
@@ -85,7 +91,7 @@ if (info.duration != null && typeof info.duration === "number") {
               cy={radius + 10}
               r={radius}
               stroke="#00FF44"
-              strokeWidth={8}
+              strokeWidth={5}
               strokeDasharray={circumference}
               animatedProps={animatedprops}
               strokeLinecap="round"
@@ -115,8 +121,8 @@ if (info.duration != null && typeof info.duration === "number") {
         </View>
         {/* View Button */}
         <Pressable onPress={() => Press(info.dayNo)} 
-                  style={{backgroundColor: '#000000', height: '35%', width: '20%', borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginTop: '5%'}} >
-          <Text style={{color: 'white', fontSize: 15, fontWeight: 'bold'}}>View</Text>
+                  style={{backgroundColor: '#000000', height: '35%', width: '20%', borderRadius: 8, justifyContent: 'center', alignItems: 'center'}} >
+          <Text style={{color: 'white', fontSize: 12, fontWeight: 'bold'}}>View</Text>
           </Pressable>
     </View>
     <View style={styles.bottomBody}>
@@ -149,34 +155,38 @@ const FinishedDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}
       LoraItalic: require("../../../assets/fonts/static/Lora-Italic.ttf"),
       LoraRegular: require("../../../assets/fonts/static/Lora-Regular.ttf"),
   });
+  const SvgSize = radius * 2
+  const ImgSize= Math.round(SvgSize * 0.75);
+  const SvgCenter = radius - ImgSize/2
   const finalProgress : number = Math.min(100, Math.round((info.achievedCalories / info.targetCalories) * 100));
     return (
     <View style={styles.listitem}>
     {/* Progress Circle */}
     <View style={styles.circleWrapper}>
       <Svg
-        height={radius * 2 + 20} 
-        width={radius * 2 + 20}
+        height={radius * 2 + 10} 
+        width={radius * 2 + 10}
         viewBox={`0 0 ${radius * 2 + 20} ${radius * 2 + 20}`}
       >
         {/* Background Circle */}
         <Circle
-          cx="50%"
-          cy="50%"
+          cx= {radius + 5}
+          cy={radius + 5}
           r={radius}
           stroke="#808080"
           strokeWidth={8}
           strokeDasharray={circumference}
           fill="none"
         />
-          <SvgImage
-            x={(radius * 2 + 20)/2 - 20}
-            y={(radius * 2 + 20)/2 - 20}
-            width={(radius * 2 + 20) -40}
-            href={require("../../../assets/images/Finished.png")}  // Local image
-            preserveAspectRatio="xMidYMid slice"
-          />
         <Circle/>
+          <SvgImage
+            x={SvgCenter +5 }
+            y={SvgCenter+5}
+            height={ImgSize}
+            width={ImgSize}
+            href={require("../../../assets/images/Finished.png")}  // Local image
+            //preserveAspectRatio="xMidYMid slice"
+          />
       </Svg>
     </View>
 
@@ -187,28 +197,32 @@ const FinishedDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}
       </View>
       <Text style={styles.subtitle}>Goal: {finalProgress}%</Text>
       
-      <Pressable onPress={() => Press(info.dayNo)} style={{backgroundColor: '#000000', height: 30, width: 70, borderRadius: 8, justifyContent: 'center', alignItems: 'center'}} >
-        <Text style={{color: 'white', fontSize: 15, fontWeight: 'bold'}}>View</Text>
-      </Pressable>
     </View>
+      <Pressable onPress={() => Press(info.dayNo)} 
+                  style={{backgroundColor: '#000000', height: '45%', width: '20%', borderRadius: 8, justifyContent: 'center', alignItems: 'center'}} >
+          <Text style={{color: 'white', fontSize: 12, fontWeight: 'bold'}}>View</Text>
+          </Pressable>
   </View>
   );
 }
 
 const LockedDay = ({info} : {info: Day}) => {
+  const SvgSize = radius * 2
+  const ImgSize= Math.round(SvgSize * 0.65);
+  const SvgCenter = radius - ImgSize/2
   return (
     <View style={styles.listitem}>
     {/* Progress Circle */}
     <View style={styles.circleWrapper}>
       <Svg
-        height={radius * 2 + 20} 
-        width={radius * 2 + 20}
-        viewBox={`0 0 ${radius * 2 + 20} ${radius * 2 + 20}`}
+        height={SvgSize + 10} 
+        width={SvgSize + 10}
+        viewBox={`0 0 ${SvgSize + 20} ${SvgSize + 20}`}
       >
         {/* Background Circle */}
         <Circle
-          cx="50%"
-          cy="50%"
+          cx={radius + 5}
+          cy={radius + 5}
           r={radius}
           stroke="#808080"
           strokeWidth={8}
@@ -218,10 +232,10 @@ const LockedDay = ({info} : {info: Day}) => {
 
         {/* Centered Image */}
         <SvgImage
-          x={(radius * 2 + 20) / 2 - 20}  // X position (center minus half img size)
-          y={(radius * 2 + 20) / 2 - 20}  // Y position (center minus half img size)
-          width={40}                      // Image width
-          height={40}                     // Image height
+          x={SvgCenter + 5}  // X position (center minus half img size)
+          y={SvgCenter + 5}  // Y position (center minus half img size)
+          width={ImgSize}                      // Image width
+          height={ImgSize}                     // Image height
           href={require("../../../assets/images/locked.png")}  // Local image
           preserveAspectRatio="xMidYMid slice"
         />
@@ -237,129 +251,153 @@ const LockedDay = ({info} : {info: Day}) => {
     )
 }
 
-const styles = StyleSheet.create({
+export const styles = StyleSheet.create({
   listitem: {
-    margin: "2%",
-    height: "9.5%",
-    flexDirection: "row",      
-    alignItems: "center",      
-    backgroundColor: '#EDCCC2',   //ui_elements screenColor
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 10,
+    margin: rs(8),
+    minHeight: rs(72),
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: color.screenColor,
+    borderRadius: rs(12),
+    padding: rs(10),
+    marginBottom: rs(10),
     shadowColor: "#000",
     shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 15,
+    shadowRadius: rs(10),
+    elevation: 8,
   },
 
   activeItem: {
-    margin: "2%",
-    height: "30%",
-    flexDirection: "column",      
-    //alignItems: "center",      
-    backgroundColor: '#EDCCC2',  //ui_elements screenColor
-    borderRadius: 14,
-    padding: 10,
-    marginBottom: 10,
-    shadowColor: "#7c1515ff",
+    margin: rs(10),
+    minHeight: rs(140),
+    flexDirection: "column",
+    backgroundColor: color.screenColor,
+    borderRadius: rs(14),
+    padding: rs(10),
+    marginBottom: rs(10),
+    shadowColor: color.activeDayShadowColor,
     shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 21,
+    shadowRadius: rs(10),
+    elevation: 12,
   },
+
   row: {
     flexDirection: "row",
-    //justifyContent: "space-between",
     alignItems: "center",
   },
+
   circleWrapper: {
-    width: 70,                 
+    width: rs(70),
     justifyContent: "center",
     alignItems: "center",
   },
+
   circleActiveWrapper: {
-    width: 70,  
-    height: radius * 2 + 20 ,               
-    //justifyContent: "center",
+    width: rs(70),
+    height: rs(80),
     alignItems: "center",
   },
+
   contentWrapper: {
     flex: 1,
-    paddingLeft: 10,
+    paddingLeft: rs(10),
+    minWidth: 0,
   },
+
   activeContentWrapper: {
     flex: 1,
-    paddingLeft: 10,
-    height: radius * 2 + 20 , 
+    paddingLeft: rs(10),
   },
+
   dayText: {
-    fontWeight: "bold",
-    fontSize: 20,
-    fontFamily: "LoraItalic",
+    fontWeight: "700",
+    fontSize: DashFonts.dayText,
+    fontFamily: 'LoraItalic',
   },
   activeDayText: {
-    paddingTop: 10,
-    fontWeight: "bold",
-    fontSize: 20,
-    fontFamily: "Inter",
+    paddingTop: rs(6),
+    fontWeight: "700",
+    fontSize: DashFonts.dayText,
+    fontFamily: 'Inter',
   },
   dateText: {
-    paddingLeft: 10,
-    fontWeight: "medium",
-    fontSize: 15,
+    paddingLeft: rs(8),
+    fontWeight: "500",
+    fontSize: DashFonts.dateText,
     color: "#666",
   },
   activeDateText: {
-    paddingLeft: 10,
-    paddingTop: 10,
-    fontWeight: "medium",
-    fontSize: 15,
+    paddingLeft: rs(8),
+    paddingTop: rs(6),
+    fontWeight: "500",
+    fontSize: DashFonts.activeDateText,
     color: "#666",
   },
+
   activeSubtitle: {
-    paddingTop: 5,
-    color: "#666666ff",
-    fontSize: 14,
+    paddingTop: rs(6),
+    color: "#666",
+    fontSize: DashFonts.subtitle,
   },
+
   subtitle: {
-    fontFamily: "Inter",
-    paddingTop: 5,
-    color: "#12b82eff",
-    fontSize: 14,
+    paddingTop: rs(6),
+    color: "#12b82e",
+    fontSize: DashFonts.subtitle,
   },
+
+  
+
   topHeader: {
     flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
+
   bottomBody: {
     width: "100%",
-    height: "56%",
-    marginTop: '7%',
+    marginTop: rs(8),
     alignItems: "center",
-    //justifyContent: "center",
   },
+
   activeInformation: {
-    width: "81%",
-    height: "100%",
-    borderRadius: 10,
+    width: "100%",
+    maxWidth: 520,
+    borderRadius: rs(10),
     backgroundColor: "#E9E9EB",
+    paddingVertical: rs(8),
+    paddingHorizontal: rs(10),
   },
-  bodyHeadings:
-  {
-    width: 72,
-    fontFamily: 'inter',
-    fontWeight: "regular",
-    fontSize: 14,
+
+  bodyHeadings: {
+    width: rs(72),
+    fontWeight: "500",
+    fontSize: rs(14),
   },
-  bodyValues:{
-    fontFamily: 'inter',
-    fontWeight: "regular",
-    fontSize: 14,
+  bodyValues: {
+    flex: 1,
+    fontSize: rs(14),
     color: "#2D6EFF",
-    marginLeft: 10, 
+    marginLeft: rs(10),
   },
-  activeInfoBoxRow: { 
+  activeInfoBoxRow: {
     flexDirection: "row",
-    paddingLeft: "5%",
-    paddingTop: "5%",
-  }
+    paddingLeft: rs(8),
+    paddingTop: rs(8),
+    alignItems: "center",
+  },
+
+  viewButton: {
+    backgroundColor: "#000000",
+    paddingVertical: rs(6),
+    paddingHorizontal: rs(10),
+    borderRadius: rs(8),
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  viewButtonText: {
+    color: "#fff",
+    fontSize: rs(15),
+    fontWeight: "700",
+  },
 });
