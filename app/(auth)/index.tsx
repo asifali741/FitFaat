@@ -1,4 +1,3 @@
-import { useSocialAuth } from "@/hooks/useSocialAuth";
 import { useAuth } from "@clerk/clerk-expo";
 import { useFonts } from "expo-font";
 import { useRouter } from "expo-router";
@@ -6,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Image, Text, TouchableOpacity, View } from "react-native";
 import { styles } from "../(auth)/style.js";
 import "../../global.css";
+import { useSocialAuth } from '../../hooks/useSocialAuth';
 
 const FULL_TEXT =
   "FitFaat is a smart health and nutrition app designed to seamlessly integrate into daily life, making healthy living accessible, practical, and affordable. With personalized 7-day diet plans generated from user details, interactive chatbot support, one-on-one video consultations with nutritionists, and structured workout modules, FitFaat empowers users to take full control of their wellness journey. ";

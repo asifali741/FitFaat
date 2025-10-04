@@ -14,6 +14,7 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { DrawerFonts } from "../app/(main)/(settings)/ui_elements";
 type DrawerSceneWrapperProps = DrawerContentComponentProps;
 const userName = 'NAME' // fetch from Authentication Token
 export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
@@ -21,12 +22,25 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
     <SafeAreaView style={{ flex: 1, backgroundColor: "transparent" }}>
       {/* Top Part */}
       <TouchableOpacity style={styles.userContainer}>
-       <Image source={require('../assets/images/Default_Profile.png')} style={styles.userImage} />
-        <View>
-          <Text style={styles.userName}>{userName}</Text>
-          <Text style={styles.userEmail}>{userName}@example.com</Text>
+        <Image source={require("../assets/images/Default_Profile.png")} style={styles.userImage} />
+        <View style={styles.userInfo}>
+          <Text
+            style={styles.userName}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {userName}
+          </Text>
+          <Text
+            style={styles.userEmail}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {userName}@exasdasdample.com
+          </Text>
         </View>
       </TouchableOpacity>
+
 
       {/* Drawer Items */}
       <DrawerContentScrollView {...props}>
@@ -109,14 +123,32 @@ const Logout_Button = () => {
 
 const styles = StyleSheet.create({
   userContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    backgroundColor: color.screenColor, //ui_elements.tsx screenColor
-    borderBottomWidth: 1,
-    borderBottomColor: "#ddd",
-    borderRadius: 40
-  },
+  flexDirection: "row",
+  alignItems: "center",
+  padding: 16,
+  backgroundColor: color.screenColor,
+  borderBottomWidth: 1,
+  borderBottomColor: "#ddd",
+  borderRadius: 40,
+},
+
+userInfo: {
+  flex: 1,              // take up remaining space
+  minWidth: 0,          // 🔑 allows text to shrink
+},
+
+userName: {
+  fontSize: DrawerFonts.body,
+  fontWeight: "600",
+  color: "#333",
+},
+
+userEmail: {
+  fontSize: DrawerFonts.drawerEmail,
+  color: "#666",
+  marginTop: 2,
+},
+
   userImage: {
     width: 60,
     height: 60,
@@ -124,16 +156,6 @@ const styles = StyleSheet.create({
     marginRight: 12,
     borderWidth: 2,
     borderColor: "#ddd",
-  },
-  userName: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#333",
-  },
-  userEmail: {
-    fontSize: 14,
-    color: "#666",
-    marginTop: 2,
   },
   logoutButton: {
     flexDirection: "row",

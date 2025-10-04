@@ -53,13 +53,18 @@ export default function DetailsDay () {
     //output
     return(<>{
         !showMenu? 
-        <Animated.View style={{ flex: 1, opacity: fade }}>
+        <Animated.ScrollView showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 10, paddingBottom: 30 }} style={{ flex: 1, opacity: fade }}>
             <View style={styles.heading}>
+            <View style={styles.dayDateWrapper}>
+                <Text style={styles.title}>Day: 0{props.dayNo}</Text>
+                <Text style={styles.date}>{props.date}</Text>
+            </View>
+            
             <Pressable style={styles.backButton} onPress={() => router.back()}>
                 <Text style={styles.backButtonText}>← Back</Text>
             </Pressable>
-            <Text style={styles.title}>Day 0{props.dayNo}</Text><Text style={styles.date}>{props.date}</Text>
             </View>
+
         <View style={styles.centerBody}>
             <View style={styles.circletext}>
                 <Pressable style={{height:'90%', width:'100%'}} onPressOut={handleUpdate}>  {/**Remove if circle touch to update is rejected */}
@@ -69,7 +74,7 @@ export default function DetailsDay () {
                                     targetHydration={props.targetHydration}/>
                 </Pressable>
                 <View style={{justifyContent: 'center', flexWrap: 'wrap' , alignContent:'center'}}>      
-                <Text className="text-subtext-light dark:text-subtext-dark">{props.remarks}</Text>
+                <Text>{props.remarks}</Text>
                 </View>
             </View>
 
@@ -121,11 +126,11 @@ export default function DetailsDay () {
                 {/**Flex rows for Heading: {value}*/}
                 <View style={styles.infoRow}>
                     <Text style={styles.infoAttribute}>Goal </Text>
-                    <Text style={styles.infoValue}>              {props.targetCalories} cals, {props.targetHydration} lit</Text>
+                    <Text style={styles.infoValue}>{props.targetCalories} cals, {props.targetHydration} lit</Text>
                 </View>
                 <View style={styles.infoRow}>
                     <Text style={styles.infoAttribute}>Calories </Text>
-                    <Text style={styles.infoValue}>      {props.achieviedHydration} cals</Text>
+                    <Text style={styles.infoValue}>{props.achieviedHydration} cals</Text>
                 </View>
                 <View style={styles.infoRow}>
                     <Text style={styles.infoAttribute}>Hydration   </Text>
@@ -133,13 +138,13 @@ export default function DetailsDay () {
                 </View>
                 <View style={styles.infoRow}>
                     <Text style={styles.infoAttribute}>Timer   </Text>
-                    <Text style={styles.infoValue}>          {timer}</Text>
+                    <Text style={styles.infoValue}>{timer}</Text>
                 </View>
             </View>
             </View>
             </>}
     </View>
-        </Animated.View>
+        </Animated.ScrollView>
         :
         <View style={styles.menuOverlay}>
             <Text style={styles.menuTitle}>Tell Me About What you had in the Meantime</Text>
@@ -172,33 +177,40 @@ export default function DetailsDay () {
     );
 }
 const styles = StyleSheet.create({
-    //
-    fullScreen:{
-        height: '100%',
-        width: '100%',
-        //backgroundColor: 'bg-background-light dark:bg-background-dark',
+    heading: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',       // align bottoms of Day + Date
+    justifyContent: 'space-between', // push back button to end
+    paddingHorizontal: 16,
+    paddingTop: 30,
+    marginBottom:10,
+    //borderWidth:3
     },
-    heading:{
+    dayDateWrapper: {
         flexDirection: 'row',
-        backgroundColor: 'transparent',
-        padding: '5%',
-        position: 'relative'
+        alignItems: 'flex-end',       // align bottoms of Day + Date
     },
-    title:{
-        fontSize: 50,
+    title: {
+        fontSize: 40,
         fontWeight: 'bold',
+        marginRight: 5,               // small spacing between day and date
     },
-    date:{
+    date: {
         fontSize: 15,
-        fontWeight: 'semibold',
-        position: 'absolute',
-        bottom: 30,
-        left: 185
+        fontWeight: '500',
+        paddingBottom: 5
+    },
+    backButton: {
+        padding: 10,
+    },
+    backButtonText: {
+        fontSize: 16,
+        color: '#000',
+        fontWeight: '600',
     },
     centerBody:{
         //borderColor: 'hsla(0, 1%, 27%, 1.00)',
-        borderWidth: 0,
-        justifyContent:'space-between',
+        justifyContent:'flex-start',
     },
     circletext:{
         width: '80%',
@@ -208,28 +220,42 @@ const styles = StyleSheet.create({
         //margin: '10%'
     },
     infoOuterBox:{
-        borderColor: 'black',
-        borderWidth: 1,
-        marginTop: '5%',
-        marginLeft: '10%',
-        marginRight: '10%',
-        marginBottom: '1%',
+        width: "100%",
+        maxWidth: 500,     // keeps it readable on tablets
+        alignSelf: "center",
+        borderWidth: 0,
         borderRadius: 12,
+        marginTop: 20,
+        marginBottom: 10,
+        padding: 16,
         overflow: 'hidden',
+        shadowColor: "#000",
+        shadowOpacity: 0.5,
+        shadowRadius: 10,
+        elevation: 5, 
+        backgroundColor: 'hsla(0, 0%, 90%, 1.00)'
     },
     infoInnerBox: {
+        width: '95%',
+        padding: 10,
         borderColor: 'black',
-        borderWidth: 1,
-        margin: '2%',
-        padding: '5%',
-        paddingTop: '10%',
+        borderWidth: 0,
+        alignSelf:'center',
         borderRadius: 8,
+        shadowColor: "hsla(0, 0%, 0%, 1.00)",
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+        elevation: 4,
         marginBottom: '0%', //this is  set to 2 inline when viewing finished days
+        backgroundColor: 'hsla(45, 0%, 95%, 1.00)'
+
     },
-    infoRow:{
-        flexDirection: 'row',
-        paddingBottom: 10
-    },
+    infoRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        paddingVertical: 6,
+},
+
     infoAttribute:{
         fontFamily: 'inter',
         fontSize: 18,
@@ -243,6 +269,11 @@ const styles = StyleSheet.create({
     adviceSection: {
         marginTop: 15,
         padding: 10,
+        borderRadius: 8,
+        shadowColor: "#424242ff",
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+        elevation: 1,
     },
     adviceHeading: {
         fontSize: 16,
@@ -276,18 +307,6 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 16,
         fontWeight: '700',
-    },
-    backButton: {
-        position: "absolute",
-        top: 40,
-        left: '80%',
-        padding: 10,
-        zIndex: 10,
-    },
-    backButtonText: {
-        fontSize: 18,
-        color: "#000000ff",
-        fontWeight: "600",
     },
     Foodtray: {
         width: "100%",
@@ -407,7 +426,7 @@ const ProgressCircle = (CircleProps: ProgressCircleProps) =>{
     /**---------------------------------------------------------------------------------------- */
     
     return(
-        <Svg width="100%" height="100%" viewBox="0 0 120 120">
+        <Svg width="100%" height={undefined} viewBox="0 0 120 120" style={{ maxWidth: 200, alignSelf: "center"}}>
         {/* Background circle of Calories */}
         <Circle  cx="60"  cy="60"  r={outerRadius}
                 stroke="#E5E7EB"  strokeWidth="10"  fill="transparent"/>
