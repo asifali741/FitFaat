@@ -1,6 +1,4 @@
-import { ScreenSceneWrapper } from '@/components/common/ScreenTiltAnimation';
-import { Topbar } from '@/components/common/TopBar';
-import { useWindowDimensions, View } from 'react-native';
+import { useWindowDimensions } from 'react-native';
 import DayPlan from './DayPlan';
 //import { DetailsDay } from './DetailsDay';
 //import { DetailsTest } from './DetailsTest';
@@ -17,16 +15,14 @@ export default function App() {
   };
   console.log("Width: "+width + " Height: "+ height);
   return (
-    <ScreenSceneWrapper>
-    <View style={[dynamicStyles.FullScreen]}>
-      <Topbar/>
-      <DayPlan/>
-      {
+    <DayPlan/>
+      //<ScreenSceneWrapper>
+      //<View style={[dynamicStyles.FullScreen]}>
+        //<Topbar/>
       //<DetailsDay/>
       //<DetailsTest/>
         //<ProgressTracker Props={temp} />
-      }     
-    </View>
-    </ScreenSceneWrapper>
+        //</View>
+        //</ScreenSceneWrapper>  
   );
 }

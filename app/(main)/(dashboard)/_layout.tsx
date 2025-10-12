@@ -1,7 +1,17 @@
-import { Stack } from "expo-router";
-export default function DashBoardLayout() {
+import { ScreenSceneWrapper } from "@/components/common/ScreenTiltAnimation";
+import { Topbar } from "@/components/common/TopBar";
+import { Slot } from "expo-router";
+import { View, useWindowDimensions } from "react-native";
+
+export default function DashboardLayout() {
+  const { width, height } = useWindowDimensions();
+
   return (
-    <Stack screenOptions={{ headerShown: false }} initialRouteName="index">
-    </Stack>
+    <ScreenSceneWrapper>
+      <View style={{ width, height }}>
+        <Topbar />
+        <Slot />
+      </View>
+    </ScreenSceneWrapper>
   );
 }
