@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import Animated, { Easing, useAnimatedProps, useSharedValue, withTiming } from "react-native-reanimated";
 import Svg, { Circle } from "react-native-svg";
 import { Day as typeDay } from "./DayPlan";
@@ -8,12 +8,14 @@ import { Day as typeDay } from "./DayPlan";
 //import { Topbar } from "@/components/common/TopBar";
 //import { ProgressTracker } from "./circle";
 //const props: typeDay = JSON.parse(day);
-type ProgressCircleProps = {
+interface ProgressCircleProps {
   achievedCalories: number;
   targetCalories: number;
   achieviedHydration: number;
   targetHydration: number;
 };
+
+const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 export default function DetailsDay () {
     const { selectedDay  } = useLocalSearchParams<{ selectedDay : string }>();
     const router = useRouter();
@@ -44,16 +46,10 @@ export default function DetailsDay () {
     const handleUpdate = () => {
         //Main api calling
     }
-    const handleAdvice = () => {
-        //chatbot Api calling
-    }
-    const handletextChange = (e: HTMLInputElement) => {
-        //forupdating relevant field
-    }
     //output
     return(<>{
         !showMenu? 
-        <Animated.ScrollView showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 10, paddingBottom: 30 }} style={{ flex: 1, opacity: fade }}>
+        <AnimatedScrollView showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 10, paddingBottom: 30 }} style={{ flex: 1, opacity: fade }}>
             <View style={styles.heading}>
             <View style={styles.dayDateWrapper}>
                 <Text style={styles.title}>Day: 0{props.dayNo}</Text>
@@ -74,11 +70,10 @@ export default function DetailsDay () {
                                     targetHydration={props.targetHydration}/>
                 </Pressable>
                 <View style={{justifyContent: 'center', flexWrap: 'wrap' , alignContent:'center'}}>      
-                <Text>{props.remarks}</Text>
+                    <Text>{props.remarks}</Text>
                 </View>
             </View>
-
-            {/**Determine wether to display Update Button or nnot */}
+        {/**Determine wether to display Update Button or nnot */}
             { props.status==='active'? (
                 <>
             <View style={styles.infoOuterBox}>
@@ -86,11 +81,11 @@ export default function DetailsDay () {
                 {/**Flex rows for Heading: {value}*/}
                 <View style={styles.infoRow}>
                     <Text style={styles.infoAttribute}>Goal </Text>
-                    <Text style={styles.infoValue}>              {props.targetCalories} cals, {props.targetHydration} lit</Text>
+                    <Text style={styles.infoValue}>{props.targetCalories} cals, {props.targetHydration} lit</Text>
                 </View>
                 <View style={styles.infoRow}>
                     <Text style={styles.infoAttribute}>Calories </Text>
-                    <Text style={styles.infoValue}>      {props.achieviedHydration} cals</Text>
+                    <Text style={styles.infoValue}>{props.achievedCalories} cals</Text>
                 </View>
                 <View style={styles.infoRow}>
                     <Text style={styles.infoAttribute}>Hydration   </Text>
@@ -98,7 +93,7 @@ export default function DetailsDay () {
                 </View>
                 <View style={styles.infoRow}>
                     <Text style={styles.infoAttribute}>Timer   </Text>
-                    <Text style={styles.infoValue}>          {timer}</Text>
+                    <Text style={styles.infoValue}>{timer}</Text>
                 </View>
             </View>
                 {/**Advice Section*/}
@@ -144,7 +139,7 @@ export default function DetailsDay () {
             </View>
             </>}
     </View>
-        </Animated.ScrollView>
+        </AnimatedScrollView>
         :
         <View style={styles.menuOverlay}>
             <Text style={styles.menuTitle}>Tell Me About What you had in the Meantime</Text>
@@ -191,7 +186,7 @@ const styles = StyleSheet.create({
         alignItems: 'flex-end',       // align bottoms of Day + Date
     },
     title: {
-        fontSize: 40,
+        fontSize: 36,
         fontWeight: 'bold',
         marginRight: 5,               // small spacing between day and date
     },
@@ -426,6 +421,7 @@ const ProgressCircle = (CircleProps: ProgressCircleProps) =>{
     /**---------------------------------------------------------------------------------------- */
     
     return(
+        //<View style={{ width: "80%", aspectRatio: 1, alignSelf: "center" }}>
         <Svg width="100%" height={undefined} viewBox="0 0 120 120" style={{ maxWidth: 200, alignSelf: "center"}}>
         {/* Background circle of Calories */}
         <Circle  cx="60"  cy="60"  r={outerRadius}
@@ -435,12 +431,14 @@ const ProgressCircle = (CircleProps: ProgressCircleProps) =>{
             stroke="#4CAF50"  strokeWidth="10"  fill="transparent"
             strokeDasharray={outerCircumference} //total
             animatedProps={animatedCalProps}
-            strokeLinecap="round" rotation="-90" origin="60,60"/>
+            strokeLinecap="round"transform= "rotate(-90 60 60)" />
         {/* Hydration Circcle */}
         <AnimatedCircle cx="60" cy="60" r={innerRadius}
             stroke="#3B82F6"  strokeWidth="10" fill="transparent"
             strokeDasharray={innerCircumference} 
             animatedProps={animatedHydrationProps}
-            strokeLinecap="round" rotation="-90" origin="60,60"/> </Svg>
+            strokeLinecap="round" transform="rotate(-90 60 60)"/> 
+        </Svg>
+            //</View>
     )
 }
