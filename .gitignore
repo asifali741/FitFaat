@@ -38,6 +38,7 @@ yarn-error.*
 
 app-example
 node_modules
+android
 app/(main)/(dashboard)/circle.tsx
 .env
 
