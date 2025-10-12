@@ -18,8 +18,10 @@ function clamp(min: number, preferred: number, max: number) {
   return Math.min(Math.max(scaled, min), max);
 }
 
-const radius = clamp(20, 0.07, 50); // radius between 30 and 40 pixels
+const radius = clamp(20, 0.07, 50);
 const circumference = 2 * Math.PI * radius;
+const strokeWidth= (radius/100)*20
+const ProgressStrokeWidth= (radius/100)*30
 
 export const Days = ({props, onDayPress}: {props: Day, onDayPress: (dayNo : number) => void}) => {
   if(props.status === 'locked'){ //props false = locked day
@@ -81,7 +83,7 @@ if (info.duration != null && typeof info.duration === "number") {
               cy={radius + 10}
               r={radius}
               stroke="#808080"
-              strokeWidth={8}
+              strokeWidth={ProgressStrokeWidth}
               strokeDasharray={circumference}
               fill="none"
               />
@@ -91,7 +93,7 @@ if (info.duration != null && typeof info.duration === "number") {
               cy={radius + 10}
               r={radius}
               stroke="#00FF44"
-              strokeWidth={5}
+              strokeWidth={strokeWidth}
               strokeDasharray={circumference}
               animatedProps={animatedprops}
               strokeLinecap="round"
@@ -102,10 +104,10 @@ if (info.duration != null && typeof info.duration === "number") {
               y="50%"
               textAnchor="middle"
               dy=".3em"
-              fontSize="16"
+              fontSize="15"
               fontWeight="bold"
               fill="#000"
-              fontStyle="italic"
+              //fontStyle="italic"
               >
               {finalProgress}%
             </SvgText>
@@ -333,21 +335,16 @@ export const styles = StyleSheet.create({
     fontSize: DashFonts.activeDateText,
     color: "#666",
   },
-
   activeSubtitle: {
     paddingTop: rs(6),
     color: "#666",
     fontSize: DashFonts.subtitle,
   },
-
   subtitle: {
     paddingTop: rs(6),
     color: "#12b82e",
     fontSize: DashFonts.subtitle,
   },
-
-  
-
   topHeader: {
     flexDirection: "row",
     alignItems: "center",

@@ -61,7 +61,7 @@ const FinishedDay : Day = {
 const ActiveDay : Day = {
   dayNo: 2,
   date: "26-08-2025",
-  achievedCalories : 2330,
+  achievedCalories : 2000,
   achieviedHydration: 800,
   targetCalories: 2330,
   targetHydration: 1400,
@@ -80,6 +80,7 @@ const checkLocalStorage = async () =>
 
 //Main Component
 export default function DayPlan () {
+  const router = useRouter();
   const [JsonResponse, setJsonResponse] = useState<null|jsonResponse>(null); 
   //Get Data from API or Local Storage
   useEffect( () => { 
@@ -167,7 +168,6 @@ export default function DayPlan () {
   }
   //function called by child component to navigate to detailed day view
   const navigateToDayDetails = (dayNo: number) : void => {
-    const router = useRouter();
     const key = `day0${dayNo.toString()}` as keyof jsonResponse
     if(JsonResponse=== null)
     {
@@ -193,9 +193,10 @@ export default function DayPlan () {
   }
   const daysArray : Day[] = Object.values(JsonResponse); // [day01, day02, ...]
   return (
-    <ScrollView showsVerticalScrollIndicator={false} 
+    <ScrollView style={styles.list}
+                showsVerticalScrollIndicator={false} 
                 showsHorizontalScrollIndicator={false} 
-                style={styles.list}>
+                >
         {
   //calling 7 <Day> components with jsonResponse useState data
           daysArray.map((dayData, index) => (
@@ -209,16 +210,22 @@ export default function DayPlan () {
 
 const styles = StyleSheet.create({
   list: {
-    height: "78.7%",
+    height: "90%",
     width: "95%",
-    borderWidth: 2,
-    margin: "2.5%",
+    //borderWidth: 2,
+    marginLeft: "2.5%",
     marginTop: "5%",
+    marginBottom: "3%",
     borderRadius: 12,
     borderColor: "transparent",
+    //overflow: 'hidden',
     //borderColor: "#b69a9aff",
     backgroundColor: "#EDCCC2", //ui_elements screenColor
     position: "relative",
+    elevation: 2,
+    shadowColor: '#edccc20c',
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
   },
 });
 

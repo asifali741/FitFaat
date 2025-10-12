@@ -1,6 +1,6 @@
 import { ScreenSceneWrapper } from '@/components/common/ScreenTiltAnimation';
 import { Topbar } from '@/components/common/TopBar';
-import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 import DayPlan from './DayPlan';
 //import { DetailsDay } from './DetailsDay';
 //import { DetailsTest } from './DetailsTest';
@@ -30,9 +30,3 @@ export default function App() {
     </ScreenSceneWrapper>
   );
 }
-//useEffect(()=>{
-
-//},[])
-const styles = StyleSheet.create({
-  
-});
