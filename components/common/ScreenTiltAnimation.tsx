@@ -23,7 +23,7 @@ export const ScreenSceneWrapper = ({ children }: { children: ReactNode }) => {
         { perspective: 1000 }, 
         { scale: interpolate(smoothProgress.value, [0, 1], [1, 0.8]) }, //as drawer opens shrinks scale to 80%
         { translateX: interpolate(smoothProgress.value, [0, 1], [0, 250]) }, //move 170 points from origin
-        //{ rotateY: `${interpolate(smoothProgress.value, [0, 1], [0, -25])}deg` }, //rotate 25degs
+        { rotateY: `${interpolate(smoothProgress.value, [0, 1], [0, -35])}deg` }, //rotate 25degs
     ],
     borderRadius: interpolate(smoothProgress.value, [0, 1], [0, 20]), //smoothen edges
   }));
