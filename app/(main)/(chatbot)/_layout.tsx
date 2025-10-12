@@ -1,9 +1,17 @@
-import { Stack } from "expo-router";
+import { ScreenSceneWrapper } from "@/components/common/ScreenTiltAnimation";
+import { Topbar } from "@/components/common/TopBar";
+import { Slot } from "expo-router";
+import { View, useWindowDimensions } from "react-native";
 
-export default function ChatbotLayout() {
+export default function DashboardLayout() {
+  const { width, height } = useWindowDimensions();
+
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" options={{ title: "Chatbot" }} />
-    </Stack>
+    <ScreenSceneWrapper>
+      <View style={{ width, height }}>
+        <Topbar />
+        <Slot />
+      </View>
+    </ScreenSceneWrapper>
   );
 }
