@@ -1,4 +1,4 @@
-import AsyncStorage, { useAsyncStorage } from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
@@ -70,13 +70,19 @@ const ActiveDay : Day = {
   status: "active"
 }
 //Check local storage
-const checkLocalStorage = async () =>
-{
-    const {getItem} = useAsyncStorage('JsonResponse')
-    const json = await getItem() as {data: jsonResponse, timestamp: Date} | null
-    console.log("Local Storage Data: ", json)
-    return (json) //null if no local saved data
-}
+const checkLocalStorage = async () => {
+  try {
+    const jsonValue = await AsyncStorage.getItem('JsonResponse');
+    if (!jsonValue) return null;
+    const parsed = JSON.parse(jsonValue) as { data: jsonResponse; timestamp: string };
+    console.log("Local Storage Data: ", parsed);
+    return parsed;
+  } catch (e) {
+    console.log("Error reading local storage", e);
+    return null;
+  }
+};
+
 
 //Main Component
 export default function DayPlan () {
@@ -192,41 +198,38 @@ export default function DayPlan () {
       </View>
   }
   const daysArray : Day[] = Object.values(JsonResponse); // [day01, day02, ...]
-  return (
+  return (  <View style={{ flex: 1 }}>
     <ScrollView style={styles.list}
+                contentContainerStyle={{ paddingBottom: 50 }}
                 showsVerticalScrollIndicator={false} 
                 showsHorizontalScrollIndicator={false} 
                 >
         {
   //calling 7 <Day> components with jsonResponse useState data
           daysArray.map((dayData, index) => (
-              <Days props={dayData} onDayPress={navigateToDayDetails}/>)
+              <Days key={index} props={dayData} onDayPress={navigateToDayDetails}/>)
               )
         }
     </ScrollView>
-  );
+  </View>);
 
 };
 
 const styles = StyleSheet.create({
   list: {
-    height: "90%",
-    width: "95%",
-    //borderWidth: 2,
-    marginLeft: "2.5%",
-    marginTop: "5%",
-    marginBottom: "3%",
-    borderRadius: 12,
-    borderColor: "transparent",
-    //overflow: 'hidden',
-    //borderColor: "#b69a9aff",
-    backgroundColor: "#EDCCC2", //ui_elements screenColor
-    position: "relative",
-    elevation: 2,
-    shadowColor: '#edccc20c',
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-  },
+  flexGrow: 1,
+  width: "95%",
+  alignSelf: "center",
+  marginTop: "5%",
+  marginBottom: "3%",
+  borderRadius: 12,
+  backgroundColor: "#EDCCC2",
+  elevation: 2,
+  shadowColor: '#edccc20c',
+  shadowOpacity: 0.3,
+  shadowRadius: 5,
+},
+
 });
 
 
