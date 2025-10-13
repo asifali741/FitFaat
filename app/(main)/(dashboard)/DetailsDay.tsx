@@ -1,13 +1,11 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import Animated, { Easing, useAnimatedProps, useSharedValue, withTiming } from "react-native-reanimated";
+import Animated, { Easing, runOnJS, useAnimatedProps, useSharedValue, withTiming } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
+import { colorsSheet as colors, rs } from "../(settings)/ui_elements";
 import { Day as typeDay } from "./DayPlan";
-//import { useRouter } from "expo-router";
-//import { Topbar } from "@/components/common/TopBar";
-//import { ProgressTracker } from "./circle";
-//const props: typeDay = JSON.parse(day);
 interface ProgressCircleProps {
   achievedCalories: number;
   targetCalories: number;
@@ -33,143 +31,205 @@ export default function DetailsDay () {
     const [timer, setTimer] = useState<string>(getDate())
     const [showMenu, setShowMenu] = useState<Boolean>(false)
     const fade = useSharedValue(1);
+    const insets = useSafeAreaInsets();
     // trigger fade-out + menu
     const openMenu = () => {
-        fade.value = withTiming(0, { duration: 800}, ()=>{setShowMenu(true)});
-    };
-    const closeMenu = () => {
-        setShowMenu(false)
-        fade.value = withTiming(1, { duration: 500});
-    };
+    fade.value = withTiming(
+      0,
+      { duration: 800, easing: Easing.inOut(Easing.ease) },
+      (isFinished) => {
+        if (isFinished) {
+          // call setShowMenu(true) on JS thread
+          runOnJS(setShowMenu)(true);
+        }
+      }
+    );
+  };
+
+  // closeMenu: set showMenu false first (so menu overlay disappears),
+  // then fade main content back in
+  const closeMenu = () => {
+    // set state on JS thread immediately
+    setShowMenu(false);
+    // animate fade in
+    fade.value = withTiming(1, { duration: 500, easing: Easing.inOut(Easing.ease) });
+  };
+
 
     //functions
     const handleUpdate = () => {
         //Main api calling
     }
     //output
-    return(<>{
-        !showMenu? 
-        <AnimatedScrollView showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 10, paddingBottom: 30 }} style={{ flex: 1, opacity: fade }}>
-            <View style={styles.heading}>
-            <View style={styles.dayDateWrapper}>
-                <Text style={styles.title}>Day: 0{props.dayNo}</Text>
-                <Text style={styles.date}>{props.date}</Text>
-            </View>
-            
-            <Pressable style={styles.backButton} onPress={() => router.back()}>
-                <Text style={styles.backButtonText}>← Back</Text>
-            </Pressable>
-            </View>
+    return (
+  <View style={{ flex: 1, paddingBottom: insets.bottom }}>
+    {!showMenu ? (
+      <AnimatedScrollView
+        showsVerticalScrollIndicator={false}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 10}}
+        style={{ flex: 1, opacity: fade }}
+      >
+        <View style={styles.heading}>
+          <View style={styles.dayDateWrapper}>
+            <Text style={styles.title}>Day: 0{props.dayNo}</Text>
+            <Text style={styles.date}>{props.date}</Text>
+          </View>
+          <Pressable style={styles.backButton} onPress={() => router.back()}>
+            <Text style={styles.backButtonText}>← Back</Text>
+          </Pressable>
+        </View>
 
         <View style={styles.centerBody}>
-            <View style={styles.circletext}>
-                <Pressable style={{height:'90%', width:'100%'}} onPressOut={handleUpdate}>  {/**Remove if circle touch to update is rejected */}
-                    <ProgressCircle achievedCalories={props.achievedCalories}
-                                    achieviedHydration={props.achieviedHydration}
-                                    targetCalories={props.targetCalories}
-                                    targetHydration={props.targetHydration}/>
-                </Pressable>
-                <View style={{justifyContent: 'center', flexWrap: 'wrap' , alignContent:'center'}}>      
-                    <Text>{props.remarks}</Text>
-                </View>
+          <View style={styles.circletext}>
+            <Pressable
+              style={{ height: rs(200), width: rs(200) }}
+              onPressOut={handleUpdate}
+              android_ripple={{ color: "rgba(0,0,0,0.06)" }}
+            >
+              {/**Remove if circle touch to update is rejected */}
+              <ProgressCircle
+                achievedCalories={props.achievedCalories}
+                achieviedHydration={props.achieviedHydration}
+                targetCalories={props.targetCalories}
+                targetHydration={props.targetHydration}
+              />
+            </Pressable>
+
+            <View
+              style={{
+                justifyContent: "center",
+                flexWrap: "wrap",
+                alignContent: "center",
+              }}
+            >
+              <Text>{String(props.remarks ?? "")}</Text>
             </View>
-        {/**Determine wether to display Update Button or nnot */}
-            { props.status==='active'? (
-                <>
-            <View style={styles.infoOuterBox}>
-            <View style={styles.infoInnerBox}>
-                {/**Flex rows for Heading: {value}*/}
-                <View style={styles.infoRow}>
+          </View>
+
+          {/**Determine whether to display Update Button or not */}
+          {props.status === "active" ? (
+            <>
+              <View style={styles.infoOuterBox}>
+                <View style={styles.infoInnerBox}>
+                  {/**Flex rows for Heading: {value}*/}
+                  <View style={styles.infoRow}>
                     <Text style={styles.infoAttribute}>Goal </Text>
-                    <Text style={styles.infoValue}>{props.targetCalories} cals, {props.targetHydration} lit</Text>
-                </View>
-                <View style={styles.infoRow}>
+                    <Text style={styles.infoValue}>
+                      {props.targetCalories} cals, {props.targetHydration} lit
+                    </Text>
+                  </View>
+                  <View style={styles.infoRow}>
                     <Text style={styles.infoAttribute}>Calories </Text>
-                    <Text style={styles.infoValue}>{props.achievedCalories} cals</Text>
-                </View>
-                <View style={styles.infoRow}>
-                    <Text style={styles.infoAttribute}>Hydration   </Text>
-                    <Text style={styles.infoValue}>{props.achieviedHydration} lit</Text>
-                </View>
-                <View style={styles.infoRow}>
-                    <Text style={styles.infoAttribute}>Timer   </Text>
+                    <Text style={styles.infoValue}>
+                      {props.achievedCalories} cals
+                    </Text>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoAttribute}>Hydration </Text>
+                    <Text style={styles.infoValue}>
+                      {props.achieviedHydration} lit
+                    </Text>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoAttribute}>Timer </Text>
                     <Text style={styles.infoValue}>{timer}</Text>
+                  </View>
                 </View>
-            </View>
+
                 {/**Advice Section*/}
                 <View style={styles.adviceSection}>
-                    <Text style={styles.adviceHeading}>What's up!</Text>
-                    <Text>{"Need any advice related to food?"}</Text>
-                    <TextInput  style={styles.input}
-                                value={adviceInput}
-                                onChangeText={setAdviceInput}
-                                placeholder="Type your question..."
-                                />
+                  <Text style={styles.adviceHeading}>What's up!</Text>
+                  <Text>Need any advice related to food?</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={adviceInput}
+                    onChangeText={setAdviceInput}
+                    placeholder="Type your question..."
+                  />
                 </View>
-            </View>
-            <View style={styles.tray}>
+              </View>
+
+              <View style={styles.tray}>
                 <Pressable style={styles.trayButton} onPress={openMenu}>
-                <Text style={styles.trayButtonText}>Update</Text>
+                  <Text style={styles.trayButtonText}>Update</Text>
                 </Pressable>
-            </View> 
+              </View>
             </>
-            )
-            : 
-            <>
+          ) : (
             <View style={styles.infoOuterBox}>
-            <View style={[styles.infoInnerBox, {marginBottom: '2%'}] }>{/**extra margin for finished days */}
+              <View
+                style={[styles.infoInnerBox, { marginBottom: 5 }]} // extra margin for finished days
+              >
                 {/**Flex rows for Heading: {value}*/}
                 <View style={styles.infoRow}>
-                    <Text style={styles.infoAttribute}>Goal </Text>
-                    <Text style={styles.infoValue}>{props.targetCalories} cals, {props.targetHydration} lit</Text>
+                  <Text style={styles.infoAttribute}>Goal </Text>
+                  <Text style={styles.infoValue}>
+                    {props.targetCalories} cals, {props.targetHydration} lit
+                  </Text>
                 </View>
                 <View style={styles.infoRow}>
-                    <Text style={styles.infoAttribute}>Calories </Text>
-                    <Text style={styles.infoValue}>{props.achieviedHydration} cals</Text>
+                  <Text style={styles.infoAttribute}>Calories </Text>
+                  <Text style={styles.infoValue}>
+                    {props.achievedCalories} cals
+                  </Text>
                 </View>
                 <View style={styles.infoRow}>
-                    <Text style={styles.infoAttribute}>Hydration   </Text>
-                    <Text style={styles.infoValue}>{props.achieviedHydration} lit</Text>
+                  <Text style={styles.infoAttribute}>Hydration </Text>
+                  <Text style={styles.infoValue}>
+                    {props.achieviedHydration} lit
+                  </Text>
                 </View>
                 <View style={styles.infoRow}>
-                    <Text style={styles.infoAttribute}>Timer   </Text>
-                    <Text style={styles.infoValue}>{timer}</Text>
+                  <Text style={styles.infoAttribute}>Timer </Text>
+                  <Text style={styles.infoValue}>{timer}</Text>
                 </View>
+              </View>
             </View>
-            </View>
-            </>}
-    </View>
-        </AnimatedScrollView>
-        :
-        <View style={styles.menuOverlay}>
-            <Text style={styles.menuTitle}>Tell Me About What you had in the Meantime</Text>
-            <Text style={styles.label}>Time</Text>
-            <TextInput /**Time when meal was had */
-                style={styles.input}
-                placeholder="HH:MM"
-                keyboardType="numeric"/>
-            <Text style={styles.label}>Food Name</Text>
-          <TextInput style={styles.input} placeholder="e.g. Chicken Salad" />
-
-          {/* Optional Description */}
-          <Text style={styles.label}>Description (optional)</Text>
-          <TextInput
-            style={[styles.input, { height: 80 }]}
-            placeholder="Short description..."
-            multiline
-          />
-          <View style={styles.menuButtons}>
-            <Pressable style={styles.backMenuButton} onPress={closeMenu}>
-              <Text style={styles.backMenuText}>Back</Text>
-            </Pressable>
-            <Pressable style={styles.submitMenuButton} onPress={() => {}}>
-              <Text style={styles.submitMenuText}>Submit</Text>
-            </Pressable>
-          </View>
+          )}
         </View>
-        }
-        </>
-    );
+      </AnimatedScrollView>
+    ) : (
+      <View style={styles.menuOverlay}>
+        <Text style={styles.menuTitle}>
+          Tell Me About What you had in the Meantime
+        </Text>
+
+        <Text style={styles.label}>Time</Text>
+        {/**Time when meal was had */}
+        <TextInput
+          style={styles.input}
+          placeholder="HH:MM"
+          keyboardType="numeric"
+        />
+
+        <Text style={styles.label}>Food Name</Text>
+        <TextInput style={styles.input} placeholder="e.g. Chicken Salad" />
+
+        {/* Optional Description */}
+        <Text style={styles.label}>Description (optional)</Text>
+        <TextInput
+          style={[styles.input, { height: 80 }]}
+          placeholder="Short description..."
+          multiline
+        />
+
+        <View style={styles.menuButtons}>
+          <Pressable style={styles.backMenuButton} onPress={closeMenu}>
+            <Text style={styles.backMenuText}>Back</Text>
+          </Pressable>
+          <Pressable
+            style={styles.submitMenuButton}
+            onPress={() => {}}
+          >
+            <Text style={styles.submitMenuText}>Submit</Text>
+          </Pressable>
+        </View>
+      </View>
+    )}
+  </View>
+);
+
 }
 const styles = StyleSheet.create({
     heading: {
@@ -228,7 +288,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.5,
         shadowRadius: 10,
         elevation: 5, 
-        backgroundColor: 'hsla(0, 0%, 90%, 1.00)'
+        backgroundColor: colors.screenColor,
     },
     infoInnerBox: {
         width: '95%',
@@ -286,9 +346,10 @@ const styles = StyleSheet.create({
     tray: {
         width: '100%',
         padding: 15,
-        borderTopWidth: 1,
-        borderTopColor: '#ddd',
-        backgroundColor: '#fafafa',
+        //marginBottom: 65,
+        //borderTopWidth: 1,
+        //borderTopColor: '#ddd',
+        backgroundColor: colors.screenColor,
         alignItems: 'center',
     },
     trayButton: {
@@ -422,7 +483,7 @@ const ProgressCircle = (CircleProps: ProgressCircleProps) =>{
     
     return(
         //<View style={{ width: "80%", aspectRatio: 1, alignSelf: "center" }}>
-        <Svg width="100%" height={undefined} viewBox="0 0 120 120" style={{ maxWidth: 200, alignSelf: "center"}}>
+        <Svg width="100%" height={'100%'} viewBox="0 0 120 120" style={{ maxWidth: 200, alignSelf: "center"}}>
         {/* Background circle of Calories */}
         <Circle  cx="60"  cy="60"  r={outerRadius}
                 stroke="#E5E7EB"  strokeWidth="10"  fill="transparent"/>

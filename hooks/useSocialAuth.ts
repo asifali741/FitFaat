@@ -10,7 +10,7 @@ export const useSocialAuth = () => {
 
   const handleGoogleAuth = async () => {
     try {
-      const redirectUrl = Linking.createURL("/"); // 👈 where to return after OAuth
+      const redirectUrl = Linking.createURL("oauth-native-callback"); // 👈 where to return after OAuth
 
       const { createdSessionId, setActive } = await startSSOFlow({
         strategy: "oauth_google",

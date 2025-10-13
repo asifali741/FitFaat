@@ -12,7 +12,7 @@ import { Day } from "./DayPlan";
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 //const finalProgress = 55; // percent
-const { width } = Dimensions.get("window");
+const { width,height } = Dimensions.get("window");
 function clamp(min: number, preferred: number, max: number) {
   const scaled = width * preferred; // e.g., 0.05 = 5% of width
   return Math.min(Math.max(scaled, min), max);
@@ -31,7 +31,7 @@ export const Days = ({props, onDayPress}: {props: Day, onDayPress: (dayNo : numb
     return <FinishedDay info={props} Press={onDayPress}/>;
   }
   else{
-    console.log("Radius: " + radius + " Width of Window: " + width )
+    console.log("Radius: " + radius + " Width of Window: " + width + ' Hieght: ' + height )
     return <ActiveDay info={props} Press={onDayPress}/>;
   }
 }
@@ -72,7 +72,7 @@ if (info.duration != null && typeof info.duration === "number") {
     <View style={styles.topHeader  /**Row of Circle, DayDate, Button */}>
       {/* Progress Circle */}
         <View style={styles.circleActiveWrapper /**Circle */}>
-          <Svg
+            <Svg
             height={radius * 2 + 20} 
             width={radius * 2 + 20}
             viewBox={`0 0 ${radius * 2 + 20} ${radius * 2 + 20}`}
@@ -89,7 +89,7 @@ if (info.duration != null && typeof info.duration === "number") {
               />
             {/* Progress Circle */}
             <AnimatedCircle
-              cx="50%"
+              cx= {radius + 10}
               cy={radius + 10}
               r={radius}
               stroke="#00FF44"
@@ -100,8 +100,8 @@ if (info.duration != null && typeof info.duration === "number") {
               fill="none"
               />
             <SvgText
-              x="50%"
-              y="50%"
+              x= {radius+7}
+              y= {radius+10}
               textAnchor="middle"
               dy=".3em"
               fontSize="15"
@@ -123,7 +123,7 @@ if (info.duration != null && typeof info.duration === "number") {
         </View>
         {/* View Button */}
         <Pressable onPress={() => Press(info.dayNo)} 
-                  style={{backgroundColor: '#000000', height: '35%', width: '20%', borderRadius: 8, justifyContent: 'center', alignItems: 'center'}} >
+                  style={{backgroundColor: '#000000', height: rs(30), width: rs(70), borderRadius: 8, justifyContent: 'center', alignItems: 'center'}} >
           <Text style={{color: 'white', fontSize: 12, fontWeight: 'bold'}}>View</Text>
           </Pressable>
     </View>
@@ -201,7 +201,7 @@ const FinishedDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}
       
     </View>
       <Pressable onPress={() => Press(info.dayNo)} 
-                  style={{backgroundColor: '#000000', height: '45%', width: '20%', borderRadius: 8, justifyContent: 'center', alignItems: 'center'}} >
+                  style={{backgroundColor: '#000000', height: rs(30), width: rs(70), borderRadius: 8, justifyContent: 'center', alignItems: 'center'}} >
           <Text style={{color: 'white', fontSize: 12, fontWeight: 'bold'}}>View</Text>
           </Pressable>
   </View>
