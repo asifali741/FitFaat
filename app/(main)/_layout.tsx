@@ -56,6 +56,11 @@ export default function MainLayout() {
       {/*add //options={{... , headerShown: false }}// to hide default Drawer Header */}
 
       <Drawer.Screen name="(dashboard)" options={{title : "Dashboard", headerShown: false}}/>
+      <Drawer.Screen name="workout" options={{title : "👑 Workouts", headerShown: false}}/>
+      <Drawer.Screen name="profile" options={{title : "Profile", headerShown: false}}/>
+      <Drawer.Screen name="favorites" options={{title : "hide", headerShown: false, drawerItemStyle:{display:'none'}}}/>
+      <Drawer.Screen name="exercises/[bodypart]" options={{title : "hide", headerShown: false, drawerItemStyle:{display:'none'}}}/>
+      <Drawer.Screen name="exercise-details" options={{title : "hide", headerShown: false, drawerItemStyle:{display:'none'}}}/>
       <Drawer.Screen name="(chatbot)" options={{title : "Chatbot", headerShown: false}}/>
       <Drawer.Screen name="(conference)" options={{title : "Conference", headerShown: false}}/>
       <Drawer.Screen name="(settings)" options={{title : "Settings", headerShown: false}}/>
