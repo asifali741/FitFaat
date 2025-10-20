@@ -5,7 +5,7 @@ import { Image, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp } from "react-native-responsive-screen";
 
 const FullText =
-  "Hi, I am HeaLora, your AI-powered health companion. I’m designed to support you on your journey toward better well-being by combining advanced technology with personalized care. With HeaLora, you can access reliable health insights, track your progress, and receive tailored guidance suited to your unique lifestyle and goals.";
+  "Hi, I am HeaLora, your AI-powered health companion. I’m designed to support you on your journey toward better well-being by combining advanced technology with personalized care.";
 export default function Index() {
   const [visibleText, setVisibleText] = useState("");
   const router = useRouter();

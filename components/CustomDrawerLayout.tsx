@@ -41,7 +41,6 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
         </View>
       </TouchableOpacity>
 
-
       {/* Drawer Items */}
       <DrawerContentScrollView {...props}>
         <DrawerItemList {...props} />
