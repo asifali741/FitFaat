@@ -24,9 +24,9 @@ export const ChatBotStyles = StyleSheet.create({
   mainHeading: {
     fontSize: hp(2.4),
     fontWeight: "400",
-    textAlign: "justify",
-    marginRight: hp(2),
-    marginLeft: hp(2),
+    textAlign: "center",
+    marginRight: hp(1),
+    marginLeft: hp(1),
     marginTop: hp(1.6),
   },
   startButton: {
@@ -40,6 +40,6 @@ export const ChatBotStyles = StyleSheet.create({
     marginTop: hp(3),
     borderRadius: hp(1),
     position: "absolute",
-    bottom: hp(9),
+    bottom: hp(20),
   },
 });
