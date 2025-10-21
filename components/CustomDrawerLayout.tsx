@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import {
   DrawerContentComponentProps,
   DrawerContentScrollView,
-  DrawerItemList,
+  DrawerItem,
 } from "@react-navigation/drawer";
 import { useRef, useState } from "react";
 import { Image, Pressable, StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -18,10 +18,27 @@ import { DrawerFonts } from "../app/(main)/(settings)/ui_elements";
 type DrawerSceneWrapperProps = DrawerContentComponentProps;
 const userName = 'NAME' // fetch from Authentication Token
 export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
+  const handleProfilePress = () => {
+    console.log('Navigating to profile screen');
+    props.navigation.navigate('profile');
+  };
+
+  // Helper function to check if route is active
+  const isRouteActive = (routeName: string) => {
+    const currentRoute = props.state.routeNames[props.state.index];
+    return currentRoute === routeName;
+  };
+
+  // Helper function to check if we're in exercises section
+  const isExercisesActive = () => {
+    const currentRoute = props.state.routeNames[props.state.index];
+    return currentRoute === '(exercises)/workout' || currentRoute.startsWith('(exercises)');
+  };
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "transparent" }}>
       {/* Top Part */}
-      <TouchableOpacity style={styles.userContainer}>
+      <TouchableOpacity style={styles.userContainer} onPress={handleProfilePress}>
         <Image source={require("../assets/images/Default_Profile.png")} style={styles.userImage} />
         <View style={styles.userInfo}>
           <Text
@@ -41,11 +58,123 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
         </View>
       </TouchableOpacity>
 
-
       {/* Drawer Items */}
-      <DrawerContentScrollView {...props}>
-        <DrawerItemList {...props} />
-      </DrawerContentScrollView>
+      <View style={{ flex: 1, paddingVertical: 10 }}>
+        <DrawerItem
+          label="Dashboard"
+          onPress={() => props.navigation.navigate('(dashboard)')}
+          labelStyle={{
+            marginLeft: 8,
+            fontSize: 18,
+            fontFamily: "PoppinsMedium500",
+            color: "#FFFFFF",
+          }}
+          style={{
+            marginHorizontal: 12,
+            marginVertical: 1,
+            borderRadius: 25,
+            paddingHorizontal: 20,
+            paddingVertical: 8,
+            minHeight: 45,
+            backgroundColor: isRouteActive('(dashboard)') ? color.drawerActiveTabColor : 'transparent',
+          }}
+        />
+        <DrawerItem
+          label="Chatbot"
+          onPress={() => props.navigation.navigate('(chatbot)')}
+          labelStyle={{
+            marginLeft: 8,
+            fontSize: 18,
+            fontFamily: "PoppinsMedium500",
+            color: "#FFFFFF",
+          }}
+          style={{
+            marginHorizontal: 12,
+            marginVertical: 1,
+            borderRadius: 25,
+            paddingHorizontal: 20,
+            paddingVertical: 8,
+            minHeight: 45,
+            backgroundColor: isRouteActive('(chatbot)') ? color.drawerActiveTabColor : 'transparent',
+          }}
+        />
+        <DrawerItem
+          label="Conference"
+          onPress={() => props.navigation.navigate('(conference)')}
+          labelStyle={{
+            marginLeft: 8,
+            fontSize: 18,
+            fontFamily: "PoppinsMedium500",
+            color: "#FFFFFF",
+          }}
+          style={{
+            marginHorizontal: 12,
+            marginVertical: 1,
+            borderRadius: 25,
+            paddingHorizontal: 20,
+            paddingVertical: 8,
+            minHeight: 45,
+            backgroundColor: isRouteActive('(conference)') ? color.drawerActiveTabColor : 'transparent',
+          }}
+        />
+        <DrawerItem
+          label="Settings"
+          onPress={() => props.navigation.navigate('(settings)')}
+          labelStyle={{
+            marginLeft: 8,
+            fontSize: 18,
+            fontFamily: "PoppinsMedium500",
+            color: "#FFFFFF",
+          }}
+          style={{
+            marginHorizontal: 12,
+            marginVertical: 1,
+            borderRadius: 25,
+            paddingHorizontal: 20,
+            paddingVertical: 8,
+            minHeight: 45,
+            backgroundColor: isRouteActive('(settings)') ? color.drawerActiveTabColor : 'transparent',
+          }}
+        />
+        <DrawerItem
+          label="Workouts 👑"
+          onPress={() => props.navigation.navigate('(exercises)/workout')}
+          labelStyle={{
+            marginLeft: 8,
+            fontSize: 18,
+            fontFamily: "PoppinsMedium500",
+            color: "#FFFFFF",
+          }}
+          style={{
+            marginHorizontal: 12,
+            marginVertical: 1,
+            borderRadius: 25,
+            paddingHorizontal: 20,
+            paddingVertical: 8,
+            minHeight: 45,
+            backgroundColor: isExercisesActive() ? color.drawerActiveTabColor : 'transparent',
+          }}
+        />
+        <DrawerItem
+          label="Join as Doctor 👨‍⚕️"
+          onPress={() => props.navigation.navigate('(doctor-portal)')}
+          labelStyle={{
+            marginLeft: 8,
+            fontSize: 18,
+            fontFamily: "PoppinsMedium500",
+            color: "#FFFFFF",
+          }}
+          style={{
+            marginHorizontal: 12,
+            marginVertical: 1,
+            borderRadius: 25,
+            paddingHorizontal: 20,
+            paddingVertical: 8,
+            minHeight: 45,
+            backgroundColor: isRouteActive('(doctor-portal)') ? color.drawerActiveTabColor : 'transparent',
+          }}
+        />
+      </View>
 
       {/* Bottom Part */}
       <Logout_Button/>
@@ -126,10 +255,12 @@ const styles = StyleSheet.create({
   flexDirection: "row",
   alignItems: "center",
   padding: 16,
+  marginHorizontal: 12,
   backgroundColor: color.screenColor,
   borderBottomWidth: 1,
   borderBottomColor: "#ddd",
-  borderRadius: 40,
+  borderRadius: 25,
+  marginBottom: 20,
 },
 
 userInfo: {
@@ -161,11 +292,12 @@ userEmail: {
     flexDirection: "row",
     alignItems: "center",
     padding: 16,
-    marginHorizontal: 16,
+    marginHorizontal: 12,
     marginVertical: 20,
     backgroundColor: color.logoutBtnColor, //ui_elements.tsx logoutBtnColor
-    borderRadius: 12,
+    borderRadius: 25,
     justifyContent: "center",
+    alignSelf: 'stretch',
   },
   logoutText: {
     color: color.logoutBtnTextColor, //ui_elements.tsx logoutBtnTextColor

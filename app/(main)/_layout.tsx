@@ -29,27 +29,32 @@ export default function MainLayout() {
                 drawerInactiveTintColor: "#FFFFFF",
                 overlayColor: "transparent",
                 drawerStyle: {
-                    backgroundColor: color.background ,//"#fa9579ff",
-                    width: "60%",
+                    backgroundColor: color.drawerBackground,
+                    width: "75%",
                     paddingTop: 40,
                 },
                 drawerLabelStyle: {
-                    marginLeft: -6,
+                    marginLeft: 8,
                     fontSize: 18,
                     fontFamily: "PoppinsMedium500",
                     color: "#FFFFFF",
+                    flexShrink: 1,
+                    flexWrap: 'wrap',
+                    flex: 1,
                 },
                 drawerItemStyle: {
-                    marginLeft: -16,
-                    marginRight: 35,
-                    borderTopLeftRadius: 0,
-                    borderBottomLeftRadius: 0,
-                    borderTopRightRadius: 50,
-                    borderBottomRightRadius: 50,
+                    marginHorizontal: 12,
+                    marginVertical: 1,
+                    borderRadius: 25,
+                    paddingHorizontal: 20,
+                    paddingVertical: 8,
+                    minHeight: 45,
+                    flexDirection: 'row',
+                    alignItems: 'center',
                 },
                 
                 sceneStyle: {
-                    backgroundColor: "#26867C",
+                    backgroundColor: "#FFFFFF",
                 }
                 }}
             >
@@ -59,6 +64,12 @@ export default function MainLayout() {
       <Drawer.Screen name="(chatbot)" options={{title : "Chatbot", headerShown: false}}/>
       <Drawer.Screen name="(conference)" options={{title : "Conference", headerShown: false}}/>
       <Drawer.Screen name="(settings)" options={{title : "Settings", headerShown: false}}/>
+      <Drawer.Screen name="(exercises)/workout" options={{title : "Workouts 👑", headerShown: false}}/>
+      <Drawer.Screen name="(doctor-portal)" options={{title : "Join as Doctor 👨‍⚕️", headerShown: false}}/>
+      <Drawer.Screen name="profile" options={{title : "hide", headerShown: false, drawerItemStyle:{display:'none'}}}/>
+      <Drawer.Screen name="(exercises)/favorites" options={{title : "hide", headerShown: false, drawerItemStyle:{display:'none'}}}/>
+      <Drawer.Screen name="(exercises)/[bodypart]" options={{title : "hide", headerShown: false, drawerItemStyle:{display:'none'}}}/>
+      <Drawer.Screen name="(exercises)/exercise-details" options={{title : "hide", headerShown: false, drawerItemStyle:{display:'none'}}}/>
       <Drawer.Screen name="index" options={{title : "hide", headerShown: false, drawerItemStyle:{display:'none'}}}/>
     </Drawer>
   </GestureHandlerRootView>
