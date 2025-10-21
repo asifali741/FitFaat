@@ -1,11 +1,15 @@
-import { View, Text, TouchableOpacity, FlatList, ActivityIndicator } from "react-native";
+import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, StyleSheet } from "react-native";
 import React, { useEffect, useState } from "react";
 import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
-import { ChevronLeftIcon } from "react-native-heroicons/outline";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import {
   widthPercentageToDP as wp,
   heightPercentageToDP as hp,
 } from "react-native-responsive-screen";
+import { useNavigation } from "@react-navigation/native";
+import { DrawerActions } from "@react-navigation/native";
+import { colorsSheet } from "../(settings)/ui_elements";
 import { fetchExercisesByBodyPart } from "../../../api/exerciseDB";
 import { dummyData } from "../../../constants/list";
 import { Image } from "expo-image";
@@ -33,7 +37,12 @@ export default function ExercisesScreen() {
   const [exercises, setExercises] = useState([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const navigation = useNavigation();
   const { bodypart, name } = useLocalSearchParams();
+
+  const openDrawer = () => {
+    navigation.dispatch(DrawerActions.openDrawer());
+  };
 
   useEffect(() => {
     if (bodypart || name) {
@@ -72,7 +81,7 @@ export default function ExercisesScreen() {
   const handleExercisePress = (exercise: any) => {
     console.log("Navigating to exercise details:", exercise.name);
     router.push({
-      pathname: "/(main)/exercise-details",
+      pathname: "/(main)/(exercises)/exercise-details",
       params: { exercise: JSON.stringify(exercise) }
     });
   };
@@ -138,82 +147,123 @@ export default function ExercisesScreen() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8f8f8' }}>
-        <ActivityIndicator size="large" color="#FF6B6B" />
-        <Text style={{ marginTop: hp(2), fontSize: hp(2), color: '#666' }}>
-          Loading exercises...
-        </Text>
-      </View>
+      <SafeAreaView style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.menuButton}
+            onPress={openDrawer}
+          >
+            <Ionicons name="menu" size={24} color={colorsSheet.textOnPrimary} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{(bodypart || name) as string} Exercises</Text>
+          <View style={styles.spacer} />
+        </View>
+
+        {/* Loading Content */}
+        <View style={styles.content}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colorsSheet.primary} />
+            <Text style={styles.loadingText}>
+              Loading exercises...
+            </Text>
+          </View>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#f8f8f8' }}>
-      {/* Header Section */}
-      <View style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        width: '100%',
-        marginTop: hp(6),
-        paddingHorizontal: wp(5),
-        marginBottom: hp(3),
-      }}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <View style={{
-            width: hp(7),
-            height: hp(7),
-            backgroundColor: '#FFD700',
-            justifyContent: 'center',
-            alignItems: 'center',
-            borderRadius: hp(1.5),
-          }}>
-            <ChevronLeftIcon
-              size={hp(4.5)}
-              color="black"
-              strokeWidth={4.5}
-            />
-          </View>
-        </TouchableOpacity>
-        <Text
-          style={{
-            fontSize: hp(3),
-            fontWeight: 'bold',
-            color: '#333',
-            flex: 1,
-            textAlign: 'center',
-            marginRight: hp(7), // Balance the back button
-          }}
+    <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.menuButton}
+          onPress={openDrawer}
         >
-          {(bodypart || name) as string} Exercises
-        </Text>
+          <Ionicons name="menu" size={24} color={colorsSheet.textOnPrimary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{(bodypart || name) as string} Exercises</Text>
+        <View style={styles.spacer} />
       </View>
 
-      {/* Exercise Count */}
-      <Text
-        style={{
-          fontSize: hp(2),
-          color: '#666',
-          textAlign: 'center',
-          marginBottom: hp(2),
-        }}
-      >
-        {exercises.length} exercises found
-      </Text>
+      {/* Main Content */}
+      <View style={styles.content}>
+        {/* Exercise Count */}
+        <Text style={styles.exerciseCount}>
+          {exercises.length} exercises found
+        </Text>
 
-      {/* Exercises List */}
-      <FlatList
-        data={exercises}
-        numColumns={2}
-        keyExtractor={(item) => item.id || item.name}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{
-          paddingBottom: hp(3),
-        }}
-        renderItem={({ item, index }) => (
-          <ExerciseCard item={item} index={index} />
-        )}
-      />
-    </View>
+        {/* Exercises List */}
+        <FlatList
+          data={exercises}
+          numColumns={2}
+          keyExtractor={(item) => item.id || item.name}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingBottom: hp(3),
+          }}
+          renderItem={({ item, index }) => (
+            <ExerciseCard item={item} index={index} />
+          )}
+        />
+      </View>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colorsSheet.primary,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: Math.min(wp(5), 20),
+    paddingVertical: Math.min(hp(1.8), 15),
+    backgroundColor: colorsSheet.primary,
+    minHeight: hp(7),
+  },
+  menuButton: {
+    padding: Math.min(wp(2), 10),
+    minWidth: wp(10),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitle: {
+    fontSize: Math.min(hp(2.5), wp(6)),
+    fontWeight: "bold",
+    color: colorsSheet.textOnPrimary,
+    textAlign: "center",
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+    backgroundColor: colorsSheet.screenColor,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingTop: hp(2),
+  },
+  spacer: {
+    width: wp(18),
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: hp(2),
+    fontSize: Math.min(hp(2), wp(5)),
+    color: colorsSheet.textSecondary,
+  },
+  exerciseCount: {
+    fontSize: Math.min(hp(2), wp(5)),
+    color: colorsSheet.textSecondary,
+    textAlign: "center",
+    marginBottom: hp(2),
+    marginTop: hp(1),
+  },
+});

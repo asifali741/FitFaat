@@ -22,15 +22,7 @@ export default function Index() {
   const iRef = useRef(0); // <-- useRef to persist value
 
 
-  const { isSignedIn } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (isSignedIn) {
-      // If already signed in, jump to dashboard
-      router.replace('/(main)/(dashboard)')
-    }
-  }, [isSignedIn]);
+  // Auth navigation is handled in _layout.tsx AuthGate
 
 
   // ... existing code ...
