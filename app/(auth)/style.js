@@ -48,7 +48,7 @@ export const styles = StyleSheet.create({
   },
   buttonDesign: {
     borderWidth: hp(0.1),
-    borderColor: "black",
+    borderColor: "#26867C",
     borderRadius: hp(5),
     height: hp(6),
     width: wp(69),
@@ -56,6 +56,7 @@ export const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#26867C",
   },
   googleLogo: {
     height: hp(3),
@@ -64,5 +65,7 @@ export const styles = StyleSheet.create({
   googleText: {
     fontSize: hp(2),
     paddingLeft: hp(0.8),
+    color: "#FFFFFF",
+    fontWeight: "600",
   },
 });

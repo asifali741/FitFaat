@@ -1,7 +1,12 @@
+import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DrawerActions, useNavigation } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { colorsSheet } from "../(settings)/ui_elements";
 import { Days } from "./Day";
 export type Day = {
   dayNo: number,
@@ -66,16 +71,20 @@ const ActiveDay : Day = {
   targetCalories: 2330,
   targetHydration: 1400,
   remarks: "Almost there, Dinner is in 2h!",
-  duration: 60, // in secs
+  duration: 1900, // in secs
   status: "active"
 }
 //Check local storage
 const checkLocalStorage = async () => {
   try {
     const jsonValue = await AsyncStorage.getItem('JsonResponse');
-    if (!jsonValue) return null;
-    const parsed = JSON.parse(jsonValue) as { data: jsonResponse; timestamp: string };
-    console.log("Local Storage Data: ", parsed);
+    if (!jsonValue) {
+      console.log('jsonvalue ')
+      return null;
+    }
+    const parsed = JSON.parse(jsonValue) as { data: jsonResponse; timestamp: Date };
+    console.log('jsonvalue not null ')
+    console.log("Local Storage Data Found: ");
     return parsed;
   } catch (e) {
     console.log("Error reading local storage", e);
@@ -87,12 +96,26 @@ const checkLocalStorage = async () => {
 //Main Component
 export default function DayPlan () {
   const router = useRouter();
-  const [JsonResponse, setJsonResponse] = useState<null|jsonResponse>(null); 
+  const navigation = useNavigation();
+  const [JsonResponse, setJsonResponse] = useState<null|jsonResponse>(null);
+
+  const openDrawer = () => {
+    navigation.dispatch(DrawerActions.openDrawer());
+  };
   //Get Data from API or Local Storage
   useEffect( () => { 
+    const fetchData =async () => {
     console.log("Fetching Day Data...");  //JsonResponse recieved here
-    const data = checkLocalStorage() 
-    data===null? loadJson(data) : callApi()
+    const stored  = await checkLocalStorage()
+    if(stored && stored.data)
+    {
+      await loadJson(stored)
+    }
+    else{
+      await callApi();
+    }
+  }
+  fetchData();
   },[]);
 
   const loadJson = async ({data, timestamp} : {data:jsonResponse, timestamp: Date}) =>{
@@ -102,7 +125,9 @@ export default function DayPlan () {
       entry = key as keyof jsonResponse
       if(data[entry].status === 'active')
       {
+        //                   current time - timestamp of localStorage    in seconds
         const timeElapsed = (Date.now() - new Date(timestamp).getTime()) / 1000;
+        //                activeDay.duration - timepassed since creation
         const timeLeft = data[entry].duration - timeElapsed;
         if(timeLeft>0)
         {
@@ -117,34 +142,7 @@ export default function DayPlan () {
           break;
         }
       }
-    }
-    /*
-    const active = Object.values(data).find(day => day.status === "active")
-    if(active?.duration)
-    {
-      //current time - time when local data was saved
-      var timeElapsed = (Date.now() - (new Date(timestamp).getTime()))/1000
-      const check = timeElapsed < active.duration
-      if(check)
-      {
-        const updatedData = {
-        ...data,
-        [Object.keys(data).find(k => data[k as keyof jsonResponse]?.status === "active")!]: {
-          ...active,
-          duration: active.duration - timeElapsed,
-        },
-      };
-
-        setJsonResponse(data)
-      }
-      else
-      {
-        await callApi()
-      }
-      //check? setJsonResponse(data) : await callApi()
-    }
-    */
-  }
+    }}
   const callApi = async () =>{
     //save data from api into local and state variable 
     var data = {
@@ -165,7 +163,7 @@ export default function DayPlan () {
     }
     try {
       const jsonValue = JSON.stringify(store);
-      console.log("Saving to Local Storage: ", jsonValue)
+      console.log("Data from Api saved to Local Storage: ")
       await AsyncStorage.setItem('JsonResponse', jsonValue);
     } catch (e) {
       console.log('saving error')
@@ -193,43 +191,116 @@ export default function DayPlan () {
   //Mapping JsonResponse to Day Components
   if(!JsonResponse)
   {
-    return <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" />
-      </View>
+    return (
+      <SafeAreaView style={dashboardStyles.container}>
+        {/* Header */}
+        <View style={dashboardStyles.header}>
+          <TouchableOpacity 
+            style={dashboardStyles.menuButton}
+            onPress={openDrawer}
+          >
+            <Ionicons name="menu" size={24} color={colorsSheet.textOnPrimary} />
+          </TouchableOpacity>
+          <Text style={dashboardStyles.headerTitle}>FitFaat Dashboard</Text>
+          <View style={dashboardStyles.spacer} />
+        </View>
+
+        {/* Loading Content */}
+        <View style={dashboardStyles.content}>
+          <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+            <ActivityIndicator size="large" color={colorsSheet.primary} />
+          </View>
+        </View>
+      </SafeAreaView>
+    )
   }
   const daysArray : Day[] = Object.values(JsonResponse); // [day01, day02, ...]
-  return (  <View style={{ flex: 1 }}>
-    <ScrollView style={styles.list}
-                contentContainerStyle={{ paddingBottom: 50 }}
-                showsVerticalScrollIndicator={false} 
-                showsHorizontalScrollIndicator={false} 
-                >
-        {
-  //calling 7 <Day> components with jsonResponse useState data
-          daysArray.map((dayData, index) => (
-              <Days key={index} props={dayData} onDayPress={navigateToDayDetails}/>)
-              )
-        }
-    </ScrollView>
-  </View>);
+  return (
+    <SafeAreaView style={dashboardStyles.container}>
+      {/* Header */}
+      <View style={dashboardStyles.header}>
+        <TouchableOpacity 
+          style={dashboardStyles.menuButton}
+          onPress={openDrawer}
+        >
+          <Ionicons name="menu" size={24} color={colorsSheet.textOnPrimary} />
+        </TouchableOpacity>
+        <Text style={dashboardStyles.headerTitle}>FitFaat Dashboard</Text>
+        <View style={dashboardStyles.spacer} />
+      </View>
+
+      {/* Main Content */}
+      <View style={dashboardStyles.content}>
+        <ScrollView style={styles.list}
+                    contentContainerStyle={{ paddingBottom: 50 }}
+                    showsVerticalScrollIndicator={false} 
+                    showsHorizontalScrollIndicator={false} 
+                    >
+            {
+      //calling 7 <Day> components with jsonResponse useState data
+              daysArray.map((dayData, index) => (
+                  <Days key={index} props={dayData} onDayPress={navigateToDayDetails}/>)
+                  )
+            }
+        </ScrollView>
+      </View>
+    </SafeAreaView>
+  );
 
 };
 
 const styles = StyleSheet.create({
   list: {
   flexGrow: 1,
-  width: "95%",
+  width: "100%",
   alignSelf: "center",
-  marginTop: "5%",
+  marginTop: "2%",
   marginBottom: "3%",
-  borderRadius: 12,
-  backgroundColor: "#EDCCC2",
-  elevation: 2,
-  shadowColor: '#edccc20c',
-  shadowOpacity: 0.3,
-  shadowRadius: 5,
+  borderRadius: 0,
+  backgroundColor: "transparent",
+  elevation: 0,
+  shadowOpacity: 0,
 },
 
+});
+
+const dashboardStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colorsSheet.primary,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: Math.min(wp(5), 20),
+    paddingVertical: Math.min(hp(1.8), 15),
+    backgroundColor: colorsSheet.primary,
+    minHeight: hp(7),
+  },
+  menuButton: {
+    padding: Math.min(wp(2), 10),
+    minWidth: wp(10),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitle: {
+    fontSize: Math.min(hp(2.5), wp(6.2)),
+    fontWeight: "bold",
+    color: colorsSheet.textOnPrimary,
+    textAlign: "center",
+    flex: 1,
+    marginHorizontal: wp(2),
+  },
+  content: {
+    flex: 1,
+    backgroundColor: colorsSheet.screenColor,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+  },
+  spacer: {
+    width: wp(18), // Same width as premium button for balance
+  },
 });
 
 

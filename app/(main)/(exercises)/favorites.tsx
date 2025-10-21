@@ -68,7 +68,7 @@ export default function FavoritesScreen() {
   const navigateToExercise = (exercise: any) => {
     console.log('Navigating to exercise details:', exercise.name);
     router.push({
-      pathname: "/(main)/exercise-details",
+      pathname: "/(main)/(exercises)/exercise-details",
       params: { exercise: JSON.stringify(exercise) }
     });
   };

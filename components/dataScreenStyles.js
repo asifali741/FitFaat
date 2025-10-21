@@ -86,6 +86,7 @@ export const dataScreenStyles = StyleSheet.create({
     marginTop: hp(0.3),
     fontSize: hp(1.8),
     textAlign: "left",
+    paddingHorizontal: hp(1.5),
   },
   miniTextInput: {
     height: hp(5),
@@ -99,6 +100,7 @@ export const dataScreenStyles = StyleSheet.create({
     marginTop: hp(0.2),
     textAlign: "center",
     fontSize: hp(1.8),
+    paddingHorizontal: hp(1),
   },
   genderSelection: {
     height: hp(6),
@@ -168,7 +170,7 @@ export const dataScreenStyles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     alignSelf: "center",
-    backgroundColor: "blue",
+    backgroundColor: "#26867C",
     marginTop: hp(1),
     borderRadius: hp(1),
   },
