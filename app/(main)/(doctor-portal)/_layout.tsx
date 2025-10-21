@@ -1,0 +1,13 @@
+import { ScreenSceneWrapper } from "@/components/common/ScreenTiltAnimation";
+import { Slot } from "expo-router";
+import { View } from "react-native";
+
+export default function DoctorPortalLayout() {
+  return (
+      <ScreenSceneWrapper>
+        <View style={{ flex: 1 }}>
+          <Slot />
+        </View>
+      </ScreenSceneWrapper>
+    );
+}

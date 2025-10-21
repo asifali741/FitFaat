@@ -79,7 +79,7 @@ export default function WorkoutButton({
           navigation.dispatch(DrawerActions.closeDrawer());
         }
         
-        router.push("/(main)/workout");
+        router.push("/(main)/(exercises)/workout");
         console.log("Workout button pressed - navigating to workout screen");
       } catch (error) {
         console.log("Navigation error:", error);
