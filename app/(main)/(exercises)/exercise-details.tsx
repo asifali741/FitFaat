@@ -1,13 +1,13 @@
-import { View, Text, TouchableOpacity, ScrollView } from "react-native";
-import React, { useState, useEffect } from "react";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Image } from "expo-image";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
+import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { XMarkIcon } from "react-native-heroicons/outline";
 import {
-  widthPercentageToDP as wp,
   heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
 } from "react-native-responsive-screen";
-import { Image } from "expo-image";
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function ExerciseDetails() {
   const router = useRouter();

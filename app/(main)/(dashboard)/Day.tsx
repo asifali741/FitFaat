@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, {
   useAnimatedProps,
@@ -35,50 +35,21 @@ export const Days = ({props, onDayPress}: {props: Day, onDayPress: (dayNo : numb
     return <FinishedDay info={props} Press={onDayPress}/>;
   }
   else{
-    console.log("Radius: " + radius + " Width of Window: " + width + ' Hieght: ' + height )
+    //console.log("Radius: " + radius + " Width of Window: " + width + ' Hieght: ' + height )
     return <ActiveDay info={props} Press={onDayPress}/>;
   }
 }
 
 const ActiveDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}) => {
-  const progress = useSharedValue(0);
-  const scale = useSharedValue(1);
-  const finalProgress : number = Math.min(100, Math.round(((info.achievedCalories + info.achieviedHydration) / (info.targetCalories + info.targetHydration)) * 100));
-  
   var time = '00:00:00'
-  const formatDuration = (totalSeconds: number): string => {
-      const hours = Math.floor(totalSeconds / 3600);
-      const mins = Math.floor((totalSeconds % 3600) / 60);
-      const secs = totalSeconds % 60;
-      const pad = (n: number) => n.toString().padStart(2, "0");
-      return `${pad(hours)}:${pad(mins)}:${pad(secs)}`;
-  };
-
-  if (info.duration != null && typeof info.duration === "number") {
-    time = formatDuration(info.duration);
-  }
-  
-  useEffect(() => {
-    progress.value = withSpring(finalProgress, { damping: 12, stiffness: 100 });
-    scale.value = withSpring(1, { damping: 8, stiffness: 150 });
-  }, [finalProgress]);
-  
-  const animatedprops = useAnimatedProps(() => {
-    const strokeDashoffset = circumference - (circumference * progress.value) / 100;
-    return { strokeDashoffset };
-  });
-
+  const scale = useSharedValue(1);
+  const finalProgress : number = Math.min(100, Math.round(((info.achievedCalories + info.achieviedHydration) / (info.targetCalories + info.targetHydration)) * 100))
   const animatedContainerStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
-
-  const getProgressColor = () => {
-    if (finalProgress >= 80) return color.success; // Green
-    if (finalProgress >= 60) return color.warning; // Orange  
-    if (finalProgress >= 40) return color.warning; // Yellow
-    return color.error; // Red
-  };
-
+  useEffect(() => {
+    scale.value = withSpring(1, { damping: 8, stiffness: 150 });
+  }, [finalProgress]);
   return (
     <Animated.View style={[styles.modernActiveItem, animatedContainerStyle]}>
       {/* Header Section */}
@@ -90,31 +61,7 @@ const ActiveDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}) 
             <Text style={styles.modernDateText}>{info.date}</Text>
           </View>
         </View>
-        
-        <View style={styles.modernProgressWrapper}>
-          <Svg height={70} width={70} viewBox="0 0 70 70">
-            <Defs>
-              <LinearGradient id="progressGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <Stop offset="0%" stopColor={getProgressColor()} stopOpacity="1" />
-                <Stop offset="100%" stopColor={getProgressColor()} stopOpacity="0.7" />
-              </LinearGradient>
-            </Defs>
-            <Circle cx="35" cy="35" r="30" stroke="#E0E0E0" strokeWidth="6" fill="none" />
-            <AnimatedCircle
-              cx="35" cy="35" r="30"
-              stroke="url(#progressGrad)"
-              strokeWidth="6"
-              strokeDasharray={circumference * 0.43}
-              animatedProps={animatedprops}
-              strokeLinecap="round"
-              fill="none"
-              transform="rotate(-90 35 35)"
-            />
-            <SvgText x="35" y="35" textAnchor="middle" dy=".3em" fontSize="14" fontWeight="bold" fill={getProgressColor()}>
-              {finalProgress}%
-            </SvgText>
-          </Svg>
-        </View>
+        <ProgressCircle finalProgress={70}/>
       </View>
 
       {/* Progress Status */}
@@ -139,10 +86,8 @@ const ActiveDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}) 
 
       {/* Action Section */}
       <View style={styles.modernActionSection}>
-        <View style={styles.modernNextMeal}>
-          <Ionicons name="time" size={16} color="#9C27B0" />
-          <Text style={styles.modernNextMealText}>Next: {time}</Text>
-        </View>
+        {/**Countdown goes here */}
+        <InfoTray duration={info.duration}/>
         <Pressable 
           onPress={() => Press(info.dayNo)} 
           style={styles.modernViewButton}
@@ -213,12 +158,93 @@ const LockedDay = ({info} : {info: Day}) => {
         
         <View style={styles.modernLockedStatus}>
           <Text style={styles.modernLockedStatusText}>Locked</Text>
-          <Text style={styles.modernLockedSubText}>Complete previous days</Text>
+          <Text style={styles.modernLockedSubText}>Unlocks on {info.date}</Text>
         </View>
       </View>
     </View>
   );
 }
+
+const ProgressCircle = React.memo(({finalProgress}: {finalProgress: number})=>{
+  const progress = useSharedValue(0);
+  useEffect(() => {
+    progress.value = withSpring(finalProgress, { damping: 12, stiffness: 100 });
+  }, [finalProgress]);
+  const animatedprops = useAnimatedProps(() => {
+    const strokeDashoffset = circumference - (circumference * progress.value) / 100;
+    return { strokeDashoffset };
+  });
+  
+  const getProgressColor = () => {
+    if (finalProgress >= 80) return color.success; // Green
+    if (finalProgress >= 60) return color.warning; // Orange  
+    if (finalProgress >= 40) return color.warning; // Yellow
+    return color.error; // Red
+  };
+  return<>
+  <View style={styles.modernProgressWrapper}>
+          <Svg height={70} width={70} viewBox="0 0 70 70">
+            <Defs>
+              <LinearGradient id="progressGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <Stop offset="0%" stopColor={getProgressColor()} stopOpacity="1" />
+                <Stop offset="100%" stopColor={getProgressColor()} stopOpacity="0.7" />
+              </LinearGradient>
+            </Defs>
+            <Circle cx="35" cy="35" r="30" stroke="#E0E0E0" strokeWidth="6" fill="none" />
+            <AnimatedCircle
+              cx="35" cy="35" r="30"
+              stroke="url(#progressGrad)"
+              strokeWidth="6"
+              strokeDasharray={circumference}
+              animatedProps={animatedprops}
+              strokeLinecap="round"
+              fill="none"
+              transform="rotate(-90 35 35)"
+            />
+            <SvgText x="35" y="35" textAnchor="middle" dy=".3em" fontSize="14" fontWeight="bold" fill={getProgressColor()}>
+              {finalProgress}%
+            </SvgText>
+          </Svg>
+        </View>
+  </>
+})
+
+
+const InfoTray = React.memo(({ duration }: { duration: number }) => {
+  const [remainingTime, setRemainingTime] = useState(duration);
+  
+  const formatDuration = (totalSeconds: number): string => {
+    const seconds = Math.max(0, Math.floor(totalSeconds));
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    return `${pad(hours)}:${pad(mins)}:${pad(secs)}`;
+  };
+
+  useEffect(() => {
+    if (remainingTime <= 0) return;
+    const interval = setInterval(() => {
+      setRemainingTime(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <View style={styles.modernNextMeal}>
+          <Ionicons name="time" size={16} color="#9C27B0" />
+          <Text style={styles.modernNextMealText}>Next: {formatDuration(remainingTime)}</Text>
+    </View>
+    
+  );
+});
+
 
 export const styles = StyleSheet.create({
   listitem: {

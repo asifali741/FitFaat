@@ -18,59 +18,49 @@ export default function MainLayout() {
       router.replace("/(auth)");
     }
   }, [isSignedIn]);
-    return <GestureHandlerRootView style={{flex: 1}}>
-        <Drawer
-            drawerContent={(props)=><DrawerSceneWrapper {...props}/>}
-            screenOptions={{
-                headerShown: false,
-                drawerActiveBackgroundColor: color.drawerActiveTabColor, // && "#33b3a6",
-                drawerInactiveBackgroundColor: "transparent",
-                drawerActiveTintColor: "#FFFFFF",
-                drawerInactiveTintColor: "#FFFFFF",
-                overlayColor: "transparent",
-                drawerStyle: {
-                    backgroundColor: color.drawerBackground,
-                    width: "75%",
-                    paddingTop: 40,
-                },
-                drawerLabelStyle: {
-                    marginLeft: 8,
-                    fontSize: 18,
-                    fontFamily: "PoppinsMedium500",
-                    color: "#FFFFFF",
-                    flexShrink: 1,
-                    flexWrap: 'wrap',
-                    flex: 1,
-                },
-                drawerItemStyle: {
-                    marginHorizontal: 12,
-                    marginVertical: 1,
-                    borderRadius: 25,
-                    paddingHorizontal: 20,
-                    paddingVertical: 8,
-                    minHeight: 45,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                },
-                
-                sceneStyle: {
-                    backgroundColor: "#FFFFFF",
-                }
-                }}
-            >
-      {/*add //options={{... , headerShown: false }}// to hide default Drawer Header */}
+    return <GestureHandlerRootView style={{ flex: 1 }}>
+  <Drawer
+    detachInactiveScreens={true}
+    drawerContent={(props) => <DrawerSceneWrapper {...props} />}
+    screenOptions={{
+      lazy: true,
+      headerShown: false,
+      drawerActiveBackgroundColor: color.drawerActiveTabColor,
+      drawerInactiveBackgroundColor: "transparent",
+      drawerActiveTintColor: "#FFFFFF",
+      drawerInactiveTintColor: "#FFFFFF",
+      overlayColor: "transparent",
+      drawerStyle: {
+        backgroundColor: color.drawerBackground,
+        width: "75%",
+        paddingTop: 40,
+      },
+      drawerLabelStyle: {
+        marginLeft: 8,
+        fontSize: 18,
+        fontFamily: "PoppinsMedium500",
+        color: "#FFFFFF",
+      },
+      drawerItemStyle: {
+        marginHorizontal: 12,
+        marginVertical: 1,
+        borderRadius: 25,
+        paddingHorizontal: 20,
+        paddingVertical: 8,
+        minHeight: 45,
+        flexDirection: "row",
+        alignItems: "center",
+      },
+      sceneStyle: { backgroundColor: "#FFFFFF" },
+    }}
+  >
+    <Drawer.Screen name="(dashboard)" options={{ title: "Dashboard" }} />
+    <Drawer.Screen name="(chatbot)" options={{ title: "Chatbot" }} />
+    <Drawer.Screen name="(conference)" options={{ title: "Conference" }} />
+    <Drawer.Screen name="(settings)" options={{ title: "Settings" }} />
+    <Drawer.Screen name="(exercises)/workout" options={{ title: "Workouts 👑" }} />
+    <Drawer.Screen name="(doctor-portal)" options={{ title: "Join as Doctor 👨‍⚕️" }} />
+  </Drawer>
+</GestureHandlerRootView>
 
-      <Drawer.Screen name="(dashboard)" options={{title : "Dashboard", headerShown: false}}/>
-      <Drawer.Screen name="(chatbot)" options={{title : "Chatbot", headerShown: false}}/>
-      <Drawer.Screen name="(conference)" options={{title : "Conference", headerShown: false}}/>
-      <Drawer.Screen name="(settings)" options={{title : "Settings", headerShown: false}}/>
-      <Drawer.Screen name="(exercises)/workout" options={{title : "Workouts 👑", headerShown: false}}/>
-      <Drawer.Screen name="(doctor-portal)" options={{title : "Join as Doctor 👨‍⚕️", headerShown: false}}/>
-      <Drawer.Screen name="profile" options={{title : "hide", headerShown: false, drawerItemStyle:{display:'none'}}}/>
-      <Drawer.Screen name="(exercises)/favorites" options={{title : "hide", headerShown: false, drawerItemStyle:{display:'none'}}}/>
-      <Drawer.Screen name="(exercises)/[bodypart]" options={{title : "hide", headerShown: false, drawerItemStyle:{display:'none'}}}/>
-      <Drawer.Screen name="(exercises)/exercise-details" options={{title : "hide", headerShown: false, drawerItemStyle:{display:'none'}}}/>
-      <Drawer.Screen name="index" options={{title : "hide", headerShown: false, drawerItemStyle:{display:'none'}}}/>
-    </Drawer>
-  </GestureHandlerRootView>
 }
