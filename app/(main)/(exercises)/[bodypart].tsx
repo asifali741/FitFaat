@@ -156,6 +156,7 @@ export default function ExercisesScreen() {
           >
             <Ionicons name="menu" size={24} color={colorsSheet.textOnPrimary} />
           </TouchableOpacity>
+          {/* Dynamic title based on selected body part */}
           <Text style={styles.headerTitle}>{(bodypart || name) as string} Exercises</Text>
           <View style={styles.spacer} />
         </View>
@@ -183,6 +184,7 @@ export default function ExercisesScreen() {
         >
           <Ionicons name="menu" size={24} color={colorsSheet.textOnPrimary} />
         </TouchableOpacity>
+        {/* Dynamic title based on selected body part */}
         <Text style={styles.headerTitle}>{(bodypart || name) as string} Exercises</Text>
         <View style={styles.spacer} />
       </View>
@@ -222,9 +224,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: Math.min(wp(5), 20),
-    paddingVertical: Math.min(hp(1.8), 15),
-    backgroundColor: colorsSheet.primary,
-    minHeight: hp(7),
+    paddingVertical: Math.min(hp(2), 16),
+    backgroundColor: colorsSheet.primary, // Green header background
+    minHeight: hp(8),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
   },
   menuButton: {
     padding: Math.min(wp(2), 10),
@@ -233,11 +240,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   headerTitle: {
-    fontSize: Math.min(hp(2.5), wp(6)),
+    fontSize: Math.min(hp(2.8), wp(6.5)),
     fontWeight: "bold",
     color: colorsSheet.textOnPrimary,
     textAlign: "center",
     flex: 1,
+    letterSpacing: 0.5,
+    textShadowColor: 'rgba(0, 0, 0, 0.1)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   content: {
     flex: 1,
