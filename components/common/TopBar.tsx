@@ -8,13 +8,8 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
+import WorkoutButton from '../WorkoutButton';
 
-type props = {
-    styleName: string
-}
-type WorkoutShortcutProps = {
-    styleName: keyof typeof styles; // keyof and typeof are keywords, stylesis imported from react-native
-};
 
 
 export const Topbar = () => {
@@ -32,12 +27,15 @@ export const Topbar = () => {
             <Text style={styles.Logo}>FitFaat</Text>
         </View>
         <View style={{flexDirection:'row'}}>
-            <View style={styles.circle}>
-                <Image source={require('../../assets/images/PremiumTry.png')} style={styles.circleImg} ></Image>
-                <Text style={styles.tinyWriting}>workout</Text>   
-            </View>
-            <View style={styles.circle}>
-                <Image source={require('../../assets/images/Default_Profile.png')} style={styles.circleProfile}></Image>
+            <View style={styles.workoutButtonContainer}>
+                <WorkoutButton 
+                    title="Premium"
+                    style={{ 
+                        transform: [{ scale: 0.5 }],
+                        marginRight: -5,
+                        marginTop: -3
+                    }}
+                />
             </View>
         </View>
     </View>
@@ -71,40 +69,12 @@ const styles = StyleSheet.create({
         width: 24,
         height: 22
     },
-    circle: {
-        width: 40,
+    workoutButtonContainer: {
+        width: 45,
         height: 40,
-        borderRadius: 35,
-        borderColor: 'black',
-        borderStyle: 'solid',
-        borderWidth: 2,
-        //position: 'absolute',
-        marginRight: 15,
-        display: 'flex',
-        flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
-        overflow: 'hidden',
-        //flexWrap: 'nowrap',
-        //alignContent: 'center',
-        //backgroundColor: 'blue',
-    },
-    circleImg: {
-        width: '45%', 
-        height: '45%', 
-        //resizeMode: 'contain'
-        //backgroundColor: 'blue',
-    },
-    circleProfile: {
-        width: 30,
-        height: 30,
-        //alignSelf: 'center',
-        resizeMode: 'contain',
-        //backgroundColor: 'blue',
-    },
-    tinyWriting:
-    {
-        fontSize: 5,
-        textAlign:'center',
+        marginRight: 8,
+        marginTop: 5,
     }
 });

@@ -1,7 +1,6 @@
-import { ChatBotStyles } from "@/components/ChatBotStyles";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import React from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
@@ -10,10 +9,7 @@ import { colorsSheet } from "../(settings)/ui_elements";
 import { useNavigation } from "@react-navigation/native";
 import { DrawerActions } from "@react-navigation/native";
 
-const FullText =
-  "Hi, I am HeaLora, your AI-powered health companion. I’m designed to support you on your journey toward better well-being by combining advanced technology with personalized care.";
-export default function Index() {
-  const [visibleText, setVisibleText] = useState("");
+export default function DoctorPortal() {
   const router = useRouter();
   const navigation = useNavigation();
 
@@ -21,23 +17,6 @@ export default function Index() {
     navigation.dispatch(DrawerActions.openDrawer());
   };
 
-  const iRef = useRef(0);
-  useEffect(() => {
-    setVisibleText("");
-    iRef.current = 0;
-    const interValId = setInterval(() => {
-      setVisibleText((prev) => {
-        if (iRef.current >= FullText.length) {
-          clearInterval(interValId);
-          return prev;
-        }
-        const updatedText = prev + FullText.charAt(iRef.current);
-        iRef.current++;
-        return updatedText;
-      });
-    }, 100);
-    return () => clearInterval(interValId);
-  }, []);
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -48,49 +27,61 @@ export default function Index() {
         >
           <Ionicons name="menu" size={24} color={colorsSheet.textOnPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>AI Health Assistant</Text>
+        <Text style={styles.headerTitle}>Doctor Portal</Text>
         <View style={styles.spacer} />
       </View>
 
       {/* Main Content */}
       <View style={styles.content}>
-        <View style={styles.titleSection}>
-          <Text style={styles.mainTitle}>
-            Conversations Redefined: {"\n"}
-            The Future of Health Monitoring
+        <View style={styles.welcomeSection}>
+          <Image 
+            source={require("../../../assets/images/logo.png")} 
+            style={styles.logo}
+          />
+          <Text style={styles.welcomeTitle}>Welcome to FitFaat Doctor Portal</Text>
+          <Text style={styles.welcomeSubtitle}>
+            Join our network of healthcare professionals and help patients achieve their fitness goals
           </Text>
         </View>
 
-        <View style={styles.aiSection}>
-          <Image
-            source={require("../../../assets/images/jarvis.png")}
-            style={styles.aiImage}
-          />
-          <View style={styles.textContainer}>
-            <Text style={styles.aiText}>{visibleText}</Text>
+        {/* Features */}
+        <View style={styles.featuresContainer}>
+          <View style={styles.featureItem}>
+            <Ionicons name="videocam" size={30} color={colorsSheet.primary} />
+            <Text style={styles.featureText}>Video Consultations</Text>
+          </View>
+          
+          <View style={styles.featureItem}>
+            <Ionicons name="people" size={30} color={colorsSheet.primaryLight} />
+            <Text style={styles.featureText}>Patient Management</Text>
+          </View>
+          
+          <View style={styles.featureItem}>
+            <Ionicons name="nutrition" size={30} color={colorsSheet.secondary} />
+            <Text style={styles.featureText}>Diet Plan Creation</Text>
           </View>
         </View>
 
-        {/* Start Button */}
+        {/* Action Buttons */}
         <View style={styles.buttonContainer}>
           <TouchableOpacity 
             style={styles.gradientButtonContainer}
-            onPress={() => router.push("/baat")}
+            onPress={() => router.push('/(main)/(doctor-portal)/register')}
             activeOpacity={0.8}
           >
             <LinearGradient
-              colors={[colorsSheet.primary, colorsSheet.primaryLight, colorsSheet.accent]}
+              colors={['#26867C', '#4CAF50', '#66BB6A']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.gradientButton}
             >
-              <Text style={styles.gradientButtonText}>Start Conversation 💬</Text>
+              <Text style={styles.gradientButtonText}>Join as Doctor ✨</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
       </View>
     </SafeAreaView>
-  )
+  );
 }
 
 const styles = StyleSheet.create({
@@ -121,51 +112,59 @@ const styles = StyleSheet.create({
     backgroundColor: colorsSheet.screenColor,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
-    paddingTop: hp(3),
+    paddingTop: hp(4),
     paddingHorizontal: wp(6),
   },
-  titleSection: {
+  welcomeSection: {
     alignItems: "center",
+    marginBottom: hp(4),
+  },
+  logo: {
+    width: hp(8),
+    height: hp(8),
     marginBottom: hp(2),
   },
-  mainTitle: {
-    fontSize: Math.min(hp(3.2), wp(8)),
+  welcomeTitle: {
+    fontSize: Math.min(hp(2.8), wp(7)),
     fontWeight: "bold",
     color: colorsSheet.textPrimary,
     textAlign: "center",
-    lineHeight: Math.min(hp(4), wp(10)),
-    paddingHorizontal: wp(4),
+    marginBottom: hp(1),
+    paddingHorizontal: wp(2),
   },
-  aiSection: {
-    alignItems: "center",
-    flex: 1,
-    justifyContent: "center",
-  },
-  aiImage: {
-    width: Math.min(hp(18), wp(36)),
-    height: Math.min(hp(18), wp(36)),
-    marginBottom: hp(2),
-    borderRadius: Math.min(hp(9), wp(18)),
-  },
-  textContainer: {
-    backgroundColor: colorsSheet.primarySoft,
-    borderRadius: 20,
-    padding: hp(2.5),
-    marginHorizontal: wp(4),
-    marginBottom: hp(3),
-  },
-  aiText: {
-    fontSize: Math.min(hp(2), wp(5)),
-    color: colorsSheet.textOnCard,
+  welcomeSubtitle: {
+    fontSize: Math.min(hp(1.8), wp(4.5)),
+    color: colorsSheet.textSecondary,
     textAlign: "center",
-    lineHeight: Math.min(hp(2.8), wp(7)),
+    lineHeight: Math.min(hp(2.5), wp(6)),
+    paddingHorizontal: wp(6),
+  },
+  featuresContainer: {
+    marginBottom: hp(4),
+  },
+  featureItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: hp(2),
+    paddingHorizontal: wp(4),
+    backgroundColor: colorsSheet.primarySoft,
+    borderRadius: 15,
+    marginBottom: hp(1.5),
+  },
+  featureText: {
+    fontSize: hp(2),
+    color: colorsSheet.textOnCard,
+    marginLeft: wp(4),
+    fontWeight: "500",
   },
   buttonContainer: {
-    paddingBottom: hp(3),
+    flex: 1,
+    justifyContent: "center",
   },
   gradientButtonContainer: {
     borderRadius: 30,
     overflow: "hidden",
+    marginBottom: hp(2),
     shadowColor: colorsSheet.primary,
     shadowOffset: {
       width: 0,
@@ -176,16 +175,15 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   gradientButton: {
-    paddingVertical: Math.min(hp(2.2), wp(5.5)),
-    paddingHorizontal: Math.min(wp(8), 35),
+    paddingVertical: hp(2.5),
+    paddingHorizontal: wp(8),
     borderRadius: 30,
     alignItems: "center",
     justifyContent: "center",
-    minHeight: hp(6),
   },
   gradientButtonText: {
     color: colorsSheet.white,
-    fontSize: Math.min(hp(2.2), wp(5.5)),
+    fontSize: hp(2.4),
     fontWeight: "700",
     letterSpacing: 0.5,
   },

@@ -1,7 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import { DrawerActions } from "@react-navigation/native";
+import { colorsSheet } from "../(settings)/ui_elements";
 import { Days } from "./Day";
 export type Day = {
   dayNo: number,
@@ -91,7 +97,12 @@ const checkLocalStorage = async () => {
 //Main Component
 export default function DayPlan () {
   const router = useRouter();
-  const [JsonResponse, setJsonResponse] = useState<null|jsonResponse>(null); 
+  const navigation = useNavigation();
+  const [JsonResponse, setJsonResponse] = useState<null|jsonResponse>(null);
+
+  const openDrawer = () => {
+    navigation.dispatch(DrawerActions.openDrawer());
+  };
   //Get Data from API or Local Storage
   useEffect( () => { 
     const fetchData =async () => {
@@ -208,43 +219,116 @@ export default function DayPlan () {
   //Mapping JsonResponse to Day Components
   if(!JsonResponse)
   {
-    return <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" />
-      </View>
+    return (
+      <SafeAreaView style={dashboardStyles.container}>
+        {/* Header */}
+        <View style={dashboardStyles.header}>
+          <TouchableOpacity 
+            style={dashboardStyles.menuButton}
+            onPress={openDrawer}
+          >
+            <Ionicons name="menu" size={24} color={colorsSheet.textOnPrimary} />
+          </TouchableOpacity>
+          <Text style={dashboardStyles.headerTitle}>FitFaat Dashboard</Text>
+          <View style={dashboardStyles.spacer} />
+        </View>
+
+        {/* Loading Content */}
+        <View style={dashboardStyles.content}>
+          <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+            <ActivityIndicator size="large" color={colorsSheet.primary} />
+          </View>
+        </View>
+      </SafeAreaView>
+    )
   }
   const daysArray : Day[] = Object.values(JsonResponse); // [day01, day02, ...]
-  return (  <View style={{ flex: 1 }}>
-    <ScrollView style={styles.list}
-                contentContainerStyle={{ paddingBottom: 50 }}
-                showsVerticalScrollIndicator={false} 
-                showsHorizontalScrollIndicator={false} 
-                >
-        {
-  //calling 7 <Day> components with jsonResponse useState data
-          daysArray.map((dayData, index) => (
-              <Days key={index} props={dayData} onDayPress={navigateToDayDetails}/>)
-              )
-        }
-    </ScrollView>
-  </View>);
+  return (
+    <SafeAreaView style={dashboardStyles.container}>
+      {/* Header */}
+      <View style={dashboardStyles.header}>
+        <TouchableOpacity 
+          style={dashboardStyles.menuButton}
+          onPress={openDrawer}
+        >
+          <Ionicons name="menu" size={24} color={colorsSheet.textOnPrimary} />
+        </TouchableOpacity>
+        <Text style={dashboardStyles.headerTitle}>FitFaat Dashboard</Text>
+        <View style={dashboardStyles.spacer} />
+      </View>
+
+      {/* Main Content */}
+      <View style={dashboardStyles.content}>
+        <ScrollView style={styles.list}
+                    contentContainerStyle={{ paddingBottom: 50 }}
+                    showsVerticalScrollIndicator={false} 
+                    showsHorizontalScrollIndicator={false} 
+                    >
+            {
+      //calling 7 <Day> components with jsonResponse useState data
+              daysArray.map((dayData, index) => (
+                  <Days key={index} props={dayData} onDayPress={navigateToDayDetails}/>)
+                  )
+            }
+        </ScrollView>
+      </View>
+    </SafeAreaView>
+  );
 
 };
 
 const styles = StyleSheet.create({
   list: {
   flexGrow: 1,
-  width: "95%",
+  width: "100%",
   alignSelf: "center",
-  marginTop: "5%",
+  marginTop: "2%",
   marginBottom: "3%",
-  borderRadius: 12,
-  backgroundColor: "#EDCCC2",
-  elevation: 2,
-  shadowColor: '#edccc20c',
-  shadowOpacity: 0.3,
-  shadowRadius: 5,
+  borderRadius: 0,
+  backgroundColor: "transparent",
+  elevation: 0,
+  shadowOpacity: 0,
 },
 
+});
+
+const dashboardStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colorsSheet.primary,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: Math.min(wp(5), 20),
+    paddingVertical: Math.min(hp(1.8), 15),
+    backgroundColor: colorsSheet.primary,
+    minHeight: hp(7),
+  },
+  menuButton: {
+    padding: Math.min(wp(2), 10),
+    minWidth: wp(10),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitle: {
+    fontSize: Math.min(hp(2.5), wp(6.2)),
+    fontWeight: "bold",
+    color: colorsSheet.textOnPrimary,
+    textAlign: "center",
+    flex: 1,
+    marginHorizontal: wp(2),
+  },
+  content: {
+    flex: 1,
+    backgroundColor: colorsSheet.screenColor,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+  },
+  spacer: {
+    width: wp(18), // Same width as premium button for balance
+  },
 });
 
 
