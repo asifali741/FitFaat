@@ -1,12 +1,11 @@
+import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DrawerActions, useNavigation } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
-import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
-import { DrawerActions } from "@react-navigation/native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { colorsSheet } from "../(settings)/ui_elements";
 import { Days } from "./Day";
 export type Day = {
@@ -143,34 +142,7 @@ export default function DayPlan () {
           break;
         }
       }
-    }
-    /*
-    const active = Object.values(data).find(day => day.status === "active")
-    if(active?.duration)
-    {
-      //current time - time when local data was saved
-      var timeElapsed = (Date.now() - (new Date(timestamp).getTime()))/1000
-      const check = timeElapsed < active.duration
-      if(check)
-      {
-        const updatedData = {
-        ...data,
-        [Object.keys(data).find(k => data[k as keyof jsonResponse]?.status === "active")!]: {
-          ...active,
-          duration: active.duration - timeElapsed,
-        },
-      };
-
-        setJsonResponse(data)
-      }
-      else
-      {
-        await callApi()
-      }
-      //check? setJsonResponse(data) : await callApi()
-    }
-    */
-  }
+    }}
   const callApi = async () =>{
     //save data from api into local and state variable 
     var data = {

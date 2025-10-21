@@ -1,17 +1,17 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from "react-native";
-import React, { useState, useEffect } from "react";
-import { useRouter, useFocusEffect } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { ScreenSceneWrapper } from "@/components/common/ScreenTiltAnimation";
 import { Ionicons } from "@expo/vector-icons";
-import {
-  widthPercentageToDP as wp,
-  heightPercentageToDP as hp,
-} from "react-native-responsive-screen";
-import { MainImages } from "../../../constants/list";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DrawerActions, useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useState } from "react";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
+} from "react-native-responsive-screen";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { colorsSheet } from "../(settings)/ui_elements";
-import { useNavigation } from "@react-navigation/native";
-import { DrawerActions } from "@react-navigation/native";
+import { MainImages } from "../../../constants/list";
 
 export default function WorkoutScreen() {
   const router = useRouter();
@@ -58,7 +58,9 @@ export default function WorkoutScreen() {
   };
 
   return (
+    <ScreenSceneWrapper>
     <SafeAreaView style={styles.container}>
+      
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
@@ -142,6 +144,7 @@ export default function WorkoutScreen() {
         </ScrollView>
       </View>
     </SafeAreaView>
+    </ScreenSceneWrapper>
   );
 }
 

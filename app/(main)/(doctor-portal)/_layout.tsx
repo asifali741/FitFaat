@@ -1,10 +1,13 @@
-import { Stack } from "expo-router";
+import { ScreenSceneWrapper } from "@/components/common/ScreenTiltAnimation";
+import { Slot } from "expo-router";
+import { View } from "react-native";
 
 export default function DoctorPortalLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" options={{ title: "Doctor Portal" }} />
-      <Stack.Screen name="register" options={{ title: "Doctor Registration" }} />
-    </Stack>
-  );
+      <ScreenSceneWrapper>
+        <View style={{ flex: 1 }}>
+          <Slot />
+        </View>
+      </ScreenSceneWrapper>
+    );
 }

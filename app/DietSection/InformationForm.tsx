@@ -1,10 +1,10 @@
-import React, { useState } from "react";
-import { ActivityIndicator, Alert, Image, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { dataScreenStyles } from "@/components/dataScreenStyles";
+import { useOnboarding } from "@/hooks/useOnboarding";
 import { Ionicons } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
+import React, { useState } from "react";
+import { ActivityIndicator, Alert, Image, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp } from "react-native-responsive-screen";
-import { useOnboarding } from "@/hooks/useOnboarding";
 /**
  * INFORMATIO FORM SCREEN!!!!
  */
@@ -39,8 +39,8 @@ export default function Index() {
   const [name, setName] = useState("");
   const [height, setHeight] = useState("");
   const [weight, setWeight] = useState("");
-  const [selectedGender, setSelectedGender] = useState(null); // 'male', 'female', 'other'
-  const [selectedGoal, setSelectedGoal] = useState(null); // 1, 2, or 3
+  const [selectedGender, setSelectedGender] = useState<'male'|'female'|'other'|null>(null); // 'male', 'female', 'other'
+  const [selectedGoal, setSelectedGoal] = useState<number|null>(null); // 1, 2, or 3
   const [birthDate, setBirthDate] = useState({ day: "", month: "", year: "" });
   
   const [fontsLoaded] = useFonts({
@@ -50,7 +50,7 @@ export default function Index() {
   });
 
   // Handle height input with automatic dot formatting
-  const handleHeightChange = (text) => {
+  const handleHeightChange = (text: string) => {
     // Remove any non-numeric characters except dots
     let cleaned = text.replace(/[^0-9]/g, "");
     
