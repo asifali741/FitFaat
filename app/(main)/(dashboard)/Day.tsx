@@ -1,5 +1,5 @@
 import { useFonts } from "expo-font";
-import { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, {
   useAnimatedProps,
@@ -10,6 +10,9 @@ import Svg, { Circle, Image as SvgImage, Text as SvgText } from "react-native-sv
 import { DashFonts, colorsSheet as color, rs } from "../(settings)/ui_elements";
 import { Day } from "./DayPlan";
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+interface ProgressCircleProps {
+  progress: number;
+}
 
 //const finalProgress = 55; // percent
 const { width,height } = Dimensions.get("window");
@@ -34,122 +37,62 @@ export const Days = ({props, onDayPress}: {props: Day, onDayPress: (dayNo : numb
     console.log("Radius: " + radius + " Width of Window: " + width + ' Hieght: ' + height )
     return <ActiveDay info={props} Press={onDayPress}/>;
   }
-}
+} 
+const ActiveDay = ({ info, Press }: { info: Day; Press: (dayNo: number) => void }) => {
+  const finalProgress = Math.min(
+    100,
+    Math.round(
+      ((info.achievedCalories + info.achieviedHydration) /
+      (info.targetCalories + info.targetHydration)) *
+      100
+    )
+  );
 
-const ActiveDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}) => {
-  const progress = useSharedValue(0);
-  const finalProgress : number = Math.min(100, Math.round(((info.achievedCalories + info.achieviedHydration) / (info.targetCalories + info.targetHydration)) * 100));
-  var time = '00:00:00'
-  const formatDuration = (totalSeconds: number): string => {
-      const hours = Math.floor(totalSeconds / 3600);
-      const mins = Math.floor((totalSeconds % 3600) / 60);
-      const secs = totalSeconds % 60;
-
-      const pad = (n: number) => n.toString().padStart(2, "0");
-
-      return `${pad(hours)}:${pad(mins)}:${pad(secs)}`;
-};
-
-// Usage
-if (info.duration != null && typeof info.duration === "number") {
-  time = formatDuration(info.duration);
-}
-  
-  useEffect(() => {
-    progress.value = withTiming(finalProgress, { duration: 1000 });
-  }, [finalProgress]);
-  
-  // Animated strokeDashoffset
-  const animatedprops = useAnimatedProps(() => {
-    const strokeDashoffset =
-    circumference - (circumference * progress.value) / 100;
-    return {
-      strokeDashoffset,
-    };
-  });
   return (
-    <View style={styles.activeItem /**Columnize the box */}>
-    <View style={styles.topHeader  /**Row of Circle, DayDate, Button */}>
-      {/* Progress Circle */}
-        <View style={styles.circleActiveWrapper /**Circle */}>
-            <Svg
-            height={radius * 2 + 20} 
-            width={radius * 2 + 20}
-            viewBox={`0 0 ${radius * 2 + 20} ${radius * 2 + 20}`}
-            >
-            {/* Background Circle */}
-            <Circle
-              cx="50%"
-              cy={radius + 10}
-              r={radius}
-              stroke="#808080"
-              strokeWidth={ProgressStrokeWidth}
-              strokeDasharray={circumference}
-              fill="none"
-              />
-            {/* Progress Circle */}
-            <AnimatedCircle
-              cx= {radius + 10}
-              cy={radius + 10}
-              r={radius}
-              stroke="#00FF44"
-              strokeWidth={strokeWidth}
-              strokeDasharray={circumference}
-              animatedProps={animatedprops}
-              strokeLinecap="round"
-              fill="none"
-              />
-            <SvgText
-              x= {radius+7}
-              y= {radius+10}
-              textAnchor="middle"
-              dy=".3em"
-              fontSize="15"
-              fontWeight="bold"
-              fill="#000"
-              //fontStyle="italic"
-              >
-              {finalProgress}%
-            </SvgText>
-          </Svg>
-        </View>
-        {/* Day & Date & Remark */}
-        <View style={styles.activeContentWrapper /**DayDate */}>
+    <View style={styles.activeItem}>
+      <View style={styles.topHeader}>
+        <ProgressCircle progress={finalProgress} /> {/**for performance separated from the card */}
+        {/* Day info */}
+        <View style={styles.activeContentWrapper}>
           <View style={styles.row}>
-            <Text style={styles.activeDayText}>Day: 0{info.dayNo} </Text> 
+            <Text style={styles.activeDayText}>Day: 0{info.dayNo}</Text>
             <Text style={styles.activeDateText}>{info.date}</Text>
           </View>
           <Text style={styles.activeSubtitle}>{info.remarks}</Text>
         </View>
         {/* View Button */}
-        <Pressable onPress={() => Press(info.dayNo)} 
-                  style={{backgroundColor: '#000000', height: rs(30), width: rs(70), borderRadius: 8, justifyContent: 'center', alignItems: 'center'}} >
-          <Text style={{color: 'white', fontSize: 12, fontWeight: 'bold'}}>View</Text>
-          </Pressable>
-    </View>
-    <View style={styles.bottomBody}>
-      <View style={styles.activeInformation}>
-        <View style={styles.activeInfoBoxRow}>
-          <Text style={styles.bodyHeadings}>Calories:</Text>
-          <Text style={styles.bodyValues}>{info.achievedCalories}</Text>
-        </View>
-        <View style={styles.activeInfoBoxRow}>
-          <Text style={styles.bodyHeadings}>Hydration:</Text>
-          <Text style={styles.bodyValues}>{info.achieviedHydration} </Text>
-        </View>
-        <View style={styles.activeInfoBoxRow}>
-          <Text style={styles.bodyHeadings}>Next Meal:</Text>
-          <Text style={styles.bodyValues}>{time}</Text>
-        </View>
-        <View style={styles.activeInfoBoxRow}>
-          <Text style={styles.bodyHeadings}>Goal:</Text>
-          <Text style={styles.bodyValues}>{`${info.targetCalories} cals, ${info.targetHydration} liters`}</Text>
+        <Pressable
+          onPress={() => Press(info.dayNo)}
+          style={{backgroundColor: '#000000', height: rs(30), width: rs(70), borderRadius: 8, justifyContent: 'center', alignItems: 'center'}} 
+        >
+          <Text style={{ color: "white", fontSize: 12, fontWeight: "bold" }}>
+            View
+          </Text>
+        </Pressable>
+      </View>
+      <View style={styles.bottomBody}>
+        <View style={styles.activeInformation}>
+          <View style={styles.activeInfoBoxRow}>
+            <Text style={styles.bodyHeadings}>Calories:</Text>
+            <Text style={styles.bodyValues}>{info.achievedCalories}</Text>
+          </View>
+          <View style={styles.activeInfoBoxRow}>
+            <Text style={styles.bodyHeadings}>Hydration:</Text>
+            <Text style={styles.bodyValues}>{info.achieviedHydration}</Text>
+          </View>
+          <InfoTray duration={info.duration} />
+          <View style={styles.activeInfoBoxRow}>
+            <Text style={styles.bodyHeadings}>Goal:</Text>
+            <Text style={styles.bodyValues}>
+              {`${info.targetCalories} cals, ${info.targetHydration} liters`}
+            </Text>
+          </View>
         </View>
       </View>
     </View>
-    
-  </View>);
-}
+  );
+};
+
 
 const FinishedDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}) => {
   const [fontsLoaded] = useFonts({
@@ -397,4 +340,97 @@ export const styles = StyleSheet.create({
     fontSize: rs(15),
     fontWeight: "700",
   },
+});
+
+
+
+const ProgressCircle = React.memo(({ progress }: ProgressCircleProps) => {
+  const animatedProgress = useSharedValue(0);
+
+  const animatedProps = useAnimatedProps(() => {
+    const strokeDashoffset =
+      circumference - (circumference * animatedProgress.value) / 100;
+    return { strokeDashoffset };
+  });
+
+  useEffect(() => {
+    animatedProgress.value = withTiming(progress, { duration: 1000 });
+  }, [progress]);
+
+  return (
+    <View>
+      <Svg
+        height={radius * 2 + 20}
+        width={radius * 2 + 20}
+        viewBox={`0 0 ${radius * 2 + 20} ${radius * 2 + 20}`}
+      >
+        <Circle
+          cx="50%"
+          cy={radius + 10}
+          r={radius}
+          stroke="#808080"
+          strokeWidth={ProgressStrokeWidth}
+          strokeDasharray={circumference}
+          fill="none"
+        />
+        <AnimatedCircle
+          cx={radius + 10}
+          cy={radius + 10}
+          r={radius}
+          stroke="#00FF44"
+          strokeWidth={strokeWidth}
+          strokeDasharray={circumference}
+          animatedProps={animatedProps}
+          strokeLinecap="round"
+          fill="none"
+        />
+        <SvgText
+          x={radius + 7}
+          y={radius + 10}
+          textAnchor="middle"
+          dy=".3em"
+          fontSize="15"
+          fontWeight="bold"
+          fill="#000"
+        >
+          {progress}%
+        </SvgText>
+      </Svg>
+    </View>
+  );
+});
+
+
+const InfoTray = React.memo(({ duration }: { duration: number }) => {
+  const [remainingTime, setRemainingTime] = useState(duration);
+  
+  const formatDuration = (totalSeconds: number): string => {
+    const seconds = Math.max(0, Math.floor(totalSeconds));
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    return `${pad(hours)}:${pad(mins)}:${pad(secs)}`;
+  };
+
+  useEffect(() => {
+    if (remainingTime <= 0) return;
+    const interval = setInterval(() => {
+      setRemainingTime(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <View style={styles.activeInfoBoxRow}>
+      <Text style={styles.bodyHeadings}>Next Meal:</Text>
+      <Text style={styles.bodyValues}>{formatDuration(remainingTime)}</Text>
+    </View>
+  );
 });
