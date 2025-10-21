@@ -66,16 +66,20 @@ const ActiveDay : Day = {
   targetCalories: 2330,
   targetHydration: 1400,
   remarks: "Almost there, Dinner is in 2h!",
-  duration: 60, // in secs
+  duration: 1900, // in secs
   status: "active"
 }
 //Check local storage
 const checkLocalStorage = async () => {
   try {
     const jsonValue = await AsyncStorage.getItem('JsonResponse');
-    if (!jsonValue) return null;
-    const parsed = JSON.parse(jsonValue) as { data: jsonResponse; timestamp: string };
-    console.log("Local Storage Data: ", parsed);
+    if (!jsonValue) {
+      console.log('jsonvalue ')
+      return null;
+    }
+    const parsed = JSON.parse(jsonValue) as { data: jsonResponse; timestamp: Date };
+    console.log('jsonvalue not null ')
+    console.log("Local Storage Data Found: ");
     return parsed;
   } catch (e) {
     console.log("Error reading local storage", e);
@@ -90,9 +94,18 @@ export default function DayPlan () {
   const [JsonResponse, setJsonResponse] = useState<null|jsonResponse>(null); 
   //Get Data from API or Local Storage
   useEffect( () => { 
+    const fetchData =async () => {
     console.log("Fetching Day Data...");  //JsonResponse recieved here
-    const data = checkLocalStorage() 
-    data===null? loadJson(data) : callApi()
+    const stored  = await checkLocalStorage()
+    if(stored && stored.data)
+    {
+      await loadJson(stored)
+    }
+    else{
+      await callApi();
+    }
+  }
+  fetchData();
   },[]);
 
   const loadJson = async ({data, timestamp} : {data:jsonResponse, timestamp: Date}) =>{
@@ -102,7 +115,9 @@ export default function DayPlan () {
       entry = key as keyof jsonResponse
       if(data[entry].status === 'active')
       {
+        //                   current time - timestamp of localStorage    in seconds
         const timeElapsed = (Date.now() - new Date(timestamp).getTime()) / 1000;
+        //                activeDay.duration - timepassed since creation
         const timeLeft = data[entry].duration - timeElapsed;
         if(timeLeft>0)
         {
@@ -165,7 +180,7 @@ export default function DayPlan () {
     }
     try {
       const jsonValue = JSON.stringify(store);
-      console.log("Saving to Local Storage: ", jsonValue)
+      console.log("Data from Api saved to Local Storage: ")
       await AsyncStorage.setItem('JsonResponse', jsonValue);
     } catch (e) {
       console.log('saving error')
