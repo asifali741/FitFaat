@@ -40,8 +40,9 @@ export default function ExercisesScreen() {
   const navigation = useNavigation();
   const { bodypart, name } = useLocalSearchParams();
 
-  const openDrawer = () => {
-    navigation.dispatch(DrawerActions.openDrawer());
+  const handleBackPress = () => {
+    // Navigate back to workout screen explicitly
+    router.push('/(main)/(exercises)/workout');
   };
 
   useEffect(() => {
@@ -151,10 +152,10 @@ export default function ExercisesScreen() {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity 
-            style={styles.menuButton}
-            onPress={openDrawer}
+            style={styles.backButton}
+            onPress={handleBackPress}
           >
-            <Ionicons name="menu" size={24} color={colorsSheet.textOnPrimary} />
+            <Ionicons name="arrow-back" size={24} color={colorsSheet.textOnPrimary} />
           </TouchableOpacity>
           {/* Dynamic title based on selected body part */}
           <Text style={styles.headerTitle}>{(bodypart || name) as string} Exercises</Text>
@@ -179,10 +180,10 @@ export default function ExercisesScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
-          style={styles.menuButton}
-          onPress={openDrawer}
+          style={styles.backButton}
+          onPress={handleBackPress}
         >
-          <Ionicons name="menu" size={24} color={colorsSheet.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colorsSheet.textOnPrimary} />
         </TouchableOpacity>
         {/* Dynamic title based on selected body part */}
         <Text style={styles.headerTitle}>{(bodypart || name) as string} Exercises</Text>
@@ -233,7 +234,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 4,
   },
-  menuButton: {
+  backButton: {
     padding: Math.min(wp(2), 10),
     minWidth: wp(10),
     alignItems: "center",
@@ -258,7 +259,7 @@ const styles = StyleSheet.create({
     paddingTop: hp(2),
   },
   spacer: {
-    width: wp(18),
+    width: wp(10),
   },
   loadingContainer: {
     flex: 1,

@@ -1,6 +1,8 @@
-import { View, Text, ScrollView, TouchableOpacity, Image } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, Image, StyleSheet } from "react-native";
 import React from "react";
 import { useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { ChevronLeftIcon } from "react-native-heroicons/outline";
 import {
   widthPercentageToDP as wp,
@@ -11,43 +13,21 @@ export default function ProfileScreen() {
   const router = useRouter();
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#f8f8f8' }}>
+    <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        width: '100%',
-        marginTop: hp(6),
-        paddingHorizontal: wp(5),
-        marginBottom: hp(3),
-      }}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <View style={{
-            width: hp(7),
-            height: hp(7),
-            backgroundColor: '#FFD700',
-            justifyContent: 'center',
-            alignItems: 'center',
-            borderRadius: hp(1.5),
-          }}>
-            <ChevronLeftIcon
-              size={hp(4.5)}
-              color="black"
-              strokeWidth={4.5}
-            />
-          </View>
+      <View style={styles.header}>
+        <TouchableOpacity 
+          onPress={() => router.back()}
+          style={styles.backButton}
+        >
+          <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
-        <Text style={{
-          fontSize: hp(3),
-          fontWeight: 'bold',
-          color: '#333',
-          flex: 1,
-          textAlign: 'center',
-          marginRight: hp(7),
-        }}>
-          My Profile 👤
-        </Text>
+        
+        <Text style={styles.headerTitle}>My Profile</Text>
+        
+        <TouchableOpacity style={styles.editButton}>
+          <Ionicons name="person" size={24} color="#26867C" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -178,6 +158,53 @@ export default function ProfileScreen() {
           ))}
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f8f8f8',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: wp(5),
+    paddingVertical: hp(2),
+    backgroundColor: '#f8f8f8',
+  },
+  backButton: {
+    width: hp(5),
+    height: hp(5),
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: hp(2.5),
+    backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  headerTitle: {
+    fontSize: hp(2.5),
+    fontWeight: 'bold',
+    color: '#333',
+    letterSpacing: 0.5,
+  },
+  editButton: {
+    width: hp(5),
+    height: hp(5),
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: hp(2.5),
+    backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+});
