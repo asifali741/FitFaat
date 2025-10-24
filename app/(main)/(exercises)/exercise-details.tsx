@@ -2,17 +2,26 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
-import { XMarkIcon } from "react-native-heroicons/outline";
+import { ScrollView, Text, TouchableOpacity, View, StyleSheet } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import {
   heightPercentageToDP as hp,
   widthPercentageToDP as wp,
 } from "react-native-responsive-screen";
+import { colorsSheet } from "../(settings)/ui_elements";
 
 export default function ExerciseDetails() {
   const router = useRouter();
+  const navigation = useNavigation();
   const { exercise } = useLocalSearchParams();
   const [isFavorite, setIsFavorite] = useState(false);
+
+  const handleBackPress = () => {
+    // Use React Navigation's goBack for proper navigation stack handling
+    navigation.goBack();
+  };
   
   let exerciseData;
   try {
@@ -84,52 +93,55 @@ export default function ExerciseDetails() {
 
   if (!exerciseData) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>Error loading exercise details</Text>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={{ color: '#FF6B6B', marginTop: 20 }}>Go Back</Text>
-        </TouchableOpacity>
-      </View>
+      <SafeAreaView style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={handleBackPress}
+          >
+            <Ionicons name="arrow-back" size={24} color={colorsSheet.textOnPrimary} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Exercise Details</Text>
+          <View style={styles.spacer} />
+        </View>
+        
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colorsSheet.screenColor }}>
+          <Text>Error loading exercise details</Text>
+          <TouchableOpacity onPress={handleBackPress}>
+            <Text style={{ color: '#FF6B6B', marginTop: 20 }}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#f8f8f8' }}>
-      <TouchableOpacity
-        onPress={() => router.back()}
-        style={{ zIndex: 10 }}
-      >
-        <View
-          style={{
-            height: hp(7),
-            width: hp(7),
-            backgroundColor: '#FFD700',
-            borderRadius: hp(2),
-            justifyContent: 'center',
-            alignItems: 'center',
-            marginTop: hp(6),
-            marginLeft: hp(2),
-          }}
+    <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={handleBackPress}
         >
-          <XMarkIcon
-            size={hp(4.5)}
-            color="red"
-            strokeWidth={4.5}
-          />
-        </View>
-      </TouchableOpacity>
-      
-      <Image
-        source={{ uri: exerciseData.gifUrl }}
-        contentFit="cover"
-        style={{
-          height: hp(45),
-          width: "100%",
-          borderBottomLeftRadius: 30,
-          borderBottomRightRadius: 30,
-          marginTop: hp(-8), // Overlap with button
-        }}
-      />
+          <Ionicons name="arrow-back" size={24} color={colorsSheet.textOnPrimary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Exercise Details</Text>
+        <View style={styles.spacer} />
+      </View>
+
+      {/* Main Content */}
+      <View style={styles.content}>
+        <Image
+          source={{ uri: exerciseData.gifUrl }}
+          contentFit="cover"
+          style={{
+            height: hp(45),
+            width: "100%",
+            borderBottomLeftRadius: 30,
+            borderBottomRightRadius: 30,
+          }}
+        />
       
       <ScrollView 
         showsVerticalScrollIndicator={false} 
@@ -284,6 +296,54 @@ export default function ExerciseDetails() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colorsSheet.primary,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: Math.min(wp(5), 20),
+    paddingVertical: Math.min(hp(2), 16),
+    backgroundColor: colorsSheet.primary,
+    minHeight: hp(8),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  backButton: {
+    padding: Math.min(wp(2), 10),
+    minWidth: wp(10),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitle: {
+    fontSize: Math.min(hp(2.8), wp(6.5)),
+    fontWeight: "bold",
+    color: colorsSheet.textOnPrimary,
+    textAlign: "center",
+    flex: 1,
+    letterSpacing: 0.5,
+    textShadowColor: 'rgba(0, 0, 0, 0.1)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+  content: {
+    flex: 1,
+    backgroundColor: colorsSheet.screenColor,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+  },
+  spacer: {
+    width: wp(10),
+  },
+});
