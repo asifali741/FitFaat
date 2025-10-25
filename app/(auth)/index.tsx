@@ -1,4 +1,3 @@
-import { useAuth } from "@clerk/clerk-expo";
 import { useFonts } from "expo-font";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -12,6 +11,7 @@ const FULL_TEXT =
 
 export default function Index() {
   const { handleGoogleAuth } = useSocialAuth();
+  const router = useRouter();
   const [visibleText, setVisibleText] = useState("");
   const [fontsLoaded] = useFonts({
     Pacifico: require("../../assets/fonts/Pacifico-Regular.ttf"),
@@ -73,6 +73,25 @@ export default function Index() {
             style={styles.googleLogo}
           />
           <Text style={styles.googleText}>Sign in with Google</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => {
+            
+            router.push('/email-login');
+          }}
+          style={[styles.buttonDesign, { marginTop: 10 }]}
+        >
+          <Text style={styles.googleText}>Login with Email</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => {
+            router.push('/email-signup');
+          }}
+          style={[styles.buttonDesign, { marginTop: 10 }]}
+        >
+          <Text style={styles.googleText}>Sign up with Email</Text>
         </TouchableOpacity>
       </View>
     </View>

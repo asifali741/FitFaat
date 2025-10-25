@@ -1,12 +1,12 @@
 import { dataScreenStyles } from "@/components/dataScreenStyles";
-import { useOnboarding } from "@/hooks/useOnboarding";
+import { useCustomOnboarding } from "@/hooks/useCustomOnboarding";
 import { Ionicons } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
 import React, { useState } from "react";
 import { ActivityIndicator, Alert, Image, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp } from "react-native-responsive-screen";
 /**
- * INFORMATIO FORM SCREEN!!!!
+ * INFORMATION FORM SCREEN!!!!
  */
 const data = [
   {
@@ -33,7 +33,7 @@ const data = [
 ];
 
 export default function Index() {
-  const { completeOnboarding, isLoading } = useOnboarding();
+  const { completeOnboarding, isLoading } = useCustomOnboarding();
   
   // Form state
   const [name, setName] = useState("");
@@ -86,45 +86,61 @@ export default function Index() {
   };
 
   const handleFormSubmit = async () => {
-    // Validate form before submission
-    const missingFields = validateForm();
-    
-    if (missingFields.length > 0) {
-      const fieldList = missingFields.join(', ');
-      Alert.alert(
-        'Incomplete Form',
-        `Please fill in all fields. Missing: ${fieldList}`,
-        [{ text: 'OK', style: 'default' }]
-      );
-      return;
+    try {
+      // Validate form before submission
+      const missingFields = validateForm();
+      
+      if (missingFields.length > 0) {
+        const fieldList = missingFields.join(', ');
+        Alert.alert(
+          'Incomplete Form',
+          `Please fill in all fields. Missing: ${fieldList}`,
+          [{ text: 'OK', style: 'default' }]
+        );
+        return;
+      }
+      
+      // Validate date of birth format
+      const day = parseInt(birthDate.day);
+      const month = parseInt(birthDate.month);
+      const year = parseInt(birthDate.year);
+      
+      if (day < 1 || day > 31 || month < 1 || month > 12 || year < 1900 || year > new Date().getFullYear()) {
+        Alert.alert(
+          'Invalid Date',
+          'Please enter a valid date of birth',
+          [{ text: 'OK', style: 'default' }]
+        );
+        return;
+      }
+      
+      // Validate gender and goal
+      if (!selectedGender) {
+        Alert.alert('Error', 'Please select your gender');
+        return;
+      }
+      
+      if (!selectedGoal) {
+        Alert.alert('Error', 'Please select your fitness goal');
+        return;
+      }
+
+      // Log the form data and complete onboarding
+      const formData = {
+        name,
+        height,
+        weight,
+        selectedGender,
+        selectedGoal,
+        birthDate
+      };
+      console.log('Form data:', formData);
+      
+      // Complete the onboarding process with the validated form data
+      await completeOnboarding(formData);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to save information. Please try again.');
     }
-    
-    // Validate date of birth format
-    const day = parseInt(birthDate.day);
-    const month = parseInt(birthDate.month);
-    const year = parseInt(birthDate.year);
-    
-    if (day < 1 || day > 31 || month < 1 || month > 12 || year < 1900 || year > new Date().getFullYear()) {
-      Alert.alert(
-        'Invalid Date',
-        'Please enter a valid date of birth',
-        [{ text: 'OK', style: 'default' }]
-      );
-      return;
-    }
-    
-    // Here you would typically save the form data
-    console.log('Form data:', {
-      name: name.trim(),
-      height,
-      weight,
-      selectedGender,
-      selectedGoal,
-      birthDate
-    });
-    
-    // Complete the onboarding process
-    await completeOnboarding();
   };
 
   if (!fontsLoaded) {
