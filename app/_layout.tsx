@@ -6,9 +6,20 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, StatusBar, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
+
+console.log('Clerk Key Status:', publishableKey ? 'Found' : 'Missing');
+console.log('Key Length:', publishableKey?.length || 0);
+
+if (!publishableKey) {
+  throw new Error(
+    'Missing Publishable Key. Please set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env'
+  );
+}
+
 export default function RootLayout() {
   return (
-    <ClerkProvider tokenCache={tokenCache} publishableKey={process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY}> 
+    <ClerkProvider tokenCache={tokenCache} publishableKey={publishableKey}> 
       <SafeAreaProvider>
       <StatusBar barStyle="dark-content"/>
         <SafeScreen>
