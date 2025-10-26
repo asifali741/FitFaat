@@ -1,10 +1,10 @@
+import { dataScreenStyles } from "@/components/dataScreenStyles";
+import { Ionicons } from '@expo/vector-icons';
+import { useFonts } from "expo-font";
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import { ActivityIndicator, Alert, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
-import { dataScreenStyles } from "@/components/dataScreenStyles";
-import { Ionicons } from "@expo/vector-icons";
-import { useFonts } from "expo-font";
 import { heightPercentageToDP as hp } from "react-native-responsive-screen";
-import { useRouter } from "expo-router";
 import { colorsSheet } from "../(settings)/ui_elements";
 
 const specializations = [
@@ -22,6 +22,81 @@ const consultationModes = [
   { id: 3, name: "Both", icon: "options", color: colorsSheet.primary },
 ];
 
+// Dropdown options
+const genderOptions = [
+  { label: "Male", value: "male" },
+  { label: "Female", value: "female" },
+  { label: "Other", value: "other" },
+];
+
+const specializationOptions = [
+  { label: "Cardiologist", value: "cardiologist" },
+  { label: "Dermatologist", value: "dermatologist" },
+  { label: "Neurologist", value: "neurologist" },
+  { label: "Pediatrician", value: "pediatrician" },
+  { label: "Orthopedic", value: "orthopedic" },
+  { label: "Gynecologist", value: "gynecologist" },
+  { label: "General Practitioner", value: "general_practitioner" },
+  { label: "Psychiatrist", value: "psychiatrist" },
+  { label: "Oncologist", value: "oncologist" },
+  { label: "Endocrinologist", value: "endocrinologist" },
+];
+
+const consultationModeOptions = [
+  { label: "In-person Only", value: "in_person" },
+  { label: "Online Only", value: "online" },
+  { label: "Both In-person and Online", value: "both" },
+];
+
+const experienceOptions = [
+  { label: "0-1 years", value: "0-1" },
+  { label: "2-5 years", value: "2-5" },
+  { label: "6-10 years", value: "6-10" },
+  { label: "11-15 years", value: "11-15" },
+  { label: "16-20 years", value: "16-20" },
+  { label: "20+ years", value: "20+" },
+];
+
+const qualificationOptions = [
+  { label: "MBBS", value: "mbbs" },
+  { label: "MD", value: "md" },
+  { label: "MS", value: "ms" },
+  { label: "DM", value: "dm" },
+  { label: "MCh", value: "mch" },
+  { label: "DNB", value: "dnb" },
+  { label: "Other", value: "other" },
+];
+
+const languageOptions = [
+  { label: "English", value: "english" },
+  { label: "Hindi", value: "hindi" },
+  { label: "Spanish", value: "spanish" },
+  { label: "French", value: "french" },
+  { label: "German", value: "german" },
+  { label: "Chinese", value: "chinese" },
+  { label: "Arabic", value: "arabic" },
+  { label: "Portuguese", value: "portuguese" },
+  { label: "Russian", value: "russian" },
+  { label: "Japanese", value: "japanese" },
+];
+
+const availableDaysOptions = [
+  { label: "Monday to Friday", value: "mon-fri" },
+  { label: "Monday to Saturday", value: "mon-sat" },
+  { label: "Monday to Sunday", value: "mon-sun" },
+  { label: "Weekends Only", value: "weekends" },
+  { label: "Custom Schedule", value: "custom" },
+];
+
+const availableHoursOptions = [
+  { label: "9:00 AM - 5:00 PM", value: "9am-5pm" },
+  { label: "8:00 AM - 6:00 PM", value: "8am-6pm" },
+  { label: "10:00 AM - 7:00 PM", value: "10am-7pm" },
+  { label: "24/7 Available", value: "24-7" },
+  { label: "Evening Hours (5 PM - 10 PM)", value: "evening" },
+  { label: "Custom Hours", value: "custom" },
+];
+
 export default function DoctorRegistration() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -35,7 +110,7 @@ export default function DoctorRegistration() {
     profilePicture: "",
     selectedGender: null,
     birthDate: { day: "", month: "", year: "" },
-    selectedSpecialization: null,
+    specialization: "",
     medicalLicense: "",
     licenseAuthority: "",
     yearsExperience: "",
@@ -44,7 +119,7 @@ export default function DoctorRegistration() {
     clinicName: "",
     clinicAddress: "",
     consultationFee: "",
-    languagesSpoken: "",
+    primaryLanguage: "",
     bio: "",
     availableDays: "",
     availableHours: "",
@@ -62,14 +137,14 @@ export default function DoctorRegistration() {
     const required = [
       'fullName', 'email', 'phoneNumber', 'password', 'medicalLicense', 
       'licenseAuthority', 'yearsExperience', 'qualification', 'university',
-      'clinicName', 'clinicAddress', 'consultationFee', 'languagesSpoken',
+      'clinicName', 'clinicAddress', 'consultationFee', 'primaryLanguage',
       'bio', 'availableDays', 'availableHours'
     ];
     
     const missingFields = [];
     
     required.forEach(field => {
-      if (!formData[field].trim()) {
+      if (!(formData as any)[field]?.trim()) {
         missingFields.push(field.replace(/([A-Z])/g, ' $1').toLowerCase());
       }
     });
@@ -78,7 +153,7 @@ export default function DoctorRegistration() {
     if (!formData.birthDate.day.trim() || !formData.birthDate.month.trim() || !formData.birthDate.year.trim()) {
       missingFields.push('date of birth');
     }
-    if (!formData.selectedSpecialization) missingFields.push('specialization');
+    if (!formData.specialization) missingFields.push('specialization');
     if (!formData.selectedConsultationMode) missingFields.push('consultation mode');
     
     return missingFields;
@@ -102,14 +177,8 @@ export default function DoctorRegistration() {
       // Here you would submit the doctor registration data
       console.log('Doctor Registration Data:', formData);
       
-      Alert.alert(
-        'Registration Submitted',
-        'Your doctor registration has been submitted successfully. We will review and get back to you within 24 hours.',
-        [{ 
-          text: 'OK', 
-          onPress: () => router.back()
-        }]
-      );
+      // Navigate to application status screen
+      router.push('/(main)/(doctor-portal)/application-status');
     } catch (error) {
       console.error('Registration error:', error);
       Alert.alert('Error', 'Failed to submit registration. Please try again.');
@@ -118,7 +187,7 @@ export default function DoctorRegistration() {
     }
   };
 
-  const updateFormData = (field, value) => {
+  const updateFormData = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -197,29 +266,29 @@ export default function DoctorRegistration() {
             <TouchableOpacity 
               style={[
                 dataScreenStyles.genderSelection,
-                formData.selectedGender === 'male' && { backgroundColor: colorsSheet.primarySoft, borderColor: colorsSheet.primary, borderWidth: 2 }
+                formData.selectedGender === 'male' && { backgroundColor: '#e3f2fd', borderColor: '#2563eb', borderWidth: 2 }
               ]}
               onPress={() => updateFormData('selectedGender', 'male')}
             >
-              <Ionicons name="male-outline" size={32} color={colorsSheet.primary} />
+              <Ionicons name="male-outline" size={32} color="#2563eb" />
             </TouchableOpacity>
             <TouchableOpacity 
               style={[
                 dataScreenStyles.genderSelection,
-                formData.selectedGender === 'female' && { backgroundColor: colorsSheet.primarySoft, borderColor: colorsSheet.secondary, borderWidth: 2 }
+                formData.selectedGender === 'female' && { backgroundColor: '#fce4ec', borderColor: '#db2777', borderWidth: 2 }
               ]}
               onPress={() => updateFormData('selectedGender', 'female')}
             >
-              <Ionicons name="female-outline" size={32} color={colorsSheet.secondary} />
+              <Ionicons name="female-outline" size={32} color="#db2777" />
             </TouchableOpacity>
             <TouchableOpacity 
               style={[
                 dataScreenStyles.genderSelection,
-                formData.selectedGender === 'other' && { backgroundColor: colorsSheet.primarySoft, borderColor: colorsSheet.primaryLight, borderWidth: 2 }
+                formData.selectedGender === 'other' && { backgroundColor: '#f3e5f5', borderColor: 'purple', borderWidth: 2 }
               ]}
               onPress={() => updateFormData('selectedGender', 'other')}
             >
-              <Ionicons name="male-female-outline" size={32} color={colorsSheet.primaryLight} />
+              <Ionicons name="male-female-outline" size={32} color="purple" />
             </TouchableOpacity>
           </View>
         </View>
@@ -260,37 +329,15 @@ export default function DoctorRegistration() {
         {/* Professional Information */}
         <Text style={[dataScreenStyles.subHeading, {marginTop: hp(2)}]}>Professional Information</Text>
         
-        {/* Specialization Selection */}
+        {/* Specialization */}
         <Text style={dataScreenStyles.subHeading}>Specialization *</Text>
-        <View style={dataScreenStyles.mappingCol}>
-          {specializations.map((item) => (
-            <TouchableOpacity 
-              key={item.id} 
-              style={[
-                dataScreenStyles.mapping,
-                formData.selectedSpecialization === item.id && { 
-                  backgroundColor: colorsSheet.primarySoft, 
-                  borderColor: item.color, 
-                  borderWidth: 2 
-                }
-              ]}
-              onPress={() => updateFormData('selectedSpecialization', item.id)}
-            >
-              <Ionicons
-                name={item.icon as keyof typeof Ionicons.glyphMap}
-                size={26}
-                color={item.color}
-                style={{ marginRight: hp(1) }}
-              />
-              <View style={{ flexDirection: "column" }}>
-                <Text style={[
-                  dataScreenStyles.mappingHeading,
-                  formData.selectedSpecialization === item.id && { fontWeight: 'bold' }
-                ]}>{item.name}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
+        <TextInput
+          placeholderTextColor="#999"
+          placeholder="e.g. Cardiologist, Dermatologist, etc."
+          style={dataScreenStyles.mainTextInput}
+          value={formData.specialization}
+          onChangeText={(value) => updateFormData('specialization', value)}
+        />
 
         <View style={dataScreenStyles.subContainer}>
           <View>
@@ -318,8 +365,7 @@ export default function DoctorRegistration() {
             <Text style={dataScreenStyles.subsubHeading}>Years Experience *</Text>
             <TextInput
               style={dataScreenStyles.miniTextInput}
-              placeholder="e.g. 5"
-              keyboardType="numeric"
+              placeholder="e.g. 5 years"
               value={formData.yearsExperience}
               onChangeText={(value) => updateFormData('yearsExperience', value)}
             />
@@ -377,12 +423,12 @@ export default function DoctorRegistration() {
             />
           </View>
           <View>
-            <Text style={dataScreenStyles.subsubHeading}>Languages *</Text>
+            <Text style={dataScreenStyles.subsubHeading}>Primary Language *</Text>
             <TextInput
               style={dataScreenStyles.miniTextInput}
-              placeholder="English, Hindi"
-              value={formData.languagesSpoken}
-              onChangeText={(value) => updateFormData('languagesSpoken', value)}
+              placeholder="e.g. English"
+              value={formData.primaryLanguage}
+              onChangeText={(value) => updateFormData('primaryLanguage', value)}
             />
           </View>
         </View>
@@ -405,7 +451,7 @@ export default function DoctorRegistration() {
             <Text style={dataScreenStyles.subsubHeading}>Available Days *</Text>
             <TextInput
               style={dataScreenStyles.miniTextInput}
-              placeholder="Mon-Fri"
+              placeholder="e.g. Mon-Fri"
               value={formData.availableDays}
               onChangeText={(value) => updateFormData('availableDays', value)}
             />
@@ -414,7 +460,7 @@ export default function DoctorRegistration() {
             <Text style={dataScreenStyles.subsubHeading}>Available Hours *</Text>
             <TextInput
               style={dataScreenStyles.miniTextInput}
-              placeholder="9AM-5PM"
+              placeholder="e.g. 9AM-5PM"
               value={formData.availableHours}
               onChangeText={(value) => updateFormData('availableHours', value)}
             />
@@ -430,7 +476,7 @@ export default function DoctorRegistration() {
               style={[
                 dataScreenStyles.mapping,
                 formData.selectedConsultationMode === item.id && { 
-                  backgroundColor: colorsSheet.primarySoft, 
+                  backgroundColor: '#f0f8ff', 
                   borderColor: item.color, 
                   borderWidth: 2 
                 }
@@ -438,7 +484,7 @@ export default function DoctorRegistration() {
               onPress={() => updateFormData('selectedConsultationMode', item.id)}
             >
               <Ionicons
-                name={item.icon as keyof typeof Ionicons.glyphMap}
+                name={item.icon as any}
                 size={26}
                 color={item.color}
                 style={{ marginRight: hp(1) }}
