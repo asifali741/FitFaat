@@ -1,14 +1,12 @@
 import { colorsSheet as colors } from "@/app/(main)/(settings)/ui_elements";
-import { ChatBotStyles } from "@/components/ChatBotStyles";
+import AppHeader from "@/components/AppHeader";
 import Message from "@/components/Message";
+import { useChatbotStorage } from "@/contexts/ChatbotStorage";
 import Controls from "@/Control/controls";
-import React, { useState } from "react";
-import { FlatList, Image, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
-import { DrawerActions } from "@react-navigation/native";
+import React, { useEffect } from "react";
+import { FlatList, Image, SafeAreaView, StyleSheet, Text, View } from "react-native";
+import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 // type ChatMessage = {
 //   role: string;
 //   content: string;
@@ -26,27 +24,41 @@ const WelcomeText: ChatMessage = {
     "Hello, I am HeaLora, your AI-powered health companion. How can I assist you today?",
 }
 export default function Baat() {
-  const [messages, setMessages] = useState<ChatMessage[]>([WelcomeText]);
+  const { 
+    messages: storedMessages, 
+    addMessage, 
+    createNewSession, 
+    currentSession,
+    isLoading 
+  } = useChatbotStorage();
   const router = useRouter();
-  const navigation = useNavigation();
 
-  const openDrawer = () => {
-    navigation.dispatch(DrawerActions.openDrawer());
+  // Initialize session and load messages
+  useEffect(() => {
+    if (!currentSession && !isLoading) {
+      createNewSession();
+    }
+  }, [currentSession, isLoading, createNewSession]);
+
+  // Convert stored messages to display format
+  const displayMessages: ChatMessage[] = storedMessages.length > 0 
+    ? storedMessages.map(msg => ({
+        role: msg.isUser ? "user" as const : "assistant" as const,
+        content: msg.text,
+        createdAt: msg.timestamp
+      }))
+    : [WelcomeText];
+
+  const handleAddMessage = (text: string, isUser: boolean) => {
+    addMessage(text, isUser);
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.menuButton}
-          onPress={openDrawer}
-        >
-          <Ionicons name="menu" size={24} color={colors.textOnPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>HeaLora Chat</Text>
-        <View style={styles.spacer} />
-      </View>
+      <AppHeader 
+        title="HeaLora Chat"
+        showStepIndicator={false}
+      />
 
       {/* Chat Content */}
       <View style={styles.content}>
@@ -61,7 +73,7 @@ export default function Baat() {
         
         <View style={styles.chatSection}>
           <FlatList
-            data={messages}
+            data={displayMessages}
             keyExtractor={(_, index) => index.toString()}
             renderItem={({ item }) => <Message msg={item} />}
             contentContainerStyle={{ padding: hp(1), paddingBottom: hp(12) }}
@@ -71,7 +83,7 @@ export default function Baat() {
           />
         </View>
         
-        <Controls setMessages={setMessages} />
+        <Controls onAddMessage={handleAddMessage} />
       </View>
     </SafeAreaView>
   );

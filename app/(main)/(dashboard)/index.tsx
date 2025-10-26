@@ -1,9 +1,8 @@
-import { Ionicons } from "@expo/vector-icons";
+import AppHeader from "@/components/AppHeader";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DrawerActions, useNavigation } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colorsSheet } from "../(settings)/ui_elements";
@@ -96,12 +95,8 @@ const checkLocalStorage = async () => {
 //Main Component
 export default function DayPlan () {
   const router = useRouter();
-  const navigation = useNavigation();
   const [JsonResponse, setJsonResponse] = useState<null|jsonResponse>(null);
 
-  const openDrawer = () => {
-    navigation.dispatch(DrawerActions.openDrawer());
-  };
   //Get Data from API or Local Storage
   useEffect( () => { 
     const fetchData =async () => {
@@ -195,12 +190,7 @@ export default function DayPlan () {
       <SafeAreaView style={dashboardStyles.container}>
         {/* Header */}
         <View style={dashboardStyles.header}>
-          <TouchableOpacity 
-            style={dashboardStyles.menuButton}
-            onPress={openDrawer}
-          >
-            <Ionicons name="menu" size={24} color={colorsSheet.textOnPrimary} />
-          </TouchableOpacity>
+        <View style={dashboardStyles.spacer} />
           <Text style={dashboardStyles.headerTitle}>FitFaat Dashboard</Text>
           <View style={dashboardStyles.spacer} />
         </View>
@@ -217,17 +207,11 @@ export default function DayPlan () {
   const daysArray : Day[] = Object.values(JsonResponse); // [day01, day02, ...]
   return (
     <SafeAreaView style={dashboardStyles.container}>
-      {/* Header */}
-      <View style={dashboardStyles.header}>
-        <TouchableOpacity 
-          style={dashboardStyles.menuButton}
-          onPress={openDrawer}
-        >
-          <Ionicons name="menu" size={24} color={colorsSheet.textOnPrimary} />
-        </TouchableOpacity>
-        <Text style={dashboardStyles.headerTitle}>FitFaat Dashboard</Text>
-        <View style={dashboardStyles.spacer} />
-      </View>
+      <AppHeader 
+        title="FitFaat Dashboard"
+        showStepIndicator={false}
+        showBackButton={false}
+      />
 
       {/* Main Content */}
       <View style={dashboardStyles.content}>
