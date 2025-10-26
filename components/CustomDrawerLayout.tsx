@@ -2,16 +2,15 @@ import { colorsSheet as color } from "@/app/(main)/(settings)/ui_elements";
 import { useAuth } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
 import {
-  DrawerContentComponentProps,
-  DrawerContentScrollView,
-  DrawerItem,
+    DrawerContentComponentProps,
+    DrawerItem
 } from "@react-navigation/drawer";
 import { useRef, useState } from "react";
 import { Image, Pressable, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { DrawerFonts } from "../app/(main)/(settings)/ui_elements";
@@ -118,25 +117,6 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
           }}
         />
         <DrawerItem
-          label="Settings"
-          onPress={() => props.navigation.navigate('(settings)')}
-          labelStyle={{
-            marginLeft: 8,
-            fontSize: 18,
-            fontFamily: "PoppinsMedium500",
-            color: "#FFFFFF",
-          }}
-          style={{
-            marginHorizontal: 12,
-            marginVertical: 1,
-            borderRadius: 25,
-            paddingHorizontal: 20,
-            paddingVertical: 8,
-            minHeight: 45,
-            backgroundColor: isRouteActive('(settings)') ? color.drawerActiveTabColor : 'transparent',
-          }}
-        />
-        <DrawerItem
           label="Workouts 👑"
           onPress={() => props.navigation.navigate('(exercises)/workout')}
           labelStyle={{
@@ -172,6 +152,25 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
             paddingVertical: 8,
             minHeight: 45,
             backgroundColor: isRouteActive('(doctor-portal)') ? color.drawerActiveTabColor : 'transparent',
+          }}
+        />
+        <DrawerItem
+          label="Settings"
+          onPress={() => props.navigation.navigate('(settings)')}
+          labelStyle={{
+            marginLeft: 8,
+            fontSize: 18,
+            fontFamily: "PoppinsMedium500",
+            color: "#FFFFFF",
+          }}
+          style={{
+            marginHorizontal: 12,
+            marginVertical: 1,
+            borderRadius: 25,
+            paddingHorizontal: 20,
+            paddingVertical: 8,
+            minHeight: 45,
+            backgroundColor: isRouteActive('(settings)') ? color.drawerActiveTabColor : 'transparent',
           }}
         />
       </View>

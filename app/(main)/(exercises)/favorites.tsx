@@ -14,7 +14,7 @@ import { colorsSheet } from "../(settings)/ui_elements";
 
 export default function FavoritesScreen() {
   const router = useRouter();
-  const [favorites, setFavorites] = useState([]);
+  const [favorites, setFavorites] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const handleBackPress = () => {
