@@ -1,35 +1,22 @@
+import AppHeader from "@/components/AppHeader";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
-import { LinearGradient } from "expo-linear-gradient";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { colorsSheet } from "../(settings)/ui_elements";
-import { useNavigation } from "@react-navigation/native";
-import { DrawerActions } from "@react-navigation/native";
 
 export default function DoctorPortal() {
   const router = useRouter();
-  const navigation = useNavigation();
-
-  const openDrawer = () => {
-    navigation.dispatch(DrawerActions.openDrawer());
-  };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.menuButton}
-          onPress={openDrawer}
-        >
-          <Ionicons name="menu" size={24} color={colorsSheet.textOnPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Doctor Portal</Text>
-        <View style={styles.spacer} />
-      </View>
+      <AppHeader 
+        title="Doctor Portal"
+        showStepIndicator={false}
+      />
 
       {/* Main Content */}
       <View style={styles.content}>
