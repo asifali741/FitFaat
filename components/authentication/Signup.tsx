@@ -97,9 +97,8 @@ export default function Signup() {
       console.log('Registration response:', response);
 
       if (response.success) {
-        Alert.alert('Success', 'Registration successful!', [
-          { text: 'OK', onPress: () => router.replace("/(main)") }
-        ]);
+        // After successful registration, redirect to onboarding page
+        router.replace("/DietSection");
       } else {
         throw new Error(response.message || 'Registration failed');
       }

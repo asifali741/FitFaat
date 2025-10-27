@@ -28,9 +28,10 @@ export default function Login() {
       
       // Redirect based on onboarding status
       if (!isOnboardingComplete) {
-        router.replace("/DietSection");
+        router.push("/DietSection");
       } else {
-        router.replace("/(main)");
+        // Navigate to the dashboard
+        router.push("/(main)/(dashboard)");
       }
     } catch (error: any) {
       console.log('Login error:', error);

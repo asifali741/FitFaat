@@ -1,5 +1,5 @@
 import { DrawerSceneWrapper } from "@/components/CustomDrawerLayout";
-import { useAuth } from "@clerk/clerk-expo";
+import { authApi } from "@/utils/auth/authApi";
 import { DrawerContentComponentProps } from "@react-navigation/drawer";
 import { useRouter } from "expo-router";
 import { Drawer } from "expo-router/drawer";
@@ -9,15 +9,24 @@ import { colorsSheet as color } from "./(settings)/ui_elements";
 type DrawerSceneWrapperProps = DrawerContentComponentProps;
 
 export default function MainLayout() {
-    const { isSignedIn } = useAuth();
     const router = useRouter();
-    console.log('Landed in (main)\_Layout')
-    //check signin status in case of expiration
+    console.log('Landed in (main)\_Layout');
+    
     useEffect(() => {
-    if (!isSignedIn) {
-      router.replace("/(auth)");
-    }
-  }, [isSignedIn]);
+      const checkAuth = async () => {
+        try {
+          const isAuthenticated = await authApi.isAuthenticated();
+          if (!isAuthenticated) {
+            router.replace("/(auth)");
+          }
+        } catch (error) {
+          console.error('Auth check error:', error);
+          router.replace("/(auth)");
+        }
+      };
+      
+      checkAuth();
+    }, []);
     return <GestureHandlerRootView style={{ flex: 1 }}>
   <Drawer
     detachInactiveScreens={true}
