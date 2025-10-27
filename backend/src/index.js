@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import morgan from 'morgan';
 import { errorHandler } from './middleware/error.js';
 import authRoutes from './routes/auth.js';
+import dietPlanRoutes from './routes/dietPlan.js';
 import userRoutes from './routes/user.js';
 
 // Load env vars
@@ -21,6 +22,7 @@ app.use(express.json());
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/diet-plan', dietPlanRoutes);
 
 // Error handler
 app.use(errorHandler);
