@@ -4,8 +4,10 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-
 import Animated, { Easing, runOnJS, useAnimatedProps, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
-import { colorsSheet as colors, rs } from "../(settings)/ui_elements";
+import { rs } from "../(settings)/ui_elements";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Day as typeDay } from "./DayPlan";
+
 interface ProgressCircleProps {
   achievedCalories: number;
   targetCalories: number;
@@ -15,6 +17,7 @@ interface ProgressCircleProps {
 
 const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 export default function DetailsDay () {
+    const { colors } = useTheme();
     const { selectedDay  } = useLocalSearchParams<{ selectedDay : string }>();
     const router = useRouter();
     const props: typeDay = JSON.parse(selectedDay )
@@ -60,6 +63,7 @@ export default function DetailsDay () {
     const handleUpdate = () => {
         //Main api calling
     }
+    const styles = getStyles(colors);
     //output
     return (
   <View style={{ flex: 1, paddingBottom: insets.bottom }}>
@@ -231,7 +235,7 @@ export default function DetailsDay () {
 );
 
 }
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
     heading: {
     flexDirection: 'row',
     alignItems: 'flex-end',       // align bottoms of Day + Date
@@ -249,18 +253,20 @@ const styles = StyleSheet.create({
         fontSize: 36,
         fontWeight: 'bold',
         marginRight: 5,               // small spacing between day and date
+        color: colors.textPrimary,
     },
     date: {
         fontSize: 15,
         fontWeight: '500',
-        paddingBottom: 5
+        paddingBottom: 5,
+        color: colors.textSecondary,
     },
     backButton: {
         padding: 10,
     },
     backButtonText: {
         fontSize: 16,
-        color: '#000',
+        color: colors.textPrimary,
         fontWeight: '600',
     },
     centerBody:{
@@ -314,7 +320,8 @@ const styles = StyleSheet.create({
     infoAttribute:{
         fontFamily: 'inter',
         fontSize: 18,
-        fontWeight:'600'
+        fontWeight:'600',
+        color: colors.textPrimary,
     },
     infoValue:{
         fontSize: 15,
@@ -334,14 +341,17 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '700',
         marginBottom: 5,
+        color: colors.textPrimary,
     },
     input: {
         borderWidth: 1,
-        borderColor: '#ccc',
+        borderColor: colors.gray,
         borderRadius: 8,
         paddingHorizontal: 10,
         paddingVertical: 6,
         marginTop: 8,
+        backgroundColor: colors.cardBackground,
+        color: colors.textPrimary,
     },
     tray: {
         width: '100%',
@@ -386,7 +396,7 @@ const styles = StyleSheet.create({
     },
     menuOverlay: {
         flex: 1,
-        backgroundColor: "#fff",
+        backgroundColor: colors.screenColor,
         padding: 20,
         justifyContent: "center",
     },
@@ -395,11 +405,13 @@ const styles = StyleSheet.create({
         fontWeight: "700",
         marginBottom: 20,
         textAlign: "center",
+        color: colors.textPrimary,
     },
     label: {
         fontSize: 16,
         fontWeight: "600",
         marginTop: 15,
+        color: colors.textPrimary,
     },
     Foodinput: {
         borderWidth: 1,

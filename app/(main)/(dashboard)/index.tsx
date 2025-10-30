@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { colorsSheet } from "../(settings)/ui_elements";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Days } from "./Day";
 export type Day = {
   dayNo: number,
@@ -95,6 +95,7 @@ const checkLocalStorage = async () => {
 //Main Component
 export default function DayPlan () {
   const router = useRouter();
+  const { colors } = useTheme();
   const [JsonResponse, setJsonResponse] = useState<null|jsonResponse>(null);
 
   //Get Data from API or Local Storage
@@ -187,18 +188,18 @@ export default function DayPlan () {
   if(!JsonResponse)
   {
     return (
-      <SafeAreaView style={dashboardStyles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.primary }]}>
         {/* Header */}
-        <View style={dashboardStyles.header}>
-        <View style={dashboardStyles.spacer} />
-          <Text style={dashboardStyles.headerTitle}>FitFaat Dashboard</Text>
-          <View style={dashboardStyles.spacer} />
+        <View style={[styles.header, { backgroundColor: colors.primary }]}>
+        <View style={styles.spacer} />
+          <Text style={[styles.headerTitle, { color: colors.textOnPrimary }]}>FitFaat Dashboard</Text>
+          <View style={styles.spacer} />
         </View>
 
         {/* Loading Content */}
-        <View style={dashboardStyles.content}>
+        <View style={[styles.content, { backgroundColor: colors.screenColor }]}>
           <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-            <ActivityIndicator size="large" color={colorsSheet.primary} />
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
         </View>
       </SafeAreaView>
@@ -206,7 +207,7 @@ export default function DayPlan () {
   }
   const daysArray : Day[] = Object.values(JsonResponse); // [day01, day02, ...]
   return (
-    <SafeAreaView style={dashboardStyles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.primary }]}>
       <AppHeader 
         title="FitFaat Dashboard"
         showStepIndicator={false}
@@ -214,7 +215,7 @@ export default function DayPlan () {
       />
 
       {/* Main Content */}
-      <View style={dashboardStyles.content}>
+      <View style={[styles.content, { backgroundColor: colors.screenColor }]}>
         <ScrollView style={styles.list}
                     contentContainerStyle={{ paddingBottom: 50 }}
                     showsVerticalScrollIndicator={false} 
@@ -234,24 +235,8 @@ export default function DayPlan () {
 };
 
 const styles = StyleSheet.create({
-  list: {
-  flexGrow: 1,
-  width: "100%",
-  alignSelf: "center",
-  marginTop: "2%",
-  marginBottom: "3%",
-  borderRadius: 0,
-  backgroundColor: "transparent",
-  elevation: 0,
-  shadowOpacity: 0,
-},
-
-});
-
-const dashboardStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colorsSheet.primary,
   },
   header: {
     flexDirection: "row",
@@ -259,31 +244,33 @@ const dashboardStyles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: Math.min(wp(5), 20),
     paddingVertical: Math.min(hp(1.8), 15),
-    backgroundColor: colorsSheet.primary,
     minHeight: hp(7),
-  },
-  menuButton: {
-    padding: Math.min(wp(2), 10),
-    minWidth: wp(10),
-    alignItems: "center",
-    justifyContent: "center",
   },
   headerTitle: {
     fontSize: Math.min(hp(2.5), wp(6.2)),
     fontWeight: "bold",
-    color: colorsSheet.textOnPrimary,
     textAlign: "center",
     flex: 1,
     marginHorizontal: wp(2),
   },
   content: {
     flex: 1,
-    backgroundColor: colorsSheet.screenColor,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
   },
   spacer: {
-    width: wp(18), // Same width as premium button for balance
+    width: wp(18),
+  },
+  list: {
+    flexGrow: 1,
+    width: "100%",
+    alignSelf: "center",
+    marginTop: "2%",
+    marginBottom: "3%",
+    borderRadius: 0,
+    backgroundColor: "transparent",
+    elevation: 0,
+    shadowOpacity: 0,
   },
 });
 

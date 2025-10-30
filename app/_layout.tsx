@@ -5,6 +5,7 @@ import { Slot, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, StatusBar, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
 
@@ -20,13 +21,25 @@ if (!publishableKey) {
 export default function RootLayout() {
   return (
     <ClerkProvider tokenCache={tokenCache} publishableKey={publishableKey}> 
-      <SafeAreaProvider>
-      <StatusBar barStyle="dark-content"/>
-        <SafeScreen>
-          <AuthGate/>
-        </SafeScreen>
-      </SafeAreaProvider>
+      <ThemeProvider>
+        <SafeAreaProvider>
+          <ThemedApp />
+        </SafeAreaProvider>
+      </ThemeProvider>
     </ClerkProvider>
+  );
+}
+
+function ThemedApp() {
+  const { isDarkMode } = useTheme();
+  
+  return (
+    <>
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"}/>
+      <SafeScreen>
+        <AuthGate/>
+      </SafeScreen>
+    </>
   );
 }
 function AuthGate() {

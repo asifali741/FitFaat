@@ -3,17 +3,19 @@ import { useAuth } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DrawerActions, useNavigation } from "@react-navigation/native";
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import { Alert, Linking, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { colorsSheet } from "./ui_elements";
+import { useTheme } from "@/contexts/ThemeContext";
 
 export default function Settings() {
   const navigation = useNavigation();
+  const router = useRouter();
   const { signOut, user } = useAuth();
+  const { isDarkMode, toggleDarkMode, colors } = useTheme();
   const [notifications, setNotifications] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
   const [locationServices, setLocationServices] = useState(true);
   const [dataSync, setDataSync] = useState(true);
 
@@ -24,63 +26,19 @@ export default function Settings() {
   const handleSettingPress = (setting: string) => {
     switch (setting) {
       case "Profile Information":
-        Alert.alert(
-          "Profile Information",
-          "This feature will allow you to edit your personal details like name, email, and profile picture.",
-          [{ text: "OK" }]
-        );
+        router.push("/profile-information");
         break;
       
       case "Edit Profile Picture":
-        Alert.alert(
-          "Edit Profile Picture",
-          "This feature will open your camera or photo library to select a new profile picture.",
-          [
-            { text: "Camera", onPress: () => console.log("Open camera") },
-            { text: "Photo Library", onPress: () => console.log("Open photo library") },
-            { text: "Cancel", style: "cancel" }
-          ]
-        );
+        router.push("/edit-profile-picture");
         break;
       
       case "Change Password":
-        Alert.alert(
-          "Change Password",
-          "This feature will allow you to update your account password securely.",
-          [{ text: "OK" }]
-        );
-        break;
-      
-      case "Account Verification":
-        Alert.alert(
-          "Account Verification",
-          `Your account verification status: ${user?.emailAddresses[0]?.verification?.status || 'Not verified'}`,
-          [{ text: "OK" }]
-        );
-        break;
-      
-      case "Connected Accounts":
-        Alert.alert(
-          "Connected Accounts",
-          "Manage your linked social media accounts and third-party services.",
-          [{ text: "OK" }]
-        );
+        router.push("/change-password");
         break;
       
       case "Payment Methods":
-        Alert.alert(
-          "Payment Methods",
-          "Add, edit, or remove your payment methods for subscriptions and purchases.",
-          [{ text: "OK" }]
-        );
-        break;
-      
-      case "Privacy & Security":
-        Alert.alert(
-          "Privacy & Security",
-          "Control your privacy settings, data sharing preferences, and security options.",
-          [{ text: "OK" }]
-        );
+        router.push("/payment-methods");
         break;
       
       case "Workout Preferences":
@@ -125,44 +83,6 @@ export default function Settings() {
           "Time Zone",
           "Set your time zone for accurate scheduling and notifications.",
           [{ text: "OK" }]
-        );
-        break;
-      
-      case "Cloud Backup":
-        Alert.alert(
-          "Cloud Backup",
-          "Backup your health data, workout history, and preferences to the cloud.",
-          [{ text: "OK" }]
-        );
-        break;
-      
-      case "Offline Mode":
-        Alert.alert(
-          "Offline Mode",
-          "Download content for offline use when you don't have internet access.",
-          [{ text: "OK" }]
-        );
-        break;
-      
-      case "Clear Cache":
-        Alert.alert(
-          "Clear Cache",
-          "This will free up storage space by clearing temporary files and cached data.",
-          [
-            { text: "Clear Cache", onPress: handleClearCache, style: "destructive" },
-            { text: "Cancel", style: "cancel" }
-          ]
-        );
-        break;
-      
-      case "Download My Data":
-        Alert.alert(
-          "Download My Data",
-          "Export all your personal data including health records, workout history, and preferences.",
-          [
-            { text: "Download", onPress: handleDownloadData },
-            { text: "Cancel", style: "cancel" }
-          ]
         );
         break;
       
@@ -268,7 +188,7 @@ export default function Settings() {
         appointments: await AsyncStorage.getItem('appointments') || [],
         settings: {
           notifications,
-          darkMode,
+          darkMode: isDarkMode,
           locationServices,
           dataSync
         }
@@ -361,26 +281,26 @@ export default function Settings() {
     rightComponent?: React.ReactNode;
     showArrow?: boolean;
   }) => (
-    <TouchableOpacity style={styles.settingItem} onPress={onPress}>
+    <TouchableOpacity style={[styles.settingItem, { backgroundColor: colors.cardBackground }]} onPress={onPress}>
       <View style={styles.settingLeft}>
-        <View style={styles.settingIcon}>
-          <Ionicons name={icon as any} size={24} color={colorsSheet.primary} />
+        <View style={[styles.settingIcon, { backgroundColor: colors.primarySoft }]}>
+          <Ionicons name={icon as any} size={24} color={colors.primary} />
         </View>
         <View style={styles.settingText}>
-          <Text style={styles.settingTitle}>{title}</Text>
-          {subtitle && <Text style={styles.settingSubtitle}>{subtitle}</Text>}
+          <Text style={[styles.settingTitle, { color: colors.textPrimary }]}>{title}</Text>
+          {subtitle && <Text style={[styles.settingSubtitle, { color: colors.textSecondary }]}>{subtitle}</Text>}
         </View>
       </View>
       <View style={styles.settingRight}>
         {rightComponent || (showArrow && (
-          <Ionicons name="chevron-forward" size={20} color={colorsSheet.textSecondary} />
+          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
         ))}
       </View>
     </TouchableOpacity>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.primary }]}>
       <AppHeader 
         title="Settings"
         showStepIndicator={false}
@@ -388,11 +308,11 @@ export default function Settings() {
       />
 
       {/* Main Content */}
-      <View style={styles.content}>
+      <View style={[styles.content, { backgroundColor: colors.screenColor }]}>
         <ScrollView showsVerticalScrollIndicator={false}>
           {/* Account Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Account</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Account</Text>
             <SettingItem
               icon="person-outline"
               title="Profile Information"
@@ -412,34 +332,16 @@ export default function Settings() {
               onPress={() => handleSettingPress("Change Password")}
             />
             <SettingItem
-              icon="checkmark-circle-outline"
-              title="Account Verification"
-              subtitle="Verify your account status"
-              onPress={() => handleSettingPress("Account Verification")}
-            />
-            <SettingItem
-              icon="link-outline"
-              title="Connected Accounts"
-              subtitle="Manage linked accounts"
-              onPress={() => handleSettingPress("Connected Accounts")}
-            />
-            <SettingItem
               icon="card-outline"
               title="Payment Methods"
               subtitle="Manage your payment options"
               onPress={() => handleSettingPress("Payment Methods")}
             />
-            <SettingItem
-              icon="shield-checkmark-outline"
-              title="Privacy & Security"
-              subtitle="Control your privacy settings"
-              onPress={() => handleSettingPress("Privacy & Security")}
-            />
           </View>
 
           {/* Preferences Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Preferences</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Preferences</Text>
             <SettingItem
               icon="notifications-outline"
               title="Notifications"
@@ -448,8 +350,8 @@ export default function Settings() {
                 <Switch
                   value={notifications}
                   onValueChange={setNotifications}
-                  trackColor={{ false: colorsSheet.textSecondary + '40', true: colorsSheet.primary + '40' }}
-                  thumbColor={notifications ? colorsSheet.primary : colorsSheet.textSecondary}
+                  trackColor={{ false: colors.textSecondary + '40', true: colors.primary + '40' }}
+                  thumbColor={notifications ? colors.primary : colors.textSecondary}
                 />
               }
               showArrow={false}
@@ -460,10 +362,10 @@ export default function Settings() {
               subtitle="Switch between light and dark themes"
               rightComponent={
                 <Switch
-                  value={darkMode}
-                  onValueChange={setDarkMode}
-                  trackColor={{ false: colorsSheet.textSecondary + '40', true: colorsSheet.primary + '40' }}
-                  thumbColor={darkMode ? colorsSheet.primary : colorsSheet.textSecondary}
+                  value={isDarkMode}
+                  onValueChange={toggleDarkMode}
+                  trackColor={{ false: colors.textSecondary + '40', true: colors.primary + '40' }}
+                  thumbColor={isDarkMode ? colors.primary : colors.textSecondary}
                 />
               }
               showArrow={false}
@@ -484,7 +386,7 @@ export default function Settings() {
 
           {/* Health & Fitness Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Health & Fitness</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Health & Fitness</Text>
             <SettingItem
               icon="fitness-outline"
               title="Workout Preferences"
@@ -511,8 +413,8 @@ export default function Settings() {
                 <Switch
                   value={dataSync}
                   onValueChange={setDataSync}
-                  trackColor={{ false: colorsSheet.textSecondary + '40', true: colorsSheet.primary + '40' }}
-                  thumbColor={dataSync ? colorsSheet.primary : colorsSheet.textSecondary}
+                  trackColor={{ false: colors.textSecondary + '40', true: colors.primary + '40' }}
+                  thumbColor={dataSync ? colors.primary : colors.textSecondary}
                 />
               }
               showArrow={false}
@@ -521,7 +423,7 @@ export default function Settings() {
 
           {/* App Settings Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>App Settings</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>App Settings</Text>
             <SettingItem
               icon="location-outline"
               title="Location Services"
@@ -530,35 +432,17 @@ export default function Settings() {
                 <Switch
                   value={locationServices}
                   onValueChange={setLocationServices}
-                  trackColor={{ false: colorsSheet.textSecondary + '40', true: colorsSheet.primary + '40' }}
-                  thumbColor={locationServices ? colorsSheet.primary : colorsSheet.textSecondary}
+                  trackColor={{ false: colors.textSecondary + '40', true: colors.primary + '40' }}
+                  thumbColor={locationServices ? colors.primary : colors.textSecondary}
                 />
               }
               showArrow={false}
-            />
-            <SettingItem
-              icon="cloud-outline"
-              title="Cloud Backup"
-              subtitle="Backup your data to the cloud"
-              onPress={() => handleSettingPress("Cloud Backup")}
-            />
-            <SettingItem
-              icon="download-outline"
-              title="Offline Mode"
-              subtitle="Download content for offline use"
-              onPress={() => handleSettingPress("Offline Mode")}
-            />
-            <SettingItem
-              icon="refresh-outline"
-              title="Clear Cache"
-              subtitle="Free up storage space"
-              onPress={() => handleSettingPress("Clear Cache")}
             />
           </View>
 
           {/* Support Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Support</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Support</Text>
             <SettingItem
               icon="help-circle-outline"
               title="Help Center"
@@ -587,7 +471,7 @@ export default function Settings() {
 
           {/* Legal Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Legal</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Legal</Text>
             <SettingItem
               icon="document-text-outline"
               title="Terms of Service"
@@ -608,36 +492,20 @@ export default function Settings() {
             />
           </View>
 
-          {/* Data Management Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Data Management</Text>
-            <SettingItem
-              icon="download-outline"
-              title="Download My Data"
-              subtitle="Export your personal data"
-              onPress={() => handleSettingPress("Download My Data")}
-            />
-            <SettingItem
-              icon="refresh-outline"
-              title="Clear Cache"
-              subtitle="Free up storage space"
-              onPress={() => handleSettingPress("Clear Cache")}
-            />
-          </View>
 
           {/* Logout Section */}
           <View style={styles.section}>
-            <TouchableOpacity style={styles.logoutButton} onPress={handleSignOut}>
-              <Ionicons name="log-out-outline" size={24} color={colorsSheet.error} />
-              <Text style={styles.logoutText}>Sign Out</Text>
+            <TouchableOpacity style={[styles.logoutButton, { backgroundColor: colors.cardBackground, borderColor: colors.error + '20' }]} onPress={handleSignOut}>
+              <Ionicons name="log-out-outline" size={24} color={colors.error} />
+              <Text style={[styles.logoutText, { color: colors.error }]}>Sign Out</Text>
             </TouchableOpacity>
           </View>
 
           {/* Delete Account Section */}
           <View style={styles.section}>
-            <TouchableOpacity style={styles.deleteAccountButton} onPress={handleDeleteAccount}>
-              <Ionicons name="trash-outline" size={24} color={colorsSheet.error} />
-              <Text style={styles.deleteAccountText}>Delete Account</Text>
+            <TouchableOpacity style={[styles.deleteAccountButton, { backgroundColor: colors.cardBackground, borderColor: colors.error + '40' }]} onPress={handleDeleteAccount}>
+              <Ionicons name="trash-outline" size={24} color={colors.error} />
+              <Text style={[styles.deleteAccountText, { color: colors.error }]}>Delete Account</Text>
             </TouchableOpacity>
         </View>
 
@@ -651,11 +519,9 @@ export default function Settings() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colorsSheet.primary,
   },
   content: {
     flex: 1,
-    backgroundColor: colorsSheet.screenColor,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
   },
@@ -666,7 +532,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: hp(2.2),
     fontWeight: 'bold',
-    color: colorsSheet.textPrimary,
     marginBottom: hp(1.5),
     marginLeft: wp(2),
   },
@@ -674,7 +539,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'white',
     paddingVertical: hp(2),
     paddingHorizontal: wp(4),
     marginBottom: hp(0.5),
@@ -694,7 +558,6 @@ const styles = StyleSheet.create({
     width: hp(5),
     height: hp(5),
     borderRadius: hp(2.5),
-    backgroundColor: colorsSheet.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: wp(4),
@@ -705,12 +568,10 @@ const styles = StyleSheet.create({
   settingTitle: {
     fontSize: hp(1.8),
     fontWeight: '600',
-    color: colorsSheet.textPrimary,
     marginBottom: hp(0.3),
   },
   settingSubtitle: {
     fontSize: hp(1.4),
-    color: colorsSheet.textSecondary,
   },
   settingRight: {
     alignItems: 'center',
@@ -720,7 +581,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'white',
     paddingVertical: hp(2),
     paddingHorizontal: wp(4),
     marginBottom: hp(0.5),
@@ -731,19 +591,16 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 1,
     borderWidth: 1,
-    borderColor: colorsSheet.error + '20',
   },
   logoutText: {
     fontSize: hp(1.8),
     fontWeight: '600',
-    color: colorsSheet.error,
     marginLeft: wp(2),
   },
   deleteAccountButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'white',
     paddingVertical: hp(2),
     paddingHorizontal: wp(4),
     marginBottom: hp(0.5),
@@ -754,12 +611,10 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 1,
     borderWidth: 1,
-    borderColor: colorsSheet.error + '40',
   },
   deleteAccountText: {
     fontSize: hp(1.8),
     fontWeight: '600',
-    color: colorsSheet.error,
     marginLeft: wp(2),
   },
 });

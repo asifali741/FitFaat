@@ -1,10 +1,10 @@
-import { colorsSheet } from '@/app/(main)/(settings)/ui_elements';
 import { Ionicons } from '@expo/vector-icons';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface AppHeaderProps {
   title: string;
@@ -27,6 +27,7 @@ export default function AppHeader({
 }: AppHeaderProps) {
   const navigation = useNavigation();
   const router = useRouter();
+  const { colors } = useTheme();
 
   const openDrawer = () => {
     navigation.dispatch(DrawerActions.openDrawer());
@@ -41,28 +42,28 @@ export default function AppHeader({
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.primary }]}>
       {/* Top Bar */}
-      <View style={styles.topBar}>
+      <View style={[styles.topBar, { backgroundColor: colors.primary }]}>
         {showMenuButton ? (
           <TouchableOpacity 
             style={styles.menuButton}
             onPress={openDrawer}
           >
-            <Ionicons name="menu" size={24} color={colorsSheet.textOnPrimary} />
+            <Ionicons name="menu" size={24} color={colors.textOnPrimary} />
           </TouchableOpacity>
         ) : (
           <View style={styles.spacer} />
         )}
         
-        <Text style={styles.title}>{title}</Text>
+        <Text style={[styles.title, { color: colors.textOnPrimary }]}>{title}</Text>
         
         {showBackButton ? (
           <TouchableOpacity 
             style={styles.backButton}
             onPress={handleBackPress}
           >
-            <Ionicons name="arrow-back" size={24} color={colorsSheet.textOnPrimary} />
+            <Ionicons name="arrow-back" size={24} color={colors.textOnPrimary} />
           </TouchableOpacity>
         ) : (
           <View style={styles.spacer} />
@@ -78,8 +79,9 @@ export default function AppHeader({
                 key={index}
                 style={[
                   styles.stepDot,
-                  index < currentStep && styles.stepDotCompleted,
-                  index === currentStep - 1 && styles.stepDotActive
+                  { backgroundColor: colors.textOnPrimary + '40' },
+                  index < currentStep && { backgroundColor: colors.textOnPrimary },
+                  index === currentStep - 1 && { backgroundColor: colors.textOnPrimary, transform: [{ scale: 1.2 }] }
                 ]}
               />
             ))}
@@ -91,16 +93,13 @@ export default function AppHeader({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: colorsSheet.primary,
-  },
+  container: {},
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: wp(5),
     paddingVertical: hp(2),
-    backgroundColor: colorsSheet.primary,
   },
   menuButton: {
     padding: 8,
@@ -108,7 +107,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: hp(2.5),
     fontWeight: 'bold',
-    color: colorsSheet.textOnPrimary,
     flex: 1,
     textAlign: 'center',
   },
@@ -131,14 +129,6 @@ const styles = StyleSheet.create({
     width: hp(1.2),
     height: hp(1.2),
     borderRadius: hp(0.6),
-    backgroundColor: colorsSheet.textOnPrimary + '40',
     marginHorizontal: wp(1.5),
-  },
-  stepDotCompleted: {
-    backgroundColor: colorsSheet.textOnPrimary,
-  },
-  stepDotActive: {
-    backgroundColor: colorsSheet.textOnPrimary,
-    transform: [{ scale: 1.2 }],
   },
 });

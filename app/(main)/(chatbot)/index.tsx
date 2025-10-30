@@ -6,13 +6,14 @@ import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { LinearGradient } from "expo-linear-gradient";
-import { colorsSheet } from "../(settings)/ui_elements";
+import { useTheme } from "@/contexts/ThemeContext";
 import { useNavigation } from "@react-navigation/native";
 import { DrawerActions } from "@react-navigation/native";
 
 const FullText =
   "Hi, I am HeaLora, your AI-powered health companion. I’m designed to support you on your journey toward better well-being by combining advanced technology with personalized care.";
 export default function Index() {
+  const { colors } = useTheme();
   const [visibleText, setVisibleText] = useState("");
   const router = useRouter();
   const navigation = useNavigation();
@@ -38,6 +39,7 @@ export default function Index() {
     }, 100);
     return () => clearInterval(interValId);
   }, []);
+  const styles = getStyles(colors);
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -46,7 +48,7 @@ export default function Index() {
           style={styles.menuButton}
           onPress={openDrawer}
         >
-          <Ionicons name="menu" size={24} color={colorsSheet.textOnPrimary} />
+          <Ionicons name="menu" size={24} color={colors.textOnPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>AI Health Assistant</Text>
         <View style={styles.spacer} />
@@ -79,7 +81,7 @@ export default function Index() {
             activeOpacity={0.8}
           >
             <LinearGradient
-              colors={[colorsSheet.primary, colorsSheet.primaryLight, colorsSheet.accent]}
+              colors={[colors.primary, colors.primaryLight, colors.accent]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.gradientButton}
@@ -93,10 +95,10 @@ export default function Index() {
   )
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: colors.primary,
   },
   header: {
     flexDirection: "row",
@@ -104,7 +106,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: wp(5),
     paddingVertical: hp(2),
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: colors.primary,
   },
   menuButton: {
     padding: 8,
@@ -112,13 +114,13 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: Math.min(hp(2.5), wp(6)),
     fontWeight: "bold",
-    color: colorsSheet.textOnPrimary,
+    color: colors.textOnPrimary,
     textAlign: "center",
     flex: 1,
   },
   content: {
     flex: 1,
-    backgroundColor: colorsSheet.screenColor,
+    backgroundColor: colors.screenColor,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     paddingTop: hp(3),
@@ -131,7 +133,7 @@ const styles = StyleSheet.create({
   mainTitle: {
     fontSize: Math.min(hp(3.2), wp(8)),
     fontWeight: "bold",
-    color: colorsSheet.textPrimary,
+    color: colors.textPrimary,
     textAlign: "center",
     lineHeight: Math.min(hp(4), wp(10)),
     paddingHorizontal: wp(4),
@@ -148,7 +150,7 @@ const styles = StyleSheet.create({
     borderRadius: Math.min(hp(9), wp(18)),
   },
   textContainer: {
-    backgroundColor: colorsSheet.primarySoft,
+    backgroundColor: colors.primarySoft,
     borderRadius: 20,
     padding: hp(2.5),
     marginHorizontal: wp(4),
@@ -156,7 +158,7 @@ const styles = StyleSheet.create({
   },
   aiText: {
     fontSize: Math.min(hp(2), wp(5)),
-    color: colorsSheet.textOnCard,
+    color: colors.textOnCard,
     textAlign: "center",
     lineHeight: Math.min(hp(2.8), wp(7)),
   },
@@ -166,7 +168,7 @@ const styles = StyleSheet.create({
   gradientButtonContainer: {
     borderRadius: 30,
     overflow: "hidden",
-    shadowColor: colorsSheet.primary,
+    shadowColor: colors.primary,
     shadowOffset: {
       width: 0,
       height: 4,
@@ -184,7 +186,7 @@ const styles = StyleSheet.create({
     minHeight: hp(6),
   },
   gradientButtonText: {
-    color: colorsSheet.white,
+    color: colors.white,
     fontSize: Math.min(hp(2.2), wp(5.5)),
     fontWeight: "700",
     letterSpacing: 0.5,

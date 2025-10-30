@@ -1,4 +1,4 @@
-import { colorsSheet as colors } from "@/app/(main)/(settings)/ui_elements";
+import { useTheme } from "@/contexts/ThemeContext";
 import AppHeader from "@/components/AppHeader";
 import Message from "@/components/Message";
 import { useChatbotStorage } from "@/contexts/ChatbotStorage";
@@ -24,6 +24,7 @@ const WelcomeText: ChatMessage = {
     "Hello, I am HeaLora, your AI-powered health companion. How can I assist you today?",
 }
 export default function Baat() {
+  const { colors } = useTheme();
   const { 
     messages: storedMessages, 
     addMessage, 
@@ -52,6 +53,8 @@ export default function Baat() {
   const handleAddMessage = (text: string, isUser: boolean) => {
     addMessage(text, isUser);
   };
+
+  const styles = getStyles(colors);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -89,7 +92,7 @@ export default function Baat() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.primary,
