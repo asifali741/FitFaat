@@ -119,4 +119,21 @@ export const authApi = {
       throw error.response?.data || error.message;
     }
   },
+
+  // Update user's BMI summary including fitness targets
+  updateBmiSummary: async (data: {
+    height: number;        // in cm
+    weight: number;        // in kg
+    gender: 'male' | 'female' | 'other';
+    age: number;          // between 13-120
+    activityLevel: 'sedentary' | 'light' | 'moderate' | 'active' | 'veryActive';
+    fitnessGoal: 1 | 2 | 3;  // 1: Weight Loss, 2: Muscle Gain, 3: Weight Gain
+  }) => {
+    try {
+      const response = await api.post('/user/update-bmi-summary', data);
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || error.message;
+    }
+  },
 };

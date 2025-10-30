@@ -75,6 +75,20 @@ const userSchema = new mongoose.Schema({
         max: new Date().getFullYear()
       }
     },
+    activityLevel: {
+      type: String,
+      enum: ['sedentary', 'light', 'moderate', 'active', 'veryActive'],
+      default: 'moderate'
+    },
+    bmi: {
+      type: Number
+    },
+    goalCalories: {
+      type: Number
+    },
+    hydrationGoal: {
+      type: Number
+    },
     fitnessGoal: {
       type: Number,
       enum: [1, 2, 3] // 1: Weight Loss, 2: Muscle Gain, 3: Weight Gain
