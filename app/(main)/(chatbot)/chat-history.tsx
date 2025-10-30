@@ -6,9 +6,10 @@ import React, { useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { colorsSheet } from "../(settings)/ui_elements";
+import { useTheme } from "@/contexts/ThemeContext";
 
 export default function ChatHistoryScreen() {
+  const { colors } = useTheme();
   const router = useRouter();
   const navigation = useNavigation();
   const { 
@@ -28,7 +29,7 @@ export default function ChatHistoryScreen() {
   const handleSessionSelect = (sessionId: string) => {
     setSelectedSession(sessionId);
     switchToSession(sessionId);
-    router.back();
+    router.push('/baat');
   };
 
   const handleDeleteSession = (sessionId: string) => {
@@ -94,6 +95,8 @@ export default function ChatHistoryScreen() {
     }
   };
 
+  const styles = getStyles(colors);
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -102,14 +105,14 @@ export default function ChatHistoryScreen() {
           style={styles.menuButton}
           onPress={openDrawer}
         >
-          <Ionicons name="menu" size={24} color={colorsSheet.textOnPrimary} />
+          <Ionicons name="menu" size={24} color={colors.textOnPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Chat History</Text>
         <TouchableOpacity 
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <Ionicons name="arrow-back" size={24} color={colorsSheet.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.textOnPrimary} />
         </TouchableOpacity>
       </View>
 
@@ -121,7 +124,7 @@ export default function ChatHistoryScreen() {
             style={styles.actionButton}
             onPress={handleExportChats}
           >
-            <Ionicons name="download" size={20} color={colorsSheet.primary} />
+            <Ionicons name="download" size={20} color={colors.primary} />
             <Text style={styles.actionButtonText}>Export</Text>
           </TouchableOpacity>
           
@@ -129,7 +132,7 @@ export default function ChatHistoryScreen() {
             style={[styles.actionButton, styles.clearButton]}
             onPress={handleClearAllChats}
           >
-            <Ionicons name="trash" size={20} color={colorsSheet.error} />
+            <Ionicons name="trash" size={20} color={colors.error} />
             <Text style={[styles.actionButtonText, styles.clearButtonText]}>Clear All</Text>
           </TouchableOpacity>
         </View>
@@ -138,7 +141,7 @@ export default function ChatHistoryScreen() {
         <ScrollView style={styles.sessionsList}>
           {sessions.length === 0 ? (
             <View style={styles.emptyState}>
-              <Ionicons name="chatbubbles-outline" size={64} color={colorsSheet.textSecondary} />
+              <Ionicons name="chatbubbles-outline" size={64} color={colors.textSecondary} />
               <Text style={styles.emptyStateTitle}>No Chat History</Text>
               <Text style={styles.emptyStateSubtitle}>
                 Your conversations with HeaLora will appear here
@@ -170,7 +173,7 @@ export default function ChatHistoryScreen() {
                   <View style={styles.sessionStats}>
                     <Text style={styles.messageCount}>{session.messageCount} messages</Text>
                     {selectedSession === session.id && (
-                      <Ionicons name="checkmark-circle" size={20} color={colorsSheet.success} />
+                      <Ionicons name="checkmark-circle" size={20} color={colors.success} />
                     )}
                   </View>
                 </View>
@@ -185,7 +188,7 @@ export default function ChatHistoryScreen() {
                   style={styles.deleteButton}
                   onPress={() => handleDeleteSession(session.id)}
                 >
-                  <Ionicons name="trash-outline" size={16} color={colorsSheet.error} />
+                  <Ionicons name="trash-outline" size={16} color={colors.error} />
                 </TouchableOpacity>
               </TouchableOpacity>
             ))
@@ -196,10 +199,10 @@ export default function ChatHistoryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: colors.primary,
   },
   header: {
     flexDirection: "row",
@@ -207,7 +210,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: wp(5),
     paddingVertical: hp(2),
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: colors.primary,
   },
   menuButton: {
     padding: 8,
@@ -215,7 +218,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: hp(2.5),
     fontWeight: "bold",
-    color: colorsSheet.textOnPrimary,
+    color: colors.textOnPrimary,
     flex: 1,
     textAlign: "center",
   },
@@ -224,7 +227,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: colorsSheet.screenColor,
+    backgroundColor: colors.screenColor,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     paddingTop: hp(3),
@@ -238,7 +241,7 @@ const styles = StyleSheet.create({
   actionButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colorsSheet.primarySoft,
+    backgroundColor: colors.primarySoft,
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.5),
     borderRadius: 15,
@@ -246,32 +249,32 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   clearButton: {
-    backgroundColor: colorsSheet.error + "20",
+    backgroundColor: colors.error + "20",
   },
   actionButtonText: {
     fontSize: hp(1.6),
     fontWeight: "600",
-    color: colorsSheet.primary,
+    color: colors.primary,
     marginLeft: wp(2),
   },
   clearButtonText: {
-    color: colorsSheet.error,
+    color: colors.white,
   },
   sessionsList: {
     flex: 1,
   },
   sessionCard: {
-    backgroundColor: colorsSheet.cardBackground,
+    backgroundColor: colors.cardBackground,
     borderRadius: 15,
     padding: hp(2),
     marginBottom: hp(1.5),
     borderWidth: 1,
-    borderColor: colorsSheet.cardBorder,
+    borderColor: colors.cardBorder,
     position: "relative",
   },
   selectedSessionCard: {
-    borderColor: colorsSheet.primary,
-    backgroundColor: colorsSheet.primarySoft,
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
   },
   sessionHeader: {
     flexDirection: "row",
@@ -285,12 +288,12 @@ const styles = StyleSheet.create({
   sessionTitle: {
     fontSize: hp(1.8),
     fontWeight: "bold",
-    color: colorsSheet.textPrimary,
+    color: colors.textPrimary,
     marginBottom: hp(0.5),
   },
   sessionDate: {
     fontSize: hp(1.4),
-    color: colorsSheet.textSecondary,
+    color: colors.textSecondary,
   },
   sessionStats: {
     flexDirection: "row",
@@ -298,12 +301,12 @@ const styles = StyleSheet.create({
   },
   messageCount: {
     fontSize: hp(1.3),
-    color: colorsSheet.textSecondary,
+    color: colors.textSecondary,
     marginRight: wp(2),
   },
   lastMessage: {
     fontSize: hp(1.5),
-    color: colorsSheet.textSecondary,
+    color: colors.textSecondary,
     lineHeight: hp(2),
     marginBottom: hp(1),
   },
@@ -320,24 +323,24 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: hp(2.2),
     fontWeight: "bold",
-    color: colorsSheet.textPrimary,
+    color: colors.textPrimary,
     marginTop: hp(2),
     marginBottom: hp(1),
   },
   emptyStateSubtitle: {
     fontSize: hp(1.6),
-    color: colorsSheet.textSecondary,
+    color: colors.textSecondary,
     textAlign: "center",
     marginBottom: hp(3),
   },
   startChatButton: {
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: colors.primary,
     paddingHorizontal: wp(6),
     paddingVertical: hp(1.5),
     borderRadius: 25,
   },
   startChatButtonText: {
-    color: colorsSheet.textOnPrimary,
+    color: colors.textOnPrimary,
     fontSize: hp(1.8),
     fontWeight: "600",
   },

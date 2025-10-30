@@ -5,10 +5,12 @@ import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { colorsSheet } from "../(settings)/ui_elements";
+import { useTheme } from "@/contexts/ThemeContext";
 
 export default function ConferenceScreen() {
+  const { colors } = useTheme();
   const router = useRouter();
+  const styles = getStyles(colors);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -23,7 +25,7 @@ export default function ConferenceScreen() {
       <View style={styles.content}>
         <View style={styles.welcomeSection}>
           <View style={styles.iconContainer}>
-            <Ionicons name="videocam" size={hp(8)} color={colorsSheet.primary} />
+            <Ionicons name="videocam" size={hp(8)} color={colors.primary} />
           </View>
           <Text style={styles.welcomeTitle}>Video Consultation</Text>
           <Text style={styles.welcomeSubtitle}>
@@ -34,17 +36,17 @@ export default function ConferenceScreen() {
         {/* Features */}
         <View style={styles.featuresContainer}>
           <View style={styles.featureItem}>
-            <Ionicons name="shield-checkmark" size={30} color={colorsSheet.success} />
+            <Ionicons name="shield-checkmark" size={30} color={colors.success} />
             <Text style={styles.featureText}>Secure & Private</Text>
           </View>
           
           <View style={styles.featureItem}>
-            <Ionicons name="time" size={30} color={colorsSheet.info} />
+            <Ionicons name="time" size={30} color={colors.info} />
             <Text style={styles.featureText}>24/7 Availability</Text>
           </View>
           
           <View style={styles.featureItem}>
-            <Ionicons name="people" size={30} color={colorsSheet.secondary} />
+            <Ionicons name="people" size={30} color={colors.secondary} />
             <Text style={styles.featureText}>Expert Doctors</Text>
           </View>
         </View>
@@ -63,10 +65,10 @@ export default function ConferenceScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: colors.primary,
   },
   header: {
     flexDirection: "row",
@@ -74,7 +76,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: wp(5),
     paddingVertical: hp(2),
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: colors.primary,
   },
   menuButton: {
     padding: 8,
@@ -82,11 +84,11 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: hp(2.5),
     fontWeight: "bold",
-    color: colorsSheet.textOnPrimary,
+    color: colors.textOnPrimary,
   },
   content: {
     flex: 1,
-    backgroundColor: colorsSheet.screenColor,
+    backgroundColor: colors.screenColor,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     paddingTop: hp(4),
@@ -100,7 +102,7 @@ const styles = StyleSheet.create({
   iconContainer: {
     width: Math.min(hp(14), wp(28)),
     height: Math.min(hp(14), wp(28)),
-    backgroundColor: colorsSheet.primarySoft,
+    backgroundColor: colors.primarySoft,
     borderRadius: Math.min(hp(7), wp(14)),
     alignItems: "center",
     justifyContent: "center",
@@ -109,14 +111,14 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     fontSize: Math.min(hp(2.8), wp(7)),
     fontWeight: "bold",
-    color: colorsSheet.textPrimary,
+    color: colors.textPrimary,
     textAlign: "center",
     marginBottom: hp(1),
     paddingHorizontal: wp(2),
   },
   welcomeSubtitle: {
     fontSize: Math.min(hp(1.8), wp(4.5)),
-    color: colorsSheet.textSecondary,
+    color: colors.textSecondary,
     textAlign: "center",
     lineHeight: Math.min(hp(2.5), wp(6)),
     paddingHorizontal: wp(6),
@@ -131,14 +133,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: Math.min(hp(1.8), wp(4)),
     paddingHorizontal: wp(4),
-    backgroundColor: colorsSheet.primarySoft,
+    backgroundColor: colors.primarySoft,
     borderRadius: 15,
     marginBottom: hp(1.2),
     marginHorizontal: wp(1),
   },
   featureText: {
     fontSize: Math.min(hp(1.9), wp(4.8)),
-    color: colorsSheet.textOnCard,
+    color: colors.textOnCard,
     marginLeft: wp(3),
     fontWeight: "500",
     flex: 1,
@@ -150,13 +152,13 @@ const styles = StyleSheet.create({
     paddingBottom: hp(3),
   },
   scheduleButton: {
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: colors.primary,
     paddingVertical: Math.min(hp(2.2), wp(5.5)),
     paddingHorizontal: wp(6),
     borderRadius: 25,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: colorsSheet.primary,
+    shadowColor: colors.primary,
     shadowOffset: {
       width: 0,
       height: 3,
@@ -166,7 +168,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   scheduleButtonText: {
-    color: colorsSheet.white,
+    color: colors.white,
     fontSize: Math.min(hp(2.1), wp(5.2)),
     fontWeight: "600",
     letterSpacing: 0.3,

@@ -1,8 +1,9 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { authApi } from '../../utils/auth/authApi';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function Signup() {
   const [email, setEmail] = useState('');
@@ -17,6 +18,8 @@ export default function Signup() {
     confirmPassword: ''
   });
   const router = useRouter();
+  const { colors, isDarkMode } = useTheme();
+  const styles = getStyles(colors, isDarkMode);
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/;
@@ -129,136 +132,201 @@ export default function Signup() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.formContainer}>
-        <Text style={styles.title}>Create Account</Text>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+      >
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.formContainer}>
+            <View style={styles.header}>
+              <Text style={styles.title}>Create Account</Text>
+              <Text style={styles.subtitle}>Join FitFaat and start your fitness journey</Text>
+            </View>
         
-        <TextInput
-          style={[styles.input, errors.email ? styles.inputError : null]}
-          placeholder="Email"
-          value={email}
-          onChangeText={(text) => {
-            setEmail(text);
-            setErrors(prev => ({ ...prev, email: '' }));
-          }}
-          autoCapitalize="none"
-          keyboardType="email-address"
-        />
-        {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Email</Text>
+          <TextInput
+            style={[styles.input, errors.email ? styles.inputError : null]}
+            placeholder="Enter your email"
+            placeholderTextColor={colors.textLight}
+            value={email}
+            onChangeText={(text) => {
+              setEmail(text);
+              setErrors(prev => ({ ...prev, email: '' }));
+            }}
+            autoCapitalize="none"
+            keyboardType="email-address"
+          />
+          {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
+        </View>
 
-        <TextInput
-          style={[styles.input, errors.username ? styles.inputError : null]}
-          placeholder="Username"
-          value={username}
-          onChangeText={(text) => {
-            setUsername(text);
-            setErrors(prev => ({ ...prev, username: '' }));
-          }}
-          autoCapitalize="none"
-        />
-        {errors.username ? <Text style={styles.errorText}>{errors.username}</Text> : null}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Username</Text>
+          <TextInput
+            style={[styles.input, errors.username ? styles.inputError : null]}
+            placeholder="Choose a username"
+            placeholderTextColor={colors.textLight}
+            value={username}
+            onChangeText={(text) => {
+              setUsername(text);
+              setErrors(prev => ({ ...prev, username: '' }));
+            }}
+            autoCapitalize="none"
+          />
+          {errors.username ? <Text style={styles.errorText}>{errors.username}</Text> : null}
+        </View>
 
-        <TextInput
-          style={[styles.input, errors.password ? styles.inputError : null]}
-          placeholder="Password"
-          value={password}
-          onChangeText={(text) => {
-            setPassword(text);
-            setErrors(prev => ({ ...prev, password: '' }));
-          }}
-          secureTextEntry
-        />
-        {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Password</Text>
+          <TextInput
+            style={[styles.input, errors.password ? styles.inputError : null]}
+            placeholder="Create a password"
+            placeholderTextColor={colors.textLight}
+            value={password}
+            onChangeText={(text) => {
+              setPassword(text);
+              setErrors(prev => ({ ...prev, password: '' }));
+            }}
+            secureTextEntry
+          />
+          {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
+        </View>
 
-        <TextInput
-          style={[styles.input, errors.confirmPassword ? styles.inputError : null]}
-          placeholder="Confirm Password"
-          value={confirmPassword}
-          onChangeText={(text) => {
-            setConfirmPassword(text);
-            setErrors(prev => ({ ...prev, confirmPassword: '' }));
-          }}
-          secureTextEntry
-        />
-        {errors.confirmPassword ? <Text style={styles.errorText}>{errors.confirmPassword}</Text> : null}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Confirm Password</Text>
+          <TextInput
+            style={[styles.input, errors.confirmPassword ? styles.inputError : null]}
+            placeholder="Confirm your password"
+            placeholderTextColor={colors.textLight}
+            value={confirmPassword}
+            onChangeText={(text) => {
+              setConfirmPassword(text);
+              setErrors(prev => ({ ...prev, confirmPassword: '' }));
+            }}
+            secureTextEntry
+          />
+          {errors.confirmPassword ? <Text style={styles.errorText}>{errors.confirmPassword}</Text> : null}
+        </View>
 
         <TouchableOpacity 
           style={[styles.button, isLoading && styles.buttonDisabled]}
           onPress={handleSignup}
           disabled={isLoading}
+          activeOpacity={0.8}
         >
-          <Text style={styles.buttonText}>{isLoading ? 'Signing up...' : 'Sign Up'}</Text>
+          <Text style={styles.buttonText}>{isLoading ? 'Creating Account...' : 'Sign Up'}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.linkButton}
-          onPress={() => router.push("/auth/email-login")}
-        >
-          <Text style={styles.linkText}>Already have an account? Login</Text>
-        </TouchableOpacity>
-      </View>
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>Already have an account? </Text>
+              <TouchableOpacity onPress={() => router.push("/auth/email-login")}>
+                <Text style={styles.linkText}>Login</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.screenColor,
   },
-  buttonDisabled: {
-    backgroundColor: '#ccc',
+  keyboardView: {
+    flex: 1,
   },
-  inputError: {
-    borderColor: '#ff3b30',
-  },
-  errorText: {
-    color: '#ff3b30',
-    fontSize: 12,
-    marginBottom: 10,
-    marginLeft: 5,
+  scrollContent: {
+    flexGrow: 1,
   },
   formContainer: {
-    flex: 1,
-    padding: 20,
-    justifyContent: 'center',
+    padding: 24,
+    paddingBottom: 40,
+  },
+  header: {
+    marginBottom: 32,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 30,
-    textAlign: 'center',
-    color: '#333',
+    fontSize: Math.min(32, 28),
+    fontWeight: '800',
+    color: colors.textPrimary,
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: Math.min(16, 15),
+    color: colors.textSecondary,
+  },
+  inputContainer: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: 8,
   },
   input: {
-    height: 50,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    marginBottom: 15,
+    minHeight: 52,
+    height: 56,
+    borderWidth: 1.5,
+    borderColor: isDarkMode ? colors.gray : '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
     fontSize: 16,
-    backgroundColor: '#f9f9f9',
+    color: colors.textPrimary,
+    backgroundColor: isDarkMode ? colors.cardBackground : '#FFFFFF',
+  },
+  inputError: {
+    borderColor: colors.error,
+    borderWidth: 2,
+  },
+  errorText: {
+    color: colors.error,
+    fontSize: 13,
+    marginTop: 6,
+    marginLeft: 4,
   },
   button: {
-    backgroundColor: '#007AFF',
-    height: 50,
-    borderRadius: 8,
+    backgroundColor: colors.primary,
+    minHeight: 52,
+    height: 56,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 8,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   buttonText: {
-    color: '#fff',
+    color: '#FFFFFF',
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
   },
-  linkButton: {
-    marginTop: 15,
-    padding: 10,
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 24,
+  },
+  footerText: {
+    fontSize: 15,
+    color: colors.textSecondary,
   },
   linkText: {
-    color: '#007AFF',
-    textAlign: 'center',
-    fontSize: 16,
+    fontSize: 15,
+    color: colors.primary,
+    fontWeight: '700',
   },
 });

@@ -10,9 +10,10 @@ import {
 } from "react-native-responsive-screen";
 import { Image } from "expo-image";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { colorsSheet } from "../(settings)/ui_elements";
+import { useTheme } from "@/contexts/ThemeContext";
 
 export default function FavoritesScreen() {
+  const { colors } = useTheme();
   const router = useRouter();
   const [favorites, setFavorites] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,7 +85,7 @@ export default function FavoritesScreen() {
   const FavoriteCard = ({ item, index }: { item: any, index: number }) => {
     return (
       <View style={{
-        backgroundColor: 'white',
+        backgroundColor: colors.cardBackground,
         marginHorizontal: wp(4),
         marginBottom: hp(2),
         borderRadius: hp(2),
@@ -116,21 +117,21 @@ export default function FavoritesScreen() {
             <Text style={{
               fontSize: hp(2.2),
               fontWeight: 'bold',
-              color: '#333',
+              color: colors.textPrimary,
               marginBottom: hp(0.5),
             }}>
               {item.name}
             </Text>
             <Text style={{
               fontSize: hp(1.6),
-              color: '#666',
+              color: colors.textSecondary,
               marginBottom: hp(0.3),
             }}>
               Target: {item.target}
             </Text>
             <Text style={{
               fontSize: hp(1.4),
-              color: '#999',
+              color: colors.textLight,
             }}>
               {item.equipment}
             </Text>
@@ -158,6 +159,8 @@ export default function FavoritesScreen() {
     );
   };
 
+  const styles = getStyles(colors);
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -167,14 +170,14 @@ export default function FavoritesScreen() {
             style={styles.backButton}
             onPress={handleBackPress}
           >
-            <Ionicons name="arrow-back" size={24} color={colorsSheet.textOnPrimary} />
+            <Ionicons name="arrow-back" size={24} color={colors.textOnPrimary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>My Favorites ❤️</Text>
           <View style={styles.spacer} />
         </View>
 
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colorsSheet.screenColor }}>
-          <Text style={{ fontSize: hp(2), color: '#666' }}>Loading favorites...</Text>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.screenColor }}>
+          <Text style={{ fontSize: hp(2), color: colors.textSecondary }}>Loading favorites...</Text>
         </View>
       </SafeAreaView>
     );
@@ -188,7 +191,7 @@ export default function FavoritesScreen() {
           style={styles.backButton}
           onPress={handleBackPress}
         >
-          <Ionicons name="arrow-back" size={24} color={colorsSheet.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.textOnPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>My Favorites ❤️</Text>
         <View style={styles.spacer} />
@@ -237,10 +240,10 @@ export default function FavoritesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: colors.primary,
   },
   header: {
     flexDirection: "row",
@@ -248,7 +251,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: Math.min(wp(5), 20),
     paddingVertical: Math.min(hp(2), 16),
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: colors.primary,
     minHeight: hp(8),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -265,7 +268,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: Math.min(hp(2.8), wp(6.5)),
     fontWeight: "bold",
-    color: colorsSheet.textOnPrimary,
+    color: colors.textOnPrimary,
     textAlign: "center",
     flex: 1,
     letterSpacing: 0.5,
@@ -275,7 +278,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: colorsSheet.screenColor,
+    backgroundColor: colors.screenColor,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     paddingTop: hp(2),
@@ -292,13 +295,13 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: hp(2.5),
     fontWeight: 'bold',
-    color: colorsSheet.textPrimary,
+    color: colors.textPrimary,
     textAlign: 'center',
     marginBottom: hp(1),
   },
   emptyDescription: {
     fontSize: hp(1.8),
-    color: colorsSheet.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: hp(2.5),
   },
@@ -321,7 +324,7 @@ const styles = StyleSheet.create({
   },
   countText: {
     fontSize: hp(2),
-    color: colorsSheet.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: hp(2),
     marginTop: hp(1),
