@@ -8,7 +8,8 @@ import Animated, {
   withSpring
 } from "react-native-reanimated";
 import Svg, { Circle, Defs, LinearGradient, Stop, Text as SvgText } from "react-native-svg";
-import { DashFonts, colorsSheet as color, rs } from "../(settings)/ui_elements";
+import { DashFonts, rs } from "../(settings)/ui_elements";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Day } from "./DayPlan";
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 interface ProgressCircleProps {
@@ -28,6 +29,8 @@ const strokeWidth= (radius/100)*20
 const ProgressStrokeWidth= (radius/100)*30
 
 export const Days = ({props, onDayPress}: {props: Day, onDayPress: (dayNo : number) => void}) => {
+  const { colors } = useTheme();
+  
   if(props.status === 'locked'){ //props false = locked day
     return <LockedDay info={props} />;
   }
@@ -41,12 +44,14 @@ export const Days = ({props, onDayPress}: {props: Day, onDayPress: (dayNo : numb
 }
 
 const ActiveDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}) => {
+  const { colors } = useTheme();
   var time = '00:00:00'
   const scale = useSharedValue(1);
   const finalProgress : number = Math.min(100, Math.round(((info.achievedCalories + info.achieviedHydration) / (info.targetCalories + info.targetHydration)) * 100))
   const animatedContainerStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
+  const styles = getStyles(colors);
   useEffect(() => {
     scale.value = withSpring(1, { damping: 8, stiffness: 150 });
   }, [finalProgress]);
@@ -101,8 +106,10 @@ const ActiveDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}) 
 }
 
 const FinishedDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}) => {
+  const { colors } = useTheme();
   const scale = useSharedValue(1);
   const finalProgress : number = Math.min(100, Math.round((info.achievedCalories / info.targetCalories) * 100));
+  const styles = getStyles(colors);
   
   useEffect(() => {
     scale.value = withSpring(1, { damping: 10, stiffness: 150 });
@@ -143,6 +150,8 @@ const FinishedDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}
 }
 
 const LockedDay = ({info} : {info: Day}) => {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   return (
     <View style={styles.modernLockedItem}>
       <View style={styles.modernLockedHeader}>
@@ -166,6 +175,8 @@ const LockedDay = ({info} : {info: Day}) => {
 }
 
 const ProgressCircle = React.memo(({finalProgress}: {finalProgress: number})=>{
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const progress = useSharedValue(0);
   useEffect(() => {
     progress.value = withSpring(finalProgress, { damping: 12, stiffness: 100 });
@@ -176,10 +187,10 @@ const ProgressCircle = React.memo(({finalProgress}: {finalProgress: number})=>{
   });
   
   const getProgressColor = () => {
-    if (finalProgress >= 80) return color.success; // Green
-    if (finalProgress >= 60) return color.warning; // Orange  
-    if (finalProgress >= 40) return color.warning; // Yellow
-    return color.error; // Red
+    if (finalProgress >= 80) return colors.success; // Green
+    if (finalProgress >= 60) return colors.warning; // Orange  
+    if (finalProgress >= 40) return colors.warning; // Yellow
+    return colors.error; // Red
   };
   return<>
   <View style={styles.modernProgressWrapper}>
@@ -211,6 +222,8 @@ const ProgressCircle = React.memo(({finalProgress}: {finalProgress: number})=>{
 
 
 const InfoTray = React.memo(({ duration }: { duration: number }) => {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const [remainingTime, setRemainingTime] = useState(duration);
   
   const formatDuration = (totalSeconds: number): string => {
@@ -246,13 +259,14 @@ const InfoTray = React.memo(({ duration }: { duration: number }) => {
 });
 
 
-export const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   listitem: {
     margin: rs(8),
     minHeight: rs(72),
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: color.screenColor,
+    backgroundColor: colors.screenColor,
+
     borderRadius: rs(12),
     padding: rs(10),
     marginBottom: rs(10),
@@ -266,11 +280,11 @@ export const styles = StyleSheet.create({
     margin: rs(10),
     minHeight: rs(140),
     flexDirection: "column",
-    backgroundColor: color.screenColor,
+    backgroundColor: colors.screenColor,
     borderRadius: rs(14),
     padding: rs(10),
     marginBottom: rs(10),
-    shadowColor: color.activeDayShadowColor,
+    shadowColor: colors.activeDayShadowColor,
     shadowOpacity: 0.3,
     shadowRadius: rs(10),
     elevation: 12,
@@ -394,17 +408,17 @@ export const styles = StyleSheet.create({
   // Modern Active Day Styles
   modernActiveItem: {
     margin: rs(8),
-    backgroundColor: color.cardBackground,
+    backgroundColor: colors.cardBackground,
     borderRadius: rs(20),
     padding: rs(16),
     marginBottom: rs(12),
-    shadowColor: color.shadowMedium,
+    shadowColor: colors.shadowMedium,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: rs(12),
     elevation: 8,
     borderLeftWidth: 4,
-    borderLeftColor: color.activeStatus,
+    borderLeftColor: colors.activeStatus,
   },
   
   modernTopHeader: {
@@ -423,9 +437,9 @@ export const styles = StyleSheet.create({
   modernDayNumber: {
     fontSize: rs(32),
     fontWeight: '800',
-    color: color.textPrimary,
+    color: colors.textPrimary,
     marginRight: rs(12),
-    backgroundColor: color.primarySoft,
+    backgroundColor: colors.primarySoft,
     borderRadius: rs(12),
     paddingHorizontal: rs(12),
     paddingVertical: rs(6),
@@ -440,13 +454,13 @@ export const styles = StyleSheet.create({
   modernDayText: {
     fontSize: rs(18),
     fontWeight: '600',
-    color: color.textPrimary,
+    color: colors.textPrimary,
     marginBottom: rs(2),
   },
   
   modernDateText: {
     fontSize: rs(14),
-    color: color.textSecondary,
+    color: colors.textSecondary,
     fontWeight: '500',
   },
   
@@ -459,7 +473,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: rs(12),
-    backgroundColor: color.offWhite,
+    backgroundColor: colors.offWhite,
     borderRadius: rs(12),
     padding: rs(12),
   },
@@ -472,7 +486,7 @@ export const styles = StyleSheet.create({
   
   modernStatusText: {
     fontSize: rs(13),
-    color: color.textPrimary,
+    color: colors.textPrimary,
     fontWeight: '500',
     marginLeft: rs(6),
   },
@@ -480,7 +494,7 @@ export const styles = StyleSheet.create({
   modernRemarksSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: color.primarySoft,
+    backgroundColor: colors.primarySoft,
     borderRadius: rs(10),
     padding: rs(10),
     marginBottom: rs(12),
@@ -488,7 +502,7 @@ export const styles = StyleSheet.create({
   
   modernRemarksText: {
     fontSize: rs(13),
-    color: color.secondary,
+    color: colors.secondary,
     fontStyle: 'italic',
     marginLeft: rs(6),
     flex: 1,
@@ -521,11 +535,11 @@ export const styles = StyleSheet.create({
   modernViewButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: color.buttonPrimary,
+    backgroundColor: colors.buttonPrimary,
     borderRadius: rs(12),
     paddingHorizontal: rs(16),
     paddingVertical: rs(10),
-    shadowColor: color.shadowMedium,
+    shadowColor: colors.shadowMedium,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
@@ -533,7 +547,7 @@ export const styles = StyleSheet.create({
   },
   
   modernViewButtonText: {
-    color: color.buttonText,
+    color: colors.buttonText,
     fontSize: rs(13),
     fontWeight: '600',
     marginRight: rs(4),
@@ -542,17 +556,17 @@ export const styles = StyleSheet.create({
   // Modern Finished Day Styles
   modernFinishedItem: {
     margin: rs(8),
-    backgroundColor: color.cardBackground,
+    backgroundColor: colors.cardBackground,
     borderRadius: rs(16),
     padding: rs(16),
     marginBottom: rs(12),
-    shadowColor: color.finishedStatus,
+    shadowColor: colors.finishedStatus,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: rs(8),
     elevation: 6,
     borderLeftWidth: 4,
-    borderLeftColor: color.finishedStatus,
+    borderLeftColor: colors.finishedStatus,
   },
   
   modernFinishedHeader: {
@@ -573,8 +587,8 @@ export const styles = StyleSheet.create({
   modernFinishedDayNumber: {
     fontSize: rs(24),
     fontWeight: '800',
-    color: color.finishedStatus,
-    backgroundColor: color.primarySoft,
+    color: colors.finishedStatus,
+    backgroundColor: colors.primarySoft,
     borderRadius: rs(8),
     paddingHorizontal: rs(8),
     paddingVertical: rs(4),
@@ -586,13 +600,13 @@ export const styles = StyleSheet.create({
   modernFinishedDayText: {
     fontSize: rs(16),
     fontWeight: '600',
-    color: color.textPrimary,
+    color: colors.textPrimary,
     marginBottom: rs(2),
   },
   
   modernFinishedDateText: {
     fontSize: rs(13),
-    color: color.textSecondary,
+    color: colors.textSecondary,
     fontWeight: '500',
   },
   
@@ -603,13 +617,14 @@ export const styles = StyleSheet.create({
   modernFinishedPercentage: {
     fontSize: rs(20),
     fontWeight: '800',
-    color: color.finishedStatus,
+    color: colors.finishedStatus,
+
     marginBottom: rs(2),
   },
   
   modernFinishedLabel: {
     fontSize: rs(11),
-    color: color.finishedStatus,
+    color: colors.finishedStatus,
     fontWeight: '600',
     textTransform: 'uppercase',
   },
@@ -618,11 +633,11 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: color.buttonSuccess,
+    backgroundColor: colors.buttonSuccess,
     borderRadius: rs(12),
     paddingHorizontal: rs(16),
     paddingVertical: rs(10),
-    shadowColor: color.buttonSuccess,
+    shadowColor: colors.buttonSuccess,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
@@ -630,7 +645,7 @@ export const styles = StyleSheet.create({
   },
   
   modernFinishedButtonText: {
-    color: color.buttonText,
+    color: colors.buttonText,
     fontSize: rs(14),
     fontWeight: '600',
     marginRight: rs(6),
@@ -639,17 +654,17 @@ export const styles = StyleSheet.create({
   // Modern Locked Day Styles
   modernLockedItem: {
     margin: rs(8),
-    backgroundColor: color.white,
+    backgroundColor: colors.cardBackground,
     borderRadius: rs(16),
     padding: rs(16),
     marginBottom: rs(12),
-    shadowColor: color.textLight,
+    shadowColor: colors.textLight,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: rs(4),
     elevation: 3,
     borderWidth: 1,
-    borderColor: color.gray,
+    borderColor: colors.gray,
     opacity: 0.8,
   },
   
@@ -671,8 +686,8 @@ export const styles = StyleSheet.create({
   modernLockedDayNumber: {
     fontSize: rs(20),
     fontWeight: '700',
-    color: color.lockedStatus,
-    backgroundColor: color.lightGray,
+    color: colors.lockedStatus,
+    backgroundColor: colors.lightGray,
     borderRadius: rs(8),
     paddingHorizontal: rs(8),
     paddingVertical: rs(4),
@@ -684,13 +699,14 @@ export const styles = StyleSheet.create({
   modernLockedDayText: {
     fontSize: rs(16),
     fontWeight: '600',
-    color: color.textSecondary,
+    color: colors.textSecondary,
     marginBottom: rs(2),
   },
   
   modernLockedDateText: {
     fontSize: rs(13),
-    color: color.lockedStatus,
+    color: colors.lockedStatus,
+
     fontWeight: '500',
   },
   
@@ -701,14 +717,14 @@ export const styles = StyleSheet.create({
   modernLockedStatusText: {
     fontSize: rs(14),
     fontWeight: '600',
-    color: color.lockedStatus,
+    color: colors.lockedStatus,
     textTransform: 'uppercase',
     marginBottom: rs(2),
   },
   
   modernLockedSubText: {
     fontSize: rs(10),
-    color: color.textLight,
+    color: colors.textLight,
     textAlign: 'center',
     fontStyle: 'italic',
   },

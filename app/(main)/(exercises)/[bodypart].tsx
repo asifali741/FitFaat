@@ -9,7 +9,7 @@ import {
 } from "react-native-responsive-screen";
 import { useNavigation } from "@react-navigation/native";
 import { DrawerActions } from "@react-navigation/native";
-import { colorsSheet } from "../(settings)/ui_elements";
+import { useTheme } from "@/contexts/ThemeContext";
 import { fetchExercisesByBodyPart } from "../../../api/exerciseDB";
 import { dummyData } from "../../../constants/list";
 import { Image } from "expo-image";
@@ -34,7 +34,8 @@ const bodyPartMap = {
 };
 
 export default function ExercisesScreen() {
-  const [exercises, setExercises] = useState([]);
+  const { colors } = useTheme();
+  const [exercises, setExercises] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const navigation = useNavigation();
@@ -55,7 +56,7 @@ export default function ExercisesScreen() {
     setLoading(true);
     console.log("Fetching exercises for:", bodyPartName);
     
-    const apiBodyPart = bodyPartMap[bodyPartName];
+    const apiBodyPart = (bodyPartMap as any)[bodyPartName];
     if (!apiBodyPart) {
       console.log("Invalid body part:", bodyPartName);
       setExercises(dummyData); // Use dummy data as fallback
@@ -101,7 +102,7 @@ export default function ExercisesScreen() {
         <TouchableOpacity
           onPress={() => handleExercisePress(item)}
           style={{
-            backgroundColor: '#f5f5f5',
+            backgroundColor: colors.cardBackground,
             borderRadius: hp(2),
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 2 },
@@ -125,7 +126,7 @@ export default function ExercisesScreen() {
                 textAlign: 'center',
                 fontWeight: '600',
                 fontSize: hp(1.8),
-                color: '#333',
+                color: colors.textPrimary,
               }}
             >
               {item?.name?.length > 20 ? item.name.slice(0,20) + '...' : item.name}
@@ -134,7 +135,7 @@ export default function ExercisesScreen() {
               style={{
                 textAlign: 'center',
                 fontSize: hp(1.4),
-                color: '#666',
+                color: colors.textSecondary,
                 marginTop: hp(0.5),
               }}
             >
@@ -146,6 +147,12 @@ export default function ExercisesScreen() {
     );
   };
 
+  const openDrawer = () => {
+    navigation.dispatch(DrawerActions.openDrawer());
+  };
+
+  const styles = getStyles(colors);
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -155,7 +162,7 @@ export default function ExercisesScreen() {
             style={styles.backButton}
             onPress={handleBackPress}
           >
-            <Ionicons name="arrow-back" size={24} color={colorsSheet.textOnPrimary} />
+            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
           {/* Dynamic title based on selected body part */}
           <Text style={styles.headerTitle}>{(bodypart || name) as string} Exercises</Text>
@@ -165,7 +172,7 @@ export default function ExercisesScreen() {
         {/* Loading Content */}
         <View style={styles.content}>
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colorsSheet.primary} />
+            <ActivityIndicator size="large" color={colors.primary} />
             <Text style={styles.loadingText}>
               Loading exercises...
             </Text>
@@ -183,7 +190,7 @@ export default function ExercisesScreen() {
           style={styles.backButton}
           onPress={handleBackPress}
         >
-          <Ionicons name="arrow-back" size={24} color={colorsSheet.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         {/* Dynamic title based on selected body part */}
         <Text style={styles.headerTitle}>{(bodypart || name) as string} Exercises</Text>
@@ -215,10 +222,10 @@ export default function ExercisesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: colors.cardBackground,
   },
   header: {
     flexDirection: "row",
@@ -226,7 +233,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: Math.min(wp(5), 20),
     paddingVertical: Math.min(hp(2), 16),
-    backgroundColor: colorsSheet.primary, // Green header background
+    backgroundColor: colors.cardBackground, // Green header background
     minHeight: hp(8),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -243,7 +250,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: Math.min(hp(2.8), wp(6.5)),
     fontWeight: "bold",
-    color: colorsSheet.textOnPrimary,
+    color: colors.textPrimary,
     textAlign: "center",
     flex: 1,
     letterSpacing: 0.5,
@@ -253,7 +260,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: colorsSheet.screenColor,
+    backgroundColor: colors.screenColor,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     paddingTop: hp(2),
@@ -269,11 +276,11 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: hp(2),
     fontSize: Math.min(hp(2), wp(5)),
-    color: colorsSheet.textSecondary,
+    color: colors.textSecondary,
   },
   exerciseCount: {
     fontSize: Math.min(hp(2), wp(5)),
-    color: colorsSheet.textSecondary,
+    color: colors.textSecondary,
     textAlign: "center",
     marginBottom: hp(2),
     marginTop: hp(1),

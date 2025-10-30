@@ -1,23 +1,24 @@
-import { colorsSheet as color } from "@/app/(main)/(settings)/ui_elements";
+import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
 import {
-  DrawerContentComponentProps,
-  DrawerContentScrollView,
-  DrawerItem,
+    DrawerContentComponentProps,
+    DrawerItem
 } from "@react-navigation/drawer";
 import { useRef, useState } from "react";
 import { Image, Pressable, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { DrawerFonts } from "../app/(main)/(settings)/ui_elements";
 type DrawerSceneWrapperProps = DrawerContentComponentProps;
 const userName = 'NAME' // fetch from Authentication Token
 export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
+  const { colors } = useTheme();
+  
   const handleProfilePress = () => {
     console.log('Navigating to profile screen');
     props.navigation.navigate('profile');
@@ -35,8 +36,10 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
     return currentRoute === '(exercises)/workout' || currentRoute.startsWith('(exercises)');
   };
 
+  const styles = getStyles(colors);
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "transparent" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.drawerBackground }}>
       {/* Top Part */}
       <TouchableOpacity style={styles.userContainer} onPress={handleProfilePress}>
         <Image source={require("../assets/images/Default_Profile.png")} style={styles.userImage} />
@@ -67,7 +70,7 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
             marginLeft: 8,
             fontSize: 18,
             fontFamily: "PoppinsMedium500",
-            color: "#FFFFFF",
+            color: colors.textOnPrimary,
           }}
           style={{
             marginHorizontal: 12,
@@ -76,7 +79,7 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
             paddingHorizontal: 20,
             paddingVertical: 8,
             minHeight: 45,
-            backgroundColor: isRouteActive('(dashboard)') ? color.drawerActiveTabColor : 'transparent',
+            backgroundColor: isRouteActive('(dashboard)') ? colors.drawerActiveTabColor : 'transparent',
           }}
         />
         <DrawerItem
@@ -86,7 +89,7 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
             marginLeft: 8,
             fontSize: 18,
             fontFamily: "PoppinsMedium500",
-            color: "#FFFFFF",
+            color: colors.textOnPrimary,
           }}
           style={{
             marginHorizontal: 12,
@@ -95,7 +98,7 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
             paddingHorizontal: 20,
             paddingVertical: 8,
             minHeight: 45,
-            backgroundColor: isRouteActive('(chatbot)') ? color.drawerActiveTabColor : 'transparent',
+            backgroundColor: isRouteActive('(chatbot)') ? colors.drawerActiveTabColor : 'transparent',
           }}
         />
         <DrawerItem
@@ -105,7 +108,7 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
             marginLeft: 8,
             fontSize: 18,
             fontFamily: "PoppinsMedium500",
-            color: "#FFFFFF",
+            color: colors.textOnPrimary,
           }}
           style={{
             marginHorizontal: 12,
@@ -114,26 +117,7 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
             paddingHorizontal: 20,
             paddingVertical: 8,
             minHeight: 45,
-            backgroundColor: isRouteActive('(conference)') ? color.drawerActiveTabColor : 'transparent',
-          }}
-        />
-        <DrawerItem
-          label="Settings"
-          onPress={() => props.navigation.navigate('(settings)')}
-          labelStyle={{
-            marginLeft: 8,
-            fontSize: 18,
-            fontFamily: "PoppinsMedium500",
-            color: "#FFFFFF",
-          }}
-          style={{
-            marginHorizontal: 12,
-            marginVertical: 1,
-            borderRadius: 25,
-            paddingHorizontal: 20,
-            paddingVertical: 8,
-            minHeight: 45,
-            backgroundColor: isRouteActive('(settings)') ? color.drawerActiveTabColor : 'transparent',
+            backgroundColor: isRouteActive('(conference)') ? colors.drawerActiveTabColor : 'transparent',
           }}
         />
         <DrawerItem
@@ -143,7 +127,7 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
             marginLeft: 8,
             fontSize: 18,
             fontFamily: "PoppinsMedium500",
-            color: "#FFFFFF",
+            color: colors.textOnPrimary,
           }}
           style={{
             marginHorizontal: 12,
@@ -152,7 +136,7 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
             paddingHorizontal: 20,
             paddingVertical: 8,
             minHeight: 45,
-            backgroundColor: isExercisesActive() ? color.drawerActiveTabColor : 'transparent',
+            backgroundColor: isExercisesActive() ? colors.drawerActiveTabColor : 'transparent',
           }}
         />
         <DrawerItem
@@ -162,7 +146,7 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
             marginLeft: 8,
             fontSize: 18,
             fontFamily: "PoppinsMedium500",
-            color: "#FFFFFF",
+            color: colors.textOnPrimary,
           }}
           style={{
             marginHorizontal: 12,
@@ -171,7 +155,26 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
             paddingHorizontal: 20,
             paddingVertical: 8,
             minHeight: 45,
-            backgroundColor: isRouteActive('(doctor-portal)') ? color.drawerActiveTabColor : 'transparent',
+            backgroundColor: isRouteActive('(doctor-portal)') ? colors.drawerActiveTabColor : 'transparent',
+          }}
+        />
+        <DrawerItem
+          label="Settings"
+          onPress={() => props.navigation.navigate('(settings)')}
+          labelStyle={{
+            marginLeft: 8,
+            fontSize: 18,
+            fontFamily: "PoppinsMedium500",
+            color: colors.textOnPrimary,
+          }}
+          style={{
+            marginHorizontal: 12,
+            marginVertical: 1,
+            borderRadius: 25,
+            paddingHorizontal: 20,
+            paddingVertical: 8,
+            minHeight: 45,
+            backgroundColor: isRouteActive('(settings)') ? colors.drawerActiveTabColor : 'transparent',
           }}
         />
       </View>
@@ -184,6 +187,7 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
 }
 
 const Logout_Button = () => {
+  const { colors } = useTheme();
   const { signOut } = useAuth();
   const baseText = "Logout".split(""); // Array of letters
   const [activeIndex, setActiveIndex] = useState(0);
@@ -225,13 +229,15 @@ const Logout_Button = () => {
     }
   };
 
+  const styles = getStyles(colors);
+
   return (
     <Pressable
       style={styles.logoutButton}
       onLongPress={handleLongPress}
       onPressOut={handlePressOut}
     >
-      <Ionicons name="log-out" size={24} color="#FFFFFF" />
+      <Ionicons name="log-out" size={24} color={colors.textOnPrimary} />
       <View style={{ flexDirection: "row", marginLeft: 5 }}>
         {baseText.map((letter, i) => {
           const animatedStyle = useAnimatedStyle(() => ({
@@ -250,15 +256,15 @@ const Logout_Button = () => {
 };
 
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   userContainer: {
   flexDirection: "row",
   alignItems: "center",
   padding: 16,
   marginHorizontal: 12,
-  backgroundColor: color.screenColor,
+  backgroundColor: colors.cardBackground,
   borderBottomWidth: 1,
-  borderBottomColor: "#ddd",
+  borderBottomColor: colors.cardBorder,
   borderRadius: 25,
   marginBottom: 20,
 },
@@ -271,12 +277,12 @@ userInfo: {
 userName: {
   fontSize: DrawerFonts.body,
   fontWeight: "600",
-  color: "#333",
+  color: colors.textPrimary,
 },
 
 userEmail: {
   fontSize: DrawerFonts.drawerEmail,
-  color: "#666",
+  color: colors.textSecondary,
   marginTop: 2,
 },
 
@@ -286,7 +292,7 @@ userEmail: {
     borderRadius: 30,
     marginRight: 12,
     borderWidth: 2,
-    borderColor: "#ddd",
+    borderColor: colors.cardBorder,
   },
   logoutButton: {
     flexDirection: "row",
@@ -294,13 +300,13 @@ userEmail: {
     padding: 16,
     marginHorizontal: 12,
     marginVertical: 20,
-    backgroundColor: color.logoutBtnColor, //ui_elements.tsx logoutBtnColor
+    backgroundColor: colors.error,
     borderRadius: 25,
     justifyContent: "center",
     alignSelf: 'stretch',
   },
   logoutText: {
-    color: color.logoutBtnTextColor, //ui_elements.tsx logoutBtnTextColor
+    color: colors.white,
     fontSize: 16,
     fontWeight: "600",
     marginLeft: 8,

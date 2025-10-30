@@ -28,14 +28,14 @@ export const Topbar = () => {
         </View>
         <View style={{flexDirection:'row'}}>
             <View style={styles.workoutButtonContainer}>
-                <WorkoutButton 
+                {/* <WorkoutButton 
                     title="Premium"
                     style={{ 
                         transform: [{ scale: 0.5 }],
                         marginRight: -5,
                         marginTop: -3
                     }}
-                />
+                /> */}
             </View>
         </View>
     </View>
