@@ -42,6 +42,7 @@ export default function Index() {
   const [selectedGender, setSelectedGender] = useState<'male'|'female'|'other'|null>(null); // 'male', 'female', 'other'
   const [selectedGoal, setSelectedGoal] = useState<number|null>(null); // 1, 2, or 3
   const [birthDate, setBirthDate] = useState({ day: "", month: "", year: "" });
+  const [age, setAge] = useState("");
   
   const [fontsLoaded] = useFonts({
     Pacifico: require("../../assets/fonts/Pacifico-Regular.ttf"),
@@ -80,7 +81,8 @@ export default function Index() {
     if (!birthDate.day.trim() || !birthDate.month.trim() || !birthDate.year.trim()) {
       missingFields.push('Date of Birth');
     }
-    if (!selectedGoal) missingFields.push('Fitness Goal');
+  if (!age.trim()) missingFields.push('Age');
+  if (!selectedGoal) missingFields.push('Fitness Goal');
     
     return missingFields;
   };
@@ -100,15 +102,38 @@ export default function Index() {
         return;
       }
       
-      // Validate date of birth format
-      const day = parseInt(birthDate.day);
-      const month = parseInt(birthDate.month);
-      const year = parseInt(birthDate.year);
+      // Validate date of birth values
+      const day = parseInt(birthDate.day, 10);
+      const month = parseInt(birthDate.month, 10);
+      const year = parseInt(birthDate.year, 10);
+      const ageNum = parseInt(age, 10);
       
-      if (day < 1 || day > 31 || month < 1 || month > 12 || year < 1900 || year > new Date().getFullYear()) {
+      // Basic range checks
+      if (month < 1 || month > 12 || year < 1900 || year > new Date().getFullYear()) {
         Alert.alert(
           'Invalid Date',
           'Please enter a valid date of birth',
+          [{ text: 'OK', style: 'default' }]
+        );
+        return;
+      }
+
+      // Day range based on month/year
+      const maxDay = new Date(year, month, 0).getDate();
+      if (day < 1 || day > maxDay) {
+        Alert.alert(
+          'Invalid Date',
+          'Please enter a valid day for the selected month',
+          [{ text: 'OK', style: 'default' }]
+        );
+        return;
+      }
+
+      // Validate age
+      if (isNaN(ageNum) || ageNum < 13 || ageNum > 120) {
+        Alert.alert(
+          'Invalid Age',
+          'Please enter a valid age between 13 and 120',
           [{ text: 'OK', style: 'default' }]
         );
         return;
@@ -132,7 +157,8 @@ export default function Index() {
         weight,
         selectedGender,
         selectedGoal,
-        birthDate
+        birthDate,
+        age: parseInt(age, 10)
       };
       console.log('Form data:', formData);
       
@@ -234,7 +260,16 @@ export default function Index() {
               keyboardType="numeric"
               maxLength={2}
               value={birthDate.day}
-              onChangeText={(text) => setBirthDate(prev => ({ ...prev, day: text }))}
+              onChangeText={(text) => {
+                // clamp to numeric
+                const digits = text.replace(/\D/g, '').slice(0,2);
+                const m = parseInt(birthDate.month || '0', 10) || 0;
+                const y = parseInt(birthDate.year || String(new Date().getFullYear()), 10) || new Date().getFullYear();
+                const maxDay = m >=1 && m <=12 ? new Date(y, m, 0).getDate() : 31;
+                let val = parseInt(digits || '0', 10);
+                if (val > maxDay) val = maxDay;
+                setBirthDate(prev => ({ ...prev, day: val ? String(val) : '' }));
+              }}
             />
             <Text style={dataScreenStyles.dobText}>:</Text>
             <TextInput
@@ -243,7 +278,12 @@ export default function Index() {
               keyboardType="numeric"
               maxLength={2}
               value={birthDate.month}
-              onChangeText={(text) => setBirthDate(prev => ({ ...prev, month: text }))}
+              onChangeText={(text) => {
+                const digits = text.replace(/\D/g, '').slice(0,2);
+                let val = parseInt(digits || '0', 10);
+                if (val > 12) val = 12;
+                setBirthDate(prev => ({ ...prev, month: val ? String(val) : '' }));
+              }}
             />
             <Text style={dataScreenStyles.dobText}>:</Text>
             <TextInput
@@ -252,9 +292,23 @@ export default function Index() {
               keyboardType="numeric"
               maxLength={4}
               value={birthDate.year}
-              onChangeText={(text) => setBirthDate(prev => ({ ...prev, year: text }))}
+              onChangeText={(text) => {
+                const digits = text.replace(/\D/g, '').slice(0,4);
+                setBirthDate(prev => ({ ...prev, year: digits }));
+              }}
             />
           </View>
+        </View>
+        <View>
+          <Text style={dataScreenStyles.subHeading}>Age *</Text>
+          <TextInput
+            style={dataScreenStyles.mainTextInput}
+            placeholder="Enter your age"
+            keyboardType="numeric"
+            maxLength={3}
+            value={age}
+            onChangeText={(text) => setAge(text.replace(/\D/g, '').slice(0,3))}
+          />
         </View>
         <Text style={dataScreenStyles.subHeading}>What&apos;s your Goal? *</Text>
         <View style={dataScreenStyles.mappingCol}>

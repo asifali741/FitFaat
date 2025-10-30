@@ -1,6 +1,7 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { protect } from '../middleware/auth.js';
+import DietPlan from '../models/DietPlan.js';
 import User from '../models/User.js';
 
 const router = express.Router();
@@ -42,16 +43,40 @@ router.put(
         });
       }
 
+      // Calculate BMI (height in cm expected)
+      let bmi = null;
+      const h = parseFloat(height);
+      const w = parseFloat(weight);
+      if (h > 0 && w > 0) {
+        const heightMeters = h / 100;
+        bmi = w / (heightMeters * heightMeters);
+        // round to 2 decimals
+        bmi = Math.round(bmi * 100) / 100;
+      }
+
       user.userInfo = {
         name,
         height,
         weight,
         gender,
         birthDate,
-        fitnessGoal
+        fitnessGoal,
+        bmi
       };
       user.isOnboardingComplete = true;
       await user.save();
+
+      // If a diet plan exists, attach/update the bmi in the plan's userMetrics
+      try {
+        const dietPlan = await DietPlan.findOne({ userId: user._id }).sort({ startDate: -1 }).limit(1);
+        if (dietPlan && bmi) {
+          dietPlan.userMetrics = dietPlan.userMetrics || {};
+          dietPlan.userMetrics.bmi = bmi;
+          await dietPlan.save();
+        }
+      } catch (dpErr) {
+        console.error('Failed to update diet plan BMI:', dpErr);
+      }
 
       res.json({
         success: true,

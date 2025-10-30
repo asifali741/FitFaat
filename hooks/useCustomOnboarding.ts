@@ -8,25 +8,31 @@ export const useCustomOnboarding = () => {
 
   const completeOnboarding = async (userInfo: {
     name: string;
-    height: string;
+    height: string; // feet.inches as string
     weight: string;
     selectedGender: 'male' | 'female' | 'other';
     selectedGoal: number;
     birthDate: { day: string; month: string; year: string };
+    age?: number;
   }) => {
     setIsLoading(true);
     try {
-      // Convert string values to numbers where needed
+      // Convert height from feet.inches to centimeters
+      const heightFeet = parseFloat(userInfo.height);
+      const heightInCm = heightFeet * 30.48;
+
+      // Convert string values to numbers where needed and send to backend
       await authApi.completeOnboarding({
         name: userInfo.name.trim(),
-        height: parseFloat(userInfo.height),
+        height: heightInCm,
         weight: parseFloat(userInfo.weight),
         gender: userInfo.selectedGender,
         birthDate: {
-          day: parseInt(userInfo.birthDate.day),
-          month: parseInt(userInfo.birthDate.month),
-          year: parseInt(userInfo.birthDate.year)
+          day: parseInt(userInfo.birthDate.day, 10),
+          month: parseInt(userInfo.birthDate.month, 10),
+          year: parseInt(userInfo.birthDate.year, 10)
         },
+        age: userInfo.age,
         fitnessGoal: userInfo.selectedGoal
       });
 

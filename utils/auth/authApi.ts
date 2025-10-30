@@ -110,6 +110,7 @@ export const authApi = {
     gender: 'male' | 'female' | 'other';
     birthDate: { day: number; month: number; year: number };
     fitnessGoal: number;
+    age?: number;
   }) => {
     try {
       const response = await api.put('/user/onboarding', userInfo);

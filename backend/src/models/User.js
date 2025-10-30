@@ -79,6 +79,10 @@ const userSchema = new mongoose.Schema({
       type: Number,
       enum: [1, 2, 3] // 1: Weight Loss, 2: Muscle Gain, 3: Weight Gain
     }
+    ,
+    bmi: {
+      type: Number
+    }
   }
 });
 
