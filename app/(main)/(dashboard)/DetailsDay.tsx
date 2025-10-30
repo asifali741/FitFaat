@@ -1,11 +1,11 @@
+import { useTheme } from "@/contexts/ThemeContext";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import Animated, { Easing, runOnJS, useAnimatedProps, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
-import { rs } from "../(settings)/ui_elements";
-import { useTheme } from "@/contexts/ThemeContext";
+import { colorsSheet, rs } from "../(settings)/ui_elements";
 import { Day as typeDay } from "./DayPlan";
 
 interface ProgressCircleProps {
@@ -66,17 +66,17 @@ export default function DetailsDay () {
     const styles = getStyles(colors);
     //output
     return (
-  <View style={{ flex: 1, paddingBottom: insets.bottom }}>
+  <View style={{ flex: 1, paddingBottom: insets.bottom, backgroundColor: colors.screenColor }}>
     {!showMenu ? (
       <AnimatedScrollView
         showsVerticalScrollIndicator={false}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 10}}
-        style={{ flex: 1, opacity: fade }}
+        style={{ flex: 1, opacity: fade, backgroundColor: colors.screenColor }}
       >
         <View style={styles.heading}>
           <View style={styles.dayDateWrapper}>
-            <Text style={styles.title}>Day: 0{props.dayNo}</Text>
+            <Text style={[styles.title, {color:colors.black}]}>Day: 0{props.dayNo}</Text>
             <Text style={styles.date}>{props.date}</Text>
           </View>
           <Pressable style={styles.backButton} onPress={() => router.back()}>
@@ -107,7 +107,7 @@ export default function DetailsDay () {
                 alignContent: "center",
               }}
             >
-              <Text>{String(props.remarks ?? "")}</Text>
+              <Text style={{color: colors.textSecondary}}>{String(props.remarks ?? "")}</Text>
             </View>
           </View>
 
@@ -115,7 +115,7 @@ export default function DetailsDay () {
           {props.status === "active" ? (
             <>
               <View style={styles.infoOuterBox}>
-                <View style={styles.infoInnerBox}>
+                <View style={[styles.infoInnerBox, {backgroundColor: colors.offWhite}]}>
                   {/**Flex rows for Heading: {value}*/}
                   <View style={styles.infoRow}>
                     <Text style={styles.infoAttribute}>Goal </Text>
@@ -144,7 +144,7 @@ export default function DetailsDay () {
                 {/**Advice Section*/}
                 <View style={styles.adviceSection}>
                   <Text style={styles.adviceHeading}>What's up!</Text>
-                  <Text>Need any advice related to food?</Text>
+                  <Text style={{color:colors.textSecondary}}>Need any advice related to food?</Text>
                   <TextInput
                     style={styles.input}
                     value={adviceInput}
@@ -155,7 +155,7 @@ export default function DetailsDay () {
               </View>
 
               <View style={styles.tray}>
-                <Pressable style={styles.trayButton} onPress={openMenu}>
+                <Pressable style={[styles.trayButton, {backgroundColor: colors.buttonPrimary}]} onPress={openMenu}>
                   <Text style={styles.trayButtonText}>Update</Text>
                 </Pressable>
               </View>
@@ -163,7 +163,7 @@ export default function DetailsDay () {
           ) : (
             <View style={styles.infoOuterBox}>
               <View
-                style={[styles.infoInnerBox, { marginBottom: 5 }]} // extra margin for finished days
+                style={[styles.infoInnerBox, { marginBottom: 5, backgroundColor: colors.offWhite }]} // extra margin for finished days
               >
                 {/**Flex rows for Heading: {value}*/}
                 <View style={styles.infoRow}>
@@ -308,7 +308,7 @@ const getStyles = (colors: any) => StyleSheet.create({
         shadowRadius: 10,
         elevation: 4,
         marginBottom: '0%', //this is  set to 2 inline when viewing finished days
-        backgroundColor: 'hsla(45, 0%, 95%, 1.00)'
+        //backgroundColor: 'hsla(45, 0%, 95%, 1.00)'
 
     },
     infoRow: {
@@ -501,7 +501,7 @@ const ProgressCircle = (CircleProps: ProgressCircleProps) =>{
                 stroke="#E5E7EB"  strokeWidth="10"  fill="transparent"/>
         {/* Calories progress */}
         <AnimatedCircle  cx="60" cy="60" r={outerRadius}
-            stroke="#4CAF50"  strokeWidth="10"  fill="transparent"
+            stroke={colorsSheet.progressBarColor}  strokeWidth="10"  fill="transparent"
             strokeDasharray={outerCircumference} //total
             animatedProps={animatedCalProps}
             strokeLinecap="round"transform= "rotate(-90 60 60)" />
