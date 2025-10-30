@@ -1,5 +1,7 @@
 import { DrawerSceneWrapper } from "@/components/CustomDrawerLayout";
-import { authApi } from "@/utils/auth/authApi";
+import { AppointmentProvider } from "@/contexts/AppointmentContext";
+import { ChatbotStorageProvider } from "@/contexts/ChatbotStorage";
+import { useAuth } from "@clerk/clerk-expo";
 import { DrawerContentComponentProps } from "@react-navigation/drawer";
 import { useRouter } from "expo-router";
 import { Drawer } from "expo-router/drawer";
@@ -28,6 +30,8 @@ export default function MainLayout() {
       checkAuth();
     }, []);
     return <GestureHandlerRootView style={{ flex: 1 }}>
+  <AppointmentProvider>
+  <ChatbotStorageProvider>
   <Drawer
     detachInactiveScreens={true}
     drawerContent={(props) => <DrawerSceneWrapper {...props} />}
@@ -70,6 +74,8 @@ export default function MainLayout() {
     <Drawer.Screen name="(exercises)/workout" options={{ title: "Workouts 👑" }} />
     <Drawer.Screen name="(doctor-portal)" options={{ title: "Join as Doctor 👨‍⚕️" }} />
   </Drawer>
+  </ChatbotStorageProvider>
+  </AppointmentProvider>
 </GestureHandlerRootView>
 
 }

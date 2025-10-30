@@ -1,12 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    StyleSheet,
+    TextInput,
+    TouchableOpacity,
+    View
 } from "react-native";
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { heightPercentageToDP as hp } from "react-native-responsive-screen";
@@ -19,10 +19,10 @@ type Message = {
 };
 
 type ControlsProps = {
-  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  onAddMessage?: (text: string, isUser: boolean) => void;
 };
 
-export default function Controls({ setMessages }: ControlsProps) {
+export default function Controls({ onAddMessage }: ControlsProps) {
   const [content, setContent] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -30,19 +30,21 @@ export default function Controls({ setMessages }: ControlsProps) {
     if (content.trim()) {
       try {
         setIsLoading(true);
-        // Add user message
-        const userMessage = { role: "user" as const, content, createdAt: new Date() };
-        setMessages(prevMessages => [...prevMessages, userMessage]);
+        
+        // Add user message to storage
+        if (onAddMessage) {
+          onAddMessage(content, true);
+        }
+        
         setContent(""); // Clear input immediately for better UX
 
         // Get AI response
         const response = await callGemini(content);
         
-        // Add AI response
-        setMessages(prevMessages => [
-          ...prevMessages,
-          { role: "assistant" as const, content: response, createdAt: new Date() }
-        ]);
+        // Add AI response to storage
+        if (onAddMessage) {
+          onAddMessage(response, false);
+        }
       } catch (error) {
         Alert.alert(
           "Error",

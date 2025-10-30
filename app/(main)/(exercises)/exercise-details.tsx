@@ -10,9 +10,10 @@ import {
   heightPercentageToDP as hp,
   widthPercentageToDP as wp,
 } from "react-native-responsive-screen";
-import { colorsSheet } from "../(settings)/ui_elements";
+import { useTheme } from "@/contexts/ThemeContext";
 
 export default function ExerciseDetails() {
+  const { colors } = useTheme();
   const router = useRouter();
   const navigation = useNavigation();
   const { exercise } = useLocalSearchParams();
@@ -46,7 +47,7 @@ export default function ExerciseDetails() {
       if (favorites && exerciseData) {
         const favoritesList = JSON.parse(favorites);
         console.log('Checking favorite status for:', exerciseData.name, 'ID:', exerciseData.id);
-        console.log('Current favorites:', favoritesList.map(f => ({ name: f.name, id: f.id })));
+        console.log('Current favorites:', favoritesList.map((f: any) => ({ name: f.name, id: f.id })));
         const isAlreadyFavorite = favoritesList.some((fav: any) => fav.id === exerciseData.id);
         console.log('Is favorite?', isAlreadyFavorite);
         setIsFavorite(isAlreadyFavorite);
@@ -91,6 +92,8 @@ export default function ExerciseDetails() {
     }
   };
 
+  const styles = getStyles(colors);
+
   if (!exerciseData) {
     return (
       <SafeAreaView style={styles.container}>
@@ -100,13 +103,13 @@ export default function ExerciseDetails() {
             style={styles.backButton}
             onPress={handleBackPress}
           >
-            <Ionicons name="arrow-back" size={24} color={colorsSheet.textOnPrimary} />
+            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Exercise Details</Text>
           <View style={styles.spacer} />
         </View>
         
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colorsSheet.screenColor }}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.cardBackground }}>
           <Text>Error loading exercise details</Text>
           <TouchableOpacity onPress={handleBackPress}>
             <Text style={{ color: '#FF6B6B', marginTop: 20 }}>Go Back</Text>
@@ -124,7 +127,7 @@ export default function ExerciseDetails() {
           style={styles.backButton}
           onPress={handleBackPress}
         >
-          <Ionicons name="arrow-back" size={24} color={colorsSheet.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Exercise Details</Text>
         <View style={styles.spacer} />
@@ -156,7 +159,7 @@ export default function ExerciseDetails() {
             fontWeight: 'bold',
             marginLeft: hp(2),
             marginRight: hp(2),
-            color: '#333',
+            color: colors.textPrimary,
             textAlign: 'center',
           }}
         >
@@ -164,7 +167,7 @@ export default function ExerciseDetails() {
         </Text>
         
         <View style={{
-          backgroundColor: 'white',
+          backgroundColor: colors.cardBackground,
           margin: hp(2),
           borderRadius: hp(2),
           padding: hp(2),
@@ -179,7 +182,7 @@ export default function ExerciseDetails() {
               fontSize: hp(2.2),
               fontWeight: '600',
               marginBottom: hp(1),
-              color: '#FF6B6B',
+              color: colors.textSecondary,
             }}
           >
             Equipment: {exerciseData?.equipment}
@@ -190,7 +193,7 @@ export default function ExerciseDetails() {
               fontSize: hp(2.2),
               fontWeight: '600',
               marginBottom: hp(1),
-              color: '#FF6B6B',
+              color: colors.textSecondary,
             }}
           >
             Target Muscle: {exerciseData?.target}
@@ -202,7 +205,7 @@ export default function ExerciseDetails() {
                 fontSize: hp(2.2),
                 fontWeight: '600',
                 marginBottom: hp(1),
-                color: '#FF6B6B',
+                color: colors.textSecondary,
               }}
             >
               Secondary Muscles: {exerciseData.secondaryMuscles.join(", ")}
@@ -214,7 +217,7 @@ export default function ExerciseDetails() {
               fontSize: hp(2.2),
               fontWeight: '600',
               marginBottom: hp(1),
-              color: '#FF6B6B',
+              color: colors.textSecondary,
             }}
           >
             Body Part: {exerciseData?.bodyPart}
@@ -222,7 +225,7 @@ export default function ExerciseDetails() {
         </View>
         
         <View style={{
-          backgroundColor: 'white',
+          backgroundColor: colors.cardBackground,
           margin: hp(2),
           borderRadius: hp(2),
           padding: hp(2),
@@ -237,7 +240,7 @@ export default function ExerciseDetails() {
               fontSize: hp(2.5),
               fontWeight: 'bold',
               marginBottom: hp(2),
-              color: '#333',
+              color: colors.textPrimary,
             }}
           >
             Instructions:
@@ -250,7 +253,7 @@ export default function ExerciseDetails() {
                 fontSize: hp(1.9),
                 marginBottom: hp(1.5),
                 lineHeight: hp(2.5),
-                color: '#555',
+                color: colors.textSecondary,
                 paddingLeft: hp(1),
               }}
             >
@@ -266,7 +269,7 @@ export default function ExerciseDetails() {
         }}>
           <TouchableOpacity
             style={{
-              backgroundColor: isFavorite ? '#FF6B6B' : '#FFD700',
+              backgroundColor: isFavorite ? colors.error : colors.cardBackground,
               paddingHorizontal: wp(12),
               paddingVertical: hp(1.8),
               borderRadius: hp(2.5),
@@ -287,7 +290,7 @@ export default function ExerciseDetails() {
               {isFavorite ? '❤️' : '🤍'}
             </Text>
             <Text style={{
-              color: isFavorite ? 'white' : '#333',
+              color: isFavorite ? colors.white : colors.textPrimary,
               fontSize: hp(2.2),
               fontWeight: 'bold',
             }}>
@@ -301,10 +304,10 @@ export default function ExerciseDetails() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: "row",
@@ -312,7 +315,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: Math.min(wp(5), 20),
     paddingVertical: Math.min(hp(2), 16),
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: colors.background,
     minHeight: hp(8),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -329,7 +332,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: Math.min(hp(2.8), wp(6.5)),
     fontWeight: "bold",
-    color: colorsSheet.textOnPrimary,
+    color: colors.textPrimary,
     textAlign: "center",
     flex: 1,
     letterSpacing: 0.5,
@@ -339,7 +342,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: colorsSheet.screenColor,
+    backgroundColor: colors.screenColor,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
   },
