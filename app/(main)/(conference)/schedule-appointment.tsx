@@ -1,13 +1,14 @@
 import AppHeader from "@/components/AppHeader";
 import CountdownTimer from "@/components/CountdownTimer";
 import { useAppointments } from "@/contexts/AppointmentContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { colorsSheet } from "../(settings)/ui_elements";
+//import { colorsSheet } from "../(settings)/ui_elements";
 
 // Mock data for doctors
 const mockDoctors = [
@@ -50,7 +51,9 @@ export default function ScheduleAppointmentScreen() {
   const [problemDescription, setProblemDescription] = useState("");
   const [appointmentTime, setAppointmentTime] = useState<Date | null>(null);
   const [canStartCall, setCanStartCall] = useState(false);
-
+  const { colors } = useTheme();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+  
 
   const handleDateSelection = (date: string) => {
     setSelectedDate(date);
@@ -211,14 +214,14 @@ export default function ScheduleAppointmentScreen() {
           >
             <View style={styles.doctorInfo}>
               <View style={styles.doctorAvatar}>
-                <Ionicons name="person" size={24} color={colorsSheet.primary} />
+                <Ionicons name="person" size={24} color={colors.primary} />
               </View>
               <View style={styles.doctorDetails}>
                 <Text style={styles.doctorName}>{doctor.name}</Text>
                 <Text style={styles.doctorSpecialty}>{doctor.specialty}</Text>
                 <Text style={styles.doctorExperience}>{doctor.experience} experience</Text>
                 <View style={styles.doctorRating}>
-                  <Ionicons name="star" size={16} color={colorsSheet.warning} />
+                  <Ionicons name="star" size={16} color={colors.warning} />
                   <Text style={styles.ratingText}>{doctor.rating}</Text>
                 </View>
               </View>
@@ -242,7 +245,7 @@ export default function ScheduleAppointmentScreen() {
         <TextInput
           style={styles.problemInput}
           placeholder="Describe your symptoms, concerns, or questions..."
-          placeholderTextColor={colorsSheet.textSecondary}
+          placeholderTextColor={colors.textSecondary}
           multiline
           numberOfLines={6}
           value={problemDescription}
@@ -265,7 +268,7 @@ export default function ScheduleAppointmentScreen() {
       
       <View style={styles.confirmationCard}>
         <View style={styles.confirmationHeader}>
-          <Ionicons name="checkmark-circle" size={32} color={colorsSheet.success} />
+          <Ionicons name="checkmark-circle" size={32} color={colors.success} />
           <Text style={styles.confirmationTitle}>Appointment Scheduled!</Text>
         </View>
         
@@ -313,7 +316,7 @@ export default function ScheduleAppointmentScreen() {
           <Ionicons 
             name="videocam" 
             size={20} 
-            color={canStartCall ? colorsSheet.textOnPrimary : colorsSheet.textSecondary} 
+            color={canStartCall ? colors.textOnPrimary : colors.textSecondary} 
           />
           <Text style={[
             styles.startCallButtonText,
@@ -356,17 +359,16 @@ export default function ScheduleAppointmentScreen() {
 
 
       {/* Main Content */}
-      <View style={styles.content}>
+      <View style={[styles.content, {backgroundColor: colors.screenColor}]}>
         {renderCurrentStep()}
       </View>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
+const getStyles = (colors: any) => StyleSheet.create({  container: {
     flex: 1,
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: colors.primary,
   },
   header: {
     flexDirection: "row",
@@ -374,7 +376,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: wp(5),
     paddingVertical: hp(2),
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: colors.primary,
   },
   menuButton: {
     padding: 8,
@@ -382,7 +384,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: hp(2.5),
     fontWeight: "bold",
-    color: colorsSheet.textOnPrimary,
+    color: colors.textOnPrimary,
     flex: 1,
     textAlign: "center",
   },
@@ -391,7 +393,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: colorsSheet.screenColor,
+   //backgroundColor: colors.screenColor,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     paddingTop: hp(4),
@@ -402,7 +404,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingVertical: hp(2),
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: colors.primary,
   },
   stepDot: {
     width: 12,
@@ -411,10 +413,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   stepDotActive: {
-    backgroundColor: colorsSheet.textOnPrimary,
+    backgroundColor: colors.textOnPrimary,
   },
   stepDotInactive: {
-    backgroundColor: colorsSheet.primarySoft,
+    backgroundColor: colors.gray,
   },
   stepContent: {
     flex: 1,
@@ -422,13 +424,13 @@ const styles = StyleSheet.create({
   stepTitle: {
     fontSize: Math.min(hp(2.8), wp(7)),
     fontWeight: "bold",
-    color: colorsSheet.textPrimary,
+    color: colors.textPrimary,
     textAlign: "center",
     marginBottom: hp(1),
   },
   stepSubtitle: {
     fontSize: Math.min(hp(1.8), wp(4.5)),
-    color: colorsSheet.textSecondary,
+    color: colors.textSecondary,
     textAlign: "center",
     marginBottom: hp(3),
   },
@@ -439,7 +441,7 @@ const styles = StyleSheet.create({
   },
   dateCard: {
     width: "30%",
-    backgroundColor: colorsSheet.primarySoft,
+    backgroundColor: colors.gray,
     borderRadius: 15,
     padding: hp(2),
     alignItems: "center",
@@ -447,7 +449,7 @@ const styles = StyleSheet.create({
   },
   dateText: {
     fontSize: Math.min(hp(1.8), wp(4.5)),
-    color: colorsSheet.textPrimary,
+    color: colors.textPrimary,
     fontWeight: "600",
   },
   timeGrid: {
@@ -457,7 +459,7 @@ const styles = StyleSheet.create({
   },
   timeCard: {
     width: "45%",
-    backgroundColor: colorsSheet.primarySoft,
+    backgroundColor: colors.gray,
     borderRadius: 15,
     padding: hp(1.8),
     alignItems: "center",
@@ -465,19 +467,19 @@ const styles = StyleSheet.create({
   },
   timeText: {
     fontSize: Math.min(hp(1.8), wp(4.5)),
-    color: colorsSheet.textPrimary,
+    color: colors.textPrimary,
     fontWeight: "600",
   },
   doctorList: {
     flex: 1,
   },
   doctorCard: {
-    backgroundColor: colorsSheet.cardBackground,
+    backgroundColor: colors.cardBackground,
     borderRadius: 15,
     padding: hp(2),
     marginBottom: hp(1.5),
     borderWidth: 1,
-    borderColor: colorsSheet.cardBorder,
+    borderColor: colors.cardBorder,
   },
   doctorInfo: {
     flexDirection: "row",
@@ -487,7 +489,7 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: colorsSheet.primarySoft,
+    backgroundColor: colors.gray,
     alignItems: "center",
     justifyContent: "center",
     marginRight: wp(3),
@@ -498,17 +500,17 @@ const styles = StyleSheet.create({
   doctorName: {
     fontSize: Math.min(hp(2), wp(5)),
     fontWeight: "bold",
-    color: colorsSheet.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 2,
   },
   doctorSpecialty: {
     fontSize: Math.min(hp(1.6), wp(4)),
-    color: colorsSheet.textSecondary,
+    color: colors.textSecondary,
     marginBottom: 2,
   },
   doctorExperience: {
     fontSize: Math.min(hp(1.4), wp(3.5)),
-    color: colorsSheet.textSecondary,
+    color: colors.textSecondary,
     marginBottom: 4,
   },
   doctorRating: {
@@ -517,7 +519,7 @@ const styles = StyleSheet.create({
   },
   ratingText: {
     fontSize: Math.min(hp(1.4), wp(3.5)),
-    color: colorsSheet.textSecondary,
+    color: colors.textSecondary,
     marginLeft: 4,
   },
   doctorFee: {
@@ -526,42 +528,42 @@ const styles = StyleSheet.create({
   feeText: {
     fontSize: Math.min(hp(2), wp(5)),
     fontWeight: "bold",
-    color: colorsSheet.primary,
+    color: colors.primary,
   },
   feeLabel: {
     fontSize: Math.min(hp(1.2), wp(3)),
-    color: colorsSheet.textSecondary,
+    color: colors.textSecondary,
   },
   problemInputContainer: {
     marginBottom: hp(3),
   },
   problemInput: {
-    backgroundColor: colorsSheet.primarySoft,
+    backgroundColor: colors.gray,
     borderRadius: 15,
     padding: hp(2),
     fontSize: Math.min(hp(1.8), wp(4.5)),
-    color: colorsSheet.textPrimary,
+    color: colors.textPrimary,
     textAlignVertical: "top",
     minHeight: hp(15),
   },
   continueButton: {
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: colors.primary,
     borderRadius: 25,
     paddingVertical: hp(2),
     alignItems: "center",
     justifyContent: "center",
   },
   continueButtonText: {
-    color: colorsSheet.textOnPrimary,
+    color: colors.textOnPrimary,
     fontSize: Math.min(hp(2), wp(5)),
     fontWeight: "600",
   },
   confirmationCard: {
-    backgroundColor: colorsSheet.cardBackground,
+    backgroundColor: colors.cardBackground,
     borderRadius: 20,
     padding: hp(3),
     borderWidth: 1,
-    borderColor: colorsSheet.cardBorder,
+    borderColor: colors.cardBorder,
   },
   confirmationHeader: {
     alignItems: "center",
@@ -570,7 +572,7 @@ const styles = StyleSheet.create({
   confirmationTitle: {
     fontSize: Math.min(hp(2.2), wp(5.5)),
     fontWeight: "bold",
-    color: colorsSheet.textPrimary,
+    color: colors.textPrimary,
     marginTop: hp(1),
   },
   appointmentDetails: {
@@ -582,49 +584,49 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: hp(1),
     borderBottomWidth: 1,
-    borderBottomColor: colorsSheet.lightGray,
+    borderBottomColor: colors.lightGray,
   },
   detailLabel: {
     fontSize: Math.min(hp(1.8), wp(4.5)),
-    color: colorsSheet.textSecondary,
+    color: colors.textSecondary,
     fontWeight: "500",
   },
   detailValue: {
     fontSize: Math.min(hp(1.8), wp(4.5)),
-    color: colorsSheet.textPrimary,
+    color: colors.textPrimary,
     fontWeight: "600",
   },
   countdownContainer: {
     alignItems: "center",
     marginBottom: hp(3),
     paddingVertical: hp(2),
-    backgroundColor: colorsSheet.primarySoft,
+    backgroundColor: colors.gray,
     borderRadius: 15,
   },
   countdownLabel: {
     fontSize: Math.min(hp(1.6), wp(4)),
-    color: colorsSheet.textSecondary,
+    color: colors.textSecondary,
     marginBottom: hp(1),
   },
   countdownTimer: {
     fontSize: Math.min(hp(3), wp(7.5)),
     fontWeight: "bold",
-    color: colorsSheet.primary,
+    color: colors.primary,
   },
   startCallButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: colors.primary,
     borderRadius: 25,
     paddingVertical: hp(2.2),
     paddingHorizontal: wp(6),
   },
   startCallButtonActive: {
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: colors.primary,
   },
   startCallButtonDisabled: {
-    backgroundColor: colorsSheet.lightGray,
+    backgroundColor: colors.lightGray,
   },
   startCallButtonText: {
     fontSize: Math.min(hp(2), wp(5)),
@@ -632,18 +634,18 @@ const styles = StyleSheet.create({
     marginLeft: wp(2),
   },
   startCallButtonTextActive: {
-    color: colorsSheet.textOnPrimary,
+    color: colors.textOnPrimary,
   },
   startCallButtonTextDisabled: {
-    color: colorsSheet.textSecondary,
+    color: colors.textSecondary,
   },
   summaryCard: {
-    backgroundColor: colorsSheet.cardBackground,
+    backgroundColor: colors.cardBackground,
     borderRadius: 15,
     padding: hp(2.5),
     marginBottom: hp(3),
     borderWidth: 1,
-    borderColor: colorsSheet.cardBorder,
+    borderColor: colors.cardBorder,
   },
   summarySection: {
     marginBottom: hp(2),
@@ -651,12 +653,12 @@ const styles = StyleSheet.create({
   summarySectionTitle: {
     fontSize: Math.min(hp(1.8), wp(4.5)),
     fontWeight: "bold",
-    color: colorsSheet.textPrimary,
+    color: colors.textPrimary,
     marginBottom: hp(1),
   },
   summaryText: {
     fontSize: Math.min(hp(1.6), wp(4)),
-    color: colorsSheet.textSecondary,
+    color: colors.textSecondary,
     marginBottom: hp(0.5),
   },
 });

@@ -1,13 +1,12 @@
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import Animated, { Easing, runOnJS, useAnimatedProps, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
 import { colorsSheet, rs } from "../(settings)/ui_elements";
 import { Day as typeDay } from "./DayPlan";
-
 interface ProgressCircleProps {
   achievedCalories: number;
   targetCalories: number;
@@ -63,7 +62,7 @@ export default function DetailsDay () {
     const handleUpdate = () => {
         //Main api calling
     }
-    const styles = getStyles(colors);
+    const styles = useMemo(() => getStyles(colors), [colors]);
     //output
     return (
   <View style={{ flex: 1, paddingBottom: insets.bottom, backgroundColor: colors.screenColor }}>
