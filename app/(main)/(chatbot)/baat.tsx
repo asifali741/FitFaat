@@ -5,7 +5,7 @@ import { useChatbotStorage } from "@/contexts/ChatbotStorage";
 import Controls from "@/Control/controls";
 import { useRouter } from "expo-router";
 import React, { useEffect } from "react";
-import { FlatList, Image, SafeAreaView, StyleSheet, Text, View } from "react-native";
+import { FlatList, Image, KeyboardAvoidingView, Platform, SafeAreaView, StyleSheet, Text, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 // type ChatMessage = {
 //   role: string;
@@ -64,7 +64,11 @@ export default function Baat() {
       />
 
       {/* Chat Content */}
-      <View style={styles.content}>
+      <KeyboardAvoidingView 
+        style={styles.content}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={0}
+      >
         <View style={styles.aiProfileSection}>
           <Image
             source={require("../../../assets/images/jarvis.png")}
@@ -79,15 +83,17 @@ export default function Baat() {
             data={displayMessages}
             keyExtractor={(_, index) => index.toString()}
             renderItem={({ item }) => <Message msg={item} />}
-            contentContainerStyle={{ padding: hp(1), paddingBottom: hp(12) }}
+            contentContainerStyle={styles.messageList}
             showsVerticalScrollIndicator={false}
             keyboardDismissMode="on-drag"
             keyboardShouldPersistTaps="handled"
           />
         </View>
         
-        <Controls onAddMessage={handleAddMessage} />
-      </View>
+        <View style={styles.inputContainer}>
+          <Controls onAddMessage={handleAddMessage} />
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -97,22 +103,6 @@ const getStyles = (colors: any) => StyleSheet.create({
     flex: 1,
     backgroundColor: colors.primary,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: wp(5),
-    paddingVertical: hp(2),
-    backgroundColor: colors.primary,
-  },
-  menuButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: hp(2.5),
-    fontWeight: "bold",
-    color: colors.textOnPrimary,
-  },
   content: {
     flex: 1,
     backgroundColor: colors.screenColor,
@@ -121,34 +111,41 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   aiProfileSection: {
     alignItems: "center",
-    paddingVertical: hp(2),
+    paddingVertical: hp(1.5),
     backgroundColor: colors.primarySoft,
     marginHorizontal: wp(4),
-    marginTop: hp(2),
-    borderRadius: 20,
+    marginTop: hp(1.5),
+    borderRadius: 15,
   },
   aiAvatar: {
-    width: hp(8),
-    height: hp(8),
-    borderRadius: hp(4),
-    marginBottom: hp(1),
+    width: Math.min(hp(6), wp(15)),
+    height: Math.min(hp(6), wp(15)),
+    borderRadius: Math.min(hp(3), wp(7.5)),
+    marginBottom: hp(0.5),
   },
   aiName: {
-    fontSize: hp(2.2),
+    fontSize: Math.min(hp(2), wp(5)),
     fontWeight: "bold",
     color: colors.textPrimary,
   },
   aiStatus: {
-    fontSize: hp(1.6),
+    fontSize: Math.min(hp(1.4), wp(3.5)),
     color: colors.textSecondary,
-    marginTop: hp(0.5),
+    marginTop: hp(0.3),
   },
   chatSection: {
     flex: 1,
     paddingHorizontal: wp(2),
+    marginBottom: hp(1),
   },
-  spacer: {
-    width: wp(18),
+  messageList: {
+    padding: hp(1),
+    paddingBottom: hp(2),
+    flexGrow: 1,
+  },
+  inputContainer: {
+    backgroundColor: colors.screenColor,
+    paddingBottom: Platform.OS === 'ios' ? 0 : hp(1),
   },
 });
 
