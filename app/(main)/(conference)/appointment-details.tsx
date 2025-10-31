@@ -209,13 +209,15 @@ export default function AppointmentDetailsScreen() {
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity
-            style={styles.cancelButton}
-            onPress={handleCancelAppointment}
-          >
-            <Ionicons name="close-circle" size={20} color={colorsSheet.error} />
-            <Text style={styles.cancelButtonText}>Cancel Appointment</Text>
-          </TouchableOpacity>
+          {appointment.status !== 'cancelled' && (
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={handleCancelAppointment}
+            >
+              <Ionicons name="close-circle" size={20} color={colorsSheet.error} />
+              <Text style={styles.cancelButtonText}>Cancel Appointment</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
