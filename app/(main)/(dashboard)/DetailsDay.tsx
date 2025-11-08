@@ -2,10 +2,11 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, Alert, TouchableOpacity, Platform } from "react-native";
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import Animated, { Easing, runOnJS, useAnimatedProps, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
-import { colorsSheet, rs } from "../(settings)/ui_elements";
+import { colorsSheet, rs } from "../(settings)/_ui_elements";
 import { Day as typeDay } from "./DayPlan";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import * as ImagePicker from 'expo-image-picker';
@@ -432,7 +433,15 @@ export default function DetailsDay () {
         </ScrollView>
       </Animated.View>
     ) : (
-      <View style={styles.menuOverlay}>
+      <KeyboardAwareScrollView 
+        style={styles.menuOverlay}
+        contentContainerStyle={styles.menuScrollContent}
+        showsVerticalScrollIndicator={false}
+        enableOnAndroid={true}
+        enableAutomaticScroll={true}
+        extraScrollHeight={Platform.OS === 'ios' ? 150 : 180}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.menuHeader}>
           <Ionicons name="restaurant" size={Math.min(hp(3.5), wp(8))} color={colors.primary} />
           <Text style={styles.menuTitle}>
@@ -577,14 +586,14 @@ export default function DetailsDay () {
                 <View style={styles.inputGroup}>
                   <View style={styles.labelRow}>
                     <MaterialIcons name="description" size={20} color={colors.primary} />
-                    <Text style={styles.label}>Additional details</Text>
+                    <Text style={styles.label}>Add Details</Text>
                   </View>
                   <TextInput
                     style={[styles.input, styles.textArea]}
                     placeholder="Portion size, ingredients, cooking method..."
                     placeholderTextColor={colors.textSecondary}
                     multiline
-                    numberOfLines={4}
+                    numberOfLines={6}
                     textAlignVertical="top"
                     value={descriptionInput}
                     onChangeText={setDescriptionInput}
@@ -726,7 +735,7 @@ export default function DetailsDay () {
             <Ionicons name="checkmark" size={Math.min(hp(2.2), wp(5))} color="white" />
           </TouchableOpacity>
         </View>
-      </View>
+      </KeyboardAwareScrollView>
     )}
   </View>
 );
@@ -1028,8 +1037,12 @@ const getStyles = (colors: any) => StyleSheet.create({
     menuOverlay: {
         flex: 1,
         backgroundColor: colors.screenColor,
+    },
+    menuScrollContent: {
+        flexGrow: 1,
         paddingHorizontal: wp(5),
         paddingTop: hp(3),
+        paddingBottom: hp(2),
         justifyContent: 'space-between',
     },
     menuContent: {
@@ -1068,8 +1081,9 @@ const getStyles = (colors: any) => StyleSheet.create({
         color: colors.textPrimary,
     },
     textArea: {
-        height: hp(8),
+        height: hp(14),
         paddingTop: hp(1.2),
+        textAlignVertical: 'top',
     },
     inputMethodSection: {
         marginVertical: hp(1.5),

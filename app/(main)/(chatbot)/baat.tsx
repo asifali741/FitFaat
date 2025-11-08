@@ -5,8 +5,9 @@ import { useChatbotStorage } from "@/contexts/ChatbotStorage";
 import Controls from "@/Control/controls";
 import { useRouter } from "expo-router";
 import React, { useEffect } from "react";
-import { FlatList, Image, KeyboardAvoidingView, Platform, SafeAreaView, StyleSheet, Text, View } from "react-native";
+import { FlatList, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 // type ChatMessage = {
 //   role: string;
 //   content: string;
@@ -25,6 +26,7 @@ const WelcomeText: ChatMessage = {
 }
 export default function Baat() {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const { 
     messages: storedMessages, 
     addMessage, 
@@ -54,21 +56,17 @@ export default function Baat() {
     addMessage(text, isUser);
   };
 
-  const styles = getStyles(colors);
+  const styles = getStyles(colors, insets);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <AppHeader 
         title="HeaLora Chat"
         showStepIndicator={false}
       />
 
       {/* Chat Content */}
-      <KeyboardAvoidingView 
-        style={styles.content}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={0}
-      >
+      <View style={styles.content}>
         <View style={styles.aiProfileSection}>
           <Image
             source={require("../../../assets/images/jarvis.png")}
@@ -90,15 +88,20 @@ export default function Baat() {
           />
         </View>
         
-        <View style={styles.inputContainer}>
-          <Controls onAddMessage={handleAddMessage} />
-        </View>
-      </KeyboardAvoidingView>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? hp(10) : 0}
+        >
+          <View style={styles.inputContainer}>
+            <Controls onAddMessage={handleAddMessage} />
+          </View>
+        </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }
 
-const getStyles = (colors: any) => StyleSheet.create({
+const getStyles = (colors: any, insets: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.primary,
@@ -136,16 +139,24 @@ const getStyles = (colors: any) => StyleSheet.create({
   chatSection: {
     flex: 1,
     paddingHorizontal: wp(2),
-    marginBottom: hp(1),
   },
   messageList: {
     padding: hp(1),
-    paddingBottom: hp(2),
+    paddingBottom: hp(12), // Extra padding to account for fixed input bar
     flexGrow: 1,
   },
   inputContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     backgroundColor: colors.screenColor,
-    paddingBottom: Platform.OS === 'ios' ? 0 : hp(1),
+    paddingBottom: insets.bottom > 0 ? insets.bottom : (Platform.OS === 'ios' ? hp(2) : hp(1)),
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
 });
 

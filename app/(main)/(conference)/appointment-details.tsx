@@ -7,7 +7,7 @@ import React, { useEffect, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { colorsSheet } from "../(settings)/ui_elements";
+import { colorsSheet } from "../(settings)/_ui_elements";
 
 export default function AppointmentDetailsScreen() {
   const router = useRouter();

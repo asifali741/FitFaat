@@ -60,41 +60,6 @@ export default function ScheduleAppointmentScreen() {
     setCurrentStep(2);
   };
 
-  // Check if a time slot is in the past
-  const isTimeSlotDisabled = (timeSlot: string) => {
-    // Only disable slots if "Today" is selected
-    if (selectedDate !== "Today") {
-      return false;
-    }
-
-    const now = new Date();
-    const currentHours = now.getHours();
-    const currentMinutes = now.getMinutes();
-
-    // Parse the time slot (e.g., "02:00 PM")
-    const timeParts = timeSlot.match(/(\d+):(\d+)\s*(AM|PM)/i);
-    if (!timeParts) return false;
-
-    let slotHours = parseInt(timeParts[1]);
-    const slotMinutes = parseInt(timeParts[2]);
-    const period = timeParts[3].toUpperCase();
-
-    // Convert to 24-hour format
-    if (period === "PM" && slotHours !== 12) {
-      slotHours += 12;
-    } else if (period === "AM" && slotHours === 12) {
-      slotHours = 0;
-    }
-
-    // Compare with current time
-    if (slotHours < currentHours) {
-      return true; // Time has passed
-    } else if (slotHours === currentHours && slotMinutes <= currentMinutes) {
-      return true; // Time has passed or is current
-    }
-
-    return false;
-  };
 
   const handleTimeSelection = (time: string) => {
     setSelectedTime(time);
@@ -208,11 +173,18 @@ export default function ScheduleAppointmentScreen() {
   };
 
   const handleStartCall = () => {
-    Alert.alert(
-      "Start Call",
-      "This would initiate a video call with the doctor. (Video call functionality not implemented)",
-      [{ text: "OK" }]
-    );
+    // Generate unique call ID for this appointment
+    const callId = `appointment_${selectedDoctor?.id}_${Date.now()}`;
+    
+    // Navigate to video call screen
+    router.push({
+      pathname: "/(main)/(conference)/video-call" as any,
+      params: {
+        callId: callId,
+        userName: "Patient", // You can replace with actual user name from context
+        doctorName: selectedDoctor?.name || "Doctor"
+      }
+    });
   };
 
   const renderStepIndicator = () => (
@@ -254,28 +226,15 @@ export default function ScheduleAppointmentScreen() {
       <Text style={styles.stepSubtitle}>Choose your preferred time slot</Text>
       
       <View style={styles.timeGrid}>
-        {["09:00 AM", "10:30 AM", "02:00 PM", "03:30 PM", "04:00 PM"].map((time, index) => {
-          const isDisabled = isTimeSlotDisabled(time);
-          return (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.timeCard,
-                isDisabled && styles.timeCardDisabled
-              ]}
-              onPress={() => !isDisabled && handleTimeSelection(time)}
-              disabled={isDisabled}
-            >
-              <Text style={[
-                styles.timeText,
-                isDisabled && styles.timeTextDisabled
-              ]}>{time}</Text>
-              {isDisabled && (
-                <Text style={styles.disabledLabel}>Past</Text>
-              )}
-            </TouchableOpacity>
-          );
-        })}
+        {["09:00 AM", "10:30 AM", "02:00 PM", "03:30 PM", "04:00 PM"].map((time, index) => (
+          <TouchableOpacity
+            key={index}
+            style={styles.timeCard}
+            onPress={() => handleTimeSelection(time)}
+          >
+            <Text style={styles.timeText}>{time}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
     </View>
   );
