@@ -93,12 +93,12 @@ export default function Login() {
               <Text style={styles.buttonText}>{isLoading ? 'Logging in...' : 'Login'}</Text>
             </TouchableOpacity>
 
-            <View style={styles.footer}>
-              <Text style={styles.footerText}>Don't have an account? </Text>
-              <TouchableOpacity onPress={() => router.push("/auth/email-signup")}>
-                <Text style={styles.linkText}>Sign Up</Text>
-              </TouchableOpacity>
-            </View>
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>Don't have an account? </Text>
+          <TouchableOpacity onPress={() => router.push("/email-signup")}>
+            <Text style={styles.linkText}>Sign Up</Text>
+          </TouchableOpacity>
+        </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

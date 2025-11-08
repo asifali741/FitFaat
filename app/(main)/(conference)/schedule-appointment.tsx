@@ -60,6 +60,7 @@ export default function ScheduleAppointmentScreen() {
     setCurrentStep(2);
   };
 
+
   const handleTimeSelection = (time: string) => {
     setSelectedTime(time);
     setCurrentStep(3);
@@ -114,9 +115,8 @@ export default function ScheduleAppointmentScreen() {
   );
 
   const handleConfirmAppointment = () => {
-    // Set appointment time to 2 hours from now for demo
-    const appointmentDateTime = new Date();
-    appointmentDateTime.setHours(appointmentDateTime.getHours() + 2);
+    // Calculate appointment time based on selected date and time
+    const appointmentDateTime = calculateAppointmentDateTime(selectedDate, selectedTime);
     setAppointmentTime(appointmentDateTime);
     
     // Save appointment to context
@@ -136,16 +136,55 @@ export default function ScheduleAppointmentScreen() {
     setCurrentStep(6);
   };
 
+  // Calculate the actual appointment date and time
+  const calculateAppointmentDateTime = (date: string, time: string): Date => {
+    const appointmentDate = new Date();
+    
+    // Set the date based on selection
+    if (date === "Tomorrow") {
+      appointmentDate.setDate(appointmentDate.getDate() + 1);
+    } else if (date === "Day After") {
+      appointmentDate.setDate(appointmentDate.getDate() + 2);
+    }
+    // For "Today", keep current date
+    
+    // Parse the selected time (e.g., "02:00 PM")
+    const timeParts = time.match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (timeParts) {
+      let hours = parseInt(timeParts[1]);
+      const minutes = parseInt(timeParts[2]);
+      const period = timeParts[3].toUpperCase();
+      
+      // Convert to 24-hour format
+      if (period === "PM" && hours !== 12) {
+        hours += 12;
+      } else if (period === "AM" && hours === 12) {
+        hours = 0;
+      }
+      
+      appointmentDate.setHours(hours, minutes, 0, 0);
+    }
+    
+    return appointmentDate;
+  };
+
   const handleTimerComplete = () => {
     setCanStartCall(true);
   };
 
   const handleStartCall = () => {
-    Alert.alert(
-      "Start Call",
-      "This would initiate a video call with the doctor. (Video call functionality not implemented)",
-      [{ text: "OK" }]
-    );
+    // Generate unique call ID for this appointment
+    const callId = `appointment_${selectedDoctor?.id}_${Date.now()}`;
+    
+    // Navigate to video call screen
+    router.push({
+      pathname: "/(main)/(conference)/video-call" as any,
+      params: {
+        callId: callId,
+        userName: "Patient", // You can replace with actual user name from context
+        doctorName: selectedDoctor?.name || "Doctor"
+      }
+    });
   };
 
   const renderStepIndicator = () => (
@@ -465,10 +504,24 @@ const getStyles = (colors: any) => StyleSheet.create({  container: {
     alignItems: "center",
     marginBottom: hp(1.5),
   },
+  timeCardDisabled: {
+    backgroundColor: colors.lightGray,
+    opacity: 0.5,
+  },
   timeText: {
     fontSize: Math.min(hp(1.8), wp(4.5)),
     color: colors.textPrimary,
     fontWeight: "600",
+  },
+  timeTextDisabled: {
+    color: colors.textSecondary,
+    textDecorationLine: 'line-through',
+  },
+  disabledLabel: {
+    fontSize: Math.min(hp(1.2), wp(3)),
+    color: colors.error || '#FF3B30',
+    marginTop: hp(0.3),
+    fontWeight: '500',
   },
   doctorList: {
     flex: 1,

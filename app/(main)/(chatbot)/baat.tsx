@@ -5,8 +5,9 @@ import { useChatbotStorage } from "@/contexts/ChatbotStorage";
 import Controls from "@/Control/controls";
 import { useRouter } from "expo-router";
 import React, { useEffect } from "react";
-import { FlatList, Image, SafeAreaView, StyleSheet, Text, View } from "react-native";
+import { FlatList, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 // type ChatMessage = {
 //   role: string;
 //   content: string;
@@ -25,6 +26,7 @@ const WelcomeText: ChatMessage = {
 }
 export default function Baat() {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const { 
     messages: storedMessages, 
     addMessage, 
@@ -54,10 +56,10 @@ export default function Baat() {
     addMessage(text, isUser);
   };
 
-  const styles = getStyles(colors);
+  const styles = getStyles(colors, insets);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <AppHeader 
         title="HeaLora Chat"
         showStepIndicator={false}
@@ -79,39 +81,30 @@ export default function Baat() {
             data={displayMessages}
             keyExtractor={(_, index) => index.toString()}
             renderItem={({ item }) => <Message msg={item} />}
-            contentContainerStyle={{ padding: hp(1), paddingBottom: hp(12) }}
+            contentContainerStyle={styles.messageList}
             showsVerticalScrollIndicator={false}
             keyboardDismissMode="on-drag"
             keyboardShouldPersistTaps="handled"
           />
         </View>
         
-        <Controls onAddMessage={handleAddMessage} />
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? hp(10) : 0}
+        >
+          <View style={styles.inputContainer}>
+            <Controls onAddMessage={handleAddMessage} />
+          </View>
+        </KeyboardAvoidingView>
       </View>
     </SafeAreaView>
   );
 }
 
-const getStyles = (colors: any) => StyleSheet.create({
+const getStyles = (colors: any, insets: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.primary,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: wp(5),
-    paddingVertical: hp(2),
-    backgroundColor: colors.primary,
-  },
-  menuButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: hp(2.5),
-    fontWeight: "bold",
-    color: colors.textOnPrimary,
   },
   content: {
     flex: 1,
@@ -121,34 +114,49 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   aiProfileSection: {
     alignItems: "center",
-    paddingVertical: hp(2),
+    paddingVertical: hp(1.5),
     backgroundColor: colors.primarySoft,
     marginHorizontal: wp(4),
-    marginTop: hp(2),
-    borderRadius: 20,
+    marginTop: hp(1.5),
+    borderRadius: 15,
   },
   aiAvatar: {
-    width: hp(8),
-    height: hp(8),
-    borderRadius: hp(4),
-    marginBottom: hp(1),
+    width: Math.min(hp(6), wp(15)),
+    height: Math.min(hp(6), wp(15)),
+    borderRadius: Math.min(hp(3), wp(7.5)),
+    marginBottom: hp(0.5),
   },
   aiName: {
-    fontSize: hp(2.2),
+    fontSize: Math.min(hp(2), wp(5)),
     fontWeight: "bold",
     color: colors.textPrimary,
   },
   aiStatus: {
-    fontSize: hp(1.6),
+    fontSize: Math.min(hp(1.4), wp(3.5)),
     color: colors.textSecondary,
-    marginTop: hp(0.5),
+    marginTop: hp(0.3),
   },
   chatSection: {
     flex: 1,
     paddingHorizontal: wp(2),
   },
-  spacer: {
-    width: wp(18),
+  messageList: {
+    padding: hp(1),
+    paddingBottom: hp(12), // Extra padding to account for fixed input bar
+    flexGrow: 1,
+  },
+  inputContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: colors.screenColor,
+    paddingBottom: insets.bottom > 0 ? insets.bottom : (Platform.OS === 'ios' ? hp(2) : hp(1)),
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
 });
 

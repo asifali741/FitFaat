@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
-import { Days } from "./Day";
+import { Days } from "./_Day";
 export type Day = {
   dayNo: number,
   date: string,
