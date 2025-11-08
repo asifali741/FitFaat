@@ -1,7 +1,8 @@
 import AppHeader from "@/components/AppHeader";
+import { useAppointments } from "@/contexts/AppointmentContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React from "react";
+import React, { useEffect } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -10,7 +11,23 @@ import { useTheme } from "@/contexts/ThemeContext";
 export default function ConferenceScreen() {
   const { colors } = useTheme();
   const router = useRouter();
+  const { appointments } = useAppointments();
   const styles = getStyles(colors);
+
+  useEffect(() => {
+    // Check if there are any active or scheduled appointments
+    const activeOrScheduled = appointments.filter(
+      apt => apt.status === 'scheduled' || apt.status === 'active'
+    );
+
+    // If there are active/scheduled appointments, redirect to the first one
+    if (activeOrScheduled.length > 0) {
+      router.replace({
+        pathname: '/(main)/(conference)/appointment-details',
+        params: { appointmentId: activeOrScheduled[0].id }
+      });
+    }
+  }, [appointments]);
 
   return (
     <SafeAreaView style={styles.container}>

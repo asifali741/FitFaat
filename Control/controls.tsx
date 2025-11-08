@@ -8,7 +8,6 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
-import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { heightPercentageToDP as hp } from "react-native-responsive-screen";
 import { callGemini } from '../utils/api';
 
@@ -59,18 +58,7 @@ export default function Controls({ onAddMessage }: ControlsProps) {
   };
 
   return (
-    <KeyboardAwareScrollView
-      style={styles.wrapper}
-      keyboardShouldPersistTaps="handled"
-      enableOnAndroid={true}
-      enableAutomaticScroll={true}
-      extraScrollHeight={hp(12)}
-      keyboardOpeningTime={0}
-      viewIsInsideTabBar={true}
-      enableResetScrollToCoords={false}
-      contentContainerStyle={{ flex: 1, justifyContent: 'flex-end' }}
-      showsVerticalScrollIndicator={false}
-    >
+    <View style={styles.wrapper}>
       <View style={styles.container}>
         <TextInput
           style={styles.input}
@@ -78,9 +66,10 @@ export default function Controls({ onAddMessage }: ControlsProps) {
           placeholderTextColor="#999"
           onChangeText={setContent}
           value={content}
-          returnKeyType="send"        // shows "Send" button on keyboard
-          blurOnSubmit={false}        // keeps keyboard open
-          onSubmitEditing={handleSend} // press Enter = send
+          returnKeyType="send"
+          blurOnSubmit={false}
+          onSubmitEditing={handleSend}
+          multiline={false}
         />
         <TouchableOpacity 
           onPress={handleSend} 
@@ -94,18 +83,15 @@ export default function Controls({ onAddMessage }: ControlsProps) {
           )}
         </TouchableOpacity>
       </View>
-    </KeyboardAwareScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrapper: {
-    flex: 1,  // Take up all available space
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    marginHorizontal: hp(2),
+    paddingHorizontal: hp(2),
+    paddingVertical: hp(1.5),
+    backgroundColor: 'transparent',
   },
   container: {
     flexDirection: "row",
@@ -118,7 +104,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 5,
     elevation: 4,
-    marginBottom: hp(2),
   },
   input: {
     flex: 1,
