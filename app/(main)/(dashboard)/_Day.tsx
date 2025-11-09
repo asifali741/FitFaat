@@ -45,7 +45,7 @@ export const Days = ({props, onDayPress}: {props: Day, onDayPress: (dayNo : numb
 
 const ActiveDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}) => {
   const { colors } = useTheme();
-  var time = '00:00:00'
+  let time = '00:00:00'
   const scale = useSharedValue(1);
   const finalProgress : number = Math.min(100, Math.round(((info.achievedCalories + info.achieviedHydration) / (info.targetCalories + info.targetHydration)) * 100))
   const animatedContainerStyle = useAnimatedStyle(() => ({
@@ -174,7 +174,7 @@ const LockedDay = ({info} : {info: Day}) => {
   );
 }
 
-const ProgressCircle = React.memo(({finalProgress}: {finalProgress: number})=>{
+const ProgressCircle = React.memo(function ProgressCircle({finalProgress}: {finalProgress: number}){
   const { colors } = useTheme();
   const styles = getStyles(colors);
   const progress = useSharedValue(0);
@@ -221,7 +221,7 @@ const ProgressCircle = React.memo(({finalProgress}: {finalProgress: number})=>{
 })
 
 
-const InfoTray = React.memo(({ duration }: { duration: number }) => {
+const InfoTray = React.memo(function InfoTray({ duration }: { duration: number }) {
   const { colors } = useTheme();
   const styles = getStyles(colors);
   const [remainingTime, setRemainingTime] = useState(duration);
@@ -729,3 +729,6 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontStyle: 'italic',
   },
 });
+
+// Dummy export to prevent Expo Router warnings
+export default null;

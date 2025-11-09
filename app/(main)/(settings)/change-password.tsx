@@ -148,7 +148,7 @@ export default function ChangePassword() {
             <View style={styles.securityNotice}>
               <Ionicons name="shield-checkmark" size={24} color={colors.primary} />
               <Text style={styles.securityText}>
-                For your security, you'll need to sign in again after changing your password
+                For your security, you&apos;ll need to sign in again after changing your password
               </Text>
             </View>
 

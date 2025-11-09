@@ -7,7 +7,7 @@ import { useRouter } from "expo-router";
 import { Drawer } from "expo-router/drawer";
 import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { colorsSheet as color } from "./(settings)/ui_elements";
+import { colorsSheet as color } from "./(settings)/_ui_elements";
 type DrawerSceneWrapperProps = DrawerContentComponentProps;
 
 export default function MainLayout() {
@@ -58,12 +58,48 @@ export default function MainLayout() {
       sceneStyle: { backgroundColor: "#FFFFFF" },
     }}
   >
-    <Drawer.Screen name="(dashboard)" options={{ title: "Dashboard" }} />
-    <Drawer.Screen name="(chatbot)" options={{ title: "Chatbot" }} />
-    <Drawer.Screen name="(conference)" options={{ title: "Conference" }} />
-    <Drawer.Screen name="(settings)" options={{ title: "Settings" }} />
-    <Drawer.Screen name="(exercises)/workout" options={{ title: "Workouts 👑" }} />
-    <Drawer.Screen name="(doctor-portal)" options={{ title: "Join as Doctor 👨‍⚕️" }} />
+    <Drawer.Screen 
+      name="(dashboard)" 
+      options={{ 
+        title: "Dashboard",
+      }} 
+    />
+    <Drawer.Screen 
+      name="(chatbot)" 
+      options={{ 
+        title: "Chatbot",
+      }} 
+    />
+    <Drawer.Screen 
+      name="(conference)" 
+      options={{ 
+        title: "Conference",
+      }} 
+    />
+    <Drawer.Screen 
+      name="(settings)" 
+      options={{ 
+        title: "Settings",
+      }} 
+    />
+    <Drawer.Screen 
+      name="(exercises)" 
+      options={{ 
+        title: "Workouts 👑",
+      }} 
+    />
+    <Drawer.Screen 
+      name="(doctor-portal)" 
+      options={{ 
+        title: "Join as Doctor 👨‍⚕️",
+      }} 
+    />
+    <Drawer.Screen 
+      name="profile" 
+      options={{ 
+        title: "Profile",
+      }} 
+    />
   </Drawer>
   </ChatbotStorageProvider>
   </AppointmentProvider>

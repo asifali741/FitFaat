@@ -1,9 +1,10 @@
+import BlueLoader from "@/components/common/BlueLoader";
 import SafeScreen from "@/components/SafeScreen";
 import { ClerkProvider, useAuth, useUser } from "@clerk/clerk-expo";
 import { tokenCache } from "@clerk/clerk-expo/token-cache";
 import { Slot, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, StatusBar, View } from "react-native";
+import { StatusBar } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
 
@@ -82,11 +83,7 @@ function AuthGate() {
   }, [isLoaded, userLoaded, isSignedIn, user, isNavigating]);
 
   if (!isLoaded || !userLoaded || isNavigating) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
+    return <BlueLoader fullScreen />;
   }
 
   return <Slot />;

@@ -57,7 +57,7 @@ export default function DoctorPortal() {
             activeOpacity={0.8}
           >
             <LinearGradient
-              colors={['#26867C', '#4CAF50', '#66BB6A']}
+              colors={[colorsSheet.primary, colorsSheet.primaryLight, colorsSheet.accent]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.gradientButton}
@@ -162,15 +162,16 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   gradientButton: {
-    paddingVertical: hp(2.5),
-    paddingHorizontal: wp(8),
+    paddingVertical: Math.min(hp(2.2), wp(5.5)),
+    paddingHorizontal: Math.min(wp(8), 35),
     borderRadius: 30,
     alignItems: "center",
     justifyContent: "center",
+    minHeight: hp(6),
   },
   gradientButtonText: {
     color: colorsSheet.white,
-    fontSize: hp(2.4),
+    fontSize: Math.min(hp(2.2), wp(5.5)),
     fontWeight: "700",
     letterSpacing: 0.5,
   },

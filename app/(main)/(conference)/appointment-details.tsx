@@ -15,11 +15,18 @@ export default function AppointmentDetailsScreen() {
   const { appointments, updateAppointmentStatus } = useAppointments();
   const { appointmentId } = useLocalSearchParams();
   const [appointment, setAppointment] = useState<Appointment | null>(null);
-  const [canStartCall, setCanStartCall] = useState(false);
+  const [canStartCall, setCanStartCall] = useState(false); // Initially disabled until timer completes
 
   useEffect(() => {
     if (appointmentId) {
       const foundAppointment = appointments.find(apt => apt.id === appointmentId);
+      
+      // If appointment is cancelled, redirect back to main conference screen
+      if (foundAppointment && foundAppointment.status === 'cancelled') {
+        router.replace('/(main)/(conference)');
+        return;
+      }
+      
       setAppointment(foundAppointment || null);
     }
   }, [appointmentId, appointments]);
@@ -36,11 +43,20 @@ export default function AppointmentDetailsScreen() {
   };
 
   const handleStartCall = () => {
-    Alert.alert(
-      "Start Call",
-      "This would initiate a video call with the doctor. (Video call functionality not implemented)",
-      [{ text: "OK" }]
-    );
+    if (!appointment) return;
+    
+    // Generate unique call ID
+    const callId = `appointment_${appointment.id}_${Date.now()}`;
+    
+    // Navigate to custom video call screen with all controls
+    router.push({
+      pathname: "/(main)/(conference)/custom-video-call" as any,
+      params: {
+        callId: callId,
+        userName: "Patient", // You can replace with actual user name from context
+        doctorName: appointment.doctorName || "Doctor"
+      }
+    });
   };
 
   const handleCancelAppointment = () => {
@@ -371,7 +387,7 @@ const styles = StyleSheet.create({
   },
   actionButtons: {
     marginTop: hp(2),
-    marginBottom: hp(4),
+    marginBottom: hp(8),
   },
   startCallButton: {
     flexDirection: "row",

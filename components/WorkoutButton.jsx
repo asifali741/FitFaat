@@ -7,7 +7,7 @@ import {
 import { useRouter } from "expo-router";
 import { DrawerActions } from '@react-navigation/native';
 import Svg, { Path } from "react-native-svg";
-import { MaterialIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function WorkoutButton({ 
   onPress, 
@@ -106,8 +106,8 @@ export default function WorkoutButton({
     } catch (error) {
       // Fallback to Expo vector icon
       return (
-        <MaterialIcons 
-          name="workspace-premium" 
+        <Ionicons 
+          name="trophy" 
           size={size * 0.8} 
           color={color} 
         />

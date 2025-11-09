@@ -1,4 +1,4 @@
-import { colorsSheet as colors } from "@/app/(main)/(settings)/ui_elements";
+import { colorsSheet as colors } from "@/app/(main)/(settings)/_ui_elements";
 import { StyleSheet } from "react-native";
 import {
   heightPercentageToDP as hp,

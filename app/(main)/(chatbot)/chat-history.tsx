@@ -121,14 +121,6 @@ export default function ChatHistoryScreen() {
         {/* Action Buttons */}
         <View style={styles.actionButtons}>
           <TouchableOpacity
-            style={styles.actionButton}
-            onPress={handleExportChats}
-          >
-            <Ionicons name="download" size={20} color={colors.primary} />
-            <Text style={styles.actionButtonText}>Export</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
             style={[styles.actionButton, styles.clearButton]}
             onPress={handleClearAllChats}
           >
@@ -139,7 +131,7 @@ export default function ChatHistoryScreen() {
 
         {/* Sessions List */}
         <ScrollView style={styles.sessionsList}>
-          {sessions.length === 0 ? (
+          {!sessions || sessions.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="chatbubbles-outline" size={64} color={colors.textSecondary} />
               <Text style={styles.emptyStateTitle}>No Chat History</Text>
@@ -235,7 +227,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   actionButtons: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "center",
     marginBottom: hp(3),
   },
   actionButton: {
@@ -245,7 +237,6 @@ const getStyles = (colors: any) => StyleSheet.create({
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.5),
     borderRadius: 15,
-    flex: 0.48,
     justifyContent: "center",
   },
   clearButton: {
@@ -338,6 +329,14 @@ const getStyles = (colors: any) => StyleSheet.create({
     paddingHorizontal: wp(6),
     paddingVertical: hp(1.5),
     borderRadius: 25,
+    shadowColor: colors.primary,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   startChatButtonText: {
     color: colors.textOnPrimary,

@@ -1,7 +1,8 @@
+import BlueLoader from '@/components/common/BlueLoader';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { Days } from "./_Day";
 export type Day = {
   dayNo: number,
@@ -96,7 +97,7 @@ export default function DayPlan () {
   },[]);
 
   const loadJson = async ({data, timestamp} : {data:jsonResponse, timestamp: Date}) =>{
-    var entry : keyof jsonResponse
+    let entry : keyof jsonResponse
     for (const key in data)
     {
       entry = key as keyof jsonResponse
@@ -147,7 +148,7 @@ export default function DayPlan () {
   }
   const callApi = async () =>{
     //save data from api into local and state variable 
-    var data = {
+    let data = {
       day01: FinishedDay,
       day02: ActiveDay,
       day03: { dayNo: 3, date: '2025-08-26', achievedCalories : 0, achieviedHydration: 0, targetCalories: 0, targetHydration: 0, remarks: '', duration: 0, status: "locked"} as Day, 
@@ -193,9 +194,7 @@ export default function DayPlan () {
   //Mapping JsonResponse to Day Components
   if(!JsonResponse)
   {
-    return <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" />
-      </View>
+    return <BlueLoader fullScreen text="Loading days..." />;
   }
   const daysArray : Day[] = Object.values(JsonResponse); // [day01, day02, ...]
   return (  <View style={{ flex: 1 }}>

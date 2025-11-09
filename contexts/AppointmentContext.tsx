@@ -18,6 +18,8 @@ interface AppointmentContextType {
   appointments: Appointment[];
   addAppointment: (appointment: Omit<Appointment, 'id' | 'status'>) => void;
   updateAppointmentStatus: (id: string, status: Appointment['status']) => void;
+  removeAppointment: (id: string) => void;
+  clearCancelledAppointments: () => void;
   getUpcomingAppointments: () => Appointment[];
   getActiveAppointments: () => Appointment[];
 }
@@ -82,11 +84,20 @@ export const AppointmentProvider: React.FC<AppointmentProviderProps> = ({ childr
   };
 
   const updateAppointmentStatus = (id: string, status: Appointment['status']) => {
+    // Keep cancelled appointments for history/profile display
     setAppointments(prev => 
       prev.map(apt => 
         apt.id === id ? { ...apt, status } : apt
       )
     );
+  };
+
+  const removeAppointment = (id: string) => {
+    setAppointments(prev => prev.filter(apt => apt.id !== id));
+  };
+
+  const clearCancelledAppointments = () => {
+    setAppointments(prev => prev.filter(apt => apt.status !== 'cancelled'));
   };
 
   const getUpcomingAppointments = () => {
@@ -109,6 +120,8 @@ export const AppointmentProvider: React.FC<AppointmentProviderProps> = ({ childr
     appointments,
     addAppointment,
     updateAppointmentStatus,
+    removeAppointment,
+    clearCancelledAppointments,
     getUpcomingAppointments,
     getActiveAppointments
   };

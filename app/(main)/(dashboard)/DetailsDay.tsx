@@ -3,12 +3,12 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, Alert, TouchableOpacity, Platform } from "react-native";
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import Animated, { Easing, runOnJS, useAnimatedProps, useSharedValue, withTiming } from "react-native-reanimated";
+import Animated, { Easing, runOnJS, useAnimatedProps, useAnimatedStyle, useSharedValue, withTiming, withSpring, withSequence, withDelay, withRepeat, interpolate } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
 import { colorsSheet, rs } from "../(settings)/_ui_elements";
 import { Day as typeDay } from "./DayPlan";
-import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -22,13 +22,15 @@ interface ProgressCircleProps {
 };
 
 const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+
 export default function DetailsDay () {
     const { colors } = useTheme();
     const { selectedDay  } = useLocalSearchParams<{ selectedDay : string }>();
     const router = useRouter();
     const props: typeDay = JSON.parse(selectedDay )
     function getDate(){
-        var currentTime = Date.now()
+        let currentTime = Date.now()
         const oldTime = new Date(props.duration*1000).getTime()
         currentTime = currentTime + oldTime;
         const date = new Date(currentTime);
@@ -37,7 +39,7 @@ export default function DetailsDay () {
     //states to track changes
     const [updateInput, setUpdateInput] = useState<string>('');
     const [timer, setTimer] = useState<string>(getDate())
-    const [showMenu, setShowMenu] = useState<Boolean>(false)
+    const [showMenu, setShowMenu] = useState<boolean>(false)
     const [timeInput, setTimeInput] = useState<string>('');
     const [selectedTime, setSelectedTime] = useState<Date>(new Date());
     const [showTimePicker, setShowTimePicker] = useState<boolean>(false);
@@ -50,6 +52,15 @@ export default function DetailsDay () {
     const [inputMethod, setInputMethod] = useState<'text' | 'audio' | 'photo'>('text');
     const fade = useSharedValue(1);
     const insets = useSafeAreaInsets();
+    
+    // Animation values for buttons
+    const trackMealScale = useSharedValue(1);
+    const trackMealRotate = useSharedValue(0);
+    const submitScale = useSharedValue(1);
+    const submitRotate = useSharedValue(0);
+    const submitSuccess = useSharedValue(0);
+    const backScale = useSharedValue(1);
+    const backTranslateX = useSharedValue(0);
     // trigger fade-out + menu
     const openMenu = () => {
     fade.value = withTiming(
@@ -72,6 +83,106 @@ export default function DetailsDay () {
     // animate fade in
     fade.value = withTiming(1, { duration: 500, easing: Easing.inOut(Easing.ease) });
   };
+  
+  // Track Meal button animation
+  const handleTrackMealPress = () => {
+    trackMealScale.value = withSequence(
+      withSpring(0.9, { damping: 10, stiffness: 400 }),
+      withSpring(1.1, { damping: 10, stiffness: 400 }),
+      withSpring(1, { damping: 10, stiffness: 400 })
+    );
+    trackMealRotate.value = withSequence(
+      withSpring(5, { damping: 10, stiffness: 400 }),
+      withSpring(-5, { damping: 10, stiffness: 400 }),
+      withSpring(0, { damping: 10, stiffness: 400 })
+    );
+    setTimeout(openMenu, 200);
+  };
+  
+  // Submit button animation - cool success effect
+  const handleSubmitPress = () => {
+    // Scale and rotate animation
+    submitScale.value = withSequence(
+      withSpring(0.85, { damping: 8, stiffness: 300 }),
+      withSpring(1.15, { damping: 8, stiffness: 300 }),
+      withSpring(1, { damping: 8, stiffness: 300 })
+    );
+    
+    submitRotate.value = withSequence(
+      withTiming(360, { duration: 600, easing: Easing.out(Easing.ease) }),
+      withTiming(0, { duration: 0 })
+    );
+    
+    // Success pulse effect
+    submitSuccess.value = withSequence(
+      withDelay(300, withSpring(1, { damping: 5, stiffness: 200 })),
+      withDelay(200, withSpring(0, { damping: 5, stiffness: 200 }))
+    );
+    
+    setTimeout(() => {
+      console.log('Time:', selectedTime.toLocaleTimeString());
+      console.log('Food:', foodNameInput);
+      console.log('Description:', descriptionInput);
+      console.log('Image:', selectedImage);
+      console.log('Audio:', audioUri);
+      closeMenu();
+    }, 800);
+  };
+  
+  // Back button animation
+  const handleBackMenuPress = () => {
+    backScale.value = withSequence(
+      withSpring(0.9, { damping: 10, stiffness: 400 }),
+      withSpring(1, { damping: 10, stiffness: 400 })
+    );
+    backTranslateX.value = withSequence(
+      withSpring(-8, { damping: 10, stiffness: 400 }),
+      withSpring(0, { damping: 10, stiffness: 400 })
+    );
+    setTimeout(closeMenu, 150);
+  };
+  
+  // Animated styles
+  const trackMealAnimatedStyle = useAnimatedStyle(() => {
+    'worklet';
+    return {
+      transform: [
+        { scale: trackMealScale.value },
+        { rotate: `${trackMealRotate.value}deg` }
+      ],
+    };
+  });
+  
+  const submitAnimatedStyle = useAnimatedStyle(() => {
+    'worklet';
+    const successScale = interpolate(submitSuccess.value, [0, 1], [1, 1.3]);
+    return {
+      transform: [
+        { scale: submitScale.value * successScale },
+        { rotate: `${submitRotate.value}deg` }
+      ],
+    };
+  });
+  
+  const submitSuccessOverlayStyle = useAnimatedStyle(() => {
+    'worklet';
+    const opacity = interpolate(submitSuccess.value, [0, 0.5, 1], [0, 0.8, 0]);
+    const scale = interpolate(submitSuccess.value, [0, 1], [0.5, 2]);
+    return {
+      opacity,
+      transform: [{ scale }],
+    };
+  });
+  
+  const backAnimatedStyle = useAnimatedStyle(() => {
+    'worklet';
+    return {
+      transform: [
+        { scale: backScale.value },
+        { translateX: backTranslateX.value }
+      ],
+    };
+  });
 
 
     //functions
@@ -314,13 +425,14 @@ export default function DetailsDay () {
                 </View>
               </View>
 
-              <TouchableOpacity
-                style={[styles.trayButton, {backgroundColor: colors.primary}]} 
-                onPress={openMenu}
+              <AnimatedTouchable
+                style={[styles.trayButton, {backgroundColor: colors.primary}, trackMealAnimatedStyle]} 
+                onPress={handleTrackMealPress}
+                activeOpacity={0.8}
               >
                 <Ionicons name="add-circle" size={20} color="white" />
                 <Text style={styles.trayButtonText}>Track Meal</Text>
-              </TouchableOpacity>
+              </AnimatedTouchable>
             </>
           ) : (
             <>
@@ -424,7 +536,7 @@ export default function DetailsDay () {
                   <Ionicons name="trophy" size={Math.min(hp(4), wp(10))} color="#FFD700" />
                   <Text style={styles.congratsTitle}>Congratulations! 🎉</Text>
                   <Text style={styles.congratsText}>
-                    You've achieved your daily goals! Keep up the great work!
+                    You&apos;ve achieved your daily goals! Keep up the great work!
                   </Text>
                 </View>
               )}
@@ -448,7 +560,7 @@ export default function DetailsDay () {
             Track Your Meal
           </Text>
           <Text style={styles.menuSubtitle}>
-            Choose how you'd like to log your meal
+            Choose how you&apos;d like to log your meal
           </Text>
         </View>
 
@@ -585,7 +697,7 @@ export default function DetailsDay () {
 
                 <View style={styles.inputGroup}>
                   <View style={styles.labelRow}>
-                    <MaterialIcons name="description" size={20} color={colors.primary} />
+                    <Ionicons name="document-text-outline" size={20} color={colors.primary} />
                     <Text style={styles.label}>Add Details</Text>
                   </View>
                   <TextInput
@@ -715,25 +827,30 @@ export default function DetailsDay () {
         </View>
 
         <View style={styles.menuButtons}>
-          <TouchableOpacity style={styles.backMenuButton} onPress={closeMenu}>
+          <AnimatedTouchable 
+            style={[styles.backMenuButton, backAnimatedStyle]} 
+            onPress={handleBackMenuPress}
+            activeOpacity={0.8}
+          >
             <Ionicons name="arrow-back" size={Math.min(hp(2.2), wp(5))} color={colors.primary} />
             <Text style={styles.backMenuText}>Back</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.submitMenuButton}
-            onPress={() => {
-              // Handle submit with all the data
-              console.log('Time:', selectedTime.toLocaleTimeString());
-              console.log('Food:', foodNameInput);
-              console.log('Description:', descriptionInput);
-              console.log('Image:', selectedImage);
-              console.log('Audio:', audioUri);
-              closeMenu();
-            }}
-          >
-            <Text style={styles.submitMenuText}>Submit</Text>
-            <Ionicons name="checkmark" size={Math.min(hp(2.2), wp(5))} color="white" />
-          </TouchableOpacity>
+          </AnimatedTouchable>
+          <View style={{ flex: 1, position: 'relative' }}>
+            <AnimatedTouchable
+              style={[styles.submitMenuButton, submitAnimatedStyle]}
+              onPress={handleSubmitPress}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.submitMenuText}>Submit</Text>
+              <Ionicons name="checkmark" size={Math.min(hp(2.2), wp(5))} color="white" />
+            </AnimatedTouchable>
+            <Animated.View 
+              style={[styles.submitSuccessOverlay, submitSuccessOverlayStyle]}
+              pointerEvents="none"
+            >
+              <Ionicons name="checkmark-circle" size={Math.min(hp(6), wp(13))} color={colors.success} />
+            </Animated.View>
+          </View>
         </View>
       </KeyboardAwareScrollView>
     )}
@@ -1269,6 +1386,11 @@ const getStyles = (colors: any) => StyleSheet.create({
         color: colors.success,
         fontWeight: '500',
     },
+    clearText: {
+        color: colors.error,
+        fontWeight: '600',
+        fontSize: 14,
+    },
     optionalLabel: {
         fontSize: 14,
         color: colors.textSecondary,
@@ -1323,6 +1445,16 @@ const getStyles = (colors: any) => StyleSheet.create({
         color: "#fff",
         fontWeight: "700",
         fontSize: Math.min(hp(1.8), wp(4.2)),
+    },
+    submitSuccessOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'transparent',
     },
     timePickerButton: {
         flexDirection: 'row',

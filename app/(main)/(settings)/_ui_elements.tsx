@@ -83,6 +83,8 @@ export const DrawerFonts = {
   drawerEmail: rf(11, 9, 16),
   };
 
+// Dummy export to prevent Expo Router warnings
+export default null;
 
 // Export the raw scale value in case you need to compute other sizes
 //export const SCALE = S;

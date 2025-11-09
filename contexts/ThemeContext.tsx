@@ -122,8 +122,8 @@ const darkColors = {
   buttonText: "#FFFFFF",
   
   // Drawer Colors
-  drawerBackground: "#1A1A1A",
-  drawerActiveTabColor: "#4CAF50",
+  drawerBackground: "#1E1E1E",
+  drawerActiveTabColor: "#2E7D32",
   drawerTintColor: "#FFFFFF",
   
   // Status Colors

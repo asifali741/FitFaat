@@ -21,7 +21,7 @@ export default function AppointmentSummaryScreen() {
   
   // Calculate time until appointment
   const [timeRemaining, setTimeRemaining] = useState("");
-  const [isCallReady, setIsCallReady] = useState(false);
+  const [isCallReady, setIsCallReady] = useState(true); // Set to true for testing
 
   useEffect(() => {
     if (!date || !time) return;
@@ -182,9 +182,9 @@ export default function AppointmentSummaryScreen() {
               // Generate unique call ID
               const callId = `appointment_${doctorId}_${Date.now()}`;
               
-              // Navigate to video call screen
+              // Navigate to custom video call screen with all controls
               router.push({
-                pathname: "/(main)/(conference)/video-call" as any,
+                pathname: "/(main)/(conference)/custom-video-call" as any,
                 params: {
                   callId: callId,
                   userName: "Patient", // You can replace with actual user name
