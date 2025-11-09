@@ -7,8 +7,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/contexts/ThemeContext";
-import { useNavigation } from "@react-navigation/native";
-import { DrawerActions } from "@react-navigation/native";
+import { colorsSheet } from "../(settings)/_ui_elements";
+import { useNavigation , DrawerActions } from "@react-navigation/native";
+
 
 const FullText =
   "Hi, I am HeaLora, your AI-powered health companion. I’m designed to support you on your journey toward better well-being by combining advanced technology with personalized care.";
@@ -51,7 +52,12 @@ export default function Index() {
           <Ionicons name="menu" size={24} color={colors.textOnPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>AI Health Assistant</Text>
-        <View style={styles.spacer} />
+        <TouchableOpacity 
+          style={styles.menuButton}
+          onPress={() => router.back()}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.textOnPrimary} />
+        </TouchableOpacity>
       </View>
 
       {/* Main Content */}
@@ -81,7 +87,7 @@ export default function Index() {
             activeOpacity={0.8}
           >
             <LinearGradient
-              colors={[colors.primary, colors.primaryLight, colors.accent]}
+              colors={[colorsSheet.primary, colorsSheet.primaryLight, colorsSheet.accent]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.gradientButton}
@@ -163,7 +169,8 @@ const getStyles = (colors: any) => StyleSheet.create({
     lineHeight: Math.min(hp(2.8), wp(7)),
   },
   buttonContainer: {
-    paddingBottom: hp(3),
+    paddingBottom: hp(8),
+    marginTop: hp(-4),
   },
   gradientButtonContainer: {
     borderRadius: 30,
@@ -190,8 +197,5 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontSize: Math.min(hp(2.2), wp(5.5)),
     fontWeight: "700",
     letterSpacing: 0.5,
-  },
-  spacer: {
-    width: wp(18),
   },
 });

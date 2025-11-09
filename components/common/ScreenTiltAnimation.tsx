@@ -1,4 +1,4 @@
-import { colorsSheet as color } from "@/app/(main)/(settings)/ui_elements";
+import { colorsSheet as color } from "@/app/(main)/(settings)/_ui_elements";
 import { useDrawerProgress } from "@react-navigation/drawer";
 import React, { ReactNode } from "react";
 import { View } from "react-native";

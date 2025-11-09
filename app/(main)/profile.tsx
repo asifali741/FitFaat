@@ -9,7 +9,7 @@ import {
     widthPercentageToDP as wp,
 } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { colorsSheet } from "./(settings)/ui_elements";
+import { colorsSheet } from "./(settings)/_ui_elements";
 
 export default function ProfileScreen() {
   const router = useRouter();

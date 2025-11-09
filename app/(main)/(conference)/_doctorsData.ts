@@ -71,3 +71,6 @@ export const getDoctorsByDate = (date: string): Doctor[] => {
 export const getDoctorById = (id: string): Doctor | undefined => {
   return dummyDoctors.find(doctor => doctor.id === id);
 };
+
+// Dummy export to prevent Expo Router warnings
+export default null;

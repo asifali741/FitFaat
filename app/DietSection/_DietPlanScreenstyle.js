@@ -15,3 +15,6 @@ export const DietPlanScreenstyle = StyleSheet.create({
     fontWeight: "bold",
   },
 });
+
+// Dummy export to prevent Expo Router warnings
+export default null;

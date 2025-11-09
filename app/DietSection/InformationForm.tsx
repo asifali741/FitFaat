@@ -3,7 +3,7 @@ import { useCustomOnboarding } from "@/hooks/useCustomOnboarding";
 import { Ionicons } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
 import React, { useState } from "react";
-import { ActivityIndicator, Alert, Image, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, Image, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp } from "react-native-responsive-screen";
 /**
  * INFORMATION FORM SCREEN!!!!
@@ -300,11 +300,9 @@ export default function Index() {
           onPress={handleFormSubmit}
           disabled={isLoading}
         >
-          {isLoading ? (
-            <ActivityIndicator color="white" size="small" />
-          ) : (
-            <Text style={{ color: "white", fontSize: hp(2.2) }}>Complete Setup</Text>
-          )}
+          <Text style={{ color: "white", fontSize: hp(2.2) }}>
+            {isLoading ? 'Processing...' : 'Complete Setup'}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>

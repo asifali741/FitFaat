@@ -1,0 +1,95 @@
+import React, { useEffect, useRef } from 'react';
+import { View, Animated, StyleSheet } from 'react-native';
+import { heightPercentageToDP as hp } from 'react-native-responsive-screen';
+import { useTheme } from '@/contexts/ThemeContext';
+
+export default function TypingIndicator() {
+  const { colors } = useTheme();
+  const dot1 = useRef(new Animated.Value(0)).current;
+  const dot2 = useRef(new Animated.Value(0)).current;
+  const dot3 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animateDot = (dot: Animated.Value, delay: number) => {
+      return Animated.loop(
+        Animated.sequence([
+          Animated.timing(dot, {
+            toValue: -10,
+            duration: 400,
+            delay,
+            useNativeDriver: true,
+          }),
+          Animated.timing(dot, {
+            toValue: 0,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+    };
+
+    const animation1 = animateDot(dot1, 0);
+    const animation2 = animateDot(dot2, 150);
+    const animation3 = animateDot(dot3, 300);
+
+    animation1.start();
+    animation2.start();
+    animation3.start();
+
+    return () => {
+      animation1.stop();
+      animation2.stop();
+      animation3.stop();
+    };
+  }, [dot1, dot2, dot3]);
+
+  const styles = getStyles(colors);
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.bubble}>
+        <Animated.View
+          style={[
+            styles.dot,
+            { transform: [{ translateY: dot1 }] },
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.dot,
+            { transform: [{ translateY: dot2 }] },
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.dot,
+            { transform: [{ translateY: dot3 }] },
+          ]}
+        />
+      </View>
+    </View>
+  );
+}
+
+const getStyles = (colors: any) => StyleSheet.create({
+  container: {
+    alignSelf: 'flex-start',
+    marginLeft: hp(2),
+    marginVertical: hp(1),
+  },
+  bubble: {
+    backgroundColor: colors.primarySoft,
+    borderRadius: hp(2),
+    paddingHorizontal: hp(2),
+    paddingVertical: hp(1.5),
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  dot: {
+    width: hp(1),
+    height: hp(1),
+    borderRadius: hp(0.5),
+    backgroundColor: colors.primary,
+    marginHorizontal: hp(0.3),
+  },
+});

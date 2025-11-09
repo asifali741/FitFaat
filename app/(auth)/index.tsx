@@ -6,6 +6,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import "../../global.css";
 import { useSocialAuth } from '../../hooks/useSocialAuth';
 import { useTheme } from '@/contexts/ThemeContext';
+import AnimatedButton from '@/components/common/AnimatedButton';
 import {
   widthPercentageToDP as wp,
   heightPercentageToDP as hp,
@@ -78,17 +79,17 @@ export default function Index() {
         </View>
         
         <View style={styles.buttonContainer}>
-          <TouchableOpacity 
+          <AnimatedButton
+            animationType="bounce"
             onPress={handleGoogleAuth} 
             style={styles.googleButton}
-            activeOpacity={0.8}
           >
             <Image
               source={require("../../assets/images/goog.png")}
               style={styles.googleLogo}
             />
             <Text style={styles.googleButtonText}>Continue with Google</Text>
-          </TouchableOpacity>
+          </AnimatedButton>
 
           <View style={styles.dividerContainer}>
             <View style={styles.divider} />
@@ -96,21 +97,21 @@ export default function Index() {
             <View style={styles.divider} />
           </View>
 
-          <TouchableOpacity
+          <AnimatedButton
+            animationType="scale"
             onPress={() => router.push('/email-login')}
             style={styles.emailButton}
-            activeOpacity={0.8}
           >
             <Text style={styles.emailButtonText}>Login with Email</Text>
-          </TouchableOpacity>
+          </AnimatedButton>
 
-          <TouchableOpacity
+          <AnimatedButton
+            animationType="pulse"
             onPress={() => router.push('/email-signup')}
             style={styles.signupButton}
-            activeOpacity={0.8}
           >
             <Text style={styles.signupButtonText}>Create New Account</Text>
-          </TouchableOpacity>
+          </AnimatedButton>
         </View>
       </ScrollView>
     </View>
@@ -130,10 +131,12 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   },
   bannerImage: {
     width: wp(100),
-    height: hp(30),
-    minHeight: 200,
-    maxHeight: 350,
+    height: hp(33),
+    minHeight: 250,
+    maxHeight: 400,
     resizeMode: "cover",
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
   },
   contentContainer: {
     paddingHorizontal: wp(6),

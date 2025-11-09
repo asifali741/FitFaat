@@ -1,34 +1,30 @@
-import { StyleSheet, Text, View } from "react-native";
+import BlueLoader from "@/components/common/BlueLoader";
+import { useAuth, useUser } from "@clerk/clerk-expo";
+import { useRouter } from "expo-router";
+import { useEffect } from "react";
 
 export default function Page() {
-  return (
-    <View style={styles.container}>
-      <View style={styles.main}>
-        <Text style={styles.title}>Hello World</Text>
-        <Text style={styles.subtitle}>This is the first page of your app.</Text>
-      </View>
-    </View>
-  );
+  const { isSignedIn, isLoaded } = useAuth();
+  const { user } = useUser();
+  const router = useRouter();
+  
+  // Immediately redirect if auth is loaded
+  useEffect(() => {
+    if (isLoaded) {
+      if (isSignedIn && user) {
+        const hasCompletedOnboarding = user.unsafeMetadata?.hasCompletedOnboarding;
+        if (hasCompletedOnboarding) {
+          router.replace("/(main)/(dashboard)");
+        } else {
+          router.replace("/DietSection");
+        }
+      } else {
+        router.replace("/(auth)");
+      }
+    }
+  }, [isLoaded, isSignedIn, user]);
+  
+  // Show blue loader while auth loads
+  return <BlueLoader fullScreen text="Loading..." />;
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: "center",
-    padding: 24,
-  },
-  main: {
-    flex: 1,
-    justifyContent: "center",
-    maxWidth: 960,
-    marginHorizontal: "auto",
-  },
-  title: {
-    fontSize: 64,
-    fontWeight: "bold",
-  },
-  subtitle: {
-    fontSize: 36,
-    color: "#38434D",
-  },
-});

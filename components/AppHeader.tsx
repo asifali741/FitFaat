@@ -6,6 +6,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
 import { useTheme } from '@/contexts/ThemeContext';
 import { HEADER_PADDING_HORIZONTAL, HEADER_PADDING_VERTICAL } from '@/constants/ui';
+import AnimatedButton, { AnimatedBackButton, AnimatedIconButton } from '@/components/common/AnimatedButton';
 
 interface AppHeaderProps {
   title: string;
@@ -15,6 +16,7 @@ interface AppHeaderProps {
   totalSteps?: number;
   onBackPress?: () => void;
   showMenuButton?: boolean;
+  rightComponent?: React.ReactNode;
 }
 
 export default function AppHeader({
@@ -25,6 +27,7 @@ export default function AppHeader({
   totalSteps = 6,
   onBackPress,
   showMenuButton = true,
+  rightComponent,
 }: AppHeaderProps) {
   const navigation = useNavigation();
   const router = useRouter();
@@ -47,25 +50,27 @@ export default function AppHeader({
       {/* Top Bar */}
       <View style={[styles.topBar, { backgroundColor: colors.primary }]}>
         {showMenuButton ? (
-          <TouchableOpacity 
+          <AnimatedIconButton
             style={styles.menuButton}
             onPress={openDrawer}
           >
             <Ionicons name="menu" size={24} color={colors.textOnPrimary} />
-          </TouchableOpacity>
+          </AnimatedIconButton>
         ) : (
           <View style={styles.spacer} />
         )}
         
         <Text style={[styles.title, { color: colors.textOnPrimary }]}>{title}</Text>
         
-        {showBackButton ? (
-          <TouchableOpacity 
+        {rightComponent ? (
+          rightComponent
+        ) : showBackButton ? (
+          <AnimatedBackButton
             style={styles.backButton}
             onPress={handleBackPress}
           >
             <Ionicons name="arrow-back" size={24} color={colors.textOnPrimary} />
-          </TouchableOpacity>
+          </AnimatedBackButton>
         ) : (
           <View style={styles.spacer} />
         )}
