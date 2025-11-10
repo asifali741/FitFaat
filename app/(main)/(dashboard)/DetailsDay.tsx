@@ -14,6 +14,8 @@ import { Audio } from 'expo-av';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { HEADER_PADDING_HORIZONTAL, HEADER_PADDING_VERTICAL } from '@/constants/ui';
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
+import { useFonts } from 'expo-font';
+import { Text as SvgText } from "react-native-svg";
 interface ProgressCircleProps {
   achievedCalories: number;
   targetCalories: number;
@@ -29,6 +31,12 @@ export default function DetailsDay () {
     const { selectedDay  } = useLocalSearchParams<{ selectedDay : string }>();
     const router = useRouter();
     const props: typeDay = JSON.parse(selectedDay )
+    
+    const [fontsLoaded] = useFonts({
+        LoraRegular: require("../../../assets/fonts/static/Lora-Regular.ttf"),
+        LoraBold: require("../../../assets/fonts/static/Lora-Bold.ttf"),
+        LoraSemiBold: require("../../../assets/fonts/static/Lora-SemiBold.ttf"),
+    });
     function getDate(){
         let currentTime = Date.now()
         const oldTime = new Date(props.duration*1000).getTime()
@@ -96,7 +104,12 @@ export default function DetailsDay () {
       withSpring(-5, { damping: 10, stiffness: 400 }),
       withSpring(0, { damping: 10, stiffness: 400 })
     );
-    setTimeout(openMenu, 200);
+    setTimeout(() => {
+      router.push({
+        pathname: '/(main)/(dashboard)/TrackMeal',
+        params: { dayNo: props.dayNo.toString(), date: props.date }
+      });
+    }, 200);
   };
   
   // Submit button animation - cool success effect
@@ -276,6 +289,11 @@ export default function DetailsDay () {
         );
     };
     const styles = useMemo(() => getStyles(colors), [colors]);
+    
+    if (!fontsLoaded) {
+        return null;
+    }
+    
     //output
     return (
   <View style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom, backgroundColor: colors.screenColor }}>
@@ -886,7 +904,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     dayNumber: {
         fontSize: 20,
-        fontWeight: 'bold',
+        fontFamily: 'LoraBold',
         color: 'white',
     },
     dateInfo: {
@@ -894,12 +912,12 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     dayLabel: {
         fontSize: 20,
-        fontWeight: '700',
+        fontFamily: 'LoraBold',
         color: colors.textPrimary,
     },
     date: {
         fontSize: 14,
-        fontWeight: '500',
+        fontFamily: 'LoraRegular',
         color: colors.textSecondary,
         marginTop: 2,
     },
@@ -946,6 +964,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     remarksText: {
         fontSize: Math.min(hp(1.6), wp(3.8)),
+        fontFamily: 'LoraRegular',
         fontStyle: 'italic',
         color: colors.textPrimary,
         textAlign: 'center',
@@ -1007,7 +1026,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     statLabel: {
         fontSize: Math.min(hp(1.3), wp(3)),
-        fontWeight: '600',
+        fontFamily: 'LoraSemiBold',
         color: colors.textSecondary,
         marginTop: hp(0.3),
         marginBottom: hp(0.3),
@@ -1016,17 +1035,18 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     statValue: {
         fontSize: Math.min(hp(2.2), wp(5.2)),
-        fontWeight: 'bold',
+        fontFamily: 'LoraBold',
         color: colors.textPrimary,
         marginBottom: hp(0.1),
     },
     statValueLarge: {
         fontSize: Math.min(hp(1.8), wp(4.2)),
-        fontWeight: 'bold',
+        fontFamily: 'LoraBold',
         color: colors.textPrimary,
     },
     statUnit: {
         fontSize: Math.min(hp(1.1), wp(2.5)),
+        fontFamily: 'LoraRegular',
         color: colors.textSecondary,
         marginBottom: hp(0.2),
     },
@@ -1039,6 +1059,7 @@ const getStyles = (colors: any) => StyleSheet.create({
         backgroundColor: colors.cardBackground,
         color: colors.textPrimary,
         fontSize: 16,
+        fontFamily: 'LoraRegular',
     },
     trayButton: {
         flexDirection: 'row',
@@ -1061,7 +1082,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     trayButtonText: {
         color: '#fff',
         fontSize: Math.min(hp(1.8), wp(4.2)),
-        fontWeight: '700',
+        fontFamily: 'LoraBold',
     },
     congratsContainer: {
         backgroundColor: colors.success + '15',
@@ -1076,13 +1097,14 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     congratsTitle: {
         fontSize: Math.min(hp(2.2), wp(5.5)),
-        fontWeight: 'bold',
+        fontFamily: 'LoraBold',
         color: colors.success,
         marginTop: hp(1),
         marginBottom: hp(0.5),
     },
     congratsText: {
         fontSize: Math.min(hp(1.6), wp(3.8)),
+        fontFamily: 'LoraRegular',
         color: colors.textPrimary,
         textAlign: 'center',
         lineHeight: Math.min(hp(2.2), wp(5)),
@@ -1111,7 +1133,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     progressLabel: {
         fontSize: Math.min(hp(1.5), wp(3.5)),
-        fontWeight: '600',
+        fontFamily: 'LoraSemiBold',
         color: colors.textPrimary,
     },
     progressBarContainer: {
@@ -1127,7 +1149,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     progressPercentage: {
         fontSize: Math.min(hp(1.8), wp(4.2)),
-        fontWeight: 'bold',
+        fontFamily: 'LoraBold',
         color: colors.textPrimary,
         textAlign: 'right',
     },
@@ -1174,12 +1196,13 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     menuTitle: {
         fontSize: Math.min(hp(2.8), wp(6.5)),
-        fontWeight: "700",
+        fontFamily: 'LoraBold',
         marginTop: hp(0.8),
         color: colors.textPrimary,
     },
     menuSubtitle: {
         fontSize: Math.min(hp(1.6), wp(3.8)),
+        fontFamily: 'LoraRegular',
         color: colors.textSecondary,
         marginTop: hp(0.4),
     },
@@ -1193,7 +1216,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     label: {
         fontSize: Math.min(hp(1.8), wp(4.2)),
-        fontWeight: "600",
+        fontFamily: 'LoraSemiBold',
         marginLeft: wp(2),
         color: colors.textPrimary,
     },
@@ -1207,7 +1230,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     sectionTitle: {
         fontSize: Math.min(hp(1.8), wp(4.2)),
-        fontWeight: "600",
+        fontFamily: 'LoraSemiBold',
         color: colors.textPrimary,
         marginBottom: hp(1),
     },
@@ -1233,7 +1256,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     inputMethodText: {
         fontSize: Math.min(hp(1.6), wp(3.6)),
-        fontWeight: "600",
+        fontFamily: 'LoraSemiBold',
         color: colors.textPrimary,
         marginTop: hp(0.3),
     },
@@ -1252,6 +1275,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     audioInstructions: {
         fontSize: Math.min(hp(1.8), wp(4.2)),
+        fontFamily: 'LoraRegular',
         color: colors.textSecondary,
         textAlign: 'center',
         marginBottom: hp(3),
@@ -1307,7 +1331,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     recordingText: {
         fontSize: Math.min(hp(1.6), wp(3.8)),
-        fontWeight: '600',
+        fontFamily: 'LoraSemiBold',
         color: '#FF3B30',
     },
     audioPreview: {
@@ -1330,7 +1354,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     audioPreviewText: {
         color: colors.success,
-        fontWeight: '600',
+        fontFamily: 'LoraSemiBold',
         fontSize: Math.min(hp(1.7), wp(4)),
     },
     clearButton: {
@@ -1345,6 +1369,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     photoInstructions: {
         fontSize: Math.min(hp(1.7), wp(4)),
+        fontFamily: 'LoraRegular',
         color: colors.textSecondary,
         textAlign: 'center',
         marginBottom: hp(2),
@@ -1368,7 +1393,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     photoButtonText: {
         fontSize: Math.min(hp(1.6), wp(3.6)),
-        fontWeight: '500',
+        fontFamily: 'LoraRegular',
         color: colors.textPrimary,
     },
     photoPreview: {
@@ -1384,15 +1409,16 @@ const getStyles = (colors: any) => StyleSheet.create({
     photoPreviewText: {
         flex: 1,
         color: colors.success,
-        fontWeight: '500',
+        fontFamily: 'LoraRegular',
     },
     clearText: {
         color: colors.error,
-        fontWeight: '600',
+        fontFamily: 'LoraSemiBold',
         fontSize: 14,
     },
     optionalLabel: {
         fontSize: 14,
+        fontFamily: 'LoraRegular',
         color: colors.textSecondary,
         marginBottom: 8,
     },
@@ -1424,7 +1450,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     backMenuText: {
         color: colors.primary,
-        fontWeight: "600",
+        fontFamily: 'LoraSemiBold',
         fontSize: Math.min(hp(1.8), wp(4.2)),
     },
     submitMenuButton: {
@@ -1443,7 +1469,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     submitMenuText: {
         color: "#fff",
-        fontWeight: "700",
+        fontFamily: 'LoraBold',
         fontSize: Math.min(hp(1.8), wp(4.2)),
     },
     submitSuccessOverlay: {
@@ -1463,6 +1489,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     timePickerText: {
         fontSize: 16,
+        fontFamily: 'LoraRegular',
         color: colors.textPrimary,
     },
     timeDoneButton: {
@@ -1475,7 +1502,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     timeDoneText: {
         color: 'white',
-        fontWeight: '600',
+        fontFamily: 'LoraSemiBold',
         fontSize: 16,
     },
 
@@ -1520,25 +1547,45 @@ const ProgressCircle = (CircleProps: ProgressCircleProps) =>{
     },[CircleProps.achieviedHydration])
     /**---------------------------------------------------------------------------------------- */
     
+    // Calculate overall percentage
+    const overallPercentage = Math.round(
+        ((CircleProps.achievedCalories + CircleProps.achieviedHydration) / 
+         (CircleProps.targetCalories + CircleProps.targetHydration)) * 100
+    );
+    
     return(
         //<View style={{ width: "80%", aspectRatio: 1, alignSelf: "center" }}>
-        <Svg width="100%" height={'100%'} viewBox="0 0 120 120" style={{ maxWidth: 200, alignSelf: "center"}}>
-        {/* Background circle of Calories */}
-        <Circle  cx="60"  cy="60"  r={outerRadius}
-                stroke="#E5E7EB"  strokeWidth="10"  fill="transparent"/>
-        {/* Calories progress */}
-        <AnimatedCircle  cx="60" cy="60" r={outerRadius}
-            stroke={colorsSheet.progressBarColor}  strokeWidth="10"  fill="transparent"
-            strokeDasharray={outerCircumference} //total
-            animatedProps={animatedCalProps}
-            strokeLinecap="round"transform= "rotate(-90 60 60)" />
-        {/* Hydration Circcle */}
-        <AnimatedCircle cx="60" cy="60" r={innerRadius}
-            stroke="#3B82F6"  strokeWidth="10" fill="transparent"
-            strokeDasharray={innerCircumference} 
-            animatedProps={animatedHydrationProps}
-            strokeLinecap="round" transform="rotate(-90 60 60)"/> 
-        </Svg>
+        <View style={{ position: 'relative', width: 120, height: 120, alignItems: 'center', justifyContent: 'center' }}>
+            <Svg width="100%" height={'100%'} viewBox="0 0 120 120" style={{ position: 'absolute' }}>
+                {/* Background circle of Calories */}
+                <Circle  cx="60"  cy="60"  r={outerRadius}
+                        stroke="#E5E7EB"  strokeWidth="10"  fill="transparent"/>
+                {/* Calories progress */}
+                <AnimatedCircle  cx="60" cy="60" r={outerRadius}
+                    stroke={colorsSheet.progressBarColor}  strokeWidth="10"  fill="transparent"
+                    strokeDasharray={outerCircumference} //total
+                    animatedProps={animatedCalProps}
+                    strokeLinecap="round"transform= "rotate(-90 60 60)" />
+                {/* Hydration Circcle */}
+                <AnimatedCircle cx="60" cy="60" r={innerRadius}
+                    stroke="#3B82F6"  strokeWidth="10" fill="transparent"
+                    strokeDasharray={innerCircumference} 
+                    animatedProps={animatedHydrationProps}
+                    strokeLinecap="round" transform="rotate(-90 60 60)"/> 
+            </Svg>
+            {/* Percentage Text in Center */}
+            <View style={{ 
+                position: 'absolute', 
+                width: 120, 
+                height: 120, 
+                alignItems: 'center', 
+                justifyContent: 'center' 
+            }}>
+                <Text style={{ fontSize: 24, fontFamily: 'LoraBold', color: colorsSheet.progressBarColor }}>
+                    {overallPercentage}%
+                </Text>
+            </View>
+        </View>
             //</View>
     )
 }

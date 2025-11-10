@@ -24,6 +24,8 @@ export default function Index() {
     Pacifico: require("../../assets/fonts/Pacifico-Regular.ttf"),
     LoraItalic: require("../../assets/fonts/static/Lora-Italic.ttf"),
     LoraRegular: require("../../assets/fonts/static/Lora-Regular.ttf"),
+    LoraBold: require("../../assets/fonts/static/Lora-Bold.ttf"),
+    LoraSemiBold: require("../../assets/fonts/static/Lora-SemiBold.ttf"),
   });
 
   const iRef = useRef(0); // <-- useRef to persist value
@@ -155,14 +157,14 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
     color: colors.textPrimary,
   },
   logoStyle: {
-    width: Math.min(wp(20), 100),
-    height: Math.min(hp(8), 80),
+    width: 50,
+    height: 50,
     marginLeft: wp(2),
     resizeMode: "contain",
   },
   paragraphText: {
     textAlign: "center",
-    fontFamily: "LoraItalic",
+    fontFamily: "LoraRegular",
     fontSize: Math.min(hp(1.8), 16),
     color: colors.textSecondary,
     lineHeight: Math.min(hp(2.6), 24),
@@ -197,7 +199,7 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   },
   googleButtonText: {
     fontSize: Math.min(hp(2), 16),
-    fontWeight: "600",
+    fontFamily: "LoraSemiBold",
     color: isDarkMode ? colors.textPrimary : "#1F2937",
     flexShrink: 1,
   },
@@ -214,8 +216,8 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   dividerText: {
     marginHorizontal: 16,
     fontSize: Math.min(hp(1.8), 14),
+    fontFamily: "LoraRegular",
     color: colors.textSecondary,
-    fontWeight: "500",
   },
   emailButton: {
     backgroundColor: colors.primary,
@@ -233,7 +235,7 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   },
   emailButtonText: {
     fontSize: Math.min(hp(2), 16),
-    fontWeight: "700",
+    fontFamily: "LoraBold",
     color: "#FFFFFF",
   },
   signupButton: {
@@ -248,7 +250,7 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   },
   signupButtonText: {
     fontSize: Math.min(hp(2), 16),
-    fontWeight: "700",
+    fontFamily: "LoraBold",
     color: colors.primary,
   },
 });

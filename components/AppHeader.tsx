@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: hp(2.5),
-    fontWeight: 'bold',
+    fontWeight: '700',
     flex: 1,
     textAlign: 'center',
   },
