@@ -53,6 +53,11 @@ router.post(
 // @access  Private
 router.get('/status', protect, getDoctorStatus);
 
+// @route   GET /api/doctors/approved
+// @desc    Get all approved doctors for booking (public)
+// @access  Public
+router.get('/approved', getAllDoctors);
+
 // @route   GET /api/doctors/all
 // @desc    Get all doctors (admin)
 // @access  Private/Admin

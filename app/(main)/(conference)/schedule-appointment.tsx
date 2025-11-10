@@ -2,48 +2,19 @@ import AppHeader from "@/components/AppHeader";
 import CountdownTimer from "@/components/CountdownTimer";
 import { useAppointments } from "@/contexts/AppointmentContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { authApi } from "@/utils/auth/authApi";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
 //import { colorsSheet } from "../(settings)/ui_elements";
 
-// Mock data for doctors
-const mockDoctors = [
-  {
-    id: 1,
-    name: "Dr. Sarah Johnson",
-    specialty: "General Medicine",
-    experience: "8 years",
-    fee: "$50",
-    rating: 4.8,
-    availableSlots: ["09:00 AM", "10:30 AM", "02:00 PM", "03:30 PM"]
-  },
-  {
-    id: 2,
-    name: "Dr. Michael Chen",
-    specialty: "Cardiology",
-    experience: "12 years",
-    fee: "$75",
-    rating: 4.9,
-    availableSlots: ["09:30 AM", "11:00 AM", "01:30 PM", "04:00 PM"]
-  },
-  {
-    id: 3,
-    name: "Dr. Emily Rodriguez",
-    specialty: "Dermatology",
-    experience: "6 years",
-    fee: "$60",
-    rating: 4.7,
-    availableSlots: ["10:00 AM", "11:30 AM", "02:30 PM", "03:00 PM"]
-  }
-];
-
 export default function ScheduleAppointmentScreen() {
   const router = useRouter();
   const { addAppointment } = useAppointments();
+  const { colors } = useTheme();
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
@@ -51,8 +22,47 @@ export default function ScheduleAppointmentScreen() {
   const [problemDescription, setProblemDescription] = useState("");
   const [appointmentTime, setAppointmentTime] = useState<Date | null>(null);
   const [canStartCall, setCanStartCall] = useState(false);
-  const { colors } = useTheme();
+  const [doctors, setDoctors] = useState<any[]>([]);
+  const [isLoadingDoctors, setIsLoadingDoctors] = useState(true);
+  const [doctorError, setDoctorError] = useState<string | null>(null);
+  
   const styles = useMemo(() => getStyles(colors), [colors]);
+
+  // Fetch approved doctors when component mounts
+  useEffect(() => {
+    fetchApprovedDoctors();
+  }, []);
+
+  const fetchApprovedDoctors = async () => {
+    setIsLoadingDoctors(true);
+    setDoctorError(null);
+    try {
+      const response = await authApi.getApprovedDoctors();
+      const approvedDoctors = response.doctors || [];
+      
+      // Transform doctor data to include required fields for display
+      const formattedDoctors = approvedDoctors.map((doctor: any) => ({
+        id: doctor._id,
+        name: `${doctor.personalInfo.firstName} ${doctor.personalInfo.lastName}`,
+        specialty: doctor.professionalInfo.specialization,
+        experience: `${doctor.professionalInfo.yearsOfExperience} years`,
+        fee: doctor.jobInfo.consultationFee ? `$${doctor.jobInfo.consultationFee}` : "$0",
+        rating: 4.8, // Default rating (can be added to doctor model later)
+        availableSlots: doctor.jobInfo.consultationMode || ["09:00 AM", "10:30 AM", "02:00 PM", "03:30 PM"],
+        consultationMode: doctor.jobInfo.consultationMode,
+        phoneNumber: doctor.personalInfo.phoneNumber
+      }));
+      
+      setDoctors(formattedDoctors);
+    } catch (error: any) {
+      console.error('Failed to fetch doctors:', error);
+      setDoctorError('Failed to load registered doctors. Using demo data.');
+      // Set empty array instead of mock data
+      setDoctors([]);
+    } finally {
+      setIsLoadingDoctors(false);
+    }
+  };
   
 
   const handleDateSelection = (date: string) => {
@@ -242,36 +252,60 @@ export default function ScheduleAppointmentScreen() {
   const renderDoctorSelection = () => (
     <View style={styles.stepContent}>
       <Text style={styles.stepTitle}>Available Doctors</Text>
-      <Text style={styles.stepSubtitle}>Select a doctor for your consultation</Text>
+      <Text style={styles.stepSubtitle}>Select a registered doctor for your consultation</Text>
       
-      <ScrollView style={styles.doctorList}>
-        {mockDoctors.map((doctor) => (
-          <TouchableOpacity
-            key={doctor.id}
-            style={styles.doctorCard}
-            onPress={() => handleDoctorSelection(doctor)}
+      {isLoadingDoctors ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading registered doctors...</Text>
+        </View>
+      ) : doctorError ? (
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle" size={32} color={colors.error} />
+          <Text style={styles.errorText}>{doctorError}</Text>
+          <TouchableOpacity 
+            style={styles.retryButton}
+            onPress={fetchApprovedDoctors}
           >
-            <View style={styles.doctorInfo}>
-              <View style={styles.doctorAvatar}>
-                <Ionicons name="person" size={24} color={colors.primary} />
-              </View>
-              <View style={styles.doctorDetails}>
-                <Text style={styles.doctorName}>{doctor.name}</Text>
-                <Text style={styles.doctorSpecialty}>{doctor.specialty}</Text>
-                <Text style={styles.doctorExperience}>{doctor.experience} experience</Text>
-                <View style={styles.doctorRating}>
-                  <Ionicons name="star" size={16} color={colors.warning} />
-                  <Text style={styles.ratingText}>{doctor.rating}</Text>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : doctors.length === 0 ? (
+        <View style={styles.noDoctorsContainer}>
+          <Ionicons name="person-remove" size={32} color={colors.textSecondary} />
+          <Text style={styles.noDoctorsText}>No registered doctors available at the moment</Text>
+          <Text style={styles.noDoctorsSubtext}>Please try again later</Text>
+        </View>
+      ) : (
+        <ScrollView style={styles.doctorList}>
+          {doctors.map((doctor: any) => (
+            <TouchableOpacity
+              key={doctor.id}
+              style={styles.doctorCard}
+              onPress={() => handleDoctorSelection(doctor)}
+            >
+              <View style={styles.doctorInfo}>
+                <View style={styles.doctorAvatar}>
+                  <Ionicons name="person" size={24} color={colors.primary} />
+                </View>
+                <View style={styles.doctorDetails}>
+                  <Text style={styles.doctorName}>{doctor.name}</Text>
+                  <Text style={styles.doctorSpecialty}>{doctor.specialty}</Text>
+                  <Text style={styles.doctorExperience}>{doctor.experience} experience</Text>
+                  <View style={styles.doctorRating}>
+                    <Ionicons name="star" size={16} color={colors.warning} />
+                    <Text style={styles.ratingText}>{doctor.rating}</Text>
+                  </View>
+                </View>
+                <View style={styles.doctorFee}>
+                  <Text style={styles.feeText}>{doctor.fee}</Text>
+                  <Text style={styles.feeLabel}>per session</Text>
                 </View>
               </View>
-              <View style={styles.doctorFee}>
-                <Text style={styles.feeText}>{doctor.fee}</Text>
-                <Text style={styles.feeLabel}>per session</Text>
-              </View>
-            </View>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
     </View>
   );
 
@@ -713,5 +747,57 @@ const getStyles = (colors: any) => StyleSheet.create({  container: {
     fontSize: Math.min(hp(1.6), wp(4)),
     color: colors.textSecondary,
     marginBottom: hp(0.5),
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: hp(10),
+  },
+  loadingText: {
+    fontSize: Math.min(hp(1.8), wp(4.5)),
+    color: colors.textSecondary,
+    marginTop: hp(2),
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: hp(10),
+  },
+  errorText: {
+    fontSize: Math.min(hp(1.8), wp(4.5)),
+    color: colors.error,
+    marginTop: hp(2),
+    textAlign: "center",
+  },
+  retryButton: {
+    marginTop: hp(2),
+    backgroundColor: colors.primary,
+    paddingHorizontal: wp(6),
+    paddingVertical: hp(1.2),
+    borderRadius: 10,
+  },
+  retryButtonText: {
+    color: colors.textOnPrimary,
+    fontSize: Math.min(hp(1.6), wp(4)),
+    fontWeight: "600",
+  },
+  noDoctorsContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: hp(10),
+  },
+  noDoctorsText: {
+    fontSize: Math.min(hp(1.8), wp(4.5)),
+    color: colors.textSecondary,
+    marginTop: hp(2),
+    textAlign: "center",
+  },
+  noDoctorsSubtext: {
+    fontSize: Math.min(hp(1.6), wp(4)),
+    color: colors.textSecondary,
+    marginTop: hp(1),
   },
 });

@@ -155,4 +155,14 @@ export const authApi = {
       throw error.response?.data || error.message;
     }
   },
+
+  // Get approved doctors for booking
+  getApprovedDoctors: async () => {
+    try {
+      const response = await api.get('/doctors/approved');
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || error.message;
+    }
+  },
 };

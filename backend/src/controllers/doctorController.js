@@ -164,20 +164,25 @@ export const getDoctorStatus = async (req, res) => {
   }
 };
 
-// @desc    Get all doctors (admin)
+// @desc    Get all doctors (admin) or approved doctors (public)
 // @route   GET /api/doctors
-// @access  Private/Admin
+// @access  Private/Admin or Public
 export const getAllDoctors = async (req, res) => {
   try {
     const { status, page = 1, limit = 10 } = req.query;
 
     let query = {};
-    if (status) {
+    
+    // If user is not authenticated (public request), only show approved doctors
+    if (!req.user) {
+      query.status = 'approved';
+    } else if (status) {
+      // Admin can filter by status
       query.status = status;
     }
 
     const doctors = await Doctor.find(query)
-      .select('-verificationDocuments')
+      .select('-verificationDocuments -adminNotes')
       .limit(limit * 1)
       .skip((page - 1) * limit)
       .sort({ submittedAt: -1 });
