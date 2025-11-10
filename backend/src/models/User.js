@@ -101,8 +101,46 @@ const userSchema = new mongoose.Schema({
     bmi: {
       type: Number
     }
-  }
+  },
+  // Appointments booked by this user with doctors
+  appointmentsBooked: [
+    {
+      doctorId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Doctor',
+        required: true
+      },
+      date: {
+        type: Date,
+        required: true
+      },
+      time: {
+        type: String,
+        required: true
+      },
+      status: {
+        type: String,
+        enum: ['pending', 'confirmed', 'completed', 'cancelled'],
+        default: 'pending'
+      },
+      price: {
+        type: Number,
+        required: true
+      },
+      description: {
+        type: String
+      },
+      bookedAt: {
+        type: Date,
+        default: Date.now
+      }
+    }
+  ]
 });
+
+// Create indexes for faster appointment conflict checking
+userSchema.index({ 'appointmentsBooked.date': 1, 'appointmentsBooked.time': 1 });
+userSchema.index({ 'appointmentsBooked.doctorId': 1 });
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {

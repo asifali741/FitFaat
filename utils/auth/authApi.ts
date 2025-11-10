@@ -165,4 +165,50 @@ export const authApi = {
       throw error.response?.data || error.message;
     }
   },
+
+  // Book an appointment with a doctor
+  bookAppointment: async (appointmentData: {
+    doctorId: string;
+    date: string;
+    time: string;
+    price: number;
+    description?: string;
+  }) => {
+    try {
+      const response = await api.post('/appointments/book', appointmentData);
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Get user's appointments
+  getUserAppointments: async () => {
+    try {
+      const response = await api.get('/appointments/my-appointments');
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Get doctor's booked appointments
+  getDoctorAppointments: async (doctorId: string) => {
+    try {
+      const response = await api.get(`/appointments/doctor/${doctorId}`);
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Cancel an appointment
+  cancelAppointment: async (appointmentId: string, reason?: string) => {
+    try {
+      const response = await api.put(`/appointments/${appointmentId}/cancel`, { reason });
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || error.message;
+    }
+  },
 };
