@@ -4,6 +4,8 @@ import express from 'express';
 import mongoose from 'mongoose';
 import morgan from 'morgan';
 import { errorHandler } from './middleware/error.js';
+import adminRoutes from './routes/admin.js';
+import adminAuthRoutes from './routes/adminAuth.js';
 import appointmentRoutes from './routes/appointments.js';
 import authRoutes from './routes/auth.js';
 import dietPlanRoutes from './routes/dietPlan.js';
@@ -23,10 +25,12 @@ app.use(express.json());
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/admin-auth', adminAuthRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/diet-plan', dietPlanRoutes);
 app.use('/api/doctors', doctorRoutes);
 app.use('/api/appointments', appointmentRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Error handler
 app.use(errorHandler);
