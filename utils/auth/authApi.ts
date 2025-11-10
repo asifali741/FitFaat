@@ -136,4 +136,23 @@ export const authApi = {
       throw error.response?.data || error.message;
     }
   },
+
+  // Doctor Registration API
+  submitDoctorRegistration: async (doctorData: any) => {
+    try {
+      const response = await api.post('/doctors/register', doctorData);
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  getDoctorStatus: async () => {
+    try {
+      const response = await api.get('/doctors/status');
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || error.message;
+    }
+  },
 };

@@ -6,6 +6,7 @@ import morgan from 'morgan';
 import { errorHandler } from './middleware/error.js';
 import authRoutes from './routes/auth.js';
 import dietPlanRoutes from './routes/dietPlan.js';
+import doctorRoutes from './routes/doctors.js';
 import userRoutes from './routes/user.js';
 
 // Load env vars
@@ -23,6 +24,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/diet-plan', dietPlanRoutes);
+app.use('/api/doctors', doctorRoutes);
 
 // Error handler
 app.use(errorHandler);
