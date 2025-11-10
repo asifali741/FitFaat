@@ -318,6 +318,54 @@
   color: white;
 }
 
+.verify-button {
+  padding: 10px 20px;
+  background: #cfe2ff;
+  color: #084298;
+  border: 2px solid #084298;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.verify-button:hover {
+  background: #084298;
+  color: white;
+}
+
+.unverify-button {
+  padding: 10px 20px;
+  background: #fff3cd;
+  color: #997404;
+  border: 2px solid #997404;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.unverify-button:hover {
+  background: #997404;
+  color: white;
+}
+
+.block-button {
+  padding: 10px 20px;
+  background: #f5c6cb;
+  color: #842029;
+  border: 2px solid #842029;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.block-button:hover {
+  background: #842029;
+  color: white;
+}
+
 .close-modal-button {
   padding: 10px 20px;
   background: #e0e0e0;

@@ -407,6 +407,138 @@ export const suspendDoctor = async (req, res) => {
   }
 };
 
+// @route   PUT /api/admin/doctors/:id/verify
+// @desc    Verify a doctor
+// @access  Private (Admin only)
+export const verifyDoctor = async (req, res) => {
+  try {
+    const doctor = await Doctor.findByIdAndUpdate(
+      req.params.id,
+      { isVerified: true },
+      { new: true }
+    );
+
+    if (!doctor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Doctor not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Doctor verified successfully',
+      data: doctor
+    });
+  } catch (error) {
+    console.error('Verify doctor error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error verifying doctor'
+    });
+  }
+};
+
+// @route   PUT /api/admin/doctors/:id/unverify
+// @desc    Unverify a doctor
+// @access  Private (Admin only)
+export const unverifyDoctor = async (req, res) => {
+  try {
+    const doctor = await Doctor.findByIdAndUpdate(
+      req.params.id,
+      { isVerified: false },
+      { new: true }
+    );
+
+    if (!doctor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Doctor not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Doctor unverified successfully',
+      data: doctor
+    });
+  } catch (error) {
+    console.error('Unverify doctor error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error unverifying doctor'
+    });
+  }
+};
+
+// @route   PUT /api/admin/doctors/:id/block
+// @desc    Block/unblock a doctor
+// @access  Private (Admin only)
+export const blockDoctor = async (req, res) => {
+  try {
+    const { isBlocked } = req.body;
+    
+    const doctor = await Doctor.findByIdAndUpdate(
+      req.params.id,
+      { isBlocked: isBlocked || true },
+      { new: true }
+    );
+
+    if (!doctor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Doctor not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Doctor ${isBlocked ? 'blocked' : 'unblocked'} successfully`,
+      data: doctor
+    });
+  } catch (error) {
+    console.error('Block doctor error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error blocking doctor'
+    });
+  }
+};
+
+// @route   PUT /api/admin/users/:id/block
+// @desc    Block/unblock a user
+// @access  Private (Admin only)
+export const blockUser = async (req, res) => {
+  try {
+    const { isActive } = req.body;
+    
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { isActive: isActive !== false },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `User ${isActive === false ? 'blocked' : 'unblocked'} successfully`,
+      data: user
+    });
+  } catch (error) {
+    console.error('Block user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error blocking user'
+    });
+  }
+};
+
 // @route   GET /api/admin/statistics
 // @desc    Get admin dashboard statistics
 // @access  Private (Admin only)

@@ -248,6 +248,38 @@
   background: #d0d0d0;
 }
 
+.block-button {
+  padding: 10px 20px;
+  background: #f5c6cb;
+  color: #842029;
+  border: 2px solid #842029;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.block-button:hover {
+  background: #842029;
+  color: white;
+}
+
+.unblock-button {
+  padding: 10px 20px;
+  background: #d4edda;
+  color: #155724;
+  border: 2px solid #155724;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.unblock-button:hover {
+  background: #155724;
+  color: white;
+}
+
 @media (max-width: 768px) {
   .list-header {
     flex-direction: column;

@@ -65,6 +65,57 @@ function DoctorsList({ token, apiUrl }) {
     }
   };
 
+  const handleVerifyDoctor = async (doctorId) => {
+    try {
+      const response = await axios.put(
+        `${apiUrl}/admin/doctors/${doctorId}/verify`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.data.success) {
+        fetchDoctors();
+        setSelectedDoctor(null);
+      }
+    } catch (err) {
+      alert('Failed to verify doctor');
+      console.error(err);
+    }
+  };
+
+  const handleUnverifyDoctor = async (doctorId) => {
+    try {
+      const response = await axios.put(
+        `${apiUrl}/admin/doctors/${doctorId}/unverify`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.data.success) {
+        fetchDoctors();
+        setSelectedDoctor(null);
+      }
+    } catch (err) {
+      alert('Failed to unverify doctor');
+      console.error(err);
+    }
+  };
+
+  const handleBlockDoctor = async (doctorId, block = true) => {
+    try {
+      const response = await axios.put(
+        `${apiUrl}/admin/doctors/${doctorId}/block`,
+        { isBlocked: block },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.data.success) {
+        fetchDoctors();
+        setSelectedDoctor(null);
+      }
+    } catch (err) {
+      alert(`Failed to ${block ? 'block' : 'unblock'} doctor`);
+      console.error(err);
+    }
+  };
+
   const filteredDoctors = doctors.filter(doctor => {
     const matchesSearch =
       doctor.personalInfo?.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -301,15 +352,40 @@ function DoctorsList({ token, apiUrl }) {
                 <>
                   <button
                     className="approve-button"
-                    onClick={() => handleApproveDoctor(selectedDoctor._id)}
+                    onClick={() => handleApproveDoctor(selectedDoctor.id)}
                   >
                     ✓ Approve
                   </button>
                   <button
                     className="reject-button"
-                    onClick={() => handleRejectDoctor(selectedDoctor._id)}
+                    onClick={() => handleRejectDoctor(selectedDoctor.id)}
                   >
                     ✕ Reject
+                  </button>
+                </>
+              )}
+              {selectedDoctor.status === 'approved' && (
+                <>
+                  {!selectedDoctor.isVerified ? (
+                    <button
+                      className="verify-button"
+                      onClick={() => handleVerifyDoctor(selectedDoctor.id)}
+                    >
+                      ✓ Verify
+                    </button>
+                  ) : (
+                    <button
+                      className="unverify-button"
+                      onClick={() => handleUnverifyDoctor(selectedDoctor.id)}
+                    >
+                      ✕ Unverify
+                    </button>
+                  )}
+                  <button
+                    className="block-button"
+                    onClick={() => handleBlockDoctor(selectedDoctor.id, true)}
+                  >
+                    🚫 Block
                   </button>
                 </>
               )}

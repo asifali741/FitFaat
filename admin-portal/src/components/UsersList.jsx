@@ -30,6 +30,23 @@ function UsersList({ token, apiUrl }) {
     }
   };
 
+  const handleBlockUser = async (userId, block = true) => {
+    try {
+      const response = await axios.put(
+        `${apiUrl}/admin/users/${userId}/block`,
+        { isActive: !block },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.data.success) {
+        fetchUsers();
+        setSelectedUser(null);
+      }
+    } catch (err) {
+      alert(`Failed to ${block ? 'block' : 'unblock'} user`);
+      console.error(err);
+    }
+  };
+
   const filteredUsers = users.filter(user =>
     user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.username.toLowerCase().includes(searchTerm.toLowerCase())
@@ -154,6 +171,21 @@ function UsersList({ token, apiUrl }) {
             </div>
 
             <div className="modal-footer">
+              {selectedUser.status === 'Active' ? (
+                <button
+                  className="block-button"
+                  onClick={() => handleBlockUser(selectedUser.id, true)}
+                >
+                  🚫 Block User
+                </button>
+              ) : (
+                <button
+                  className="unblock-button"
+                  onClick={() => handleBlockUser(selectedUser.id, false)}
+                >
+                  ✓ Unblock User
+                </button>
+              )}
               <button
                 className="close-modal-button"
                 onClick={() => setSelectedUser(null)}
