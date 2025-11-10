@@ -64,13 +64,14 @@ export default function Controls({
         
         if (onTypingChange) onTypingChange(false);
         
+        // DISABLED: Speech functionality temporarily disabled
         // Start speaking immediately while text is being displayed
-        if (response && isSpeakerEnabled && onSpeakText) {
-          // Start speech first for immediate audio feedback
-          setTimeout(() => {
-            onSpeakText(response);
-          }, 100); // Small delay to ensure UI is ready
-        }
+        // if (response && isSpeakerEnabled && onSpeakText) {
+        //   // Start speech first for immediate audio feedback
+        //   setTimeout(() => {
+        //     onSpeakText(response);
+        //   }, 100); // Small delay to ensure UI is ready
+        // }
         
         // Then add AI response to storage (text will appear)
         if (onAddMessage) {

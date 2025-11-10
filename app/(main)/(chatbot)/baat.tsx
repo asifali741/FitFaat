@@ -46,7 +46,7 @@ export default function Baat() {
   const [isTyping, setIsTyping] = useState(false);
   const [bookmarkedMessages, setBookmarkedMessages] = useState<string[]>([]);
   const [latestMessageId, setLatestMessageId] = useState<string | null>(null);
-  const [isSpeakerEnabled, setIsSpeakerEnabled] = useState(true);
+  const [isSpeakerEnabled, setIsSpeakerEnabled] = useState(false); // DISABLED: Changed from true to false
   const [speechInitialized, setSpeechInitialized] = useState(false);
   const [currentSpeechText, setCurrentSpeechText] = useState<string>("");
   const [speechPosition, setSpeechPosition] = useState(0);
@@ -95,11 +95,12 @@ export default function Baat() {
       // Mark welcome message for typewriter animation
       setAnimatingMessageIds(prev => new Set(prev).add('welcome'));
       
+      // DISABLED: Speech functionality temporarily disabled
       // Small delay to ensure UI is ready, then speak in parallel with typewriter
-      setTimeout(() => {
-        speakText(WelcomeText.content);
-        setHasSpokenWelcome(true);
-      }, 500);
+      // setTimeout(() => {
+      //   speakText(WelcomeText.content);
+      //   setHasSpokenWelcome(true);
+      // }, 500);
     }
     
     // Reset flag when messages change (user sends a message)
@@ -142,6 +143,7 @@ export default function Baat() {
 
   // Speech functions
   const speakText = async (text: string, fromPosition: number = 0) => {
+    return; // DISABLED: Speech functionality temporarily disabled
     if (!text || !isSpeakerEnabled) return;
     
     // Stop any current speech first
@@ -307,10 +309,11 @@ export default function Baat() {
       setAnimatingMessageIds(prev => new Set(prev).add(responseId));
       addMessage(answer, false);
       
+      // DISABLED: Speech functionality temporarily disabled
       // Start speaking immediately for parallel delivery with typewriter
       if (isSpeakerEnabled) {
         // Speak in parallel with typewriter effect
-        speakText(answer);
+        // speakText(answer); // DISABLED
       } else {
         // Store the text for later if speaker is re-enabled
         setCurrentSpeechText(answer);
