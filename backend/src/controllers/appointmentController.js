@@ -9,16 +9,12 @@ import User from '../models/User.js';
  * @body    { doctorId, date, time, price, description }
  */
 export const bookAppointment = async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
     const userId = req.user.id;
     const { doctorId, date, time, price, description } = req.body;
 
     // Validate required fields
     if (!doctorId || !date || !time || price === undefined) {
-      await session.abortTransaction();
       return res.status(400).json({
         success: false,
         message: 'Missing required fields: doctorId, date, time, price'
@@ -28,7 +24,6 @@ export const bookAppointment = async (req, res) => {
     // Parse and validate date
     const appointmentDate = new Date(date);
     if (isNaN(appointmentDate.getTime())) {
-      await session.abortTransaction();
       return res.status(400).json({
         success: false,
         message: 'Invalid date format'
@@ -38,7 +33,6 @@ export const bookAppointment = async (req, res) => {
     // Validate time format (HH:MM AM/PM)
     const timeRegex = /^(0?[1-9]|1[0-2]):[0-5][0-9]\s?(AM|PM)$/i;
     if (!timeRegex.test(time)) {
-      await session.abortTransaction();
       return res.status(400).json({
         success: false,
         message: 'Invalid time format. Use HH:MM AM/PM format'
@@ -46,9 +40,8 @@ export const bookAppointment = async (req, res) => {
     }
 
     // Check if user exists
-    const user = await User.findById(userId).session(session);
+    const user = await User.findById(userId);
     if (!user) {
-      await session.abortTransaction();
       return res.status(404).json({
         success: false,
         message: 'User not found'
@@ -56,9 +49,8 @@ export const bookAppointment = async (req, res) => {
     }
 
     // Check if doctor exists and is approved
-    const doctor = await Doctor.findById(doctorId).session(session);
+    const doctor = await Doctor.findById(doctorId);
     if (!doctor) {
-      await session.abortTransaction();
       return res.status(404).json({
         success: false,
         message: 'Doctor not found'
@@ -66,7 +58,6 @@ export const bookAppointment = async (req, res) => {
     }
 
     if (doctor.status !== 'approved') {
-      await session.abortTransaction();
       return res.status(400).json({
         success: false,
         message: 'This doctor is not available for booking'
@@ -87,7 +78,6 @@ export const bookAppointment = async (req, res) => {
     });
 
     if (userConflict) {
-      await session.abortTransaction();
       return res.status(400).json({
         success: false,
         message: 'You already have an appointment at this time. Please choose a different slot.'
@@ -105,7 +95,6 @@ export const bookAppointment = async (req, res) => {
     });
 
     if (doctorConflict) {
-      await session.abortTransaction();
       return res.status(400).json({
         success: false,
         message: 'Time slot already booked. Please choose a different slot.'
@@ -127,7 +116,7 @@ export const bookAppointment = async (req, res) => {
 
     // Add appointment to user's appointmentsBooked array
     user.appointmentsBooked.push(appointmentData);
-    await user.save({ session });
+    await user.save();
 
     // Add appointment to doctor's bookedAppointments array
     const doctorAppointmentData = {
@@ -141,10 +130,7 @@ export const bookAppointment = async (req, res) => {
     };
 
     doctor.bookedAppointments.push(doctorAppointmentData);
-    await doctor.save({ session });
-
-    // Commit transaction
-    await session.commitTransaction();
+    await doctor.save();
 
     // Fetch the created appointment to return it
     const updatedUser = await User.findById(userId).populate('appointmentsBooked.doctorId', 'personalInfo professionalInfo');
@@ -165,16 +151,11 @@ export const bookAppointment = async (req, res) => {
       }
     });
   } catch (error) {
-    // Abort transaction on error
-    await session.abortTransaction();
-
     console.error('Appointment booking error:', error);
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to book appointment'
     });
-  } finally {
-    await session.endSession();
   }
 };
 
@@ -250,16 +231,12 @@ export const getDoctorAppointments = async (req, res) => {
  * @access  Private
  */
 export const cancelAppointment = async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
     const userId = req.user.id;
     const { appointmentId } = req.params;
 
     // Validate appointmentId format
     if (!mongoose.Types.ObjectId.isValid(appointmentId)) {
-      await session.abortTransaction();
       return res.status(400).json({
         success: false,
         message: 'Invalid appointment ID'
@@ -267,9 +244,8 @@ export const cancelAppointment = async (req, res) => {
     }
 
     // Find and update appointment in user's record
-    const user = await User.findById(userId).session(session);
+    const user = await User.findById(userId);
     if (!user) {
-      await session.abortTransaction();
       return res.status(404).json({
         success: false,
         message: 'User not found'
@@ -281,7 +257,6 @@ export const cancelAppointment = async (req, res) => {
     );
 
     if (appointmentIndex === -1) {
-      await session.abortTransaction();
       return res.status(404).json({
         success: false,
         message: 'Appointment not found'
@@ -291,7 +266,6 @@ export const cancelAppointment = async (req, res) => {
     const appointment = user.appointmentsBooked[appointmentIndex];
 
     if (appointment.status === 'cancelled') {
-      await session.abortTransaction();
       return res.status(400).json({
         success: false,
         message: 'Appointment is already cancelled'
@@ -300,10 +274,10 @@ export const cancelAppointment = async (req, res) => {
 
     // Update appointment status to cancelled
     appointment.status = 'cancelled';
-    await user.save({ session });
+    await user.save();
 
     // Find and update the same appointment in doctor's record
-    const doctor = await Doctor.findById(appointment.doctorId).session(session);
+    const doctor = await Doctor.findById(appointment.doctorId);
     if (doctor) {
       const doctorAptIndex = doctor.bookedAppointments.findIndex(
         apt => apt.userId.toString() === userId &&
@@ -313,11 +287,9 @@ export const cancelAppointment = async (req, res) => {
 
       if (doctorAptIndex !== -1) {
         doctor.bookedAppointments[doctorAptIndex].status = 'cancelled';
-        await doctor.save({ session });
+        await doctor.save();
       }
     }
-
-    await session.commitTransaction();
 
     res.json({
       success: true,
@@ -325,14 +297,10 @@ export const cancelAppointment = async (req, res) => {
       appointment
     });
   } catch (error) {
-    await session.abortTransaction();
-
     console.error('Cancel appointment error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to cancel appointment'
     });
-  } finally {
-    await session.endSession();
   }
 };

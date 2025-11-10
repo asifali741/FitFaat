@@ -1,12 +1,12 @@
 import AppHeader from "@/components/AppHeader";
 import { useAppointments } from "@/contexts/AppointmentContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useTheme } from "@/contexts/ThemeContext";
 
 export default function ConferenceScreen() {
   const { colors } = useTheme();
@@ -72,7 +72,7 @@ export default function ConferenceScreen() {
         <View style={styles.buttonContainer}>
           <TouchableOpacity 
             style={styles.scheduleButton}
-            onPress={() => router.push('/(main)/(conference)/schedule-appointment')}
+            onPress={() => router.push('/(main)/(conference)/doctor-time-date-selection')}
           >
             <Text style={styles.scheduleButtonText}>Schedule Appointment 📅</Text>
           </TouchableOpacity>

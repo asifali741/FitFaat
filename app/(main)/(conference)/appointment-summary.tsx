@@ -1,79 +1,72 @@
-import React, { useState, useEffect } from "react";
-import { StyleSheet, Text, TouchableOpacity, View, ScrollView } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useAppointmentBooking } from "@/hooks/useAppointmentBooking";
 import { Ionicons } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { colorsSheet } from "../(settings)/_ui_elements";
-import { getDoctorById } from "./_doctorsData";
 
 export default function AppointmentSummaryScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { bookAppointment, isLoading, error } = useAppointmentBooking();
+  const [isConfirming, setIsConfirming] = useState(false);
   
-  // Extract and validate parameters
+  // Extract parameters from route
   const doctorId = Array.isArray(params.doctorId) ? params.doctorId[0] : params.doctorId;
+  const doctorName = Array.isArray(params.doctorName) ? params.doctorName[0] : params.doctorName;
+  const specialty = Array.isArray(params.specialty) ? params.specialty[0] : params.specialty;
+  const fee = Array.isArray(params.fee) ? parseFloat(params.fee[0]) : parseFloat(params.fee as string || "0");
   const date = Array.isArray(params.date) ? params.date[0] : params.date;
   const time = Array.isArray(params.time) ? params.time[0] : params.time;
   const problem = Array.isArray(params.problem) ? params.problem[0] : params.problem;
-  
-  const doctor = getDoctorById(doctorId);
-  
-  // Calculate time until appointment
-  const [timeRemaining, setTimeRemaining] = useState("");
+
   const [isCallReady, setIsCallReady] = useState(false);
 
-  useEffect(() => {
-    if (!date || !time) return;
-    
-    const calculateTimeRemaining = () => {
-      // Parse date string safely
-      let appointmentDateTime: Date;
-      try {
-        appointmentDateTime = new Date(date + " " + time);
-        // Check if date is valid
-        if (isNaN(appointmentDateTime.getTime())) {
-          throw new Error("Invalid date");
-        }
-      } catch (error) {
-        console.error("Error parsing appointment date:", error);
-        setTimeRemaining("Invalid date");
-        return;
+  const handleConfirmAppointment = async () => {
+    if (!doctorId || !date || !time || fee === undefined) {
+      Alert.alert('Error', 'Missing appointment details');
+      return;
+    }
+
+    setIsConfirming(true);
+    try {
+      const response = await bookAppointment({
+        doctorId,
+        date,
+        time,
+        price: fee,
+        description: problem || '',
+      });
+
+      if (response.success) {
+        Alert.alert(
+          'Success',
+          'Appointment booked successfully!',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                router.replace('/(main)/(conference)');
+              },
+            },
+          ]
+        );
       }
-      
-      const now = new Date();
-      const diff = appointmentDateTime.getTime() - now.getTime();
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to book appointment');
+    } finally {
+      setIsConfirming(false);
+    }
+  };
 
-      if (diff <= 0) {
-        setIsCallReady(true);
-        setTimeRemaining("Ready to start!");
-        return;
-      }
-
-      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-
-      let timeString = "";
-      if (days > 0) timeString += `${days}d `;
-      if (hours > 0) timeString += `${hours}h `;
-      if (minutes > 0) timeString += `${minutes}m `;
-      timeString += `${seconds}s`;
-
-      setTimeRemaining(timeString);
-    };
-
-    calculateTimeRemaining();
-    const interval = setInterval(calculateTimeRemaining, 1000);
-
-    return () => clearInterval(interval);
-  }, [date, time]);
-
-  if (!doctor) {
+  if (!doctorId || !date || !time) {
     return (
       <SafeAreaView style={styles.container}>
-        <Text>Doctor not found</Text>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Missing appointment details</Text>
+        </View>
       </SafeAreaView>
     );
   }
@@ -98,12 +91,6 @@ export default function AppointmentSummaryScreen() {
           <Text style={styles.successSubtitle}>Your consultation is scheduled</Text>
         </View>
 
-        {/* Countdown Timer */}
-        <View style={styles.timerCard}>
-          <Text style={styles.timerLabel}>Time until appointment:</Text>
-          <Text style={styles.timerValue}>{timeRemaining}</Text>
-        </View>
-
         {/* Appointment Summary */}
         <View style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>Appointment Summary</Text>
@@ -114,8 +101,8 @@ export default function AppointmentSummaryScreen() {
             </View>
             <View style={styles.summaryTextContainer}>
               <Text style={styles.summaryLabel}>Doctor</Text>
-              <Text style={styles.summaryValue}>{doctor.name}</Text>
-              <Text style={styles.summarySubValue}>{doctor.specialty}</Text>
+              <Text style={styles.summaryValue}>{doctorName}</Text>
+              <Text style={styles.summarySubValue}>{specialty}</Text>
             </View>
           </View>
 
@@ -179,16 +166,14 @@ export default function AppointmentSummaryScreen() {
           disabled={!isCallReady}
           onPress={() => {
             if (isCallReady) {
-              // Generate unique call ID
               const callId = `appointment_${doctorId}_${Date.now()}`;
               
-              // Navigate to video call screen
               router.push({
                 pathname: "/(main)/(conference)/video-call" as any,
                 params: {
                   callId: callId,
-                  userName: "Patient", // You can replace with actual user name
-                  doctorName: doctor?.name || "Doctor"
+                  userName: "Patient",
+                  doctorName: doctorName || "Doctor"
                 }
               });
             }
@@ -203,6 +188,32 @@ export default function AppointmentSummaryScreen() {
             {isCallReady ? "Start Call" : "Start Call (Not Ready)"}
           </Text>
         </TouchableOpacity>
+
+        {/* Confirm Appointment Button */}
+        <TouchableOpacity 
+          style={[styles.confirmButton, (isConfirming || isLoading) && styles.confirmButtonDisabled]}
+          disabled={isConfirming || isLoading}
+          onPress={handleConfirmAppointment}
+        >
+          {isConfirming || isLoading ? (
+            <>
+              <ActivityIndicator color={colorsSheet.white} />
+              <Text style={styles.confirmButtonText}>Booking...</Text>
+            </>
+          ) : (
+            <>
+              <Ionicons name="checkmark-circle" size={20} color={colorsSheet.white} />
+              <Text style={styles.confirmButtonText}>Confirm Appointment</Text>
+            </>
+          )}
+        </TouchableOpacity>
+
+        {error && (
+          <View style={styles.errorAlert}>
+            <Ionicons name="alert-circle" size={20} color={colorsSheet.error} />
+            <Text style={styles.errorAlertText}>{error}</Text>
+          </View>
+        )}
 
         <TouchableOpacity 
           style={styles.homeButton}
@@ -392,5 +403,59 @@ const styles = StyleSheet.create({
     color: colorsSheet.primary,
     fontSize: hp(1.8),
     fontWeight: "600",
+  },
+  confirmButton: {
+    flexDirection: "row",
+    backgroundColor: colorsSheet.primary,
+    paddingVertical: hp(2),
+    paddingHorizontal: wp(6),
+    borderRadius: 25,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: hp(1.5),
+    shadowColor: colorsSheet.primary,
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  confirmButtonDisabled: {
+    backgroundColor: colorsSheet.gray,
+    shadowColor: colorsSheet.gray,
+    opacity: 0.6,
+  },
+  confirmButtonText: {
+    color: colorsSheet.white,
+    fontSize: hp(1.8),
+    fontWeight: "600",
+    marginLeft: wp(2),
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  errorText: {
+    fontSize: hp(1.8),
+    color: colorsSheet.error || "#FF3B30",
+  },
+  errorAlert: {
+    flexDirection: "row",
+    backgroundColor: "#FFE5E5",
+    borderRadius: 12,
+    padding: wp(4),
+    marginTop: hp(2),
+    alignItems: "center",
+    borderLeftWidth: 4,
+    borderLeftColor: colorsSheet.error || "#FF3B30",
+  },
+  errorAlertText: {
+    color: colorsSheet.error || "#FF3B30",
+    fontSize: hp(1.5),
+    marginLeft: wp(3),
+    flex: 1,
   },
 });
