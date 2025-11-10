@@ -111,7 +111,7 @@ export default function DoctorPortal() {
               style={styles.gradientButton}
             >
               <Text style={styles.gradientButtonText}>
-                {isLoadingStatus ? 'Loading...' : doctorStatus === 'approved' && doctorName ? `Dr. ${doctorName} ✓` : 'Join as Doctor ✨'}
+                {isLoadingStatus ? 'Loading...' : doctorStatus === 'approved' && doctorName ? `Hey Dr. ${doctorName} ` : 'Join as Doctor ✨'}
               </Text>
             </LinearGradient>
           </TouchableOpacity>
