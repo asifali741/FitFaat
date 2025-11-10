@@ -1,6 +1,7 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import {
+    approveAppointment,
     bookAppointment,
     cancelAppointment,
     getDoctorAppointments,
@@ -88,6 +89,19 @@ router.put(
     }
 
     await cancelAppointment(req, res);
+  }
+);
+
+/**
+ * @route   PUT /api/appointments/doctor/:doctorId/:appointmentId/approve
+ * @desc    Approve an appointment (Doctor action)
+ * @access  Private
+ */
+router.put(
+  '/doctor/:doctorId/:appointmentId/approve',
+  protect,
+  async (req, res) => {
+    await approveAppointment(req, res);
   }
 );
 
