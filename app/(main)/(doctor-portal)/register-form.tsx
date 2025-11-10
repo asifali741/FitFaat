@@ -55,7 +55,6 @@ export default function DoctorRegistrationForm() {
     firstName: '',
     lastName: '',
     phoneNumber: '',
-    age: '',
     gender: '',
     bio: '',
     licenseNumber: '',
@@ -93,7 +92,7 @@ export default function DoctorRegistrationForm() {
 
   const validateForm = () => {
     const requiredFields = [
-      'firstName', 'lastName', 'phoneNumber', 'age', 'gender',
+      'firstName', 'lastName', 'phoneNumber', 'gender',
       'licenseNumber', 'licenseAuthority', 'yearsOfExperience', 'specialization',
       'qualifications', 'university', 'domain', 'jobType'
     ];
@@ -107,12 +106,6 @@ export default function DoctorRegistrationForm() {
 
     if (formData.consultationMode.length === 0) {
       Alert.alert('Consultation Mode', 'Please select at least one consultation mode');
-      return false;
-    }
-
-    const age = parseInt(formData.age);
-    if (age < 18 || age > 80) {
-      Alert.alert('Invalid Age', 'Age must be between 18 and 80');
       return false;
     }
 
@@ -132,7 +125,6 @@ export default function DoctorRegistrationForm() {
       await submitDoctorRegistration({
         ...formData,
         gender: formData.gender as 'male' | 'female' | 'other',
-        age: parseInt(formData.age),
         yearsOfExperience: parseInt(formData.yearsOfExperience),
         registrationYear: parseInt(formData.registrationYear),
         consultationFee: formData.consultationFee ? parseFloat(formData.consultationFee) : 0,
@@ -217,17 +209,6 @@ export default function DoctorRegistrationForm() {
             />
 
             <View style={styles.row}>
-              <View style={styles.halfWidth}>
-                <Text style={styles.label}>Age *</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="30"
-                  keyboardType="number-pad"
-                  value={formData.age}
-                  onChangeText={(value) => handleInputChange('age', value.replace(/[^0-9]/g, ''))}
-                  placeholderTextColor={colors.textSecondary}
-                />
-              </View>
               <View style={styles.halfWidth}>
                 <Text style={styles.label}>Gender *</Text>
                 <View style={styles.selectContainer}>

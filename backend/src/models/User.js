@@ -43,6 +43,10 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  isDocregister: {
+    type: Boolean,
+    default: false
+  },
   userInfo: {
     name: {
       type: String,

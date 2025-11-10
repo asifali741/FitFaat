@@ -1,4 +1,5 @@
 import Doctor from '../models/Doctor.js';
+import User from '../models/User.js';
 
 // @desc    Submit doctor registration
 // @route   POST /api/doctors/register
@@ -52,7 +53,7 @@ export const submitDoctorRegistration = async (req, res) => {
 
     // Validate required fields
     const requiredFields = [
-      'firstName', 'lastName', 'phoneNumber', 'age', 'gender',
+      'firstName', 'lastName', 'phoneNumber', 'gender',
       'licenseNumber', 'licenseAuthority', 'registrationYear', 'yearsOfExperience',
       'specialization', 'qualifications', 'university', 'domain', 'jobType', 'consultationMode'
     ];
@@ -62,14 +63,6 @@ export const submitDoctorRegistration = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: `Missing required fields: ${missingFields.join(', ')}`
-      });
-    }
-
-    // Validate age
-    if (age < 18 || age > 80) {
-      return res.status(400).json({
-        success: false,
-        message: 'Age must be between 18 and 80'
       });
     }
 
@@ -89,7 +82,7 @@ export const submitDoctorRegistration = async (req, res) => {
         lastName,
         email: user.email,
         phoneNumber,
-        age,
+        ...(age && { age }),
         gender,
         bio
       },
@@ -241,6 +234,14 @@ export const reviewDoctorApplication = async (req, res) => {
         message: 'Doctor not found'
       });
     }
+
+    // Update user's isDocregister field based on approval status
+    const isDocregister = status === 'approved' ? true : false;
+    await User.findByIdAndUpdate(
+      doctor.userId,
+      { isDocregister },
+      { new: true }
+    );
 
     res.json({
       success: true,
