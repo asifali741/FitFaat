@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { useEffect, useState } from 'react';
 import './App.css';
+import NotificationToast from './components/NotificationToast';
 import DashboardPage from './pages/DashboardPage';
 import LoginPage from './pages/LoginPage';
 
@@ -68,6 +69,7 @@ function App() {
 
   return (
     <div className="app">
+      <NotificationToast />
       {!isLoggedIn ? (
         <LoginPage onLogin={handleLogin} apiUrl={API_BASE_URL} />
       ) : (

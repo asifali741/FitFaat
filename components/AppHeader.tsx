@@ -1,11 +1,11 @@
+import { HEADER_PADDING_HORIZONTAL, HEADER_PADDING_VERTICAL } from '@/constants/ui';
+import { useTheme } from '@/contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
-import { useTheme } from '@/contexts/ThemeContext';
-import { HEADER_PADDING_HORIZONTAL, HEADER_PADDING_VERTICAL } from '@/constants/ui';
 
 interface AppHeaderProps {
   title: string;
@@ -15,6 +15,9 @@ interface AppHeaderProps {
   totalSteps?: number;
   onBackPress?: () => void;
   showMenuButton?: boolean;
+  showNotificationBell?: boolean;
+  notificationCount?: number;
+  onNotificationPress?: () => void;
 }
 
 export default function AppHeader({
@@ -25,10 +28,15 @@ export default function AppHeader({
   totalSteps = 6,
   onBackPress,
   showMenuButton = true,
+  showNotificationBell = false,
+  notificationCount = 0,
+  onNotificationPress,
 }: AppHeaderProps) {
   const navigation = useNavigation();
   const router = useRouter();
   const { colors } = useTheme();
+
+  console.log('AppHeader - showNotificationBell:', showNotificationBell, 'notificationCount:', notificationCount);
 
   const openDrawer = () => {
     navigation.dispatch(DrawerActions.openDrawer());
@@ -59,16 +67,36 @@ export default function AppHeader({
         
         <Text style={[styles.title, { color: colors.textOnPrimary }]}>{title}</Text>
         
-        {showBackButton ? (
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={handleBackPress}
-          >
-            <Ionicons name="arrow-back" size={24} color={colors.textOnPrimary} />
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.spacer} />
-        )}
+        <View style={styles.rightIconContainer}>
+          {showNotificationBell && (
+            <TouchableOpacity 
+              style={styles.notificationButton}
+              onPress={onNotificationPress}
+            >
+              <Ionicons name="notifications" size={24} color={colors.textOnPrimary} />
+              {notificationCount && notificationCount > 0 && (
+                <View style={[styles.badge, { backgroundColor: '#FF6B6B' }]}>
+                  <Text style={styles.badgeText}>
+                    {notificationCount > 99 ? '99+' : notificationCount}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          )}
+          
+          {showBackButton && !showNotificationBell && (
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={handleBackPress}
+            >
+              <Ionicons name="arrow-back" size={24} color={colors.textOnPrimary} />
+            </TouchableOpacity>
+          )}
+          
+          {!showNotificationBell && !showBackButton && (
+            <View style={styles.spacer} />
+          )}
+        </View>
       </View>
 
       {/* Step Indicator */}
@@ -113,6 +141,31 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 8,
+  },
+  notificationButton: {
+    padding: 8,
+    position: 'relative',
+  },
+  rightIconContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    minWidth: wp(12),
+  },
+  badge: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  badgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   spacer: {
     width: wp(12),

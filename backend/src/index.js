@@ -10,6 +10,8 @@ import appointmentRoutes from './routes/appointments.js';
 import authRoutes from './routes/auth.js';
 import dietPlanRoutes from './routes/dietPlan.js';
 import doctorRoutes from './routes/doctors.js';
+import newsRoutes from './routes/news.js';
+import pushTokenRoutes from './routes/pushToken.js';
 import userRoutes from './routes/user.js';
 
 // Load env vars
@@ -31,6 +33,8 @@ app.use('/api/diet-plan', dietPlanRoutes);
 app.use('/api/doctors', doctorRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/news', newsRoutes);
+app.use('/api/push-token', pushTokenRoutes);
 
 // Error handler
 app.use(errorHandler);
