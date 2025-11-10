@@ -157,13 +157,18 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
   };
 
   const addMessage = (text: string, isUser: boolean) => {
+    // If no current session, create one first
     if (!currentSession) {
-      createNewSession();
+      const sessionId = createNewSession();
+      // Use setTimeout to ensure state is updated before adding message
+      setTimeout(() => {
+        addMessage(text, isUser);
+      }, 100);
       return;
     }
 
     const message: ChatMessage = {
-      id: Date.now().toString(),
+      id: Date.now().toString() + Math.random().toString(), // Ensure unique ID
       text,
       isUser,
       timestamp: new Date(),
@@ -180,9 +185,11 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
         currentSession.title
     };
 
-    setSessions(prev => 
-      prev.map(s => s.id === currentSession.id ? updatedSession : s)
-    );
+    // Update both sessions array and current session atomically
+    setSessions(prev => {
+      const updated = prev.map(s => s.id === currentSession.id ? updatedSession : s);
+      return updated;
+    });
     setCurrentSession(updatedSession);
   };
 

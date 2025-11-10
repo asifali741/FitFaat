@@ -5,7 +5,7 @@ import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import { ActivityIndicator, Alert, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp } from "react-native-responsive-screen";
-import { colorsSheet } from "../(settings)/ui_elements";
+import { colorsSheet } from "../(settings)/_ui_elements";
 
 const specializations = [
   { id: 1, name: "Cardiologist", icon: "heart", color: colorsSheet.error },
