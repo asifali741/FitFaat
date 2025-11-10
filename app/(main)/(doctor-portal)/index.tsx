@@ -13,6 +13,7 @@ export default function DoctorPortal() {
   const router = useRouter();
   const { getDoctorStatus } = useDoctorRegistration();
   const [doctorStatus, setDoctorStatus] = useState<string | null>(null);
+  const [doctorName, setDoctorName] = useState<string | null>(null);
   const [isLoadingStatus, setIsLoadingStatus] = useState(false);
 
   useFocusEffect(
@@ -26,9 +27,11 @@ export default function DoctorPortal() {
     try {
       const response = await getDoctorStatus();
       setDoctorStatus(response.doctor?.status || null);
+      setDoctorName(response.doctor?.name || null);
     } catch (error) {
       // Doctor status not found (first time user)
       setDoctorStatus(null);
+      setDoctorName(null);
     } finally {
       setIsLoadingStatus(false);
     }
@@ -108,7 +111,7 @@ export default function DoctorPortal() {
               style={styles.gradientButton}
             >
               <Text style={styles.gradientButtonText}>
-                {isLoadingStatus ? 'Loading...' : 'Join as Doctor ✨'}
+                {isLoadingStatus ? 'Loading...' : doctorStatus === 'approved' && doctorName ? `Dr. ${doctorName} ✓` : 'Join as Doctor ✨'}
               </Text>
             </LinearGradient>
           </TouchableOpacity>
