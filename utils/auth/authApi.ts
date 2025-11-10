@@ -203,9 +203,19 @@ export const authApi = {
   },
 
   // Cancel an appointment
-  cancelAppointment: async (appointmentId: string, reason?: string) => {
+  cancelAppointment: async (appointmentId: string, reason?: string, doctorId?: string) => {
     try {
-      const response = await api.put(`/appointments/${appointmentId}/cancel`, { reason });
+      const response = await api.put(`/appointments/${appointmentId}/cancel`, { reason, doctorId });
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Approve an appointment (Doctor action)
+  approveAppointment: async (doctorId: string, appointmentId: string) => {
+    try {
+      const response = await api.put(`/appointments/doctor/${doctorId}/${appointmentId}/approve`);
       return response.data;
     } catch (error: any) {
       throw error.response?.data || error.message;

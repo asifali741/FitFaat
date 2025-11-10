@@ -202,8 +202,7 @@ export const getDoctorAppointments = async (req, res) => {
     const { doctorId } = req.params;
 
     const doctor = await Doctor.findById(doctorId)
-      .select('bookedAppointments')
-      .populate('bookedAppointments.userId', 'username email userInfo.name');
+      .select('bookedAppointments');
 
     if (!doctor) {
       return res.status(404).json({
@@ -212,9 +211,28 @@ export const getDoctorAppointments = async (req, res) => {
       });
     }
 
+    // Populate user details for each appointment
+    const appointmentsWithUserDetails = await Promise.all(
+      (doctor.bookedAppointments || []).map(async (apt) => {
+        const user = await User.findById(apt.userId).select('userInfo.name email');
+        return {
+          _id: apt._id,
+          userId: apt.userId,
+          date: apt.date,
+          time: apt.time,
+          status: apt.status,
+          price: apt.price,
+          description: apt.description,
+          bookedAt: apt.bookedAt,
+          userName: user?.userInfo?.name || 'Unknown',
+          userEmail: user?.email || 'N/A'
+        };
+      })
+    );
+
     res.json({
       success: true,
-      appointments: doctor.bookedAppointments || []
+      appointments: appointmentsWithUserDetails
     });
   } catch (error) {
     console.error('Get doctor appointments error:', error);
@@ -234,6 +252,7 @@ export const cancelAppointment = async (req, res) => {
   try {
     const userId = req.user.id;
     const { appointmentId } = req.params;
+    const { reason, doctorId } = req.body;
 
     // Validate appointmentId format
     if (!mongoose.Types.ObjectId.isValid(appointmentId)) {
@@ -243,7 +262,61 @@ export const cancelAppointment = async (req, res) => {
       });
     }
 
-    // Find and update appointment in user's record
+    // If doctorId is provided, doctor is cancelling (rejecting)
+    if (doctorId) {
+      const doctor = await Doctor.findById(doctorId);
+      if (!doctor) {
+        return res.status(404).json({
+          success: false,
+          message: 'Doctor not found'
+        });
+      }
+
+      const doctorAptIndex = doctor.bookedAppointments.findIndex(
+        apt => apt._id.toString() === appointmentId
+      );
+
+      if (doctorAptIndex === -1) {
+        return res.status(404).json({
+          success: false,
+          message: 'Appointment not found'
+        });
+      }
+
+      const doctorAppointment = doctor.bookedAppointments[doctorAptIndex];
+
+      if (doctorAppointment.status === 'cancelled') {
+        return res.status(400).json({
+          success: false,
+          message: 'Appointment is already cancelled'
+        });
+      }
+
+      // Update in doctor's record
+      doctorAppointment.status = 'cancelled';
+      await doctor.save();
+
+      // Update in user's record
+      const user = await User.findById(doctorAppointment.userId);
+      if (user) {
+        const userAptIndex = user.appointmentsBooked.findIndex(
+          apt => apt._id.toString() === appointmentId
+        );
+
+        if (userAptIndex !== -1) {
+          user.appointmentsBooked[userAptIndex].status = 'cancelled';
+          await user.save();
+        }
+      }
+
+      return res.json({
+        success: true,
+        message: 'Appointment rejected successfully',
+        appointment: doctorAppointment
+      });
+    }
+
+    // User is cancelling their own appointment
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({
@@ -280,9 +353,7 @@ export const cancelAppointment = async (req, res) => {
     const doctor = await Doctor.findById(appointment.doctorId);
     if (doctor) {
       const doctorAptIndex = doctor.bookedAppointments.findIndex(
-        apt => apt.userId.toString() === userId &&
-               new Date(apt.date).toISOString() === new Date(appointment.date).toISOString() &&
-               apt.time === appointment.time
+        apt => apt._id.toString() === appointmentId
       );
 
       if (doctorAptIndex !== -1) {
@@ -301,6 +372,86 @@ export const cancelAppointment = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to cancel appointment'
+    });
+  }
+};
+
+/**
+ * @desc    Approve an appointment (Doctor action)
+ * @route   PUT /api/appointments/:appointmentId/approve
+ * @access  Private
+ */
+export const approveAppointment = async (req, res) => {
+  try {
+    const doctorId = req.params.doctorId;
+    const { appointmentId } = req.params;
+
+    // Validate appointmentId format
+    if (!mongoose.Types.ObjectId.isValid(appointmentId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid appointment ID'
+      });
+    }
+
+    // Find doctor and update appointment in doctor's record
+    const doctor = await Doctor.findById(doctorId);
+    if (!doctor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Doctor not found'
+      });
+    }
+
+    const doctorAptIndex = doctor.bookedAppointments.findIndex(
+      apt => apt._id.toString() === appointmentId
+    );
+
+    if (doctorAptIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: 'Appointment not found'
+      });
+    }
+
+    const doctorAppointment = doctor.bookedAppointments[doctorAptIndex];
+
+    if (doctorAppointment.status === 'confirmed') {
+      return res.status(400).json({
+        success: false,
+        message: 'Appointment is already approved'
+      });
+    }
+
+    // Update appointment status to confirmed in doctor's record
+    doctorAppointment.status = 'confirmed';
+    await doctor.save();
+
+    // Find and update the same appointment in user's record
+    const user = await User.findById(doctorAppointment.userId);
+    if (user) {
+      const userAptIndex = user.appointmentsBooked.findIndex(
+        apt => apt.doctorId.toString() === doctorId &&
+               new Date(apt.date).toISOString() === new Date(doctorAppointment.date).toISOString() &&
+               apt.time === doctorAppointment.time
+      );
+
+      if (userAptIndex !== -1) {
+        user.appointmentsBooked[userAptIndex].status = 'confirmed';
+        await user.save();
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Appointment approved successfully',
+      appointment: doctorAppointment
+    });
+  } catch (error) {
+    console.error('Approve appointment error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to approve appointment'
     });
   }
 };

@@ -85,10 +85,16 @@ export default function DoctorPortal() {
             <Text style={styles.featureText}>Video Consultations</Text>
           </View>
           
-          <View style={styles.featureItem}>
+          <TouchableOpacity 
+            style={styles.featureItem}
+            onPress={() => router.push('/(main)/(doctor-portal)/patient-management')}
+          >
             <Ionicons name="people" size={30} color={colorsSheet.primaryLight} />
             <Text style={styles.featureText}>Patient Management</Text>
-          </View>
+            <View style={styles.featureBadge}>
+              <Text style={styles.featureBadgeText}>New</Text>
+            </View>
+          </TouchableOpacity>
           
           <View style={styles.featureItem}>
             <Ionicons name="nutrition" size={30} color={colorsSheet.secondary} />
@@ -193,6 +199,18 @@ const styles = StyleSheet.create({
     color: colorsSheet.textOnCard,
     marginLeft: wp(4),
     fontWeight: "500",
+  },
+  featureBadge: {
+    backgroundColor: colorsSheet.primary,
+    paddingVertical: hp(0.4),
+    paddingHorizontal: wp(2),
+    borderRadius: 12,
+    marginLeft: 'auto',
+  },
+  featureBadgeText: {
+    color: colorsSheet.white,
+    fontSize: hp(1.3),
+    fontWeight: '600',
   },
   buttonContainer: {
     flex: 1,
