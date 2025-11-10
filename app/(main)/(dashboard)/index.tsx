@@ -1,4 +1,5 @@
 import AppHeader from "@/components/AppHeader";
+import NewsModalPopup from "@/components/NewsModalPopup";
 import { useNews } from "@/contexts/NewsContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -97,8 +98,9 @@ const checkLocalStorage = async () => {
 export default function DayPlan () {
   const router = useRouter();
   const { colors } = useTheme();
-  const { news } = useNews();
+  const { news, unreadCount, markNewsAsRead } = useNews();
   const [JsonResponse, setJsonResponse] = useState<null|jsonResponse>(null);
+  const [showNewsModal, setShowNewsModal] = useState(false);
 
   //Get Data from API or Local Storage
   useEffect( () => { 
@@ -210,11 +212,19 @@ export default function DayPlan () {
   const daysArray : Day[] = Object.values(JsonResponse); // [day01, day02, ...]
   
   const handleNotificationPress = () => {
-    console.log('📢 News bell pressed, navigating to news screen');
-    router.push('/(main)/(news)');
+    console.log('📢 News bell pressed, opening news popup');
+    setShowNewsModal(true);
+  };
+
+  const handleCloseNewsModal = () => {
+    setShowNewsModal(false);
+  };
+
+  const handleNewsRead = async (newsId: string) => {
+    await markNewsAsRead(newsId);
   };
   
-  console.log('Dashboard - News count:', news.length);
+  console.log('Dashboard - News count:', news.length, 'Unread:', unreadCount);
   
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.primary }]}>
@@ -223,8 +233,16 @@ export default function DayPlan () {
         showStepIndicator={false}
         showBackButton={false}
         showNotificationBell={true}
-        notificationCount={news.length}
+        notificationCount={unreadCount}
         onNotificationPress={handleNotificationPress}
+      />
+
+      {/* News Modal Popup */}
+      <NewsModalPopup
+        visible={showNewsModal}
+        onClose={handleCloseNewsModal}
+        newsList={news}
+        onNewsRead={handleNewsRead}
       />
 
       {/* Main Content */}

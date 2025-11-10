@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
@@ -21,16 +22,21 @@ interface NewsContextType {
   news: NewsItem[];
   loading: boolean;
   error: string | null;
+  unreadCount: number;
   fetchPublishedNews: () => Promise<void>;
   refreshNews: () => Promise<void>;
+  markNewsAsRead: (newsId: string) => Promise<void>;
 }
 
 const NewsContext = createContext<NewsContextType | undefined>(undefined);
+
+const STORAGE_KEY = 'fitfaat_read_news';
 
 export const NewsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [readNewsIds, setReadNewsIds] = useState<Set<string>>(new Set());
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const previousIdsRef = useRef<Set<string>>(new Set());
 
@@ -43,6 +49,38 @@ export const NewsProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const API_BASE_URL = getApiUrl();
+
+  // Load read news from storage
+  const loadReadNews = async () => {
+    try {
+      const stored = await AsyncStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const ids = JSON.parse(stored);
+        setReadNewsIds(new Set(ids));
+        console.log('✅ Loaded read news:', ids.length, 'items');
+      }
+    } catch (err) {
+      console.error('Error loading read news:', err);
+    }
+  };
+
+  // Save read news to storage
+  const saveReadNews = async (ids: Set<string>) => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(ids)));
+    } catch (err) {
+      console.error('Error saving read news:', err);
+    }
+  };
+
+  // Mark a news item as read
+  const markNewsAsRead = async (newsId: string) => {
+    const newReadIds = new Set(readNewsIds);
+    newReadIds.add(newsId);
+    setReadNewsIds(newReadIds);
+    await saveReadNews(newReadIds);
+    console.log('📖 Marked as read:', newsId);
+  };
 
   const fetchPublishedNews = async () => {
     try {
@@ -87,6 +125,7 @@ export const NewsProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     console.log('🚀 NewsProvider Init - Platform:', Platform.OS);
+    loadReadNews();
     fetchPublishedNews();
 
     pollIntervalRef.current = setInterval(() => {
@@ -99,12 +138,17 @@ export const NewsProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
+  // Calculate unread count
+  const unreadCount = news.filter((item) => !readNewsIds.has(item._id || item.id || '')).length;
+
   const value: NewsContextType = {
     news,
     loading,
     error,
+    unreadCount,
     fetchPublishedNews,
     refreshNews,
+    markNewsAsRead,
   };
 
   return <NewsContext.Provider value={value}>{children}</NewsContext.Provider>;
