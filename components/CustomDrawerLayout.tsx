@@ -47,53 +47,52 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
 
   return (
     <View style={styles.container}>
-    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-      {/* Top Part with Gradient Background */}
-      <LinearGradient
-        colors={[colors.primary, colors.primaryDark]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.headerGradient}
-      >
+    <SafeAreaView style={styles.safeArea} edges={[]}>
+      {/* Profile Section */}
+      <View style={styles.profileSection}>
         <TouchableOpacity 
           style={styles.userContainer} 
           onPress={handleProfilePress}
           activeOpacity={0.8}
         >
           <View style={styles.avatarWrapper}>
-            <View style={styles.avatarContainer}>
-              <Image source={require("../assets/images/Default_Profile.png")} style={styles.userImage} />
-              <View style={styles.onlineIndicator} />
-            </View>
+            <Image source={require("../assets/images/Default_Profile.png")} style={styles.userImage} />
           </View>
           
           <View style={styles.userInfo}>
-            <View style={styles.nameRow}>
-              <Text style={styles.userName} numberOfLines={1}>
-                {userName}
-              </Text>
-              <View style={styles.verifiedBadge}>
-                <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
-              </View>
-            </View>
-            
-            <View style={styles.emailRow}>
-              <Ionicons name="mail-outline" size={11} color="rgba(255, 255, 255, 0.7)" />
-              <Text style={styles.userEmail} numberOfLines={1}>
-                {userEmail}
-              </Text>
-            </View>
-          </View>
-          
-          <View style={styles.actionButton}>
-            <Ionicons name="create-outline" size={18} color="#fff" />
+            <Text style={styles.userName} numberOfLines={1}>
+              {userName}
+            </Text>
+            <Text style={styles.userHandle} numberOfLines={1}>
+              @{user?.username || 'username'}
+            </Text>
           </View>
         </TouchableOpacity>
         
-        {/* Decorative Elements */}
-        <View style={styles.decorCircle1} />
-        <View style={styles.decorCircle2} />
-      </LinearGradient>
+        {/* Stats Row */}
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>12</Text>
+            <Text style={styles.statLabel}>Workouts</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>5</Text>
+            <Text style={styles.statLabel}>Favorites</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>24</Text>
+            <Text style={styles.statLabel}>Days Active</Text>
+          </View>
+        </View>
+        
+        {/* Email Display */}
+        <View style={styles.emailContainer}>
+          <Ionicons name="mail-outline" size={14} color={colors.textSecondary} />
+          <Text style={styles.emailText} numberOfLines={1}>
+            {userEmail}
+          </Text>
+        </View>
+      </View>
 
       {/* Drawer Items */}
       <View style={styles.menuSection}>
@@ -101,14 +100,14 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
         <DrawerItem
           label="Dashboard"
           icon={({ size }) => (
-            <Ionicons name="home" size={22} color={isRouteActive('(dashboard)') ? colors.primary : colors.textOnPrimary} />
+            <Ionicons name="home" size={22} color={isRouteActive('(dashboard)') ? colors.primary : colors.textPrimary} />
           )}
           onPress={() => props.navigation.navigate('(dashboard)')}
           labelStyle={{
             marginLeft: -4,
             fontSize: 16,
             fontWeight: isRouteActive('(dashboard)') ? '600' : '500',
-            color: isRouteActive('(dashboard)') ? colors.primary : colors.textOnPrimary,
+            color: isRouteActive('(dashboard)') ? colors.primary : colors.textPrimary,
           }}
           style={{
             marginHorizontal: 8,
@@ -125,14 +124,14 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
         <DrawerItem
           label="Chatbot"
           icon={({ size }) => (
-            <Ionicons name="chatbubbles" size={22} color={isRouteActive('(chatbot)') ? colors.primary : colors.textOnPrimary} />
+            <Ionicons name="chatbubbles" size={22} color={isRouteActive('(chatbot)') ? colors.primary : colors.textPrimary} />
           )}
           onPress={() => props.navigation.navigate('(chatbot)')}
           labelStyle={{
             marginLeft: -4,
             fontSize: 16,
             fontWeight: isRouteActive('(chatbot)') ? '600' : '500',
-            color: isRouteActive('(chatbot)') ? colors.primary : colors.textOnPrimary,
+            color: isRouteActive('(chatbot)') ? colors.primary : colors.textPrimary,
           }}
           style={{
             marginHorizontal: 8,
@@ -149,14 +148,14 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
         <DrawerItem
           label="Conference"
           icon={({ size }) => (
-            <Ionicons name="videocam" size={22} color={isRouteActive('(conference)') ? colors.primary : colors.textOnPrimary} />
+            <Ionicons name="videocam" size={22} color={isRouteActive('(conference)') ? colors.primary : colors.textPrimary} />
           )}
           onPress={() => props.navigation.navigate('(conference)')}
           labelStyle={{
             marginLeft: -4,
             fontSize: 16,
             fontWeight: isRouteActive('(conference)') ? '600' : '500',
-            color: isRouteActive('(conference)') ? colors.primary : colors.textOnPrimary,
+            color: isRouteActive('(conference)') ? colors.primary : colors.textPrimary,
           }}
           style={{
             marginHorizontal: 8,
@@ -173,14 +172,14 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
         <DrawerItem
           label="Workouts 👑"
           icon={({ size }) => (
-            <Ionicons name="barbell" size={22} color={isExercisesActive() ? colors.primary : colors.textOnPrimary} />
+            <Ionicons name="barbell" size={22} color={isExercisesActive() ? colors.primary : colors.textPrimary} />
           )}
           onPress={() => props.navigation.navigate('(exercises)')}
           labelStyle={{
             marginLeft: -4,
             fontSize: 16,
             fontWeight: isExercisesActive() ? '600' : '500',
-            color: isExercisesActive() ? colors.primary : colors.textOnPrimary,
+            color: isExercisesActive() ? colors.primary : colors.textPrimary,
           }}
           style={{
             marginHorizontal: 8,
@@ -197,14 +196,14 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
         <DrawerItem
           label="Join as Doctor"
           icon={({ size }) => (
-            <Ionicons name="medical" size={22} color={isRouteActive('(doctor-portal)') ? colors.primary : colors.textOnPrimary} />
+            <Ionicons name="medical" size={22} color={isRouteActive('(doctor-portal)') ? colors.primary : colors.textPrimary} />
           )}
           onPress={() => props.navigation.navigate('(doctor-portal)')}
           labelStyle={{
             marginLeft: -4,
             fontSize: 16,
             fontWeight: isRouteActive('(doctor-portal)') ? '600' : '500',
-            color: isRouteActive('(doctor-portal)') ? colors.primary : colors.textOnPrimary,
+            color: isRouteActive('(doctor-portal)') ? colors.primary : colors.textPrimary,
           }}
           style={{
             marginHorizontal: 8,
@@ -221,14 +220,14 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
         <DrawerItem
           label="Settings"
           icon={({ size }) => (
-            <Ionicons name="settings" size={22} color={isRouteActive('(settings)') ? colors.primary : colors.textOnPrimary} />
+            <Ionicons name="settings" size={22} color={isRouteActive('(settings)') ? colors.primary : colors.textPrimary} />
           )}
           onPress={() => props.navigation.navigate('(settings)')}
           labelStyle={{
             marginLeft: -4,
             fontSize: 16,
             fontWeight: isRouteActive('(settings)') ? '600' : '500',
-            color: isRouteActive('(settings)') ? colors.primary : colors.textOnPrimary,
+            color: isRouteActive('(settings)') ? colors.primary : colors.textPrimary,
           }}
           style={{
             marginHorizontal: 8,
@@ -345,6 +344,8 @@ const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.primary,
+    paddingTop: 20,
+    paddingBottom: 20,
   },
   safeArea: {
     flex: 1,
@@ -353,118 +354,70 @@ const getStyles = (colors: any) => StyleSheet.create({
     borderBottomRightRadius: 24,
     overflow: 'hidden',
   },
-  headerGradient: {
-    paddingTop: 12,
+  profileSection: {
+    paddingTop: 20,
     paddingBottom: 20,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  decorCircle1: {
-    position: 'absolute',
-    top: -40,
-    right: -40,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  decorCircle2: {
-    position: 'absolute',
-    bottom: -30,
-    left: -30,
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   userContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginHorizontal: 16,
-    marginVertical: 12,
-    padding: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
+    marginBottom: 16,
   },
   avatarWrapper: {
     marginRight: 12,
   },
-  avatarContainer: {
-    position: 'relative',
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    padding: 3,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   userImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    borderWidth: 2,
-    borderColor: '#fff',
-    backgroundColor: colors.cardBackground,
-  },
-  onlineIndicator: {
-    position: 'absolute',
-    bottom: 3,
-    right: 3,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#4CAF50',
-    borderWidth: 2.5,
-    borderColor: '#fff',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
   },
   userInfo: {
     flex: 1,
-    minWidth: 0,
-    justifyContent: 'center',
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
   },
   userName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "700",
-    color: '#FFFFFF',
-    letterSpacing: 0.3,
-    marginRight: 4,
+    color: colors.textPrimary,
+    marginBottom: 2,
   },
-  verifiedBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    borderRadius: 10,
-    padding: 2,
+  userHandle: {
+    fontSize: 14,
+    color: colors.textSecondary,
   },
-  emailRow: {
+  statsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    paddingRight: 10,
   },
-  userEmail: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.75)',
+  statItem: {
+    flexDirection: 'row',
+    gap: 3,
+    alignItems: 'baseline',
     flex: 1,
   },
-  actionButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    justifyContent: 'center',
+  statValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  statLabel: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    flexShrink: 1,
+  },
+  emailContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 8,
+    gap: 6,
+  },
+  emailText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    flex: 1,
   },
   menuSection: {
     flex: 1,
