@@ -1,14 +1,13 @@
 import { DrawerSceneWrapper } from "@/components/CustomDrawerLayout";
 import { AppointmentProvider } from "@/contexts/AppointmentContext";
 import { ChatbotStorageProvider } from "@/contexts/ChatbotStorage";
-import { useAuth } from "@clerk/clerk-expo";
+import { authApi } from "@/utils/auth/authApi";
 import { DrawerContentComponentProps } from "@react-navigation/drawer";
 import { useRouter } from "expo-router";
 import { Drawer } from "expo-router/drawer";
 import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { colorsSheet as color } from "./(settings)/ui_elements";
-import { authApi } from "@/utils/auth/authApi";
+import { colorsSheet as color } from "./(settings)/_ui_elements";
 type DrawerSceneWrapperProps = DrawerContentComponentProps;
 
 export default function MainLayout() {
