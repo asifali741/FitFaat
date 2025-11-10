@@ -5,6 +5,7 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
 import { useTheme } from '@/contexts/ThemeContext';
+import { HEADER_PADDING_HORIZONTAL, HEADER_PADDING_VERTICAL } from '@/constants/ui';
 
 interface AppHeaderProps {
   title: string;
@@ -98,8 +99,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: wp(5),
-    paddingVertical: hp(2),
+    paddingHorizontal: HEADER_PADDING_HORIZONTAL,
+    paddingVertical: HEADER_PADDING_VERTICAL,
   },
   menuButton: {
     padding: 8,
