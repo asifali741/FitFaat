@@ -1,11 +1,12 @@
 import AppHeader from "@/components/AppHeader";
+import { useNews } from "@/contexts/NewsContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useTheme } from "@/contexts/ThemeContext";
 import { Days } from "./_Day";
 export type Day = {
   dayNo: number,
@@ -96,6 +97,7 @@ const checkLocalStorage = async () => {
 export default function DayPlan () {
   const router = useRouter();
   const { colors } = useTheme();
+  const { news } = useNews();
   const [JsonResponse, setJsonResponse] = useState<null|jsonResponse>(null);
 
   //Get Data from API or Local Storage
@@ -206,12 +208,23 @@ export default function DayPlan () {
     )
   }
   const daysArray : Day[] = Object.values(JsonResponse); // [day01, day02, ...]
+  
+  const handleNotificationPress = () => {
+    console.log('📢 News bell pressed, navigating to news screen');
+    router.push('/(main)/(news)');
+  };
+  
+  console.log('Dashboard - News count:', news.length);
+  
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.primary }]}>
       <AppHeader 
         title="FitFaat Dashboard"
         showStepIndicator={false}
         showBackButton={false}
+        showNotificationBell={true}
+        notificationCount={news.length}
+        onNotificationPress={handleNotificationPress}
       />
 
       {/* Main Content */}

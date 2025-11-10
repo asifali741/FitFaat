@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import DoctorsList from '../components/DoctorsList';
+import NewsList from '../components/NewsList';
 import UsersList from '../components/UsersList';
 import './DashboardPage.css';
 
@@ -37,6 +38,12 @@ function DashboardPage({ adminData, token, apiUrl, onLogout }) {
           >
             👨‍⚕️ Doctors
           </button>
+          <button
+            className={`tab-button ${activeTab === 'news' ? 'active' : ''}`}
+            onClick={() => setActiveTab('news')}
+          >
+            📰 News
+          </button>
         </div>
 
         {/* Tab Content */}
@@ -46,6 +53,9 @@ function DashboardPage({ adminData, token, apiUrl, onLogout }) {
           )}
           {activeTab === 'doctors' && (
             <DoctorsList token={token} apiUrl={apiUrl} />
+          )}
+          {activeTab === 'news' && (
+            <NewsList token={token} apiUrl={apiUrl} />
           )}
         </div>
       </div>

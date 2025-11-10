@@ -1,6 +1,7 @@
 import { DrawerSceneWrapper } from "@/components/CustomDrawerLayout";
 import { AppointmentProvider } from "@/contexts/AppointmentContext";
 import { ChatbotStorageProvider } from "@/contexts/ChatbotStorage";
+import { NewsProvider } from "@/contexts/NewsContext";
 import { authApi } from "@/utils/auth/authApi";
 import { DrawerContentComponentProps } from "@react-navigation/drawer";
 import { useRouter } from "expo-router";
@@ -32,6 +33,7 @@ export default function MainLayout() {
     return <GestureHandlerRootView style={{ flex: 1 }}>
   <AppointmentProvider>
   <ChatbotStorageProvider>
+  <NewsProvider>
   <Drawer
     detachInactiveScreens={true}
     drawerContent={(props) => <DrawerSceneWrapper {...props} />}
@@ -70,10 +72,12 @@ export default function MainLayout() {
     <Drawer.Screen name="(dashboard)" options={{ title: "Dashboard" }} />
     <Drawer.Screen name="(chatbot)" options={{ title: "Chatbot" }} />
     <Drawer.Screen name="(conference)" options={{ title: "Conference" }} />
+    <Drawer.Screen name="(news)" options={{ title: "📰 News" }} />
     <Drawer.Screen name="(settings)" options={{ title: "Settings" }} />
     <Drawer.Screen name="(exercises)/workout" options={{ title: "Workouts 👑" }} />
     <Drawer.Screen name="(doctor-portal)" options={{ title: "Join as Doctor 👨‍⚕️" }} />
   </Drawer>
+  </NewsProvider>
   </ChatbotStorageProvider>
   </AppointmentProvider>
 </GestureHandlerRootView>

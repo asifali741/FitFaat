@@ -1,11 +1,12 @@
 import SafeScreen from "@/components/SafeScreen";
+import { NotificationProvider } from "@/contexts/NotificationContext";
+import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
 import { ClerkProvider, useAuth, useUser } from "@clerk/clerk-expo";
 import { tokenCache } from "@clerk/clerk-expo/token-cache";
 import { Slot, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, StatusBar, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
 
@@ -20,13 +21,15 @@ if (!publishableKey) {
 
 export default function RootLayout() {
   return (
-    <ClerkProvider tokenCache={tokenCache} publishableKey={publishableKey}> 
-      <ThemeProvider>
-        <SafeAreaProvider>
-          <ThemedApp />
-        </SafeAreaProvider>
-      </ThemeProvider>
-    </ClerkProvider>
+    <NotificationProvider>
+      <ClerkProvider tokenCache={tokenCache} publishableKey={publishableKey}> 
+        <ThemeProvider>
+          <SafeAreaProvider>
+            <ThemedApp />
+          </SafeAreaProvider>
+        </ThemeProvider>
+      </ClerkProvider>
+    </NotificationProvider>
   );
 }
 
