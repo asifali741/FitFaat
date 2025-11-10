@@ -20,7 +20,7 @@ function UsersList({ token, apiUrl }) {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (response.data.success) {
-        setUsers(response.data.users || []);
+        setUsers(response.data.data || []);
       }
     } catch (err) {
       setError('Failed to fetch users');
@@ -75,15 +75,15 @@ function UsersList({ token, apiUrl }) {
               </tr>
             ) : (
               filteredUsers.map((user) => (
-                <tr key={user._id}>
-                  <td>{user._id.substring(0, 8)}...</td>
+                <tr key={user.id}>
+                  <td>{user.id.substring(0, 8)}...</td>
                   <td>
                     <div className="user-name">{user.username}</div>
                   </td>
                   <td>{user.email}</td>
                   <td>
-                    <span className={`status-badge ${user.isActive ? 'active' : 'inactive'}`}>
-                      {user.isActive ? 'Active' : 'Inactive'}
+                    <span className={`status-badge ${user.status === 'Active' ? 'active' : 'inactive'}`}>
+                      {user.status}
                     </span>
                   </td>
                   <td>{new Date(user.createdAt).toLocaleDateString()}</td>
@@ -119,7 +119,7 @@ function UsersList({ token, apiUrl }) {
             <div className="modal-body">
               <div className="detail-row">
                 <div className="detail-label">User ID:</div>
-                <div className="detail-value">{selectedUser._id}</div>
+                <div className="detail-value">{selectedUser.id}</div>
               </div>
               <div className="detail-row">
                 <div className="detail-label">Username:</div>
@@ -132,7 +132,7 @@ function UsersList({ token, apiUrl }) {
               <div className="detail-row">
                 <div className="detail-label">Status:</div>
                 <div className="detail-value">
-                  {selectedUser.isActive ? '✅ Active' : '❌ Inactive'}
+                  {selectedUser.status === 'Active' ? '✅ Active' : '❌ Inactive'}
                 </div>
               </div>
               <div className="detail-row">
@@ -142,15 +142,13 @@ function UsersList({ token, apiUrl }) {
                 </div>
               </div>
               <div className="detail-row">
-                <div className="detail-label">Last Updated:</div>
-                <div className="detail-value">
-                  {new Date(selectedUser.updatedAt).toLocaleString()}
-                </div>
+                <div className="detail-label">Name:</div>
+                <div className="detail-value">{selectedUser.name}</div>
               </div>
-              {selectedUser.phone && (
+              {selectedUser.appointmentsCount > 0 && (
                 <div className="detail-row">
-                  <div className="detail-label">Phone:</div>
-                  <div className="detail-value">{selectedUser.phone}</div>
+                  <div className="detail-label">Appointments:</div>
+                  <div className="detail-value">{selectedUser.appointmentsCount}</div>
                 </div>
               )}
             </div>

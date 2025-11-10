@@ -21,7 +21,7 @@ function DoctorsList({ token, apiUrl }) {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (response.data.success) {
-        setDoctors(response.data.doctors || []);
+        setDoctors(response.data.data || []);
       }
     } catch (err) {
       setError('Failed to fetch doctors');
@@ -69,7 +69,7 @@ function DoctorsList({ token, apiUrl }) {
     const matchesSearch =
       doctor.personalInfo?.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       doctor.personalInfo?.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doctor.email?.toLowerCase().includes(searchTerm.toLowerCase());
+      doctor.userEmail?.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesFilter =
       filterStatus === 'all' ||
@@ -132,21 +132,21 @@ function DoctorsList({ token, apiUrl }) {
               </tr>
             ) : (
               filteredDoctors.map((doctor) => (
-                <tr key={doctor._id}>
+                <tr key={doctor.id}>
                   <td>
                     <div className="doctor-name">
                       {doctor.personalInfo?.firstName} {doctor.personalInfo?.lastName}
                     </div>
                   </td>
-                  <td>{doctor.email}</td>
-                  <td>{doctor.specialization || 'N/A'}</td>
+                  <td>{doctor.userEmail}</td>
+                  <td>{doctor.professionalInfo?.specialization || 'N/A'}</td>
                   <td>
                     <span className={`status-badge ${doctor.status}`}>
                       {doctor.status.charAt(0).toUpperCase() + doctor.status.slice(1)}
                     </span>
                   </td>
-                  <td>{doctor.licenseNumber || 'N/A'}</td>
-                  <td>{new Date(doctor.submittedAt).toLocaleDateString()}</td>
+                  <td>{doctor.professionalInfo?.licenseNumber || 'N/A'}</td>
+                  <td>{new Date(doctor.createdAt).toLocaleDateString()}</td>
                   <td>
                     <button
                       className="view-button"
@@ -188,7 +188,7 @@ function DoctorsList({ token, apiUrl }) {
                 </div>
                 <div className="detail-row">
                   <div className="detail-label">Email:</div>
-                  <div className="detail-value">{selectedDoctor.email}</div>
+                  <div className="detail-value">{selectedDoctor.userEmail}</div>
                 </div>
                 <div className="detail-row">
                   <div className="detail-label">Phone:</div>
@@ -209,23 +209,23 @@ function DoctorsList({ token, apiUrl }) {
                 <h4>Professional Information</h4>
                 <div className="detail-row">
                   <div className="detail-label">Specialization:</div>
-                  <div className="detail-value">{selectedDoctor.specialization || 'N/A'}</div>
+                  <div className="detail-value">{selectedDoctor.professionalInfo?.specialization || 'N/A'}</div>
                 </div>
                 <div className="detail-row">
                   <div className="detail-label">License Number:</div>
-                  <div className="detail-value">{selectedDoctor.licenseNumber || 'N/A'}</div>
+                  <div className="detail-value">{selectedDoctor.professionalInfo?.licenseNumber || 'N/A'}</div>
                 </div>
                 <div className="detail-row">
                   <div className="detail-label">License Expiry:</div>
                   <div className="detail-value">
-                    {selectedDoctor.licenseExpiry 
-                      ? new Date(selectedDoctor.licenseExpiry).toLocaleDateString() 
+                    {selectedDoctor.professionalInfo?.licenseExpiry 
+                      ? new Date(selectedDoctor.professionalInfo.licenseExpiry).toLocaleDateString() 
                       : 'N/A'}
                   </div>
                 </div>
                 <div className="detail-row">
                   <div className="detail-label">Years of Experience:</div>
-                  <div className="detail-value">{selectedDoctor.yearsOfExperience || 'N/A'}</div>
+                  <div className="detail-value">{selectedDoctor.professionalInfo?.yearsOfExperience || 'N/A'}</div>
                 </div>
               </div>
 
