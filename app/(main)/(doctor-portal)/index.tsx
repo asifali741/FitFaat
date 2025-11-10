@@ -1,15 +1,59 @@
 import AppHeader from "@/components/AppHeader";
+import { useDoctorRegistration } from "@/hooks/useDoctorRegistration";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import React from "react";
-import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useState } from "react";
+import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colorsSheet } from "../(settings)/_ui_elements";
 
 export default function DoctorPortal() {
   const router = useRouter();
+  const { getDoctorStatus } = useDoctorRegistration();
+  const [doctorStatus, setDoctorStatus] = useState<string | null>(null);
+  const [isLoadingStatus, setIsLoadingStatus] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchDoctorStatus();
+    }, [])
+  );
+
+  const fetchDoctorStatus = async () => {
+    setIsLoadingStatus(true);
+    try {
+      const response = await getDoctorStatus();
+      setDoctorStatus(response.doctor?.status || null);
+    } catch (error) {
+      // Doctor status not found (first time user)
+      setDoctorStatus(null);
+    } finally {
+      setIsLoadingStatus(false);
+    }
+  };
+
+  const handleDoctorButtonPress = () => {
+    if (doctorStatus === 'approved') {
+      Alert.alert('Already Registered', 'You are already registered as a doctor!');
+      return;
+    }
+
+    if (doctorStatus === 'pending') {
+      Alert.alert('Application Pending', 'Your request is under process. We will let you know soon!');
+      return;
+    }
+
+    if (doctorStatus === 'rejected') {
+      Alert.alert('Application Rejected', 'Your application was rejected. You can submit a new application.');
+      router.push('/(main)/(doctor-portal)/register-form');
+      return;
+    }
+
+    // No previous application
+    router.push('/(main)/(doctor-portal)/register-form');
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -53,8 +97,9 @@ export default function DoctorPortal() {
         <View style={styles.buttonContainer}>
           <TouchableOpacity 
             style={styles.gradientButtonContainer}
-            onPress={() => router.push('/(main)/(doctor-portal)/register-form')}
+            onPress={handleDoctorButtonPress}
             activeOpacity={0.8}
+            disabled={isLoadingStatus}
           >
             <LinearGradient
               colors={['#26867C', '#4CAF50', '#66BB6A']}
@@ -62,7 +107,9 @@ export default function DoctorPortal() {
               end={{ x: 1, y: 0 }}
               style={styles.gradientButton}
             >
-              <Text style={styles.gradientButtonText}>Join as Doctor ✨</Text>
+              <Text style={styles.gradientButtonText}>
+                {isLoadingStatus ? 'Loading...' : 'Join as Doctor ✨'}
+              </Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
