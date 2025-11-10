@@ -90,7 +90,7 @@ export default function DoctorPortal() {
             onPress={() => router.push('/(main)/(doctor-portal)/patient-management')}
           >
             <Ionicons name="people" size={30} color={colorsSheet.primaryLight} />
-            <Text style={styles.featureText}>Patient Management</Text>
+            <Text style={styles.featureText}>Appointments Management</Text>
             <View style={styles.featureBadge}>
               <Text style={styles.featureBadgeText}>New</Text>
             </View>
