@@ -128,9 +128,7 @@ export const submitDoctorRegistration = async (req, res) => {
   }
 };
 
-// @desc    Get doctor registration status
-// @route   GET /api/doctors/status
-// @access  Private
+
 export const getDoctorStatus = async (req, res) => {
   try {
     const userId = req.user.id;
