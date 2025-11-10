@@ -6,6 +6,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Dimensions,
     FlatList,
     Modal,
     ScrollView,
@@ -18,6 +19,8 @@ import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-nat
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colorsSheet } from '../(settings)/_ui_elements';
 
+const { width } = Dimensions.get('window');
+
 export default function PatientManagementScreen() {
   const router = useRouter();
   const [appointments, setAppointments] = useState<any[]>([]);
@@ -27,6 +30,8 @@ export default function PatientManagementScreen() {
   const [showModal, setShowModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [doctorId, setDoctorId] = useState<string | null>(null);
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [confirmationType, setConfirmationType] = useState<'approve' | 'reject' | null>(null);
 
   const styles = useMemo(() => getStyles(), []);
 
@@ -69,24 +74,28 @@ export default function PatientManagementScreen() {
 
     setIsProcessing(true);
     try {
-      // Call the approve appointment API
       const response = await authApi.approveAppointment(doctorId, selectedAppointment._id);
-      
+
       if (response.success) {
-        Alert.alert(
-          'Success',
-          'Appointment request approved! Patient will be notified.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                setShowModal(false);
-                setSelectedAppointment(null);
-                fetchDoctorAppointments();
+        setShowConfirmationModal(false);
+        setShowModal(false);
+        
+        // Show success popup
+        setTimeout(() => {
+          Alert.alert(
+            '✓ Success',
+            'Appointment approved successfully! Patient has been notified.',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  setSelectedAppointment(null);
+                  fetchDoctorAppointments();
+                },
               },
-            },
-          ]
-        );
+            ]
+          );
+        }, 300);
       } else {
         Alert.alert('Error', response.message || 'Failed to approve appointment');
       }
@@ -107,22 +116,27 @@ export default function PatientManagementScreen() {
         'Doctor rejected the appointment request',
         doctorId
       );
-      
+
       if (response.success) {
-        Alert.alert(
-          'Success',
-          'Appointment request rejected. Patient will be notified.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                setShowModal(false);
-                setSelectedAppointment(null);
-                fetchDoctorAppointments();
+        setShowConfirmationModal(false);
+        setShowModal(false);
+
+        // Show success popup
+        setTimeout(() => {
+          Alert.alert(
+            '✓ Rejected',
+            'Appointment request has been rejected. Patient has been notified.',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  setSelectedAppointment(null);
+                  fetchDoctorAppointments();
+                },
               },
-            },
-          ]
-        );
+            ]
+          );
+        }, 300);
       } else {
         Alert.alert('Error', response.message || 'Failed to reject appointment');
       }
@@ -143,13 +157,13 @@ export default function PatientManagementScreen() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending':
-        return colorsSheet.warning;
+        return { bg: '#FFF3CD', text: '#856404', icon: '#FF9800' };
       case 'confirmed':
-        return colorsSheet.success;
+        return { bg: '#D4EDDA', text: '#155724', icon: '#4CAF50' };
       case 'cancelled':
-        return colorsSheet.error;
+        return { bg: '#F8D7DA', text: '#721C24', icon: '#F44336' };
       default:
-        return colorsSheet.textSecondary;
+        return { bg: '#E2E3E5', text: '#383D41', icon: '#6C757D' };
     }
   };
 
@@ -182,6 +196,7 @@ export default function PatientManagementScreen() {
       month: 'short',
       year: 'numeric',
     });
+    const statusColor = getStatusColor(item.status);
 
     return (
       <TouchableOpacity
@@ -190,37 +205,37 @@ export default function PatientManagementScreen() {
           setSelectedAppointment(item);
           setShowModal(true);
         }}
+        activeOpacity={0.7}
       >
-        <View style={styles.requestContent}>
-          <View style={styles.patientAvatar}>
-            <Ionicons name="person" size={24} color={colorsSheet.primary} />
-          </View>
-
-          <View style={styles.requestInfo}>
-            <Text style={styles.patientName}>Patient Request</Text>
-            <Text style={styles.appointmentDateTime}>
-              {dateString} at {item.time}
+        <View style={styles.cardHeader}>
+          <View style={[styles.statusIndicator, { backgroundColor: statusColor.icon }]} />
+          <View style={styles.cardTitleContainer}>
+            <Text style={styles.patientName} numberOfLines={1}>
+              {item.userName || 'Patient'}
             </Text>
-            <Text style={styles.consultationFee}>Consultation Fee: Rs {item.price}</Text>
+            <Text style={styles.appointmentDateTime} numberOfLines={1}>
+              {dateString} • {item.time}
+            </Text>
           </View>
+          <View style={[styles.statusBadge, { backgroundColor: statusColor.bg }]}>
+            <Text style={[styles.statusBadgeText, { color: statusColor.text }]}>
+              {item.status === 'pending'
+                ? 'Pending'
+                : item.status === 'confirmed'
+                ? 'Approved'
+                : 'Cancelled'}
+            </Text>
+          </View>
+        </View>
 
-          <View style={styles.statusContainer}>
-            <View
-              style={[
-                styles.statusBadge,
-                { backgroundColor: getStatusColor(item.status) + '20' },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.statusBadgeText,
-                  { color: getStatusColor(item.status) },
-                ]}
-              >
-                {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
-              </Text>
-            </View>
+        <View style={styles.cardDivider} />
+
+        <View style={styles.cardFooter}>
+          <View style={styles.feeContainer}>
+            <Ionicons name="cash" size={16} color={colorsSheet.success} />
+            <Text style={styles.feeText}>Rs {item.price}</Text>
           </View>
+          <Ionicons name="chevron-forward" size={20} color={colorsSheet.textSecondary} />
         </View>
       </TouchableOpacity>
     );
@@ -396,7 +411,7 @@ export default function PatientManagementScreen() {
                       {
                         borderLeftColor: getStatusColor(
                           selectedAppointment.status
-                        ),
+                        ).icon,
                       },
                     ]}
                   >
@@ -405,7 +420,7 @@ export default function PatientManagementScreen() {
                         styles.statusIcon,
                         {
                           backgroundColor:
-                            getStatusColor(selectedAppointment.status) + '20',
+                            getStatusColor(selectedAppointment.status).icon + '20',
                         },
                       ]}
                     >
@@ -416,7 +431,7 @@ export default function PatientManagementScreen() {
                             : 'checkmark-circle'
                         }
                         size={24}
-                        color={getStatusColor(selectedAppointment.status)}
+                        color={getStatusColor(selectedAppointment.status).icon}
                       />
                     </View>
                     <View style={styles.statusInfo}>
@@ -425,12 +440,15 @@ export default function PatientManagementScreen() {
                         style={[
                           styles.statusValue,
                           {
-                            color: getStatusColor(selectedAppointment.status),
+                            color: getStatusColor(selectedAppointment.status).icon,
                           },
                         ]}
                       >
-                        {selectedAppointment.status.charAt(0).toUpperCase() +
-                          selectedAppointment.status.slice(1)}
+                        {selectedAppointment.status === 'pending'
+                          ? 'Pending'
+                          : selectedAppointment.status === 'confirmed'
+                          ? 'Approved'
+                          : 'Cancelled'}
                       </Text>
                     </View>
                   </View>
@@ -445,7 +463,10 @@ export default function PatientManagementScreen() {
                         styles.approveButton,
                         isProcessing && styles.buttonDisabled,
                       ]}
-                      onPress={handleApproveAppointment}
+                      onPress={() => {
+                        setConfirmationType('approve');
+                        setShowConfirmationModal(true);
+                      }}
                       disabled={isProcessing}
                     >
                       {isProcessing ? (
@@ -474,18 +495,8 @@ export default function PatientManagementScreen() {
                         isProcessing && styles.buttonDisabled,
                       ]}
                       onPress={() => {
-                        Alert.alert(
-                          'Reject Request',
-                          'Are you sure you want to reject this appointment request?',
-                          [
-                            { text: 'Cancel', onPress: () => {} },
-                            {
-                              text: 'Reject',
-                              onPress: handleRejectAppointment,
-                              style: 'destructive',
-                            },
-                          ]
-                        );
+                        setConfirmationType('reject');
+                        setShowConfirmationModal(true);
                       }}
                       disabled={isProcessing}
                     >
@@ -531,6 +542,102 @@ export default function PatientManagementScreen() {
           </ScrollView>
         </SafeAreaView>
       </Modal>
+
+      {/* Confirmation Modal */}
+      <Modal
+        visible={showConfirmationModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowConfirmationModal(false)}
+      >
+        <View style={styles.confirmationOverlay}>
+          <View style={styles.confirmationContainer}>
+            {/* Header */}
+            <View style={[styles.confirmationHeader, confirmationType === 'approve' ? styles.confirmApproveHeader : styles.confirmRejectHeader]}>
+              <Ionicons
+                name={confirmationType === 'approve' ? 'checkmark-circle' : 'alert-circle'}
+                size={48}
+                color={colorsSheet.white}
+              />
+              <Text style={styles.confirmationTitle}>
+                {confirmationType === 'approve' ? 'Approve Appointment?' : 'Reject Appointment?'}
+              </Text>
+            </View>
+
+            {/* Content */}
+            <View style={styles.confirmationContent}>
+              <View style={styles.appointmentSummary}>
+                <View style={styles.summaryRow}>
+                  <Ionicons name="person" size={18} color={colorsSheet.textSecondary} />
+                  <Text style={styles.summaryLabel}>Patient:</Text>
+                  <Text style={styles.summaryValue}>{selectedAppointment?.userName || 'Unknown'}</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Ionicons name="calendar" size={18} color={colorsSheet.textSecondary} />
+                  <Text style={styles.summaryLabel}>Date:</Text>
+                  <Text style={styles.summaryValue}>
+                    {selectedAppointment?.date
+                      ? new Date(selectedAppointment.date).toLocaleDateString('en-GB', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })
+                      : 'N/A'}
+                  </Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Ionicons name="time" size={18} color={colorsSheet.textSecondary} />
+                  <Text style={styles.summaryLabel}>Time:</Text>
+                  <Text style={styles.summaryValue}>{selectedAppointment?.time || 'N/A'}</Text>
+                </View>
+              </View>
+
+              <Text style={styles.confirmationMessage}>
+                {confirmationType === 'approve'
+                  ? 'Are you sure you want to approve this appointment request? The patient will be notified immediately.'
+                  : 'Are you sure you want to reject this appointment request? The patient will be notified about the rejection.'}
+              </Text>
+            </View>
+
+            {/* Action Buttons */}
+            <View style={styles.confirmationActions}>
+              <TouchableOpacity
+                style={styles.confirmationCancelButton}
+                onPress={() => setShowConfirmationModal(false)}
+              >
+                <Text style={styles.confirmationCancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.confirmationActionButton,
+                  confirmationType === 'approve'
+                    ? styles.confirmationApproveButton
+                    : styles.confirmationRejectButton,
+                  isProcessing && styles.buttonDisabled,
+                ]}
+                onPress={confirmationType === 'approve' ? handleApproveAppointment : handleRejectAppointment}
+                disabled={isProcessing}
+              >
+                {isProcessing ? (
+                  <ActivityIndicator color={colorsSheet.white} size="small" />
+                ) : (
+                  <>
+                    <Ionicons
+                      name={confirmationType === 'approve' ? 'checkmark' : 'close'}
+                      size={18}
+                      color={colorsSheet.white}
+                    />
+                    <Text style={styles.confirmationActionText}>
+                      {confirmationType === 'approve' ? 'Approve' : 'Reject'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -543,7 +650,7 @@ const getStyles = () =>
     },
     content: {
       flex: 1,
-      backgroundColor: colorsSheet.screenColor,
+      backgroundColor: '#F8F9FB',
       borderTopLeftRadius: 30,
       borderTopRightRadius: 30,
       paddingTop: hp(2),
@@ -555,10 +662,10 @@ const getStyles = () =>
       gap: wp(2),
     },
     filterButton: {
-      paddingVertical: hp(0.8),
-      paddingHorizontal: wp(3),
-      borderRadius: 20,
-      borderWidth: 1.5,
+      paddingVertical: hp(0.9),
+      paddingHorizontal: wp(3.5),
+      borderRadius: 12,
+      borderWidth: 2,
       borderColor: colorsSheet.lightGray,
       backgroundColor: colorsSheet.white,
     },
@@ -602,18 +709,74 @@ const getStyles = () =>
       paddingVertical: hp(1),
       paddingBottom: hp(3),
     },
+    // Card Styles
     requestCard: {
       backgroundColor: colorsSheet.white,
-      borderRadius: 15,
-      padding: wp(4),
+      borderRadius: 16,
       marginBottom: hp(2),
-      borderLeftWidth: 4,
-      borderLeftColor: colorsSheet.primary,
-      shadowColor: colorsSheet.primary,
+      shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
+      shadowOpacity: 0.08,
       shadowRadius: 4,
       elevation: 3,
+      overflow: 'hidden',
+    },
+    cardHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: wp(4),
+      paddingVertical: hp(2),
+    },
+    statusIndicator: {
+      width: 4,
+      height: hp(5),
+      borderRadius: 2,
+      marginRight: wp(3),
+    },
+    cardTitleContainer: {
+      flex: 1,
+    },
+    patientName: {
+      fontSize: hp(1.8),
+      fontWeight: '700',
+      color: colorsSheet.textPrimary,
+      marginBottom: hp(0.3),
+    },
+    appointmentDateTime: {
+      fontSize: hp(1.4),
+      color: colorsSheet.textSecondary,
+    },
+    statusBadge: {
+      paddingVertical: hp(0.6),
+      paddingHorizontal: wp(2.5),
+      borderRadius: 8,
+      marginLeft: wp(2),
+    },
+    statusBadgeText: {
+      fontSize: hp(1.2),
+      fontWeight: '600',
+    },
+    cardDivider: {
+      height: 1,
+      backgroundColor: '#EFEFEF',
+      marginHorizontal: wp(4),
+    },
+    cardFooter: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: wp(4),
+      paddingVertical: hp(1.5),
+    },
+    feeContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: wp(2),
+    },
+    feeText: {
+      fontSize: hp(1.5),
+      fontWeight: '600',
+      color: colorsSheet.success,
     },
     requestContent: {
       flexDirection: 'row',
@@ -631,17 +794,6 @@ const getStyles = () =>
     requestInfo: {
       flex: 1,
     },
-    patientName: {
-      fontSize: hp(1.8),
-      fontWeight: '600',
-      color: colorsSheet.textPrimary,
-      marginBottom: hp(0.3),
-    },
-    appointmentDateTime: {
-      fontSize: hp(1.5),
-      color: colorsSheet.textSecondary,
-      marginBottom: hp(0.3),
-    },
     consultationFee: {
       fontSize: hp(1.4),
       fontWeight: '500',
@@ -650,19 +802,10 @@ const getStyles = () =>
     statusContainer: {
       marginLeft: wp(2),
     },
-    statusBadge: {
-      paddingVertical: hp(0.6),
-      paddingHorizontal: wp(2.5),
-      borderRadius: 8,
-    },
-    statusBadgeText: {
-      fontSize: hp(1.2),
-      fontWeight: '600',
-    },
     // Modal Styles
     modalContainer: {
       flex: 1,
-      backgroundColor: colorsSheet.screenColor,
+      backgroundColor: '#F8F9FB',
     },
     modalHeader: {
       flexDirection: 'row',
@@ -670,17 +813,17 @@ const getStyles = () =>
       justifyContent: 'space-between',
       paddingHorizontal: wp(4),
       paddingVertical: hp(2),
-      backgroundColor: colorsSheet.primary,
+      backgroundColor: colorsSheet.white,
       borderBottomWidth: 1,
-      borderBottomColor: colorsSheet.gray,
+      borderBottomColor: '#EFEFEF',
     },
     closeButton: {
       padding: hp(0.5),
     },
     modalTitle: {
       fontSize: hp(2.2),
-      fontWeight: 'bold',
-      color: colorsSheet.white,
+      fontWeight: '700',
+      color: colorsSheet.textPrimary,
     },
     headerSpacer: {
       width: hp(3),
@@ -702,15 +845,18 @@ const getStyles = () =>
     infoCard: {
       flexDirection: 'row',
       backgroundColor: colorsSheet.white,
-      borderRadius: 15,
+      borderRadius: 16,
       padding: wp(4),
       alignItems: 'center',
+      borderLeftWidth: 4,
+      borderLeftColor: colorsSheet.primary,
+      marginBottom: hp(1),
     },
     avatarLarge: {
-      width: wp(16),
-      height: wp(16),
-      borderRadius: wp(8),
-      backgroundColor: colorsSheet.primarySoft,
+      width: wp(14),
+      height: wp(14),
+      borderRadius: wp(7),
+      backgroundColor: colorsSheet.primary,
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: wp(3),
@@ -719,8 +865,8 @@ const getStyles = () =>
       flex: 1,
     },
     patientNameLarge: {
-      fontSize: hp(1.9),
-      fontWeight: '600',
+      fontSize: hp(1.8),
+      fontWeight: '700',
       color: colorsSheet.textPrimary,
       marginBottom: hp(0.3),
     },
@@ -731,32 +877,35 @@ const getStyles = () =>
     detailRow: {
       flexDirection: 'row',
       backgroundColor: colorsSheet.white,
-      borderRadius: 12,
+      borderRadius: 14,
       padding: wp(4),
-      marginBottom: hp(1),
+      marginBottom: hp(1.2),
       alignItems: 'flex-start',
+      borderLeftWidth: 3,
+      borderLeftColor: colorsSheet.info,
     },
     detailContent: {
       flex: 1,
       marginLeft: wp(3),
     },
     detailLabel: {
-      fontSize: hp(1.3),
+      fontSize: hp(1.2),
       color: colorsSheet.textSecondary,
       marginBottom: hp(0.3),
     },
     detailValue: {
       fontSize: hp(1.7),
-      fontWeight: '600',
+      fontWeight: '700',
       color: colorsSheet.textPrimary,
     },
     statusDisplay: {
       flexDirection: 'row',
       backgroundColor: colorsSheet.white,
-      borderRadius: 12,
+      borderRadius: 14,
       padding: wp(4),
-      borderLeftWidth: 3,
+      borderLeftWidth: 4,
       alignItems: 'center',
+      marginBottom: hp(1),
     },
     statusIcon: {
       width: wp(12),
@@ -839,5 +988,121 @@ const getStyles = () =>
       color: colorsSheet.textPrimary,
       fontSize: hp(1.7),
       fontWeight: '600',
+    },
+    // Confirmation Modal Styles
+    confirmationOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.6)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    confirmationContainer: {
+      backgroundColor: colorsSheet.white,
+      borderRadius: 20,
+      overflow: 'hidden',
+      width: '85%',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.25,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    confirmationHeader: {
+      paddingVertical: hp(2.5),
+      paddingHorizontal: wp(5),
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: wp(2),
+    },
+    confirmApproveHeader: {
+      backgroundColor: colorsSheet.success,
+    },
+    confirmRejectHeader: {
+      backgroundColor: colorsSheet.error,
+    },
+    confirmationTitle: {
+      fontSize: hp(2.2),
+      fontWeight: '700',
+      color: colorsSheet.white,
+      textAlign: 'center',
+    },
+    confirmationContent: {
+      paddingHorizontal: wp(5),
+      paddingVertical: hp(2),
+    },
+    appointmentSummary: {
+      backgroundColor: '#F5F5F5',
+      borderRadius: 12,
+      padding: wp(4),
+      marginVertical: hp(1.5),
+      gap: hp(1),
+    },
+    summaryRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: hp(1),
+    },
+    summaryLabel: {
+      fontSize: hp(1.4),
+      fontWeight: '600',
+      color: colorsSheet.textSecondary,
+      flex: 1,
+    },
+    summaryValue: {
+      fontSize: hp(1.6),
+      fontWeight: '700',
+      color: colorsSheet.textPrimary,
+      flex: 1.5,
+      textAlign: 'right',
+    },
+    confirmationMessage: {
+      fontSize: hp(1.5),
+      color: colorsSheet.textSecondary,
+      textAlign: 'center',
+      marginVertical: hp(1.5),
+      lineHeight: hp(2.2),
+    },
+    confirmationActions: {
+      flexDirection: 'row',
+      gap: wp(3),
+      marginTop: hp(2),
+      paddingHorizontal: wp(5),
+      paddingBottom: hp(2),
+    },
+    confirmationCancelButton: {
+      flex: 1,
+      backgroundColor: '#F0F0F0',
+      paddingVertical: hp(1.6),
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: '#E0E0E0',
+    },
+    confirmationCancelText: {
+      fontSize: hp(1.6),
+      fontWeight: '600',
+      color: colorsSheet.textPrimary,
+    },
+    confirmationActionButton: {
+      flex: 1,
+      paddingVertical: hp(1.6),
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+      gap: wp(1.5),
+    },
+    confirmationApproveButton: {
+      backgroundColor: colorsSheet.success,
+    },
+    confirmationRejectButton: {
+      backgroundColor: colorsSheet.error,
+    },
+    confirmationActionText: {
+      fontSize: hp(1.6),
+      fontWeight: '700',
+      color: colorsSheet.white,
     },
   });
