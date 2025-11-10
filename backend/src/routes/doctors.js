@@ -22,7 +22,7 @@ router.post(
     body('firstName').trim().notEmpty().withMessage('First name is required'),
     body('lastName').trim().notEmpty().withMessage('Last name is required'),
     body('phoneNumber').trim().notEmpty().withMessage('Phone number is required'),
-    body('age').isInt({ min: 18, max: 80 }).withMessage('Age must be between 18 and 80'),
+    body('age').optional().isInt({ min: 18, max: 80 }).withMessage('Age must be between 18 and 80'),
     body('gender').isIn(['male', 'female', 'other']).withMessage('Valid gender is required'),
     body('licenseNumber').trim().notEmpty().withMessage('License number is required'),
     body('licenseAuthority').trim().notEmpty().withMessage('License authority is required'),

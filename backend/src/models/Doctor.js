@@ -26,12 +26,10 @@ const doctorSchema = new mongoose.Schema({
       required: [true, 'Phone number is required']
     },
     dateOfBirth: {
-      type: Date,
-      required: [true, 'Date of birth is required']
+      type: Date
     },
     age: {
       type: Number,
-      required: [true, 'Age is required'],
       min: 18,
       max: 80
     },

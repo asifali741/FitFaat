@@ -12,7 +12,7 @@ export const useDoctorRegistration = () => {
     firstName: string;
     lastName: string;
     phoneNumber: string;
-    age: number;
+    age?: number;
     gender: 'male' | 'female' | 'other';
     bio?: string;
     licenseNumber: string;
