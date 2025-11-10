@@ -25,7 +25,14 @@ export default function DashboardLayout() {
             name="DetailsDay" 
             options={{
               animation: 'slide_from_right',
-              presentation: 'modal',
+              presentation: 'card',
+            }} 
+          />
+          <Stack.Screen 
+            name="TrackMeal" 
+            options={{
+              animation: 'slide_from_right',
+              presentation: 'fullScreenModal',
             }} 
           />
           <Stack.Screen 

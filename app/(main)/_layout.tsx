@@ -86,6 +86,7 @@ export default function MainLayout() {
       name="(exercises)" 
       options={{ 
         title: "Workouts 👑",
+        animationEnabled: false,
       }} 
     />
     <Drawer.Screen 

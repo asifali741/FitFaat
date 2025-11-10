@@ -6,10 +6,13 @@ import React from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { colorsSheet } from "../(settings)/_ui_elements";
+import { useTheme } from "@/contexts/ThemeContext";
 
 export default function DoctorPortal() {
   const router = useRouter();
+  const { colors } = useTheme();
+  
+  const styles = getStyles(colors);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -34,17 +37,17 @@ export default function DoctorPortal() {
         {/* Features */}
         <View style={styles.featuresContainer}>
           <View style={styles.featureItem}>
-            <Ionicons name="videocam" size={30} color={colorsSheet.primary} />
+            <Ionicons name="videocam" size={30} color={colors.primary} />
             <Text style={styles.featureText}>Video Consultations</Text>
           </View>
           
           <View style={styles.featureItem}>
-            <Ionicons name="people" size={30} color={colorsSheet.primaryLight} />
+            <Ionicons name="people" size={30} color={colors.primaryLight} />
             <Text style={styles.featureText}>Patient Management</Text>
           </View>
           
           <View style={styles.featureItem}>
-            <Ionicons name="nutrition" size={30} color={colorsSheet.secondary} />
+            <Ionicons name="nutrition" size={30} color={colors.secondary} />
             <Text style={styles.featureText}>Diet Plan Creation</Text>
           </View>
         </View>
@@ -57,7 +60,7 @@ export default function DoctorPortal() {
             activeOpacity={0.8}
           >
             <LinearGradient
-              colors={[colorsSheet.primary, colorsSheet.primaryLight, colorsSheet.accent]}
+              colors={[colors.primary, colors.primaryLight, colors.accent]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.gradientButton}
@@ -71,10 +74,10 @@ export default function DoctorPortal() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: colors.primary,
   },
   header: {
     flexDirection: "row",
@@ -82,7 +85,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: wp(5),
     paddingVertical: hp(2),
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: colors.primary,
   },
   menuButton: {
     padding: 8,
@@ -90,13 +93,13 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: Math.min(hp(2.5), wp(6)),
     fontWeight: "bold",
-    color: colorsSheet.textOnPrimary,
+    color: colors.textOnPrimary,
     textAlign: "center",
     flex: 1,
   },
   content: {
     flex: 1,
-    backgroundColor: colorsSheet.screenColor,
+    backgroundColor: colors.screenColor,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     paddingTop: hp(4),
@@ -114,14 +117,14 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     fontSize: Math.min(hp(2.8), wp(7)),
     fontWeight: "bold",
-    color: colorsSheet.textPrimary,
+    color: colors.textPrimary,
     textAlign: "center",
     marginBottom: hp(1),
     paddingHorizontal: wp(2),
   },
   welcomeSubtitle: {
     fontSize: Math.min(hp(1.8), wp(4.5)),
-    color: colorsSheet.textSecondary,
+    color: colors.textSecondary,
     textAlign: "center",
     lineHeight: Math.min(hp(2.5), wp(6)),
     paddingHorizontal: wp(6),
@@ -134,13 +137,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: hp(2),
     paddingHorizontal: wp(4),
-    backgroundColor: colorsSheet.primarySoft,
+    backgroundColor: colors.primarySoft,
     borderRadius: 15,
     marginBottom: hp(1.5),
   },
   featureText: {
     fontSize: hp(2),
-    color: colorsSheet.textOnCard,
+    color: colors.textOnCard,
     marginLeft: wp(4),
     fontWeight: "500",
   },
@@ -152,7 +155,7 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     overflow: "hidden",
     marginBottom: hp(2),
-    shadowColor: colorsSheet.primary,
+    shadowColor: colors.shadowMedium,
     shadowOffset: {
       width: 0,
       height: 4,
@@ -170,7 +173,7 @@ const styles = StyleSheet.create({
     minHeight: hp(6),
   },
   gradientButtonText: {
-    color: colorsSheet.white,
+    color: colors.white,
     fontSize: Math.min(hp(2.2), wp(5.5)),
     fontWeight: "700",
     letterSpacing: 0.5,

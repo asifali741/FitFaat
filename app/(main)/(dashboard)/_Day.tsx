@@ -11,6 +11,7 @@ import Svg, { Circle, Defs, LinearGradient, Stop, Text as SvgText } from "react-
 import { DashFonts, rs } from "../(settings)/_ui_elements";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Day } from "./DayPlan";
+import { useFonts } from 'expo-font';
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 interface ProgressCircleProps {
   progress: number;
@@ -30,6 +31,15 @@ const ProgressStrokeWidth= (radius/100)*30
 
 export const Days = ({props, onDayPress}: {props: Day, onDayPress: (dayNo : number) => void}) => {
   const { colors } = useTheme();
+  
+  const [fontsLoaded] = useFonts({
+    LoraRegular: require("../../../assets/fonts/static/Lora-Regular.ttf"),
+    LoraBold: require("../../../assets/fonts/static/Lora-Bold.ttf"),
+    LoraSemiBold: require("../../../assets/fonts/static/Lora-SemiBold.ttf"),
+    LoraItalic: require("../../../assets/fonts/static/Lora-Italic.ttf"),
+  });
+
+  if (!fontsLoaded) return null;
   
   if(props.status === 'locked'){ //props false = locked day
     return <LockedDay info={props} />;
@@ -66,7 +76,7 @@ const ActiveDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}) 
             <Text style={styles.modernDateText}>{info.date}</Text>
           </View>
         </View>
-        <ProgressCircle finalProgress={70}/>
+        <ProgressCircle finalProgress={finalProgress}/>
       </View>
 
       {/* Progress Status */}
@@ -212,7 +222,7 @@ const ProgressCircle = React.memo(function ProgressCircle({finalProgress}: {fina
               fill="none"
               transform="rotate(-90 35 35)"
             />
-            <SvgText x="35" y="35" textAnchor="middle" dy=".3em" fontSize="14" fontWeight="bold" fill={getProgressColor()}>
+            <SvgText x="35" y="39" textAnchor="middle" fontSize="14" fontWeight="bold" fill={getProgressColor()} alignmentBaseline="middle">
               {finalProgress}%
             </SvgText>
           </Svg>
@@ -319,15 +329,13 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
 
   dayText: {
-    fontWeight: "700",
     fontSize: DashFonts.dayText,
-    fontFamily: 'LoraItalic',
+    fontFamily: 'LoraBold',
   },
   activeDayText: {
     paddingTop: rs(6),
-    fontWeight: "700",
     fontSize: DashFonts.dayText,
-    fontFamily: 'Inter',
+    fontFamily: 'LoraBold',
   },
   dateText: {
     paddingLeft: rs(8),
@@ -436,7 +444,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   
   modernDayNumber: {
     fontSize: rs(32),
-    fontWeight: '800',
+    fontFamily: 'LoraBold',
     color: colors.textPrimary,
     marginRight: rs(12),
     backgroundColor: colors.primarySoft,
@@ -453,15 +461,15 @@ const getStyles = (colors: any) => StyleSheet.create({
   
   modernDayText: {
     fontSize: rs(18),
-    fontWeight: '600',
+    fontFamily: 'LoraSemiBold',
     color: colors.textPrimary,
     marginBottom: rs(2),
   },
   
   modernDateText: {
     fontSize: rs(14),
+    fontFamily: 'LoraRegular',
     color: colors.textSecondary,
-    fontWeight: '500',
   },
   
   modernProgressWrapper: {
@@ -486,8 +494,8 @@ const getStyles = (colors: any) => StyleSheet.create({
   
   modernStatusText: {
     fontSize: rs(13),
+    fontFamily: 'LoraRegular',
     color: colors.textPrimary,
-    fontWeight: '500',
     marginLeft: rs(6),
   },
   
@@ -502,8 +510,8 @@ const getStyles = (colors: any) => StyleSheet.create({
   
   modernRemarksText: {
     fontSize: rs(13),
+    fontFamily: 'LoraItalic',
     color: colors.secondary,
-    fontStyle: 'italic',
     marginLeft: rs(6),
     flex: 1,
   },
@@ -527,8 +535,8 @@ const getStyles = (colors: any) => StyleSheet.create({
   
   modernNextMealText: {
     fontSize: rs(12),
+    fontFamily: 'LoraSemiBold',
     color: '#7B1FA2',
-    fontWeight: '600',
     marginLeft: rs(4),
   },
   
@@ -549,7 +557,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   modernViewButtonText: {
     color: colors.buttonText,
     fontSize: rs(13),
-    fontWeight: '600',
+    fontFamily: 'LoraSemiBold',
     marginRight: rs(4),
   },
   
@@ -586,7 +594,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   
   modernFinishedDayNumber: {
     fontSize: rs(24),
-    fontWeight: '800',
+    fontFamily: 'LoraBold',
     color: colors.finishedStatus,
     backgroundColor: colors.primarySoft,
     borderRadius: rs(8),
@@ -599,15 +607,15 @@ const getStyles = (colors: any) => StyleSheet.create({
   
   modernFinishedDayText: {
     fontSize: rs(16),
-    fontWeight: '600',
+    fontFamily: 'LoraSemiBold',
     color: colors.textPrimary,
     marginBottom: rs(2),
   },
   
   modernFinishedDateText: {
     fontSize: rs(13),
+    fontFamily: 'LoraRegular',
     color: colors.textSecondary,
-    fontWeight: '500',
   },
   
   modernFinishedProgress: {
@@ -616,7 +624,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   
   modernFinishedPercentage: {
     fontSize: rs(20),
-    fontWeight: '800',
+    fontFamily: 'LoraBold',
     color: colors.finishedStatus,
 
     marginBottom: rs(2),
@@ -624,8 +632,8 @@ const getStyles = (colors: any) => StyleSheet.create({
   
   modernFinishedLabel: {
     fontSize: rs(11),
+    fontFamily: 'LoraSemiBold',
     color: colors.finishedStatus,
-    fontWeight: '600',
     textTransform: 'uppercase',
   },
   
@@ -647,7 +655,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   modernFinishedButtonText: {
     color: colors.buttonText,
     fontSize: rs(14),
-    fontWeight: '600',
+    fontFamily: 'LoraSemiBold',
     marginRight: rs(6),
   },
   
@@ -685,7 +693,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   
   modernLockedDayNumber: {
     fontSize: rs(20),
-    fontWeight: '700',
+    fontFamily: 'LoraBold',
     color: colors.lockedStatus,
     backgroundColor: colors.lightGray,
     borderRadius: rs(8),
@@ -698,16 +706,15 @@ const getStyles = (colors: any) => StyleSheet.create({
   
   modernLockedDayText: {
     fontSize: rs(16),
-    fontWeight: '600',
+    fontFamily: 'LoraSemiBold',
     color: colors.textSecondary,
     marginBottom: rs(2),
   },
   
   modernLockedDateText: {
     fontSize: rs(13),
+    fontFamily: 'LoraRegular',
     color: colors.lockedStatus,
-
-    fontWeight: '500',
   },
   
   modernLockedStatus: {
@@ -716,7 +723,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   
   modernLockedStatusText: {
     fontSize: rs(14),
-    fontWeight: '600',
+    fontFamily: 'LoraSemiBold',
     color: colors.lockedStatus,
     textTransform: 'uppercase',
     marginBottom: rs(2),
@@ -724,9 +731,9 @@ const getStyles = (colors: any) => StyleSheet.create({
   
   modernLockedSubText: {
     fontSize: rs(10),
+    fontFamily: 'LoraItalic',
     color: colors.textLight,
     textAlign: 'center',
-    fontStyle: 'italic',
   },
 });
 

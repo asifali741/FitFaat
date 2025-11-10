@@ -344,7 +344,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.primary,
-    paddingTop: 20,
+    paddingTop: 10,
     paddingBottom: 20,
   },
   safeArea: {
@@ -429,15 +429,15 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   bottomSection: {
     paddingTop: 16,
-    paddingBottom: 20,
+    paddingBottom: 16,
   },
   logoutButton: {
     flexDirection: "row",
     alignItems: "center",
     padding: 16,
     marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 4,
+    marginTop: 8,
+    marginBottom: 16,
     backgroundColor: colors.error,
     borderRadius: 20,
     justifyContent: "center",
