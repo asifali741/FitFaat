@@ -24,7 +24,9 @@ export default function DoctorSelectionScreen() {
   const [selectedDoctor, setSelectedDoctor] = useState<any>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [step, setStep] = useState<'doctors' | 'time' | 'date'>('doctors');
+  const [step, setStep] = useState<'doctors' | 'date' | 'time'>('doctors');
+  const [bookedSlots, setBookedSlots] = useState<string[]>([]);
+  const [isLoadingSlots, setIsLoadingSlots] = useState(false);
 
   const styles = useMemo(() => getStyles(colors), [colors]);
 
@@ -52,6 +54,29 @@ export default function DoctorSelectionScreen() {
       Alert.alert('Error', 'Failed to load doctors. Please try again.');
     } finally {
       setIsLoadingDoctors(false);
+    }
+  };
+
+  // Fetch booked appointments for selected doctor
+  const fetchBookedSlots = async (doctorId: string, date: string) => {
+    setIsLoadingSlots(true);
+    try {
+      const response = await authApi.getDoctorAppointments(doctorId);
+      if (response.success && response.appointments) {
+        // Filter appointments for the selected date
+        const bookedForDate = response.appointments
+          .filter((apt: any) => {
+            const aptDate = new Date(apt.date).toISOString().split('T')[0];
+            return aptDate === date && ['pending', 'confirmed'].includes(apt.status);
+          })
+          .map((apt: any) => apt.time);
+        setBookedSlots(bookedForDate);
+      }
+    } catch (error) {
+      console.error('Failed to fetch booked slots:', error);
+      // Don't show error alert, just continue with empty booked slots
+    } finally {
+      setIsLoadingSlots(false);
     }
   };
 
@@ -101,24 +126,29 @@ export default function DoctorSelectionScreen() {
     setSelectedDoctor(doctor);
     setSelectedTime(null);
     setSelectedDate(null);
+    setBookedSlots([]);
+    setStep('date');
+  };
+
+  const handleDateSelect = async (date: string) => {
+    setSelectedDate(date);
+    // Fetch booked slots for this date
+    if (selectedDoctor) {
+      await fetchBookedSlots(selectedDoctor.id, date);
+    }
     setStep('time');
   };
 
   const handleTimeSelect = (time: string) => {
     setSelectedTime(time);
-    setStep('date');
-  };
-
-  const handleDateSelect = (date: string) => {
-    setSelectedDate(date);
   };
 
   const handleNext = () => {
     if (step === 'doctors' && selectedDoctor) {
-      setStep('time');
-    } else if (step === 'time' && selectedTime) {
       setStep('date');
-    } else if (step === 'date' && selectedDate && selectedDoctor && selectedTime) {
+    } else if (step === 'date' && selectedDate && selectedDoctor) {
+      setStep('time');
+    } else if (step === 'time' && selectedTime && selectedDate && selectedDoctor) {
       // Navigate to appointment summary
       router.push({
         pathname: '/(main)/(conference)/appointment-summary' as any,
@@ -135,13 +165,13 @@ export default function DoctorSelectionScreen() {
   };
 
   const handleBack = () => {
-    if (step === 'time') {
+    if (step === 'date') {
       setSelectedDoctor(null);
-      setSelectedTime(null);
-      setStep('doctors');
-    } else if (step === 'date') {
       setSelectedDate(null);
-      setStep('time');
+      setStep('doctors');
+    } else if (step === 'time') {
+      setSelectedTime(null);
+      setStep('date');
     } else {
       router.back();
     }
@@ -149,15 +179,15 @@ export default function DoctorSelectionScreen() {
 
   const isNextDisabled = () => {
     if (step === 'doctors') return !selectedDoctor;
-    if (step === 'time') return !selectedTime;
     if (step === 'date') return !selectedDate;
+    if (step === 'time') return !selectedTime || isLoadingSlots;
     return true;
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader
-        title={step === 'doctors' ? 'Select Doctor' : step === 'time' ? 'Select Time' : 'Select Date'}
+        title={step === 'doctors' ? 'Select Doctor' : step === 'date' ? 'Select Date' : 'Select Time'}
         showStepIndicator={false}
       />
 
@@ -218,44 +248,12 @@ export default function DoctorSelectionScreen() {
           </View>
         )}
 
-        {/* Step 2: Time Selection */}
-        {step === 'time' && selectedDoctor && (
-          <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Select Time</Text>
-            <Text style={styles.stepSubtitle}>
-              {selectedDoctor.name} - Choose your preferred time
-            </Text>
-
-            <View style={styles.timeGrid}>
-              {timeSlots.map((time) => (
-                <TouchableOpacity
-                  key={time}
-                  style={[
-                    styles.timeSlot,
-                    selectedTime === time && styles.timeSlotSelected,
-                  ]}
-                  onPress={() => handleTimeSelect(time)}
-                >
-                  <Text
-                    style={[
-                      styles.timeSlotText,
-                      selectedTime === time && styles.timeSlotTextSelected,
-                    ]}
-                  >
-                    {time}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Step 3: Date Selection */}
-        {step === 'date' && selectedDoctor && selectedTime && (
+        {/* Step 2: Date Selection */}
+        {step === 'date' && selectedDoctor && (
           <View style={styles.stepContainer}>
             <Text style={styles.stepTitle}>Select Date</Text>
             <Text style={styles.stepSubtitle}>
-              {selectedTime} with {selectedDoctor.name}
+              {selectedDoctor.name} - Choose your preferred date
             </Text>
 
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -283,6 +281,61 @@ export default function DoctorSelectionScreen() {
           </View>
         )}
 
+        {/* Step 3: Time Selection */}
+        {step === 'time' && selectedDoctor && selectedDate && (
+          <View style={styles.stepContainer}>
+            <Text style={styles.stepTitle}>Select Time</Text>
+            <Text style={styles.stepSubtitle}>
+              {selectedDoctor.name} - Choose your preferred time
+            </Text>
+
+            {isLoadingSlots ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={styles.loadingText}>Loading available slots...</Text>
+              </View>
+            ) : (
+              <View style={styles.timeGrid}>
+                {timeSlots.map((time) => {
+                  const isBooked = bookedSlots.includes(time);
+                  const isSelected = selectedTime === time;
+                  
+                  return (
+                    <TouchableOpacity
+                      key={time}
+                      style={[
+                        styles.timeSlot,
+                        isSelected && styles.timeSlotSelected,
+                        isBooked && styles.timeSlotBooked,
+                      ]}
+                      onPress={() => !isBooked && handleTimeSelect(time)}
+                      disabled={isBooked}
+                    >
+                      <Text
+                        style={[
+                          styles.timeSlotText,
+                          isSelected && styles.timeSlotTextSelected,
+                          isBooked && styles.timeSlotTextBooked,
+                        ]}
+                      >
+                        {time}
+                      </Text>
+                      {isBooked && (
+                        <Ionicons 
+                          name="close-circle" 
+                          size={16} 
+                          color={colors.error} 
+                          style={styles.bookedIcon}
+                        />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        )}
+
         {/* Navigation Buttons */}
         <View style={styles.buttonContainer}>
           <TouchableOpacity
@@ -297,7 +350,7 @@ export default function DoctorSelectionScreen() {
             disabled={isNextDisabled()}
           >
             <Text style={[styles.nextBtnText, isNextDisabled() && styles.nextBtnTextDisabled]}>
-              {step === 'date' ? 'Continue to Summary' : 'Next'}
+              {step === 'time' ? 'Continue to Summary' : 'Next'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -347,6 +400,11 @@ const getStyles = (colors: any) =>
       fontSize: hp(1.8),
       color: colors.textSecondary,
       marginTop: hp(1),
+    },
+    loadingText: {
+      fontSize: hp(1.6),
+      color: colors.textSecondary,
+      marginTop: hp(2),
     },
     doctorCard: {
       backgroundColor: colors.cardBackground || colors.white,
@@ -446,6 +504,20 @@ const getStyles = (colors: any) =>
     },
     timeSlotTextSelected: {
       color: colors.white,
+    },
+    timeSlotBooked: {
+      backgroundColor: colors.lightGray || '#e0e0e0',
+      borderColor: colors.error || '#FF6B6B',
+      opacity: 0.6,
+    },
+    timeSlotTextBooked: {
+      color: colors.error || '#FF6B6B',
+      textDecorationLine: 'line-through',
+    },
+    bookedIcon: {
+      position: 'absolute',
+      top: -8,
+      right: -8,
     },
     dateCard: {
       backgroundColor: colors.cardBackground || colors.white,

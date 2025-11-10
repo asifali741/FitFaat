@@ -1,8 +1,8 @@
 import { useAppointmentBooking } from "@/hooks/useAppointmentBooking";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useState } from "react";
+import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colorsSheet } from "../(settings)/_ui_elements";
@@ -12,6 +12,11 @@ export default function AppointmentSummaryScreen() {
   const params = useLocalSearchParams();
   const { bookAppointment, isLoading, error } = useAppointmentBooking();
   const [isConfirming, setIsConfirming] = useState(false);
+  const [showResultModal, setShowResultModal] = useState(false);
+  const [bookingResult, setBookingResult] = useState<{
+    success: boolean;
+    message: string;
+  }>({ success: false, message: '' });
   
   // Extract parameters from route
   const doctorId = Array.isArray(params.doctorId) ? params.doctorId[0] : params.doctorId;
@@ -26,7 +31,11 @@ export default function AppointmentSummaryScreen() {
 
   const handleConfirmAppointment = async () => {
     if (!doctorId || !date || !time || fee === undefined) {
-      Alert.alert('Error', 'Missing appointment details');
+      setBookingResult({
+        success: false,
+        message: 'Missing appointment details'
+      });
+      setShowResultModal(true);
       return;
     }
 
@@ -41,21 +50,30 @@ export default function AppointmentSummaryScreen() {
       });
 
       if (response.success) {
-        Alert.alert(
-          'Success',
-          'Appointment booked successfully!',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                router.replace('/(main)/(conference)');
-              },
-            },
-          ]
-        );
+        setBookingResult({
+          success: true,
+          message: 'Appointment booked successfully!'
+        });
+        setShowResultModal(true);
+        
+        // Auto navigate after 3 seconds
+        setTimeout(() => {
+          setShowResultModal(false);
+          router.replace('/(main)/(conference)');
+        }, 10000);
+      } else {
+        setBookingResult({
+          success: false,
+          message: response.message || 'Failed to book appointment'
+        });
+        setShowResultModal(true);
       }
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to book appointment');
+      setBookingResult({
+        success: false,
+        message: err.message || 'Failed to book appointment'
+      });
+      setShowResultModal(true);
     } finally {
       setIsConfirming(false);
     }
@@ -87,8 +105,8 @@ export default function AppointmentSummaryScreen() {
           <View style={styles.successIconCircle}>
             <Ionicons name="checkmark-circle" size={80} color={colorsSheet.success} />
           </View>
-          <Text style={styles.successTitle}>Appointment Booked Successfully!</Text>
-          <Text style={styles.successSubtitle}>Your consultation is scheduled</Text>
+          <Text style={styles.successTitle}>Please Confirm Your Appointment!</Text>
+          <Text style={styles.successSubtitle}>Get a best Consultation Experience</Text>
         </View>
 
         {/* Appointment Summary */}
@@ -222,6 +240,61 @@ export default function AppointmentSummaryScreen() {
           <Text style={styles.homeButtonText}>Back to Conference</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Booking Result Modal */}
+      <Modal
+        visible={showResultModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowResultModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[
+            styles.modalContent,
+            bookingResult.success ? styles.modalSuccess : styles.modalError
+          ]}>
+            {/* Icon */}
+            <View style={[
+              styles.resultIconContainer,
+              bookingResult.success ? styles.resultIconSuccess : styles.resultIconError
+            ]}>
+              <Ionicons 
+                name={bookingResult.success ? "checkmark-circle" : "close-circle"} 
+                size={80} 
+                color={colorsSheet.white} 
+              />
+            </View>
+
+            {/* Title */}
+            <Text style={styles.resultTitle}>
+              {bookingResult.success ? "Congratulations! 🎉" : "Oops! Something went wrong"}
+            </Text>
+
+            {/* Message */}
+            <Text style={styles.resultMessage}>
+              {bookingResult.message}
+            </Text>
+
+            {/* Action Button */}
+            <TouchableOpacity 
+              style={[
+                styles.resultButton,
+                bookingResult.success ? styles.resultButtonSuccess : styles.resultButtonError
+              ]}
+              onPress={() => {
+                setShowResultModal(false);
+                if (bookingResult.success) {
+                  router.replace('/(main)/(conference)');
+                }
+              }}
+            >
+              <Text style={styles.resultButtonText}>
+                {bookingResult.success ? "Continue" : "Try Again"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -457,5 +530,80 @@ const styles = StyleSheet.create({
     fontSize: hp(1.5),
     marginLeft: wp(3),
     flex: 1,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: colorsSheet.white,
+    borderRadius: 30,
+    padding: wp(8),
+    width: wp(85),
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalSuccess: {
+    backgroundColor: colorsSheet.white,
+  },
+  modalError: {
+    backgroundColor: colorsSheet.white,
+  },
+  resultIconContainer: {
+    width: hp(12),
+    height: hp(12),
+    borderRadius: hp(6),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: hp(2),
+  },
+  resultIconSuccess: {
+    backgroundColor: colorsSheet.success || '#4CAF50',
+  },
+  resultIconError: {
+    backgroundColor: colorsSheet.error || '#FF3B30',
+  },
+  resultTitle: {
+    fontSize: hp(2.5),
+    fontWeight: 'bold',
+    color: colorsSheet.textPrimary,
+    textAlign: 'center',
+    marginBottom: hp(1),
+  },
+  resultMessage: {
+    fontSize: hp(1.6),
+    color: colorsSheet.textSecondary,
+    textAlign: 'center',
+    marginBottom: hp(2.5),
+    lineHeight: hp(2.4),
+  },
+  resultButton: {
+    paddingVertical: hp(1.8),
+    paddingHorizontal: wp(8),
+    borderRadius: 20,
+    width: '100%',
+    alignItems: 'center',
+    marginTop: hp(1),
+  },
+  resultButtonSuccess: {
+    backgroundColor: colorsSheet.success || '#4CAF50',
+  },
+  resultButtonError: {
+    backgroundColor: colorsSheet.error || '#FF3B30',
+  },
+  resultButtonText: {
+    color: colorsSheet.white,
+    fontSize: hp(1.8),
+    fontWeight: '600',
   },
 });
