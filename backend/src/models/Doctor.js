@@ -210,8 +210,47 @@ const doctorSchema = new mongoose.Schema({
   approvedAt: {
     type: Date,
     default: null
-  }
+  },
+
+  // Appointments booked with this doctor
+  bookedAppointments: [
+    {
+      userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+      },
+      date: {
+        type: Date,
+        required: true
+      },
+      time: {
+        type: String,
+        required: true
+      },
+      status: {
+        type: String,
+        enum: ['pending', 'confirmed', 'completed', 'cancelled'],
+        default: 'pending'
+      },
+      price: {
+        type: Number,
+        required: true
+      },
+      description: {
+        type: String
+      },
+      bookedAt: {
+        type: Date,
+        default: Date.now
+      }
+    }
+  ]
 });
+
+// Create indexes for faster appointment conflict checking
+doctorSchema.index({ 'bookedAppointments.date': 1, 'bookedAppointments.time': 1 });
+doctorSchema.index({ 'bookedAppointments.userId': 1 });
 
 // Update the updatedAt timestamp before saving
 doctorSchema.pre('save', function(next) {
