@@ -2,18 +2,18 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
 import {
-    DrawerContentComponentProps,
-    DrawerItem
+  DrawerContentComponentProps,
+  DrawerItem
 } from "@react-navigation/drawer";
 import { useRef, useState } from "react";
 import { Image, Pressable, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Animated, {
-    useAnimatedStyle,
-    useSharedValue,
-    withSpring,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { DrawerFonts } from "../app/(main)/(settings)/ui_elements";
+import { DrawerFonts } from "../app/(main)/(settings)/_ui_elements";
 type DrawerSceneWrapperProps = DrawerContentComponentProps;
 const userName = 'NAME' // fetch from Authentication Token
 export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {

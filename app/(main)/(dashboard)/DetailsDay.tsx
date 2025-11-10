@@ -690,7 +690,7 @@ export default function DetailsDay () {
                     <Ionicons name="checkmark-circle" size={20} color={colors.success} />
                     <Text style={styles.photoPreviewText}>Photo attached</Text>
                     <TouchableOpacity onPress={() => setSelectedImage(null)}>
-                      <Text style={styles.clearText}>Remove</Text>
+                      <Text>Remove</Text>
                     </TouchableOpacity>
                   </View>
                 )}
