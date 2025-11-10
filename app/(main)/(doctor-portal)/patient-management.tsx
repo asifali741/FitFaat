@@ -247,7 +247,7 @@ export default function PatientManagementScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <AppHeader
-          title="Patient Management"
+          title="Appointment Management"
           showStepIndicator={false}
         />
         <View style={styles.loadingContainer}>
@@ -260,7 +260,7 @@ export default function PatientManagementScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader
-        title="Patient Management"
+        title="Appointment Management"
         showStepIndicator={false}
       />
 
