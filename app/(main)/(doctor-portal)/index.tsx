@@ -53,7 +53,7 @@ export default function DoctorPortal() {
         <View style={styles.buttonContainer}>
           <TouchableOpacity 
             style={styles.gradientButtonContainer}
-            onPress={() => router.push('/(main)/(doctor-portal)/register')}
+            onPress={() => router.push('/(main)/(doctor-portal)/register-form')}
             activeOpacity={0.8}
           >
             <LinearGradient
