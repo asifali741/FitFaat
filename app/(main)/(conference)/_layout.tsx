@@ -1,10 +1,8 @@
 import { ScreenSceneWrapper } from "@/components/common/ScreenTiltAnimation";
 import { Stack } from "expo-router";
 import { View, useWindowDimensions } from "react-native";
-
 export default function ConferenceLayout() {
-  const { width, height } = useWindowDimensions();
-
+  const { width, height } = useWindowDimensions()
   return (
     <ScreenSceneWrapper>
       <View style={{ width, height }}>
