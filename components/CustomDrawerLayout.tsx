@@ -20,7 +20,7 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
   const { colors } = useTheme();
   
   const handleProfilePress = () => {
-    console.log('Navigating to profile screen');
+   
     props.navigation.navigate('profile');
   };
 

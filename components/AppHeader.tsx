@@ -36,7 +36,7 @@ export default function AppHeader({
   const router = useRouter();
   const { colors } = useTheme();
 
-  console.log('AppHeader - showNotificationBell:', showNotificationBell, 'notificationCount:', notificationCount);
+
 
   const openDrawer = () => {
     navigation.dispatch(DrawerActions.openDrawer());

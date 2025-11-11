@@ -57,7 +57,7 @@ export const NewsProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (stored) {
         const ids = JSON.parse(stored);
         setReadNewsIds(new Set(ids));
-        console.log('✅ Loaded read news:', ids.length, 'items');
+        
       }
     } catch (err) {
       console.error('Error loading read news:', err);
@@ -88,21 +88,17 @@ export const NewsProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setError(null);
 
       const apiUrl = `${API_BASE_URL}/api/admin/news/published`;
-      console.log('📰 Fetching from:', apiUrl, 'Platform:', Platform.OS);
 
       const response = await axios.get(apiUrl, {
         timeout: 10000,
       });
 
       const newsList = response.data?.data || [];
-      console.log('📰 News count:', newsList.length);
 
       // Find newly added items
       const newlyAdded = newsList.filter(
         (item: NewsItem) => !previousIdsRef.current.has(item._id || item.id || '')
       );
-
-      console.log('🆕 New items:', newlyAdded.length);
 
       // Update tracking
       const currentIds: Set<string> = new Set(
@@ -124,12 +120,12 @@ export const NewsProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    console.log('🚀 NewsProvider Init - Platform:', Platform.OS);
+    
     loadReadNews();
     fetchPublishedNews();
 
     pollIntervalRef.current = setInterval(() => {
-      console.log('⏰ Poll check...');
+      
       fetchPublishedNews();
     }, 5000);
 
