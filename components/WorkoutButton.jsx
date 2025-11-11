@@ -80,11 +80,9 @@ export default function WorkoutButton({
         }
         
         router.push("/(main)/(exercises)/workout");
-        console.log("Workout button pressed - navigating to workout screen");
+      
       } catch (error) {
-        console.log("Navigation error:", error);
-        // Fallback action
-        console.log("Workout button pressed - no navigation configured");
+        
       }
     }
   };

@@ -223,9 +223,7 @@ export default function DayPlan () {
   const handleNewsRead = async (newsId: string) => {
     await markNewsAsRead(newsId);
   };
-  
-  console.log('Dashboard - News count:', news.length, 'Unread:', unreadCount);
-  
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.primary }]}>
       <AppHeader 
