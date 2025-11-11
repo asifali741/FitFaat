@@ -19,7 +19,6 @@ interface AppHeaderProps {
   notificationCount?: number;
   onNotificationPress?: () => void;
 }
-
 export default function AppHeader({
   title,
   showBackButton = true,
