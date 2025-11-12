@@ -1,5 +1,5 @@
 import SafeScreen from "@/components/SafeScreen";
-import { NotificationProvider } from "@/contexts/NotificationContext";
+// import { NotificationProvider } from "@/contexts/NotificationContext"; // DISABLED
 import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
 import { ClerkProvider, useAuth, useUser } from "@clerk/clerk-expo";
 import { tokenCache } from "@clerk/clerk-expo/token-cache";
@@ -21,7 +21,8 @@ if (!publishableKey) {
 
 export default function RootLayout() {
   return (
-    <NotificationProvider>
+    // {/* NOTIFICATION FUNCTIONALITY DISABLED FOR NOW */}
+    // <NotificationProvider>
       <ClerkProvider tokenCache={tokenCache} publishableKey={publishableKey}> 
         <ThemeProvider>
           <SafeAreaProvider>
@@ -29,7 +30,7 @@ export default function RootLayout() {
           </SafeAreaProvider>
         </ThemeProvider>
       </ClerkProvider>
-    </NotificationProvider>
+    // </NotificationProvider>
   );
 }
 

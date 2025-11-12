@@ -1,9 +1,11 @@
 import axios from 'axios';
 import * as Notifications from 'expo-notifications';
-import React, { createContext, useContext, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useRef } from 'react';
 import { Platform } from 'react-native';
 
+// NOTIFICATION FUNCTIONALITY DISABLED FOR NOW
 // Configure notification behavior
+/* 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -13,6 +15,7 @@ Notifications.setNotificationHandler({
     shouldShowList: true,
   }),
 });
+*/
 
 interface NotificationContextType {
   expoPushToken: string | null;
@@ -27,10 +30,13 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const notificationListener = useRef<Notifications.Subscription | null>(null);
   const responseListener = useRef<Notifications.Subscription | null>(null);
 
+  // DISABLED: useEffect for push notification registration
+  /*
   useEffect(() => {
     // Register for push notifications
     registerForPushNotifications();
   }, []);
+  */
 
   const registerForPushNotifications = async () => {
     try {
@@ -104,6 +110,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
 
+  // DISABLED: Notification listeners setup
+  /*
   useEffect(() => {
     // Listen for notifications when app is in foreground
     notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
@@ -126,6 +134,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       }
     };
   }, []);
+  */
 
   const value: NotificationContextType = {
     expoPushToken,
