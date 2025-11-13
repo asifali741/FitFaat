@@ -1,23 +1,35 @@
 import AppHeader from "@/components/AppHeader";
-import { useAuth } from "@clerk/clerk-expo";
+import { useTheme } from "@/contexts/ThemeContext";
+import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DrawerActions, useNavigation } from "@react-navigation/native";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Alert, Linking, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useTheme } from "@/contexts/ThemeContext";
 
 export default function Settings() {
   const navigation = useNavigation();
   const router = useRouter();
-  const { signOut, user } = useAuth();
   const { isDarkMode, toggleDarkMode, colors } = useTheme();
   const [notifications, setNotifications] = useState(true);
   const [locationServices, setLocationServices] = useState(true);
   const [dataSync, setDataSync] = useState(true);
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const userData = await tokenStorage.getUser();
+        setUser(userData);
+      } catch (error) {
+        console.error('Error loading user:', error);
+      }
+    };
+    loadUser();
+  }, []);
 
   const openDrawer = () => {
     navigation.dispatch(DrawerActions.openDrawer());
@@ -172,11 +184,11 @@ export default function Settings() {
 
   const handleDownloadData = async () => {
     try {
-      // Simulate data export
+      // Get current user data
       const userData = {
         profile: {
-          name: user?.fullName || "User",
-          email: user?.emailAddresses[0]?.emailAddress || "user@example.com",
+          name: user?.username || "User",
+          email: user?.email || "user@example.com",
           createdAt: user?.createdAt
         },
         workouts: await AsyncStorage.getItem('workout_history') || [],
@@ -217,7 +229,12 @@ export default function Settings() {
           style: "destructive",
           onPress: async () => {
             try {
-              await signOut();
+              // Clear all auth data
+              await tokenStorage.removeToken();
+              await tokenStorage.removeUser();
+              await AsyncStorage.removeItem('weeklyTrackingId');
+              // Navigate to login
+              router.replace('/(auth)/email-login');
             } catch (error) {
               Alert.alert("Error", "Failed to sign out. Please try again.");
             }
