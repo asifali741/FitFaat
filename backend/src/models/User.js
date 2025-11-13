@@ -108,6 +108,119 @@ const userSchema = new mongoose.Schema({
     ref: 'WeeklyTracking',
     default: null
   },
+  // Nutrition & Meal History - Comprehensive tracking
+  nutritionHistory: {
+    totalMealsLogged: {
+      type: Number,
+      default: 0
+    },
+    totalCaloriesBurned: {
+      type: Number,
+      default: 0 // Estimated from exercises/activities
+    },
+    totalCaloriesConsumed: {
+      type: Number,
+      default: 0
+    },
+    totalProteinsConsumed: {
+      type: Number,
+      default: 0
+    },
+    totalCarbsConsumed: {
+      type: Number,
+      default: 0
+    },
+    totalFatsConsumed: {
+      type: Number,
+      default: 0
+    },
+    averageDailyCalories: {
+      type: Number,
+      default: 0
+    },
+    averageDailyProteins: {
+      type: Number,
+      default: 0
+    },
+    lastUpdated: {
+      type: Date,
+      default: Date.now
+    }
+  },
+  // Food preferences and frequency tracking
+  frequentFoods: [
+    {
+      foodName: {
+        type: String,
+        required: true
+      },
+      category: String,
+      calories: Number,
+      timesConsumed: {
+        type: Number,
+        default: 1
+      },
+      lastConsumedDate: {
+        type: Date,
+        default: Date.now
+      },
+      averageCaloriesPerServing: Number
+    }
+  ],
+  // Macronutrient daily goals (set during onboarding)
+  macroGoals: {
+    dailyProteinGoal: {
+      type: Number,
+      default: 0 // in grams
+    },
+    dailyCarbGoal: {
+      type: Number,
+      default: 0 // in grams
+    },
+    dailyFatGoal: {
+      type: Number,
+      default: 0 // in grams
+    }
+  },
+  // Daily calorie burn tracking
+  caloriesBurnedLog: [
+    {
+      date: {
+        type: String, // YYYY-MM-DD format
+        required: true
+      },
+      exerciseType: String,
+      duration: Number, // in minutes
+      caloriesBurned: Number,
+      timestamp: {
+        type: Date,
+        default: Date.now
+      }
+    }
+  ],
+  // Weekly nutrition summary
+  weeklyNutritionSummary: [
+    {
+      weekStartDate: {
+        type: Date,
+        required: true
+      },
+      weekEndDate: {
+        type: Date,
+        required: true
+      },
+      totalCaloriesConsumed: Number,
+      totalCaloriesBurned: Number,
+      netCalories: Number, // Consumed - Burned
+      averageProteinDaily: Number,
+      averageCarbsDaily: Number,
+      averageFatsDaily: Number,
+      mealsLogged: Number,
+      workoutsLogged: Number,
+      consistencyScore: Number, // 0-100
+      weekSummaryNotes: String
+    }
+  ],
   // Appointments booked by this user with doctors
   appointmentsBooked: [
     {
