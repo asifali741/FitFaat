@@ -7,14 +7,15 @@ const ENV = Constants.expoConfig?.extra;
 const getBaseURL = () => {
   const envUrl = ENV?.EXPO_PUBLIC_BACKEND_API_URL;
   if (envUrl) {
+    // envUrl already includes /api, so return it directly
     return envUrl;
   }
   // Default: use 10.0.2.2 for Android emulator, localhost for iOS
   const defaultHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
-  return `http://${defaultHost}:5001`;
+  return `http://${defaultHost}:5001/api`;
 };
 
-const API_BASE_URL = `${getBaseURL()}/api`;
+const API_BASE_URL = getBaseURL();
 
 export const dailyLogsApi = {
   // Create a new weekly plan

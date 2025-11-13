@@ -1,8 +1,10 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { protect } from '../middleware/auth.js';
+import DailyLog from '../models/DailyLog.js';
 import DietPlan from '../models/DietPlan.js';
 import User from '../models/User.js';
+import WeeklyTracking from '../models/WeeklyTracking.js';
 
 const router = express.Router();
 
@@ -99,6 +101,36 @@ router.put(
       };
       user.isOnboardingComplete = true;
       await user.save();
+
+      // Update all daily logs with the personalized calorie and hydration goals
+      try {
+        const currentWeeklyTracking = await WeeklyTracking.findById(user.currentWeeklyTrackingId);
+        if (currentWeeklyTracking) {
+          // Convert hydrationGoal from liters to ml (assuming frontend expects ml)
+          const hydrationGoalInMl = Math.round(hydrationGoal * 1000);
+          
+          // Update all daily logs in the current week
+          await DailyLog.updateMany(
+            { _id: { $in: currentWeeklyTracking.dailyLogs } },
+            {
+              $set: {
+                targetCalories: goalCalories,
+                targetHydration: hydrationGoalInMl
+              }
+            }
+          );
+          
+          // Also update the weekly tracking document with new targets
+          currentWeeklyTracking.baseTargetCalories = goalCalories;
+          currentWeeklyTracking.baseTargetHydration = hydrationGoalInMl;
+          await currentWeeklyTracking.save();
+          
+          console.log('[onboarding] Updated daily logs with personalized values - Calories:', goalCalories, 'Hydration:', hydrationGoalInMl);
+        }
+      } catch (err) {
+        console.error('[onboarding] Error updating daily logs:', err.message);
+        // Don't fail the onboarding if daily log update fails
+      }
 
       // If a diet plan exists, attach/update all metrics
       try {
