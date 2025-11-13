@@ -102,6 +102,12 @@ const userSchema = new mongoose.Schema({
       type: Number
     }
   },
+  // Current weekly tracking ID for active 7-day plan
+  currentWeeklyTrackingId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'WeeklyTracking',
+    default: null
+  },
   // Appointments booked by this user with doctors
   appointmentsBooked: [
     {
@@ -131,6 +137,55 @@ const userSchema = new mongoose.Schema({
         type: String
       },
       bookedAt: {
+        type: Date,
+        default: Date.now
+      }
+    }
+  ],
+  // Completed 7-day tracking weeks
+  completedWeeks: [
+    {
+      weeklyTrackingId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'WeeklyTracking'
+      },
+      weekStartDate: {
+        type: Date,
+        required: true
+      },
+      weekEndDate: {
+        type: Date,
+        required: true
+      },
+      days: [
+        {
+          dayNumber: {
+            type: Number,
+            min: 1,
+            max: 7
+          },
+          date: String,
+          lock: {
+            type: Boolean,
+            default: false
+          },
+          achievedCalories: Number,
+          targetCalories: Number,
+          achievedHydration: Number,
+          targetHydration: Number,
+          completionPercentage: Number,
+          calorieCompletionPercentage: Number,
+          hydrationCompletionPercentage: Number,
+          performanceRating: String,
+          remarks: String
+        }
+      ],
+      totalCaloriesAchieved: Number,
+      totalCaloriesTarget: Number,
+      totalHydrationAchieved: Number,
+      totalHydrationTarget: Number,
+      weeklyCompletionPercentage: Number,
+      completedAt: {
         type: Date,
         default: Date.now
       }
