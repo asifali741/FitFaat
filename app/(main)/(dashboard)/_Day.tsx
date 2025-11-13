@@ -1,3 +1,4 @@
+import { useTheme } from "@/contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
@@ -9,8 +10,7 @@ import Animated, {
 } from "react-native-reanimated";
 import Svg, { Circle, Defs, LinearGradient, Stop, Text as SvgText } from "react-native-svg";
 import { DashFonts, rs } from "../(settings)/_ui_elements";
-import { useTheme } from "@/contexts/ThemeContext";
-import { Day } from "./DayPlan";
+import { Day } from "./types";
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 interface ProgressCircleProps {
   progress: number;
@@ -66,7 +66,7 @@ const ActiveDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}) 
             <Text style={styles.modernDateText}>{info.date}</Text>
           </View>
         </View>
-        <ProgressCircle finalProgress={70}/>
+        <ProgressCircle finalProgress={finalProgress}/>
       </View>
 
       {/* Progress Status */}

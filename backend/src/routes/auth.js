@@ -248,7 +248,8 @@ router.post(
         user: {
           id: user._id,
           email: user.email,
-          username: user.username
+          username: user.username,
+          weeklyTrackingId: user.currentWeeklyTrackingId
         }
       });
     } catch (err) {
