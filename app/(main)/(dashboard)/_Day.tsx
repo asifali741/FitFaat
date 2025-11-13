@@ -224,7 +224,7 @@ const ProgressCircle = React.memo(({finalProgress}: {finalProgress: number})=>{
 const InfoTray = React.memo(({ duration }: { duration: number }) => {
   const { colors } = useTheme();
   const styles = getStyles(colors);
-  const [remainingTime, setRemainingTime] = useState(duration);
+  const [timeRemaining, setTimeRemaining] = useState<string>('00:00:00');
   
   const formatDuration = (totalSeconds: number): string => {
     const seconds = Math.max(0, Math.floor(totalSeconds));
@@ -235,24 +235,41 @@ const InfoTray = React.memo(({ duration }: { duration: number }) => {
     return `${pad(hours)}:${pad(mins)}:${pad(secs)}`;
   };
 
+  // Calculate time remaining until end of day (11:59:59 PM)
+  const calculateTimeUntilEndOfDay = (): number => {
+    const now = new Date();
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    const diffMs = endOfDay.getTime() - now.getTime();
+    const diffSeconds = Math.max(0, Math.floor(diffMs / 1000));
+    
+    return diffSeconds;
+  };
+
   useEffect(() => {
-    if (remainingTime <= 0) return;
+    // Set initial time
+    setTimeRemaining(formatDuration(calculateTimeUntilEndOfDay()));
+
+    // Update every second
     const interval = setInterval(() => {
-      setRemainingTime(prev => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        return prev - 1;
-      });
+      const secondsLeft = calculateTimeUntilEndOfDay();
+      setTimeRemaining(formatDuration(secondsLeft));
+      
+      // Optional: trigger refresh when day ends (optional enhancement)
+      if (secondsLeft === 0) {
+        clearInterval(interval);
+        // Could trigger a day refresh here
+      }
     }, 1000);
+
     return () => clearInterval(interval);
   }, []);
 
   return (
     <View style={styles.modernNextMeal}>
           <Ionicons name="time" size={16} color="#9C27B0" />
-          <Text style={styles.modernNextMealText}>Next: {formatDuration(remainingTime)}</Text>
+          <Text style={styles.modernNextMealText}>Time left: {timeRemaining}</Text>
     </View>
     
   );
