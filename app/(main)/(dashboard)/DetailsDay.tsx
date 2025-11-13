@@ -1,5 +1,7 @@
+import { goalBasedSuggestions, searchFoods } from '@/constants/foodDatabase';
 import { HEADER_PADDING_HORIZONTAL, HEADER_PADDING_VERTICAL } from '@/constants/ui';
 import { useTheme } from "@/contexts/ThemeContext";
+import { dailyLogsApi } from '@/utils/dailyLogsApi';
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Audio } from 'expo-av';
@@ -93,6 +95,7 @@ export default function DetailsDay () {
       
       return () => clearInterval(timerInterval);
     }, []);
+    
     const [showMenu, setShowMenu] = useState<Boolean>(false)
     const [timeInput, setTimeInput] = useState<string>('');
     const [selectedTime, setSelectedTime] = useState<Date>(new Date());
@@ -104,6 +107,34 @@ export default function DetailsDay () {
     const [audioUri, setAudioUri] = useState<string | null>(null);
     const [isRecording, setIsRecording] = useState(false);
     const [inputMethod, setInputMethod] = useState<'text' | 'audio' | 'photo'>('text');
+    const [calorieInput, setCalorieInput] = useState<string>('');
+    const [selectedFoodItem, setSelectedFoodItem] = useState<any>(null);
+    const [foodSearch, setFoodSearch] = useState<string>('');
+    const [filteredFoods, setFilteredFoods] = useState<any[]>([]);
+    const [showFoodSearch, setShowFoodSearch] = useState(false);
+    const [suggestedFoods, setSuggestedFoods] = useState<any[]>([]);
+    const [mealQuantity, setMealQuantity] = useState<string>('1');
+    
+    // Initialize suggested foods based on user's goal
+    useEffect(() => {
+      const userGoal = (props as any).userGoal || 3; // Default to maintenance
+      const suggestions = goalBasedSuggestions[userGoal as keyof typeof goalBasedSuggestions];
+      if (suggestions) {
+        setSuggestedFoods(suggestions.foods);
+      }
+    }, [props]);
+    
+    // Handle food search
+    useEffect(() => {
+      if (foodSearch.trim()) {
+        const results = searchFoods(foodSearch);
+        setFilteredFoods(results);
+        setShowFoodSearch(true);
+      } else {
+        setShowFoodSearch(false);
+        setFilteredFoods([]);
+      }
+    }, [foodSearch]);
     const fade = useSharedValue(1);
     const insets = useSafeAreaInsets();
     // trigger fade-out + menu
@@ -579,45 +610,29 @@ export default function DetailsDay () {
                 </Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[
-                  styles.inputMethodButton,
-                  inputMethod === 'audio' && styles.inputMethodButtonActive
-                ]}
-                onPress={() => setInputMethod('audio')}
-              >
+              <View style={styles.disabledButton}>
                 <Ionicons 
                   name="mic-outline" 
                   size={24} 
-                  color={inputMethod === 'audio' ? 'white' : colors.primary} 
+                  color="#CCCCCC" 
                 />
-                <Text style={[
-                  styles.inputMethodText,
-                  inputMethod === 'audio' && styles.inputMethodTextActive
-                ]}>
+                <Text style={styles.disabledButtonText}>
                   Voice
                 </Text>
-              </TouchableOpacity>
+                <Text style={styles.comingSoonBadge}>Coming Soon</Text>
+              </View>
 
-              <TouchableOpacity
-                style={[
-                  styles.inputMethodButton,
-                  inputMethod === 'photo' && styles.inputMethodButtonActive
-                ]}
-                onPress={() => setInputMethod('photo')}
-              >
+              <View style={styles.disabledButton}>
                 <Ionicons 
                   name="camera-outline" 
                   size={24} 
-                  color={inputMethod === 'photo' ? 'white' : colors.primary} 
+                  color="#CCCCCC" 
                 />
-                <Text style={[
-                  styles.inputMethodText,
-                  inputMethod === 'photo' && styles.inputMethodTextActive
-                ]}>
+                <Text style={styles.disabledButtonText}>
                   Photo
                 </Text>
-              </TouchableOpacity>
+                <Text style={styles.comingSoonBadge}>Coming Soon</Text>
+              </View>
             </View>
           </View>
 
@@ -625,31 +640,185 @@ export default function DetailsDay () {
           <View style={styles.dynamicInputSection}>
             {inputMethod === 'text' && (
               <>
+                {/* Quick Suggested Foods */}
+                <View style={styles.suggestionsSection}>
+                  <Text style={styles.suggestionTitle}>Your Daily Goal Suggestions</Text>
+                  <ScrollView 
+                    horizontal 
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.suggestionsScroll}
+                    contentContainerStyle={styles.suggestionsContent}
+                  >
+                    {suggestedFoods.map((food, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={styles.suggestionCard}
+                        onPress={() => {
+                          setSelectedFoodItem(food);
+                          setCalorieInput(String(food.calories));
+                        }}
+                      >
+                        <Text style={styles.suggestionFoodName}>{food.name}</Text>
+                        <Text style={styles.suggestionCalories}>{food.calories} cals</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+
+                {/* Food Search */}
                 <View style={styles.inputGroup}>
                   <View style={styles.labelRow}>
                     <Ionicons name="fast-food-outline" size={20} color={colors.primary} />
-                    <Text style={styles.label}>What did you eat?</Text>
+                    <Text style={styles.label}>Search for food</Text>
                   </View>
-                  <TextInput 
-                    style={styles.input} 
-                    placeholder="e.g. Grilled chicken with vegetables"
-                    placeholderTextColor={colors.textSecondary}
-                    value={foodNameInput}
-                    onChangeText={setFoodNameInput}
-                  />
+                  <View style={styles.searchContainer}>
+                    <TextInput 
+                      style={styles.searchInput}
+                      placeholder="e.g. Chicken, Rice, Bread..."
+                      placeholderTextColor={colors.textSecondary}
+                      value={foodSearch}
+                      onChangeText={setFoodSearch}
+                    />
+                    {foodSearch.length > 0 && (
+                      <TouchableOpacity onPress={() => { setFoodSearch(''); setShowFoodSearch(false); }}>
+                        <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  {/* Food Search Results */}
+                  {showFoodSearch && filteredFoods.length > 0 && (
+                    <View style={styles.searchResults}>
+                      {filteredFoods.slice(0, 8).map((food, index) => (
+                        <TouchableOpacity
+                          key={index}
+                          style={styles.resultItem}
+                          onPress={() => {
+                            setSelectedFoodItem(food);
+                            setCalorieInput(String(Math.round(food.calories * parseFloat(mealQuantity || '1'))));
+                            setFoodSearch('');
+                            setShowFoodSearch(false);
+                          }}
+                        >
+                          <View style={styles.resultInfo}>
+                            <Text style={styles.resultFoodName}>{food.name}</Text>
+                            <Text style={styles.resultCategory}>{food.category}</Text>
+                          </View>
+                          <Text style={styles.resultCalories}>{Math.round(food.calories * parseFloat(mealQuantity || '1'))} cals</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  {showFoodSearch && foodSearch.length > 0 && filteredFoods.length === 0 && (
+                    <Text style={styles.noResults}>No foods found. Enter custom calories below.</Text>
+                  )}
                 </View>
 
+                {/* Selected Food Display */}
+                {selectedFoodItem && (
+                  <View style={styles.selectedFoodBox}>
+                    <View style={styles.selectedFoodHeader}>
+                      <Ionicons name="checkmark-circle" size={24} color={colors.success} />
+                      <View style={styles.selectedFoodInfo}>
+                        <Text style={styles.selectedFoodName}>{selectedFoodItem.name}</Text>
+                        <Text style={styles.selectedFoodCalories}>
+                          {Math.round(selectedFoodItem.calories * parseFloat(mealQuantity || '1'))} calories
+                        </Text>
+                      </View>
+                      <TouchableOpacity onPress={() => setSelectedFoodItem(null)}>
+                        <Ionicons name="trash-outline" size={20} color={colors.error} />
+                      </TouchableOpacity>
+                    </View>
+                    
+                    {/* Quantity Adjuster */}
+                    <View style={styles.quantitySection}>
+                      <Text style={styles.quantityLabel}>Quantity (portions):</Text>
+                      <View style={styles.quantityInputRow}>
+                        <TouchableOpacity 
+                          style={styles.quantityBtn}
+                          onPress={() => {
+                            const q = Math.max(0.5, parseFloat(mealQuantity || '1') - 0.5);
+                            setMealQuantity(String(q));
+                            setCalorieInput(String(Math.round(selectedFoodItem.calories * q)));
+                          }}
+                        >
+                          <Text style={styles.quantityBtnText}>−</Text>
+                        </TouchableOpacity>
+                        <TextInput
+                          style={styles.quantityInput}
+                          value={mealQuantity}
+                          onChangeText={(text) => {
+                            setMealQuantity(text);
+                            if (text && !isNaN(parseFloat(text))) {
+                              setCalorieInput(String(Math.round(selectedFoodItem.calories * parseFloat(text))));
+                            }
+                          }}
+                          keyboardType="decimal-pad"
+                        />
+                        <TouchableOpacity 
+                          style={styles.quantityBtn}
+                          onPress={() => {
+                            const q = parseFloat(mealQuantity || '1') + 0.5;
+                            setMealQuantity(String(q));
+                            setCalorieInput(String(Math.round(selectedFoodItem.calories * q)));
+                          }}
+                        >
+                          <Text style={styles.quantityBtnText}>+</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                )}
+
+                {/* Manual Calorie Input */}
+                <View style={styles.inputGroup}>
+                  <View style={styles.labelRow}>
+                    <Ionicons name="flame-outline" size={20} color="#FF6B6B" />
+                    <Text style={styles.label}>Calories</Text>
+                  </View>
+                  <View style={styles.calorieInputContainer}>
+                    <TextInput 
+                      style={styles.input} 
+                      placeholder="Enter calories (e.g. 450)"
+                      placeholderTextColor={colors.textSecondary}
+                      value={calorieInput}
+                      onChangeText={setCalorieInput}
+                      keyboardType="number-pad"
+                    />
+                    {calorieInput && (
+                      <View style={styles.calorieInfo}>
+                        <Text style={styles.calorieInfoText}>
+                          Remaining: {dayData.targetCalories - parseInt(calorieInput)} / {dayData.targetCalories} cals
+                        </Text>
+                        <View style={styles.calorieBar}>
+                          <View 
+                            style={[
+                              styles.calorieBarFill,
+                              {
+                                width: `${Math.min((parseInt(calorieInput) / dayData.targetCalories) * 100, 100)}%`,
+                                backgroundColor: parseInt(calorieInput) > dayData.targetCalories ? '#FF6B6B' : '#4ECDC4'
+                              }
+                            ]}
+                          />
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                {/* Notes */}
                 <View style={styles.inputGroup}>
                   <View style={styles.labelRow}>
                     <MaterialIcons name="description" size={20} color={colors.primary} />
-                    <Text style={styles.label}>Add Details</Text>
+                    <Text style={styles.label}>Notes (Optional)</Text>
                   </View>
                   <TextInput
                     style={[styles.input, styles.textArea]}
-                    placeholder="Portion size, ingredients, cooking method..."
+                    placeholder="e.g. Added extra rice, swapped for whole wheat..."
                     placeholderTextColor={colors.textSecondary}
                     multiline
-                    numberOfLines={6}
+                    numberOfLines={4}
                     textAlignVertical="top"
                     value={descriptionInput}
                     onChangeText={setDescriptionInput}
@@ -660,110 +829,17 @@ export default function DetailsDay () {
 
             {inputMethod === 'audio' && (
               <View style={styles.audioSection}>
-                <Text style={styles.audioInstructions}>
-                  {isRecording 
-                    ? "Recording... Describe your meal" 
-                    : audioUri 
-                    ? "Voice note recorded! You can re-record if needed."
-                    : "Tap the microphone to start recording"}
-                </Text>
-                
-                <View style={styles.audioRecordContainer}>
-                  <TouchableOpacity
-                    style={[
-                      styles.audioRecordButton,
-                      isRecording && styles.audioRecordButtonActive
-                    ]}
-                    onPress={isRecording ? stopRecording : startRecording}
-                    activeOpacity={0.7}
-                  >
-                    {isRecording ? (
-                      <View style={styles.stopIconContainer}>
-                        <View style={styles.stopIcon} />
-                      </View>
-                    ) : (
-                      <Ionicons 
-                        name="mic" 
-                        size={Math.min(hp(4), wp(9))} 
-                        color="white" 
-                      />
-                    )}
-                  </TouchableOpacity>
-                  
-                  {isRecording && (
-                    <View style={styles.recordingIndicator}>
-                      <View style={styles.recordingDot} />
-                      <Text style={styles.recordingText}>Recording...</Text>
-                    </View>
-                  )}
-                </View>
-
-                {audioUri && (
-                  <View style={styles.audioPreview}>
-                    <View style={styles.audioPreviewLeft}>
-                      <Ionicons name="checkmark-circle" size={24} color={colors.success} />
-                      <Text style={styles.audioPreviewText}>Voice note saved</Text>
-                    </View>
-                    <TouchableOpacity 
-                      style={styles.clearButton}
-                      onPress={() => setAudioUri(null)}
-                    >
-                      <Ionicons name="trash-outline" size={18} color={colors.error} />
-                    </TouchableOpacity>
-                  </View>
-                )}
+                <Ionicons name="lock-closed" size={Math.min(hp(5), wp(12))} color="#CCCCCC" />
+                <Text style={styles.audioInstructions}>Voice input coming soon</Text>
+                <Text style={styles.comingSoonMessage}>We're working on voice recognition for meal logging</Text>
               </View>
             )}
 
             {inputMethod === 'photo' && (
-              <View style={styles.photoSection}>
-                <Text style={styles.photoInstructions}>
-                  {selectedImage 
-                    ? "Photo selected! You can change it if needed."
-                    : "Take a photo or select from gallery"}
-                </Text>
-                
-                <View style={styles.photoButtons}>
-                  <TouchableOpacity
-                    style={styles.photoButton}
-                    onPress={takePhoto}
-                  >
-                    <Ionicons name="camera" size={32} color={colors.primary} />
-                    <Text style={styles.photoButtonText}>Take Photo</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.photoButton}
-                    onPress={pickImage}
-                  >
-                    <Ionicons name="images" size={32} color={colors.primary} />
-                    <Text style={styles.photoButtonText}>From Gallery</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {selectedImage && (
-                  <View style={styles.photoPreview}>
-                    <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-                    <Text style={styles.photoPreviewText}>Photo attached</Text>
-                    <TouchableOpacity onPress={() => setSelectedImage(null)}>
-                      <Text>Remove</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                {/* Text field for photo description */}
-                {selectedImage && (
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.optionalLabel}>Describe your meal</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="What is this meal? Include portion size and ingredients"
-                      placeholderTextColor={colors.textSecondary}
-                      value={descriptionInput}
-                      onChangeText={setDescriptionInput}
-                    />
-                  </View>
-                )}
+              <View style={styles.audioSection}>
+                <Ionicons name="lock-closed" size={Math.min(hp(5), wp(12))} color="#CCCCCC" />
+                <Text style={styles.audioInstructions}>Photo input coming soon</Text>
+                <Text style={styles.comingSoonMessage}>We're working on AI food recognition</Text>
               </View>
             )}
           </View>
@@ -776,15 +852,75 @@ export default function DetailsDay () {
             <Text style={styles.backMenuText}>Back</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.submitMenuButton}
-            onPress={() => {
-              // Handle submit with all the data
-              console.log('Time:', selectedTime.toLocaleTimeString());
-              console.log('Food:', foodNameInput);
-              console.log('Description:', descriptionInput);
-              console.log('Image:', selectedImage);
-              console.log('Audio:', audioUri);
-              closeMenu();
+            style={[styles.submitMenuButton, (!calorieInput.trim() || isLoading) && {opacity: 0.5}]}
+            disabled={!calorieInput.trim() || isLoading}
+            onPress={async () => {
+              if (!calorieInput.trim()) {
+                Alert.alert('Validation', 'Please enter calories for the meal');
+                return;
+              }
+
+              setIsLoading(true);
+              try {
+                if (!calorieInput.trim()) {
+                  Alert.alert('Validation', 'Please enter calories for the meal');
+                  return;
+                }
+
+                const calories = parseInt(calorieInput);
+                const foodName = selectedFoodItem?.name || 'Custom Meal';
+                const dayLogId = (dayData as any)._id || (props as any)._id;
+
+                if (!dayLogId) {
+                  Alert.alert('Error', 'Unable to find day log. Please refresh and try again.');
+                  return;
+                }
+
+                // Add meal using existing addMeal API
+                const mealResponse = await dailyLogsApi.addMeal(
+                  dayLogId,
+                  foodName,
+                  parseFloat(mealQuantity || '1'),
+                  'portion',
+                  calories,
+                  undefined,
+                  undefined,
+                  undefined,
+                  descriptionInput
+                );
+
+                if (mealResponse) {
+                  const remainingCalories = dayData.targetCalories - calories;
+                  
+                  // Show success with haptic feedback
+                  Alert.alert(
+                    'Success! 🎉',
+                    `${calories} calories logged\nRemaining: ${Math.max(0, remainingCalories)} cals`,
+                    [{ text: 'OK', onPress: closeMenu }]
+                  );
+
+                  // Reset form
+                  setFoodSearch('');
+                  setSelectedFoodItem(null);
+                  setCalorieInput('');
+                  setMealQuantity('1');
+                  setDescriptionInput('');
+                  
+                  // Update day data with new achieved calories
+                  setDayData((prev: any) => ({
+                    ...prev,
+                    achievedCalories: (prev.achievedCalories || 0) + calories,
+                    meals: prev.meals ? [...prev.meals, mealResponse] : [mealResponse],
+                  }));
+                } else {
+                  Alert.alert('Error', 'Failed to log meal. Please try again.');
+                }
+              } catch (error) {
+                console.error('Error logging meal:', error);
+                Alert.alert('Error', 'Failed to log meal. Please check your connection.');
+              } finally {
+                setIsLoading(false);
+              }
             }}
           >
             <Text style={styles.submitMenuText}>Submit</Text>
@@ -1179,6 +1315,34 @@ const getStyles = (colors: any) => StyleSheet.create({
     inputMethodTextActive: {
         color: 'white',
     },
+    disabledButton: {
+        flex: 1,
+        paddingVertical: hp(1.5),
+        paddingHorizontal: wp(2),
+        borderRadius: 12,
+        backgroundColor: colors.gray + '10',
+        borderWidth: 2,
+        borderColor: colors.gray + '30',
+        alignItems: "center",
+        gap: hp(0.4),
+        opacity: 0.6,
+    },
+    disabledButtonText: {
+        fontSize: Math.min(hp(1.6), wp(3.6)),
+        fontWeight: "600",
+        color: '#CCCCCC',
+        marginTop: hp(0.3),
+    },
+    comingSoonBadge: {
+        fontSize: Math.min(hp(1.2), wp(2.8)),
+        fontWeight: "600",
+        color: '#FF9500',
+        marginTop: hp(0.2),
+        paddingHorizontal: wp(1.5),
+        paddingVertical: hp(0.2),
+        backgroundColor: '#FF950010',
+        borderRadius: 4,
+    },
     dynamicInputSection: {
         flex: 1,
         marginTop: hp(1),
@@ -1402,7 +1566,209 @@ const getStyles = (colors: any) => StyleSheet.create({
         fontWeight: '600',
         fontSize: 16,
     },
-
+    // Suggestion styles
+    suggestionsSection: {
+        marginBottom: hp(2),
+    },
+    suggestionTitle: {
+        fontSize: Math.min(hp(1.7), wp(4)),
+        fontWeight: '700',
+        color: colors.textPrimary,
+        marginBottom: hp(1),
+        marginLeft: wp(1),
+    },
+    suggestionsScroll: {
+        marginHorizontal: -wp(5),
+        paddingHorizontal: wp(5),
+    },
+    suggestionsContent: {
+        gap: wp(2),
+        paddingRight: wp(5),
+    },
+    suggestionCard: {
+        backgroundColor: colors.primary + '15',
+        borderRadius: 12,
+        paddingHorizontal: wp(3.5),
+        paddingVertical: hp(1),
+        borderLeftWidth: 4,
+        borderLeftColor: colors.primary,
+        minWidth: wp(35),
+    },
+    suggestionFoodName: {
+        fontSize: Math.min(hp(1.5), wp(3.5)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+        marginBottom: hp(0.3),
+    },
+    suggestionCalories: {
+        fontSize: Math.min(hp(1.4), wp(3.2)),
+        fontWeight: '700',
+        color: colors.primary,
+    },
+    // Food search styles
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.cardBackground,
+        borderWidth: 1,
+        borderColor: colors.gray + '50',
+        borderRadius: 10,
+        paddingHorizontal: wp(3),
+    },
+    searchInput: {
+        flex: 1,
+        paddingVertical: hp(1.2),
+        fontSize: 16,
+        color: colors.textPrimary,
+    },
+    searchResults: {
+        marginTop: hp(1),
+        backgroundColor: colors.cardBackground,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: colors.gray + '30',
+        overflow: 'hidden',
+        maxHeight: hp(25),
+    },
+    resultItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: wp(3),
+        paddingVertical: hp(1.2),
+        borderBottomWidth: 1,
+        borderBottomColor: colors.gray + '20',
+    },
+    resultInfo: {
+        flex: 1,
+    },
+    resultFoodName: {
+        fontSize: Math.min(hp(1.6), wp(3.8)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+        marginBottom: hp(0.2),
+    },
+    resultCategory: {
+        fontSize: Math.min(hp(1.3), wp(3)),
+        color: colors.textSecondary,
+    },
+    resultCalories: {
+        fontSize: Math.min(hp(1.6), wp(3.8)),
+        fontWeight: 'bold',
+        color: colors.primary,
+        marginLeft: wp(2),
+    },
+    noResults: {
+        textAlign: 'center',
+        paddingVertical: hp(2),
+        color: colors.textSecondary,
+        fontSize: Math.min(hp(1.5), wp(3.5)),
+    },
+    // Selected food display
+    selectedFoodBox: {
+        backgroundColor: colors.success + '10',
+        borderRadius: 12,
+        padding: wp(4),
+        marginBottom: hp(1.5),
+        borderWidth: 2,
+        borderColor: colors.success + '30',
+    },
+    selectedFoodHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: hp(1),
+    },
+    selectedFoodInfo: {
+        flex: 1,
+        marginLeft: wp(2),
+    },
+    selectedFoodName: {
+        fontSize: Math.min(hp(1.7), wp(4)),
+        fontWeight: '700',
+        color: colors.textPrimary,
+    },
+    selectedFoodCalories: {
+        fontSize: Math.min(hp(1.4), wp(3.2)),
+        color: colors.success,
+        fontWeight: '600',
+        marginTop: hp(0.2),
+    },
+    // Quantity selector
+    quantitySection: {
+        marginTop: hp(1),
+        paddingTop: hp(1),
+        borderTopWidth: 1,
+        borderTopColor: colors.gray + '20',
+    },
+    quantityLabel: {
+        fontSize: Math.min(hp(1.4), wp(3.2)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+        marginBottom: hp(0.8),
+    },
+    quantityInputRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(2),
+    },
+    quantityBtn: {
+        width: wp(10),
+        height: wp(10),
+        borderRadius: wp(5),
+        backgroundColor: colors.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    quantityBtnText: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: 'white',
+    },
+    quantityInput: {
+        flex: 1,
+        borderWidth: 1,
+        borderColor: colors.gray + '50',
+        borderRadius: 8,
+        paddingHorizontal: wp(2),
+        paddingVertical: hp(0.8),
+        fontSize: 16,
+        color: colors.textPrimary,
+        textAlign: 'center',
+    },
+    // Calorie input
+    calorieInputContainer: {
+        gap: hp(1),
+    },
+    calorieInfo: {
+        backgroundColor: colors.primary + '10',
+        padding: wp(3),
+        borderRadius: 10,
+        borderLeftWidth: 4,
+        borderLeftColor: colors.primary,
+    },
+    calorieInfoText: {
+        fontSize: Math.min(hp(1.4), wp(3.2)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+        marginBottom: hp(0.6),
+    },
+    calorieBar: {
+        height: hp(1),
+        backgroundColor: colors.gray + '20',
+        borderRadius: hp(0.5),
+        overflow: 'hidden',
+    },
+    calorieBarFill: {
+        height: '100%',
+        borderRadius: hp(0.5),
+    },
+    comingSoonMessage: {
+        fontSize: Math.min(hp(1.5), wp(3.5)),
+        color: colors.textSecondary,
+        marginTop: hp(0.8),
+        textAlign: 'center',
+    },
 })
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)

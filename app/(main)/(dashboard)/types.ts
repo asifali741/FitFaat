@@ -1,4 +1,5 @@
 export type Day = {
+  _id?: string, // MongoDB daily log ID
   dayNo: number,
   date: string,
   achievedCalories : number,

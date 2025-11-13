@@ -306,4 +306,104 @@ router.get('/onboarding-status', protect, async (req, res) => {
   }
 });
 
+// @route   GET /api/user/nutrition-summary
+// @desc    Get user's nutrition history and statistics
+// @access  Private
+router.get('/nutrition-summary', protect, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select(
+      'nutritionHistory frequentFoods macroGoals weeklyNutritionSummary userInfo'
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Calculate average daily calories if we have total meals logged
+    if (user.nutritionHistory.totalMealsLogged > 0) {
+      // Assuming 7 days per week
+      user.nutritionHistory.averageDailyCalories = Math.round(
+        user.nutritionHistory.totalCaloriesConsumed / Math.max(1, Math.floor(user.nutritionHistory.totalMealsLogged / 3))
+      );
+      user.nutritionHistory.averageDailyProteins = Math.round(
+        user.nutritionHistory.totalProteinsConsumed / Math.max(1, Math.floor(user.nutritionHistory.totalMealsLogged / 3))
+      );
+    }
+
+    res.json({
+      success: true,
+      data: {
+        nutritionHistory: user.nutritionHistory,
+        frequentFoods: user.frequentFoods.slice(0, 10), // Top 10 frequent foods
+        macroGoals: user.macroGoals,
+        recentWeeksSummary: user.weeklyNutritionSummary.slice(-4), // Last 4 weeks
+        goalCalories: user.userInfo?.goalCalories || 0
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching nutrition summary:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching nutrition summary',
+      error: error.message
+    });
+  }
+});
+
+// @route   GET /api/user/meal-history
+// @desc    Get user's meal history for a specific date or date range
+// @access  Private
+router.get('/meal-history', protect, async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    // Build query
+    let query = { userId: req.user.id };
+
+    if (startDate && endDate) {
+      query.date = {
+        $gte: startDate,
+        $lte: endDate
+      };
+    } else if (startDate) {
+      query.date = { $gte: startDate };
+    }
+
+    const mealHistory = await DailyLog.find(query)
+      .select('date meals achievedCalories targetCalories meals')
+      .sort({ date: -1 })
+      .limit(30); // Last 30 days
+
+    // Flatten meals for easier consumption
+    const flattenedMeals = [];
+    mealHistory.forEach(log => {
+      log.meals.forEach(meal => {
+        flattenedMeals.push({
+          date: log.date,
+          ...meal.toObject()
+        });
+      });
+    });
+
+    res.json({
+      success: true,
+      data: {
+        mealHistory: flattenedMeals,
+        totalDaysTracked: mealHistory.length,
+        totalMeals: flattenedMeals.length
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching meal history:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching meal history',
+      error: error.message
+    });
+  }
+});
+
 export default router;

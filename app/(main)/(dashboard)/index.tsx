@@ -19,6 +19,7 @@ const convertToJsonResponse = (weeklyTracking: any): jsonResponse => {
   weeklyTracking.dailyLogs.forEach((dailyLog: any) => {
     const dayKey = `day0${dailyLog.dayNumber}` as keyof jsonResponse;
     data[dayKey] = {
+      _id: dailyLog._id, // Include MongoDB daily log ID
       dayNo: dailyLog.dayNumber,
       date: dailyLog.date,
       achievedCalories: dailyLog.achievedCalories,

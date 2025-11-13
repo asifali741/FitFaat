@@ -182,6 +182,46 @@ export const addMeal = async (req, res) => {
     // Save (will trigger pre-save hook for calculations)
     await dailyLog.save();
 
+    // Update user's nutrition history
+    if (dailyLog.userId) {
+      const user = await User.findById(dailyLog.userId);
+      if (user) {
+        // Update total nutrition stats
+        user.nutritionHistory.totalMealsLogged += 1;
+        user.nutritionHistory.totalCaloriesConsumed += calories;
+        user.nutritionHistory.totalProteinsConsumed += (protein || 0);
+        user.nutritionHistory.totalCarbsConsumed += (carbs || 0);
+        user.nutritionHistory.totalFatsConsumed += (fats || 0);
+        user.nutritionHistory.lastUpdated = new Date();
+
+        // Update frequent foods list
+        const existingFood = user.frequentFoods.find(f => f.foodName.toLowerCase() === foodName.toLowerCase());
+        if (existingFood) {
+          existingFood.timesConsumed += 1;
+          existingFood.lastConsumedDate = new Date();
+        } else {
+          user.frequentFoods.push({
+            foodName,
+            category: 'Custom',
+            calories,
+            timesConsumed: 1,
+            lastConsumedDate: new Date(),
+            averageCaloriesPerServing: calories
+          });
+        }
+
+        // Keep only top 20 frequent foods
+        if (user.frequentFoods.length > 20) {
+          user.frequentFoods = user.frequentFoods
+            .sort((a, b) => b.timesConsumed - a.timesConsumed)
+            .slice(0, 20);
+        }
+
+        await user.save();
+        console.log(`[addMeal] Updated nutrition history for user ${dailyLog.userId}`);
+      }
+    }
+
     res.status(200).json({
       success: true,
       message: 'Meal added successfully',
@@ -233,6 +273,20 @@ export const removeMeal = async (req, res) => {
 
     // Save (will trigger pre-save hook for calculations)
     await dailyLog.save();
+
+    // Update user's nutrition history (subtract the removed meal)
+    if (dailyLog.userId) {
+      const user = await User.findById(dailyLog.userId);
+      if (user) {
+        user.nutritionHistory.totalCaloriesConsumed -= meal.calories;
+        user.nutritionHistory.totalProteinsConsumed -= (meal.protein || 0);
+        user.nutritionHistory.totalCarbsConsumed -= (meal.carbs || 0);
+        user.nutritionHistory.totalFatsConsumed -= (meal.fats || 0);
+        user.nutritionHistory.lastUpdated = new Date();
+        await user.save();
+        console.log(`[removeMeal] Updated nutrition history for user ${dailyLog.userId}`);
+      }
+    }
 
     res.status(200).json({
       success: true,
