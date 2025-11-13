@@ -64,6 +64,7 @@ export default {
     extra: {
       OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
       EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY, // 👈 optional but helpful
+      EXPO_PUBLIC_BACKEND_API_URL: process.env.EXPO_PUBLIC_BACKEND_API_URL || 'http://localhost:5001/api',
     },
   },
 };

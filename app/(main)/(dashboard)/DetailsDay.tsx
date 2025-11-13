@@ -1,19 +1,19 @@
+import { HEADER_PADDING_HORIZONTAL, HEADER_PADDING_VERTICAL } from '@/constants/ui';
 import { useTheme } from "@/contexts/ThemeContext";
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { Audio } from 'expo-av';
+import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, Alert, TouchableOpacity, Platform } from "react-native";
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import Animated, { Easing, runOnJS, useAnimatedProps, useSharedValue, withTiming } from "react-native-reanimated";
+import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
-import { colorsSheet, rs } from "../(settings)/_ui_elements";
-import { Day as typeDay } from "./DayPlan";
-import { Ionicons, MaterialIcons } from "@expo/vector-icons";
-import * as ImagePicker from 'expo-image-picker';
-import { Audio } from 'expo-av';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { HEADER_PADDING_HORIZONTAL, HEADER_PADDING_VERTICAL } from '@/constants/ui';
-import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
+import { colorsSheet } from "../(settings)/_ui_elements";
+import { Day as typeDay } from "./types";
 interface ProgressCircleProps {
   achievedCalories: number;
   targetCalories: number;

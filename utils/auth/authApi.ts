@@ -1,8 +1,23 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import { tokenStorage } from './tokenStorage';
 
-// For Android Emulator, use 10.0.2.2 instead of localhost
-const API_URL = 'http://10.0.2.2:5001/api';
+const ENV = Constants.expoConfig?.extra;
+
+// Get base URL from environment variables or use platform-specific defaults
+const getAPIURL = () => {
+  const envUrl = ENV?.EXPO_PUBLIC_BACKEND_API_URL;
+  if (envUrl) {
+    return envUrl;
+  }
+  // Default: use 10.0.2.2 for Android emulator, localhost for iOS
+  const defaultHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
+  return `http://${defaultHost}:5001/api`;
+};
+
+const API_URL = getAPIURL();
 
 const api = axios.create({
   baseURL: API_URL,
@@ -35,6 +50,12 @@ export const authApi = {
       if (response.data.token) {
         await tokenStorage.saveToken(response.data.token);
         await tokenStorage.saveUser(response.data.user);
+        
+        // Save weeklyTrackingId to AsyncStorage if it exists
+        if (response.data.user?.weeklyTrackingId) {
+          await AsyncStorage.setItem('weeklyTrackingId', response.data.user.weeklyTrackingId);
+          console.log('Saved weeklyTrackingId:', response.data.user.weeklyTrackingId);
+        }
       }
       return response.data;
     } catch (error: any) {
@@ -61,6 +82,12 @@ export const authApi = {
       if (response.data.token) {
         await tokenStorage.saveToken(response.data.token);
         await tokenStorage.saveUser(response.data.user);
+        
+        // Save weeklyTrackingId to AsyncStorage if it exists
+        if (response.data.user?.weeklyTrackingId) {
+          await AsyncStorage.setItem('weeklyTrackingId', response.data.user.weeklyTrackingId);
+          console.log('Saved weeklyTrackingId:', response.data.user.weeklyTrackingId);
+        }
       }
       return response.data;
     } catch (error: any) {

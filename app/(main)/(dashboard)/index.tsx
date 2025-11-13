@@ -2,6 +2,7 @@ import AppHeader from "@/components/AppHeader";
 import NewsModalPopup from "@/components/NewsModalPopup";
 import { useNews } from "@/contexts/NewsContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { dailyLogsApi } from "@/utils/dailyLogsApi";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -9,72 +10,29 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-nat
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Days } from "./_Day";
-export type Day = {
-  dayNo: number,
-  date: string,
-  achievedCalories : number,
-  achieviedHydration: number,
-  targetCalories: number,
-  targetHydration: number,
-  remarks: string | null, 
-  duration: number, // in seconds, sync with API //determines when to refresh data 
-  status?: "locked" | "active" | "finished" // using to detemine if finished or active or locked
-}
-type jsonResponse = {
-  /**
-   * Each day0x can either contain null || Day Object
-   *              null = locked day
-   * Day Object with duration and remarks = active day
-   * Day Object with duration null = finished day
-   */
-  /**
-   * when recieved from API, saves locally and uses that local data to render the days everytime
-   * 
-   * when recieved active day->duration, start a timer to decrease duration every second
-   * when duration = 0, refetch data from API to get new jsonResponse
-   * only other way response can change is when user manually updates the day (adds food/water)
-   */
+import { Day, jsonResponse } from "./types";
 
-
-  day01: Day,
-  day02: Day,
-  day03: Day,
-  day04: Day,
-  day05: Day,
-  day06: Day,
-  day07: Day
+// Convert WeeklyTracking data to jsonResponse format
+const convertToJsonResponse = (weeklyTracking: any): jsonResponse => {
+  const data: any = {};
   
-  /**
-   *OPTIMIIZED LOGIC FOR REFRESH 
-   * when recieved active day->duration, calculate which time duration will expire
-   * i.e timestamp = current time + duration(in --:--:-- format)
-   *          when timestamp reached, refetch data from API to get new jsonResponse
-  */
-}
-//for testing remove when API is connected
-const FinishedDay : Day = {
-  dayNo: 1,
-  date: "25-08-2025",
-  achievedCalories : 1400,
-  achieviedHydration: 1600,
-  targetCalories: 1400,
-  targetHydration: 1400,
-  remarks: "", //Blank
-  duration: 0, // in minutes
-  status: "finished"
-}
-//for testing remove when API is connected
-const ActiveDay : Day = {
-  dayNo: 2,
-  date: "26-08-2025",
-  achievedCalories : 2000,
-  achieviedHydration: 800,
-  targetCalories: 2330,
-  targetHydration: 1400,
-  remarks: "Almost there, Dinner is in 2h!",
-  duration: 1900, // in secs
-  status: "active"
-}
+  weeklyTracking.dailyLogs.forEach((dailyLog: any) => {
+    const dayKey = `day0${dailyLog.dayNumber}` as keyof jsonResponse;
+    data[dayKey] = {
+      dayNo: dailyLog.dayNumber,
+      date: dailyLog.date,
+      achievedCalories: dailyLog.achievedCalories,
+      achieviedHydration: dailyLog.achievedHydration,
+      targetCalories: dailyLog.targetCalories,
+      targetHydration: dailyLog.targetHydration,
+      remarks: dailyLog.remarks || null,
+      duration: 0,
+      status: dailyLog.status as "locked" | "active" | "finished",
+    };
+  });
+  
+  return data as jsonResponse;
+};
 //Check local storage
 const checkLocalStorage = async () => {
   try {
@@ -143,33 +101,44 @@ export default function DayPlan () {
         }
       }
     }}
-  const callApi = async () =>{
-    //save data from api into local and state variable 
-    var data = {
-      day01: FinishedDay,
-      day02: ActiveDay,
-      day03: { dayNo: 3, date: '2025-08-26', achievedCalories : 0, achieviedHydration: 0, targetCalories: 0, targetHydration: 0, remarks: '', duration: 0, status: "locked"} as Day, 
-      day04: { dayNo: 4, date: "2025-08-27", duration: 0, achievedCalories: 0, achieviedHydration: 0, targetCalories: 0, targetHydration: 3, remarks: "" , status: "locked"} as Day, 
-      day05: { dayNo: 5, date: "2025-08-28", duration: 0, achievedCalories: 0, achieviedHydration: 0, targetCalories: 0, targetHydration: 3, remarks: "" , status: "locked"} as Day, 
-      day06: { dayNo: 6, date: "2025-08-29", duration: 0, achievedCalories: 0, achieviedHydration: 0, targetCalories: 0, targetHydration: 3, remarks: "" , status: "locked"} as Day, 
-      day07: { dayNo: 7, date: "2025-08-30", duration: 0, achievedCalories: 0, achieviedHydration: 0, targetCalories: 0, targetHydration: 3, remarks: "" , status: "locked"} as Day, 
-      }
-    setJsonResponse(data)
-    //Replace Local Data with renewed api data
-    const store:  {data:jsonResponse, timestamp: Date} =
-    {
-      data: data,
-      timestamp: new Date()
-    }
+  const callApi = async () => {
     try {
-      const jsonValue = JSON.stringify(store);
-      console.log("Data from Api saved to Local Storage: ")
-      await AsyncStorage.setItem('JsonResponse', jsonValue);
-    } catch (e) {
-      console.log('saving error')
-    }
+      console.log("Fetching data from API...");
+      
+      // Get weeklyTrackingId from AsyncStorage
+      const weeklyTrackingId = await AsyncStorage.getItem('weeklyTrackingId');
+      
+      if (!weeklyTrackingId) {
+        console.log('No weekly tracking ID found');
+        return;
+      }
 
-  }
+      // Fetch weekly progress from backend
+      const weeklyData = await dailyLogsApi.getWeeklyProgress(weeklyTrackingId);
+      console.log('Weekly data received:', weeklyData);
+
+      // Convert to jsonResponse format
+      const data = convertToJsonResponse(weeklyData);
+      
+      setJsonResponse(data);
+
+      // Save to local storage
+      const store: { data: jsonResponse; timestamp: Date } = {
+        data: data,
+        timestamp: new Date()
+      };
+
+      try {
+        const jsonValue = JSON.stringify(store);
+        await AsyncStorage.setItem('JsonResponse', jsonValue);
+        console.log("Data saved to Local Storage");
+      } catch (e) {
+        console.log('Error saving to local storage:', e);
+      }
+    } catch (error) {
+      console.error('Error calling API:', error);
+    }
+  };
   //function called by child component to navigate to detailed day view
   const navigateToDayDetails = (dayNo: number) : void => {
     const key = `day0${dayNo.toString()}` as keyof jsonResponse
