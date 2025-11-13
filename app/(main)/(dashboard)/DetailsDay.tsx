@@ -27,16 +27,72 @@ export default function DetailsDay () {
     const { selectedDay  } = useLocalSearchParams<{ selectedDay : string }>();
     const router = useRouter();
     const props: typeDay = JSON.parse(selectedDay )
-    function getDate(){
-        var currentTime = Date.now()
-        const oldTime = new Date(props.duration*1000).getTime()
-        currentTime = currentTime + oldTime;
-        const date = new Date(currentTime);
-        return date.toISOString().slice(11, 19); // "HH:MM:SS"
+    
+    // State for fetched day data from backend
+    const [dayData, setDayData] = useState<any>(props);
+    const [isLoading, setIsLoading] = useState(false);
+    
+    // Calculate time remaining in the day (from current time to 11:59:59 PM)
+    function getRemainingTime(){
+        const now = new Date();
+        const endOfDay = new Date();
+        endOfDay.setHours(23, 59, 59, 999); // Set to 11:59:59 PM
+        
+        const diff = endOfDay.getTime() - now.getTime();
+        
+        if (diff <= 0) return "00:00:00"; // Day is over
+        
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     }
+    
+    // Fetch complete day data from backend
+    useEffect(() => {
+      const fetchDayData = async () => {
+        try {
+          setIsLoading(false);
+          console.log('Day data loaded from props:', props.dayNo);
+          
+          // Use the props data directly since it comes from the weekly API
+          // which already has all the updated calorie and hydration values
+          setDayData({
+            ...props,
+            achievedCalories: props.achievedCalories || 0,
+            achieviedHydration: props.achieviedHydration || 0,
+            targetCalories: props.targetCalories,
+            targetHydration: props.targetHydration,
+            meals: (props as any).meals || [],
+            remarks: props.remarks,
+            status: props.status,
+            isCompleted: (props as any).isCompleted || false,
+            completionPercentage: (props as any).completionPercentage || 0,
+          });
+        } catch (error) {
+          console.error('Error loading day data:', error);
+          setDayData(props);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      fetchDayData();
+    }, [props.dayNo]);
+    
     //states to track changes
     const [updateInput, setUpdateInput] = useState<string>('');
-    const [timer, setTimer] = useState<string>(getDate())
+    const [timer, setTimer] = useState<string>(getRemainingTime())
+    
+    // Update timer every second
+    useEffect(() => {
+      const timerInterval = setInterval(() => {
+        setTimer(getRemainingTime());
+      }, 1000);
+      
+      return () => clearInterval(timerInterval);
+    }, []);
     const [showMenu, setShowMenu] = useState<Boolean>(false)
     const [timeInput, setTimeInput] = useState<string>('');
     const [selectedTime, setSelectedTime] = useState<Date>(new Date());
@@ -203,23 +259,23 @@ export default function DetailsDay () {
                 android_ripple={{ color: "rgba(0,0,0,0.06)" }}
               >
                 <ProgressCircle
-                  achievedCalories={props.achievedCalories}
-                  achieviedHydration={props.achieviedHydration}
-                  targetCalories={props.targetCalories}
-                  targetHydration={props.targetHydration}
+                  achievedCalories={dayData.achievedCalories}
+                  achieviedHydration={dayData.achieviedHydration}
+                  targetCalories={dayData.targetCalories}
+                  targetHydration={dayData.targetHydration}
                 />
               </Pressable>
             </View>
 
-            {props.remarks && (
+            {dayData.remarks && (
               <View style={styles.remarksContainer}>
-                <Text style={styles.remarksText}>{String(props.remarks)}</Text>
+                <Text style={styles.remarksText}>{String(dayData.remarks)}</Text>
               </View>
             )}
           </View>
 
           {/**Determine whether to display Update Button or not */}
-          {props.status === "active" ? (
+          {dayData.status === "active" ? (
             <>
               <View style={styles.infoOuterBox}>
                 <View style={styles.statsGrid}>
