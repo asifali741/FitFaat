@@ -83,6 +83,14 @@ export default function DetailsDay () {
       fetchDayData();
     }, [props.dayNo]);
     
+    // Helper function to safely calculate percentage
+    const calculatePercentage = (achieved: number, target: number): number => {
+      if (!target || target === 0) return 0;
+      if (!achieved || achieved < 0) return 0;
+      const percent = (achieved / target) * 100;
+      return Math.min(Math.round(percent * 10) / 10, 100); // Round to 1 decimal place, cap at 100
+    };
+
     //states to track changes
     const [updateInput, setUpdateInput] = useState<string>('');
     const [timer, setTimer] = useState<string>(getRemainingTime())
@@ -137,6 +145,13 @@ export default function DetailsDay () {
         setFilteredFoods([]);
       }
     }, [foodSearch]);
+
+    // Ensure UI updates when dayData changes
+    useEffect(() => {
+      // This empty effect serves to notify React that dayData has changed
+      // triggering a full component re-render
+    }, [dayData.achieviedHydration, dayData.achievedCalories]);
+
     const fade = useSharedValue(1);
     const insets = useSafeAreaInsets();
     // trigger fade-out + menu
@@ -366,6 +381,7 @@ export default function DetailsDay () {
                     </View>
                     <View style={styles.progressBarContainer}>
                       <View 
+                        key={`cal-active-${dayData.achievedCalories}`}
                         style={[
                           styles.progressBar, 
                           { 
@@ -376,7 +392,7 @@ export default function DetailsDay () {
                       />
                     </View>
                     <Text style={styles.progressPercentage}>
-                      {Math.round((dayData.achievedCalories / dayData.targetCalories) * 100)}%
+                      {calculatePercentage(dayData.achievedCalories, dayData.targetCalories)}%
                     </Text>
                   </View>
                   
@@ -387,6 +403,7 @@ export default function DetailsDay () {
                     </View>
                     <View style={styles.progressBarContainer}>
                       <View 
+                        key={`hydration-active-${dayData.achieviedHydration}`}
                         style={[
                           styles.progressBar, 
                           { 
@@ -397,7 +414,7 @@ export default function DetailsDay () {
                       />
                     </View>
                     <Text style={styles.progressPercentage}>
-                      {Math.round((dayData.achieviedHydration / dayData.targetHydration) * 100)}%
+                      {calculatePercentage(dayData.achieviedHydration, dayData.targetHydration)}%
                     </Text>
                   </View>
                 </View>
@@ -469,6 +486,7 @@ export default function DetailsDay () {
                     </View>
                     <View style={styles.progressBarContainer}>
                       <View 
+                        key={`cal-inactive-${dayData.achievedCalories}`}
                         style={[
                           styles.progressBar, 
                           { 
@@ -479,7 +497,7 @@ export default function DetailsDay () {
                       />
                     </View>
                     <Text style={styles.progressPercentage}>
-                      {Math.round((dayData.achievedCalories / dayData.targetCalories) * 100)}%
+                      {calculatePercentage(dayData.achievedCalories, dayData.targetCalories)}%
                     </Text>
                   </View>
                   
@@ -490,6 +508,7 @@ export default function DetailsDay () {
                     </View>
                     <View style={styles.progressBarContainer}>
                       <View 
+                        key={`hydration-inactive-${dayData.achieviedHydration}`}
                         style={[
                           styles.progressBar, 
                           { 
@@ -500,7 +519,7 @@ export default function DetailsDay () {
                       />
                     </View>
                     <Text style={styles.progressPercentage}>
-                      {Math.round((dayData.achieviedHydration / dayData.targetHydration) * 100)}%
+                      {calculatePercentage(dayData.achieviedHydration, dayData.targetHydration)}%
                     </Text>
                   </View>
                 </View>
@@ -683,38 +702,83 @@ export default function DetailsDay () {
                 </ScrollView>
               </View>
 
-              {/* Water Input with +/- */}
+              {/* Glass Counter Display */}
+              <View style={styles.glassCounterSection}>
+                <View style={styles.glassCounterHeader}>
+                  <Ionicons name="water" size={18} color="#4ECDC4" />
+                  <Text style={styles.glassCounterTitle}>Glasses</Text>
+                </View>
+                <View style={styles.glassCounterDisplay}>
+                  <Text style={styles.glassCount}>
+                    {Math.round((parseFloat(waterInput || '0') / 0.25) * 10) / 10}
+                  </Text>
+                  <Text style={styles.glassLabel}>glasses (250ml each)</Text>
+                </View>
+              </View>
+
+              {/* Water Input with +/- by Glass */}
               <View style={styles.waterControlSection}>
                 <TouchableOpacity 
                   style={styles.waterControlButton}
                   onPress={() => {
                     const current = parseFloat(waterInput) || 0;
-                    setWaterInput(Math.max(0, current - 0.1).toFixed(2));
+                    setWaterInput(Math.max(0, current - 0.25).toFixed(2));
                   }}
                 >
-                  <Text style={styles.waterControlText}>−</Text>
+                  <Ionicons name="remove" size={18} color="#4ECDC4" />
                 </TouchableOpacity>
-                <TextInput
-                  style={styles.waterInputField}
-                  value={waterInput}
-                  onChangeText={setWaterInput}
-                  keyboardType="decimal-pad"
-                  placeholder="0.25"
-                />
+                <View style={styles.waterInputDisplay}>
+                  <TextInput
+                    style={styles.waterInputField}
+                    value={waterInput}
+                    onChangeText={setWaterInput}
+                    keyboardType="decimal-pad"
+                    placeholder="0.25"
+                  />
+                  <Text style={styles.waterUnitLabel}>L</Text>
+                </View>
                 <TouchableOpacity 
                   style={styles.waterControlButton}
                   onPress={() => {
                     const current = parseFloat(waterInput) || 0;
-                    setWaterInput((current + 0.1).toFixed(2));
+                    setWaterInput((current + 0.25).toFixed(2));
                   }}
                 >
-                  <Text style={styles.waterControlText}>+</Text>
+                  <Ionicons name="add" size={18} color="#4ECDC4" />
                 </TouchableOpacity>
               </View>
 
               <Text style={styles.waterDisplayLabel}>
                 {waterInput}L ({Math.round(parseFloat(waterInput || '0') * 1000)}ml)
               </Text>
+
+              {/* Hydration Progress Indicator */}
+              <View style={styles.hydrationProgressSection}>
+                <View style={styles.hydrationProgressHeader}>
+                  <Text style={styles.hydrationProgressTitle}>Today's Hydration</Text>
+                  <Text style={styles.hydrationProgressPercent}>
+                    {calculatePercentage(dayData.achieviedHydration + parseFloat(waterInput || '0'), dayData.targetHydration)}%
+                  </Text>
+                </View>
+                <View style={styles.hydrationProgressBar}>
+                  <View
+                    style={[
+                      styles.hydrationProgressFill,
+                      {
+                        width: `${Math.min(((dayData.achieviedHydration + parseFloat(waterInput || '0')) / dayData.targetHydration) * 100, 100)}%`
+                      }
+                    ]}
+                  />
+                </View>
+                <View style={styles.hydrationProgressText}>
+                  <Text style={styles.hydrationProgressCurrent}>
+                    {dayData.achieviedHydration}L logged
+                  </Text>
+                  <Text style={styles.hydrationProgressTarget}>
+                    Goal: {dayData.targetHydration}L
+                  </Text>
+                </View>
+              </View>
             </View>
           </View>
 
@@ -942,6 +1006,7 @@ export default function DetailsDay () {
                 let hasMeal = false;
                 let hasWater = false;
                 let successMessages = [];
+                let updatedDayData: any = { ...dayData };
 
                 // Log meal if calories are entered
                 if (calorieInput.trim()) {
@@ -962,14 +1027,13 @@ export default function DetailsDay () {
 
                   if (mealResponse) {
                     hasMeal = true;
-                    const remainingCalories = dayData.targetCalories - calories;
                     successMessages.push(`${calories} calories logged`);
                     
-                    setDayData((prev: any) => ({
-                      ...prev,
-                      achievedCalories: (prev.achievedCalories || 0) + calories,
-                      meals: prev.meals ? [...prev.meals, mealResponse] : [mealResponse],
-                    }));
+                    updatedDayData = {
+                      ...updatedDayData,
+                      achievedCalories: (updatedDayData.achievedCalories || 0) + calories,
+                      meals: updatedDayData.meals ? [...updatedDayData.meals, mealResponse] : [mealResponse],
+                    };
                   }
                 }
 
@@ -982,28 +1046,37 @@ export default function DetailsDay () {
                     hasWater = true;
                     successMessages.push(`${waterAmount}L of water logged`);
                     
-                    setDayData((prev: any) => ({
-                      ...prev,
-                      achieviedHydration: (prev.achieviedHydration || 0) + waterAmount,
-                    }));
+                    // Update with full response data to ensure accuracy
+                    updatedDayData = {
+                      ...updatedDayData,
+                      achieviedHydration: waterResponse.achieviedHydration || (updatedDayData.achieviedHydration || 0) + waterAmount,
+                      waterIntake: waterResponse.waterIntake || updatedDayData.waterIntake,
+                    };
                   }
                 }
 
                 // Show combined success message
                 if (hasMeal || hasWater) {
-                  Alert.alert(
-                    'Success! ✅',
-                    successMessages.join('\n'),
-                    [{ text: 'OK', onPress: closeMenu }]
-                  );
-
-                  // Reset forms
+                  // Update state once with all changes
+                  setDayData(updatedDayData);
+                  
+                  // Reset forms immediately
                   setFoodSearch('');
                   setSelectedFoodItem(null);
                   setCalorieInput('');
                   setMealQuantity('1');
                   setDescriptionInput('');
                   setWaterInput('0.25');
+                  
+                  // Use setTimeout to ensure state updates are processed
+                  setTimeout(() => {
+                    closeMenu();
+                    
+                    Alert.alert(
+                      'Success! ✅',
+                      successMessages.join('\n')
+                    );
+                  }, 100);
                 } else {
                   Alert.alert('Error', 'Please enter at least meal calories or water amount');
                 }
@@ -2102,6 +2175,102 @@ const getStyles = (colors: any) => StyleSheet.create({
         textAlign: 'center',
         marginTop: hp(0.5),
         fontWeight: '500',
+    },
+    // Glass Counter Styles
+    glassCounterSection: {
+        backgroundColor: '#4ECDC4' + '10',
+        borderRadius: wp(3),
+        padding: wp(2.5),
+        marginTop: hp(1),
+        marginBottom: hp(1),
+    },
+    glassCounterHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: hp(0.5),
+        gap: wp(1.5),
+    },
+    glassCounterTitle: {
+        fontSize: Math.min(hp(1.2), wp(3)),
+        fontWeight: '600',
+        color: '#4ECDC4',
+    },
+    glassCounterDisplay: {
+        alignItems: 'center',
+        paddingVertical: hp(0.5),
+    },
+    glassCount: {
+        fontSize: Math.min(hp(2), wp(5)),
+        fontWeight: 'bold',
+        color: '#4ECDC4',
+    },
+    glassLabel: {
+        fontSize: Math.min(hp(1), wp(2.5)),
+        color: colors.textSecondary,
+        marginTop: hp(0.3),
+    },
+    waterInputDisplay: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: wp(1),
+    },
+    waterUnitLabel: {
+        fontSize: Math.min(hp(1.5), wp(4)),
+        fontWeight: '600',
+        color: '#4ECDC4',
+    },
+    // Hydration Progress in Input Modal
+    hydrationProgressSection: {
+        backgroundColor: colors.cardBackground,
+        borderRadius: wp(3),
+        padding: wp(3),
+        marginTop: hp(1.5),
+        borderWidth: 1,
+        borderColor: '#4ECDC4' + '30',
+    },
+    hydrationProgressHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: hp(0.8),
+    },
+    hydrationProgressTitle: {
+        fontSize: Math.min(hp(1.3), wp(3.5)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+    },
+    hydrationProgressPercent: {
+        fontSize: Math.min(hp(1.5), wp(4)),
+        fontWeight: 'bold',
+        color: '#4ECDC4',
+    },
+    hydrationProgressBar: {
+        height: hp(1.2),
+        backgroundColor: '#E5E7EB',
+        borderRadius: wp(2),
+        overflow: 'hidden',
+        marginBottom: hp(0.8),
+    },
+    hydrationProgressFill: {
+        height: '100%',
+        backgroundColor: '#4ECDC4',
+        borderRadius: wp(2),
+    },
+    hydrationProgressText: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingHorizontal: wp(1),
+    },
+    hydrationProgressCurrent: {
+        fontSize: Math.min(hp(1), wp(2.5)),
+        color: '#4ECDC4',
+        fontWeight: '500',
+    },
+    hydrationProgressTarget: {
+        fontSize: Math.min(hp(1), wp(2.5)),
+        color: colors.textSecondary,
     },
 })
 
