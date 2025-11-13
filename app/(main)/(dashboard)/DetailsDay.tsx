@@ -1,4 +1,4 @@
-import { goalBasedSuggestions, searchFoods } from '@/constants/foodDatabase';
+import { goalBasedSuggestions, searchFoods, waterIntakeDatabase } from '@/constants/foodDatabase';
 import { HEADER_PADDING_HORIZONTAL, HEADER_PADDING_VERTICAL } from '@/constants/ui';
 import { useTheme } from "@/contexts/ThemeContext";
 import { dailyLogsApi } from '@/utils/dailyLogsApi';
@@ -114,6 +114,8 @@ export default function DetailsDay () {
     const [showFoodSearch, setShowFoodSearch] = useState(false);
     const [suggestedFoods, setSuggestedFoods] = useState<any[]>([]);
     const [mealQuantity, setMealQuantity] = useState<string>('1');
+    const [waterInput, setWaterInput] = useState<string>('0.25'); // Default to 250ml glass
+    const [showWaterTab, setShowWaterTab] = useState(false);
     
     // Initialize suggested foods based on user's goal
     useEffect(() => {
@@ -317,12 +319,12 @@ export default function DetailsDay () {
                     </View>
                     <View style={styles.goalRowContainer}>
                       <View style={styles.goalItem}>
-                        <Text style={styles.statValue}>{props.targetCalories}</Text>
+                        <Text style={styles.statValue}>{dayData.targetCalories}</Text>
                         <Text style={styles.statUnit}>cals</Text>
                       </View>
                       <View style={styles.goalDivider} />
                       <View style={styles.goalItem}>
-                        <Text style={styles.statValue}>{props.targetHydration}</Text>
+                        <Text style={styles.statValue}>{dayData.targetHydration}</Text>
                         <Text style={styles.statUnit}>liters</Text>
                       </View>
                     </View>
@@ -333,7 +335,7 @@ export default function DetailsDay () {
                       <Ionicons name="flame" size={Math.min(hp(2.2), wp(5.5))} color="#FF6B6B" />
                       <Text style={styles.statLabel}>Calories</Text>
                     </View>
-                    <Text style={styles.statValue}>{props.achievedCalories}</Text>
+                    <Text style={styles.statValue}>{dayData.achievedCalories}</Text>
                     <Text style={styles.statUnit}>cals</Text>
                   </View>
 
@@ -342,7 +344,7 @@ export default function DetailsDay () {
                       <Ionicons name="water" size={Math.min(hp(2.2), wp(5.5))} color="#4ECDC4" />
                       <Text style={styles.statLabel}>Hydration</Text>
                     </View>
-                    <Text style={styles.statValue}>{props.achieviedHydration}</Text>
+                    <Text style={styles.statValue}>{dayData.achieviedHydration}</Text>
                     <Text style={styles.statUnit}>liters</Text>
                   </View>
 
@@ -367,14 +369,14 @@ export default function DetailsDay () {
                         style={[
                           styles.progressBar, 
                           { 
-                            width: `${Math.min((props.achievedCalories / props.targetCalories) * 100, 100)}%`,
+                            width: `${Math.min((dayData.achievedCalories / dayData.targetCalories) * 100, 100)}%`,
                             backgroundColor: '#FF6B6B'
                           }
                         ]} 
                       />
                     </View>
                     <Text style={styles.progressPercentage}>
-                      {Math.round((props.achievedCalories / props.targetCalories) * 100)}%
+                      {Math.round((dayData.achievedCalories / dayData.targetCalories) * 100)}%
                     </Text>
                   </View>
                   
@@ -388,14 +390,14 @@ export default function DetailsDay () {
                         style={[
                           styles.progressBar, 
                           { 
-                            width: `${Math.min((props.achieviedHydration / props.targetHydration) * 100, 100)}%`,
+                            width: `${Math.min((dayData.achieviedHydration / dayData.targetHydration) * 100, 100)}%`,
                             backgroundColor: '#4ECDC4'
                           }
                         ]} 
                       />
                     </View>
                     <Text style={styles.progressPercentage}>
-                      {Math.round((props.achieviedHydration / props.targetHydration) * 100)}%
+                      {Math.round((dayData.achieviedHydration / dayData.targetHydration) * 100)}%
                     </Text>
                   </View>
                 </View>
@@ -420,12 +422,12 @@ export default function DetailsDay () {
                     </View>
                     <View style={styles.goalRowContainer}>
                       <View style={styles.goalItem}>
-                        <Text style={styles.statValue}>{props.targetCalories}</Text>
+                        <Text style={styles.statValue}>{dayData.targetCalories}</Text>
                         <Text style={styles.statUnit}>cals</Text>
                       </View>
                       <View style={styles.goalDivider} />
                       <View style={styles.goalItem}>
-                        <Text style={styles.statValue}>{props.targetHydration}</Text>
+                        <Text style={styles.statValue}>{dayData.targetHydration}</Text>
                         <Text style={styles.statUnit}>liters</Text>
                       </View>
                     </View>
@@ -436,7 +438,7 @@ export default function DetailsDay () {
                       <Ionicons name="flame" size={Math.min(hp(2.2), wp(5.5))} color="#FF6B6B" />
                       <Text style={styles.statLabel}>Calories</Text>
                     </View>
-                    <Text style={styles.statValue}>{props.achievedCalories}</Text>
+                    <Text style={styles.statValue}>{dayData.achievedCalories}</Text>
                     <Text style={styles.statUnit}>cals</Text>
                   </View>
 
@@ -445,7 +447,7 @@ export default function DetailsDay () {
                       <Ionicons name="water" size={Math.min(hp(2.2), wp(5.5))} color="#4ECDC4" />
                       <Text style={styles.statLabel}>Hydration</Text>
                     </View>
-                    <Text style={styles.statValue}>{props.achieviedHydration}</Text>
+                    <Text style={styles.statValue}>{dayData.achieviedHydration}</Text>
                     <Text style={styles.statUnit}>liters</Text>
                   </View>
 
@@ -470,14 +472,14 @@ export default function DetailsDay () {
                         style={[
                           styles.progressBar, 
                           { 
-                            width: `${Math.min((props.achievedCalories / props.targetCalories) * 100, 100)}%`,
+                            width: `${Math.min((dayData.achievedCalories / dayData.targetCalories) * 100, 100)}%`,
                             backgroundColor: '#FF6B6B'
                           }
                         ]} 
                       />
                     </View>
                     <Text style={styles.progressPercentage}>
-                      {Math.round((props.achievedCalories / props.targetCalories) * 100)}%
+                      {Math.round((dayData.achievedCalories / dayData.targetCalories) * 100)}%
                     </Text>
                   </View>
                   
@@ -491,22 +493,22 @@ export default function DetailsDay () {
                         style={[
                           styles.progressBar, 
                           { 
-                            width: `${Math.min((props.achieviedHydration / props.targetHydration) * 100, 100)}%`,
+                            width: `${Math.min((dayData.achieviedHydration / dayData.targetHydration) * 100, 100)}%`,
                             backgroundColor: '#4ECDC4'
                           }
                         ]} 
                       />
                     </View>
                     <Text style={styles.progressPercentage}>
-                      {Math.round((props.achieviedHydration / props.targetHydration) * 100)}%
+                      {Math.round((dayData.achieviedHydration / dayData.targetHydration) * 100)}%
                     </Text>
                   </View>
                 </View>
               </View>
 
               {/* Congratulations Message for 100% Completion */}
-              {props.achievedCalories >= props.targetCalories && 
-               props.achieviedHydration >= props.targetHydration && (
+              {dayData.achievedCalories >= dayData.targetCalories && 
+               dayData.achieviedHydration >= dayData.targetHydration && (
                 <View style={styles.congratsContainer}>
                   <Ionicons name="trophy" size={Math.min(hp(4), wp(10))} color="#FFD700" />
                   <Text style={styles.congratsTitle}>Congratulations! 🎉</Text>
@@ -586,264 +588,337 @@ export default function DetailsDay () {
             )}
           </View>
 
-          {/* Input Method Selection */}
-          <View style={styles.inputMethodSection}>
-            <Text style={styles.sectionTitle}>How would you like to add your meal?</Text>
-            <View style={styles.inputMethodButtons}>
-              <TouchableOpacity
-                style={[
-                  styles.inputMethodButton,
-                  inputMethod === 'text' && styles.inputMethodButtonActive
-                ]}
-                onPress={() => setInputMethod('text')}
-              >
-                <Ionicons 
-                  name="create-outline" 
-                  size={24} 
-                  color={inputMethod === 'text' ? 'white' : colors.primary} 
-                />
-                <Text style={[
-                  styles.inputMethodText,
-                  inputMethod === 'text' && styles.inputMethodTextActive
-                ]}>
-                  Type
-                </Text>
-              </TouchableOpacity>
+          {/* Dual Input Section - Meal & Water */}
+          <View style={styles.sectionTitle}>
+            <Text style={styles.sectionTitleText}>Add Meal & Water</Text>
+          </View>
 
-              <View style={styles.disabledButton}>
-                <Ionicons 
-                  name="mic-outline" 
-                  size={24} 
-                  color="#CCCCCC" 
-                />
-                <Text style={styles.disabledButtonText}>
-                  Voice
-                </Text>
-                <Text style={styles.comingSoonBadge}>Coming Soon</Text>
+          <View style={styles.dualInputContainer}>
+            {/* LEFT COLUMN - MEAL INPUT */}
+            <View style={styles.inputColumn}>
+              <View style={styles.columnHeader}>
+                <Ionicons name="fast-food-outline" size={20} color={colors.primary} />
+                <Text style={styles.columnTitle}>Meal</Text>
               </View>
 
-              <View style={styles.disabledButton}>
-                <Ionicons 
-                  name="camera-outline" 
-                  size={24} 
-                  color="#CCCCCC" 
-                />
-                <Text style={styles.disabledButtonText}>
-                  Photo
-                </Text>
-                <Text style={styles.comingSoonBadge}>Coming Soon</Text>
+              {/* Meal Suggestions */}
+              <View style={styles.miniSuggestionsSection}>
+                <Text style={styles.miniSuggestionsTitle}>Quick Pick</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.miniSuggestionsScroll}>
+                  {suggestedFoods.slice(0, 4).map((food, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.miniSuggestionCard}
+                      onPress={() => {
+                        setSelectedFoodItem(food);
+                        setCalorieInput(String(food.calories));
+                      }}
+                    >
+                      <Text style={styles.miniSuggestionText}>{food.name}</Text>
+                      <Text style={styles.miniSuggestionCals}>{food.calories}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
               </View>
+
+              {/* Meal Input Fields */}
+              <TextInput 
+                style={styles.mealInput}
+                placeholder="Search food..."
+                placeholderTextColor={colors.textSecondary}
+                value={foodSearch}
+                onChangeText={setFoodSearch}
+              />
+              
+              <TextInput
+                style={styles.calorieInput}
+                placeholder="Calories"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="decimal-pad"
+                value={calorieInput}
+                onChangeText={setCalorieInput}
+              />
+
+              {showFoodSearch && filteredFoods.length > 0 && (
+                <ScrollView style={styles.foodResultsList} nestedScrollEnabled>
+                  {filteredFoods.slice(0, 3).map((food, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.foodResultItem}
+                      onPress={() => {
+                        setSelectedFoodItem(food);
+                        setCalorieInput(String(food.calories));
+                        setFoodSearch('');
+                      }}
+                    >
+                      <Text style={styles.foodResultName}>{food.name}</Text>
+                      <Text style={styles.foodResultCals}>{food.calories} cals</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+
+            {/* RIGHT COLUMN - WATER INPUT */}
+            <View style={styles.inputColumn}>
+              <View style={styles.columnHeader}>
+                <Ionicons name="water" size={20} color="#4ECDC4" />
+                <Text style={styles.columnTitle}>Water</Text>
+              </View>
+
+              {/* Water Quick Suggestions */}
+              <View style={styles.miniSuggestionsSection}>
+                <Text style={styles.miniSuggestionsTitle}>Quick Pick</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.miniSuggestionsScroll}>
+                  {waterIntakeDatabase.options.map((option) => (
+                    <TouchableOpacity
+                      key={option.name}
+                      style={styles.miniWaterCard}
+                      onPress={() => setWaterInput(option.amount.toString())}
+                    >
+                      <Ionicons name="water" size={16} color="#4ECDC4" />
+                      <Text style={styles.miniWaterText}>{option.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              {/* Water Input with +/- */}
+              <View style={styles.waterControlSection}>
+                <TouchableOpacity 
+                  style={styles.waterControlButton}
+                  onPress={() => {
+                    const current = parseFloat(waterInput) || 0;
+                    setWaterInput(Math.max(0, current - 0.1).toFixed(2));
+                  }}
+                >
+                  <Text style={styles.waterControlText}>−</Text>
+                </TouchableOpacity>
+                <TextInput
+                  style={styles.waterInputField}
+                  value={waterInput}
+                  onChangeText={setWaterInput}
+                  keyboardType="decimal-pad"
+                  placeholder="0.25"
+                />
+                <TouchableOpacity 
+                  style={styles.waterControlButton}
+                  onPress={() => {
+                    const current = parseFloat(waterInput) || 0;
+                    setWaterInput((current + 0.1).toFixed(2));
+                  }}
+                >
+                  <Text style={styles.waterControlText}>+</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.waterDisplayLabel}>
+                {waterInput}L ({Math.round(parseFloat(waterInput || '0') * 1000)}ml)
+              </Text>
             </View>
           </View>
 
-          {/* Dynamic Input Based on Selection */}
-          <View style={styles.dynamicInputSection}>
-            {inputMethod === 'text' && (
-              <>
-                {/* Quick Suggested Foods */}
-                <View style={styles.suggestionsSection}>
-                  <Text style={styles.suggestionTitle}>Your Daily Goal Suggestions</Text>
-                  <ScrollView 
-                    horizontal 
-                    showsHorizontalScrollIndicator={false}
-                    style={styles.suggestionsScroll}
-                    contentContainerStyle={styles.suggestionsContent}
+          {/* Search Results Section */}
+          {showFoodSearch && (
+            <View style={styles.suggestionsSection}>
+              <Text style={styles.suggestionTitle}>Your Daily Goal Suggestions</Text>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                style={styles.suggestionsScroll}
+                contentContainerStyle={styles.suggestionsContent}
+              >
+                {suggestedFoods.map((food, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.suggestionCard}
+                    onPress={() => {
+                      setSelectedFoodItem(food);
+                      setCalorieInput(String(food.calories));
+                    }}
                   >
-                    {suggestedFoods.map((food, index) => (
-                      <TouchableOpacity
-                        key={index}
-                        style={styles.suggestionCard}
-                        onPress={() => {
-                          setSelectedFoodItem(food);
-                          setCalorieInput(String(food.calories));
-                        }}
-                      >
-                        <Text style={styles.suggestionFoodName}>{food.name}</Text>
-                        <Text style={styles.suggestionCalories}>{food.calories} cals</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
+                    <Text style={styles.suggestionFoodName}>{food.name}</Text>
+                    <Text style={styles.suggestionCalories}>{food.calories} cals</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
 
-                {/* Food Search */}
-                <View style={styles.inputGroup}>
-                  <View style={styles.labelRow}>
-                    <Ionicons name="fast-food-outline" size={20} color={colors.primary} />
-                    <Text style={styles.label}>Search for food</Text>
-                  </View>
-                  <View style={styles.searchContainer}>
-                    <TextInput 
-                      style={styles.searchInput}
-                      placeholder="e.g. Chicken, Rice, Bread..."
-                      placeholderTextColor={colors.textSecondary}
-                      value={foodSearch}
-                      onChangeText={setFoodSearch}
-                    />
-                    {foodSearch.length > 0 && (
-                      <TouchableOpacity onPress={() => { setFoodSearch(''); setShowFoodSearch(false); }}>
-                        <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
-                      </TouchableOpacity>
-                    )}
-                  </View>
+          {/* Detailed Food Search & Selection (Old UI - kept for reference) */}
+          <View style={styles.inputGroup}>
+            <View style={styles.labelRow}>
+              <Ionicons name="fast-food-outline" size={20} color={colors.primary} />
+              <Text style={styles.label}>Search for food</Text>
+            </View>
+            <View style={styles.searchContainer}>
+              <TextInput 
+                style={styles.searchInput}
+                placeholder="e.g. Chicken, Rice, Bread..."
+                placeholderTextColor={colors.textSecondary}
+                value={foodSearch}
+                onChangeText={setFoodSearch}
+              />
+              {foodSearch.length > 0 && (
+                <TouchableOpacity onPress={() => { setFoodSearch(''); setShowFoodSearch(false); }}>
+                  <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+              )}
+            </View>
 
-                  {/* Food Search Results */}
-                  {showFoodSearch && filteredFoods.length > 0 && (
-                    <View style={styles.searchResults}>
-                      {filteredFoods.slice(0, 8).map((food, index) => (
-                        <TouchableOpacity
-                          key={index}
-                          style={styles.resultItem}
-                          onPress={() => {
-                            setSelectedFoodItem(food);
-                            setCalorieInput(String(Math.round(food.calories * parseFloat(mealQuantity || '1'))));
-                            setFoodSearch('');
-                            setShowFoodSearch(false);
-                          }}
-                        >
-                          <View style={styles.resultInfo}>
-                            <Text style={styles.resultFoodName}>{food.name}</Text>
-                            <Text style={styles.resultCategory}>{food.category}</Text>
-                          </View>
-                          <Text style={styles.resultCalories}>{Math.round(food.calories * parseFloat(mealQuantity || '1'))} cals</Text>
-                        </TouchableOpacity>
-                      ))}
+            {/* Food Search Results */}
+            {showFoodSearch && filteredFoods.length > 0 && (
+              <View style={styles.searchResults}>
+                {filteredFoods.slice(0, 8).map((food, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.resultItem}
+                    onPress={() => {
+                      setSelectedFoodItem(food);
+                      setCalorieInput(String(Math.round(food.calories * parseFloat(mealQuantity || '1'))));
+                      setFoodSearch('');
+                      setShowFoodSearch(false);
+                    }}
+                  >
+                    <View style={styles.resultInfo}>
+                      <Text style={styles.resultFoodName}>{food.name}</Text>
+                      <Text style={styles.resultCategory}>{food.category}</Text>
                     </View>
-                  )}
-
-                  {showFoodSearch && foodSearch.length > 0 && filteredFoods.length === 0 && (
-                    <Text style={styles.noResults}>No foods found. Enter custom calories below.</Text>
-                  )}
-                </View>
-
-                {/* Selected Food Display */}
-                {selectedFoodItem && (
-                  <View style={styles.selectedFoodBox}>
-                    <View style={styles.selectedFoodHeader}>
-                      <Ionicons name="checkmark-circle" size={24} color={colors.success} />
-                      <View style={styles.selectedFoodInfo}>
-                        <Text style={styles.selectedFoodName}>{selectedFoodItem.name}</Text>
-                        <Text style={styles.selectedFoodCalories}>
-                          {Math.round(selectedFoodItem.calories * parseFloat(mealQuantity || '1'))} calories
-                        </Text>
-                      </View>
-                      <TouchableOpacity onPress={() => setSelectedFoodItem(null)}>
-                        <Ionicons name="trash-outline" size={20} color={colors.error} />
-                      </TouchableOpacity>
-                    </View>
-                    
-                    {/* Quantity Adjuster */}
-                    <View style={styles.quantitySection}>
-                      <Text style={styles.quantityLabel}>Quantity (portions):</Text>
-                      <View style={styles.quantityInputRow}>
-                        <TouchableOpacity 
-                          style={styles.quantityBtn}
-                          onPress={() => {
-                            const q = Math.max(0.5, parseFloat(mealQuantity || '1') - 0.5);
-                            setMealQuantity(String(q));
-                            setCalorieInput(String(Math.round(selectedFoodItem.calories * q)));
-                          }}
-                        >
-                          <Text style={styles.quantityBtnText}>−</Text>
-                        </TouchableOpacity>
-                        <TextInput
-                          style={styles.quantityInput}
-                          value={mealQuantity}
-                          onChangeText={(text) => {
-                            setMealQuantity(text);
-                            if (text && !isNaN(parseFloat(text))) {
-                              setCalorieInput(String(Math.round(selectedFoodItem.calories * parseFloat(text))));
-                            }
-                          }}
-                          keyboardType="decimal-pad"
-                        />
-                        <TouchableOpacity 
-                          style={styles.quantityBtn}
-                          onPress={() => {
-                            const q = parseFloat(mealQuantity || '1') + 0.5;
-                            setMealQuantity(String(q));
-                            setCalorieInput(String(Math.round(selectedFoodItem.calories * q)));
-                          }}
-                        >
-                          <Text style={styles.quantityBtnText}>+</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  </View>
-                )}
-
-                {/* Manual Calorie Input */}
-                <View style={styles.inputGroup}>
-                  <View style={styles.labelRow}>
-                    <Ionicons name="flame-outline" size={20} color="#FF6B6B" />
-                    <Text style={styles.label}>Calories</Text>
-                  </View>
-                  <View style={styles.calorieInputContainer}>
-                    <TextInput 
-                      style={styles.input} 
-                      placeholder="Enter calories (e.g. 450)"
-                      placeholderTextColor={colors.textSecondary}
-                      value={calorieInput}
-                      onChangeText={setCalorieInput}
-                      keyboardType="number-pad"
-                    />
-                    {calorieInput && (
-                      <View style={styles.calorieInfo}>
-                        <Text style={styles.calorieInfoText}>
-                          Remaining: {dayData.targetCalories - parseInt(calorieInput)} / {dayData.targetCalories} cals
-                        </Text>
-                        <View style={styles.calorieBar}>
-                          <View 
-                            style={[
-                              styles.calorieBarFill,
-                              {
-                                width: `${Math.min((parseInt(calorieInput) / dayData.targetCalories) * 100, 100)}%`,
-                                backgroundColor: parseInt(calorieInput) > dayData.targetCalories ? '#FF6B6B' : '#4ECDC4'
-                              }
-                            ]}
-                          />
-                        </View>
-                      </View>
-                    )}
-                  </View>
-                </View>
-
-                {/* Notes */}
-                <View style={styles.inputGroup}>
-                  <View style={styles.labelRow}>
-                    <MaterialIcons name="description" size={20} color={colors.primary} />
-                    <Text style={styles.label}>Notes (Optional)</Text>
-                  </View>
-                  <TextInput
-                    style={[styles.input, styles.textArea]}
-                    placeholder="e.g. Added extra rice, swapped for whole wheat..."
-                    placeholderTextColor={colors.textSecondary}
-                    multiline
-                    numberOfLines={4}
-                    textAlignVertical="top"
-                    value={descriptionInput}
-                    onChangeText={setDescriptionInput}
-                  />
-                </View>
-              </>
-            )}
-
-            {inputMethod === 'audio' && (
-              <View style={styles.audioSection}>
-                <Ionicons name="lock-closed" size={Math.min(hp(5), wp(12))} color="#CCCCCC" />
-                <Text style={styles.audioInstructions}>Voice input coming soon</Text>
-                <Text style={styles.comingSoonMessage}>We're working on voice recognition for meal logging</Text>
+                    <Text style={styles.resultCalories}>{Math.round(food.calories * parseFloat(mealQuantity || '1'))} cals</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             )}
 
-            {inputMethod === 'photo' && (
-              <View style={styles.audioSection}>
-                <Ionicons name="lock-closed" size={Math.min(hp(5), wp(12))} color="#CCCCCC" />
-                <Text style={styles.audioInstructions}>Photo input coming soon</Text>
-                <Text style={styles.comingSoonMessage}>We're working on AI food recognition</Text>
-              </View>
+            {showFoodSearch && foodSearch.length > 0 && filteredFoods.length === 0 && (
+              <Text style={styles.noResults}>No foods found. Enter custom calories below.</Text>
             )}
           </View>
 
+          {/* Selected Food Display */}
+          {selectedFoodItem && (
+            <View style={styles.selectedFoodBox}>
+              <View style={styles.selectedFoodHeader}>
+                <Ionicons name="checkmark-circle" size={24} color={colors.success} />
+                <View style={styles.selectedFoodInfo}>
+                  <Text style={styles.selectedFoodName}>{selectedFoodItem.name}</Text>
+                  <Text style={styles.selectedFoodCalories}>
+                    {Math.round(selectedFoodItem.calories * parseFloat(mealQuantity || '1'))} calories
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => setSelectedFoodItem(null)}>
+                  <Ionicons name="trash-outline" size={20} color={colors.error} />
+                </TouchableOpacity>
+              </View>
+              
+              {/* Quantity Adjuster */}
+              <View style={styles.quantitySection}>
+                <Text style={styles.quantityLabel}>Quantity (portions):</Text>
+                <View style={styles.quantityInputRow}>
+                  <TouchableOpacity 
+                    style={styles.quantityBtn}
+                    onPress={() => {
+                      const q = Math.max(0.5, parseFloat(mealQuantity || '1') - 0.5);
+                      setMealQuantity(String(q));
+                      setCalorieInput(String(Math.round(selectedFoodItem.calories * q)));
+                    }}
+                  >
+                    <Text style={styles.quantityBtnText}>−</Text>
+                  </TouchableOpacity>
+                  <TextInput
+                    style={styles.quantityInput}
+                    value={mealQuantity}
+                    onChangeText={(text) => {
+                      setMealQuantity(text);
+                      if (text && !isNaN(parseFloat(text))) {
+                        setCalorieInput(String(Math.round(selectedFoodItem.calories * parseFloat(text))));
+                      }
+                    }}
+                    keyboardType="decimal-pad"
+                  />
+                  <TouchableOpacity 
+                    style={styles.quantityBtn}
+                    onPress={() => {
+                      const q = parseFloat(mealQuantity || '1') + 0.5;
+                      setMealQuantity(String(q));
+                      setCalorieInput(String(Math.round(selectedFoodItem.calories * q)));
+                    }}
+                  >
+                    <Text style={styles.quantityBtnText}>+</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Manual Calorie Input */}
+          <View style={styles.inputGroup}>
+            <View style={styles.labelRow}>
+              <Ionicons name="flame-outline" size={20} color="#FF6B6B" />
+              <Text style={styles.label}>Calories</Text>
+            </View>
+            <View style={styles.calorieInputContainer}>
+              <TextInput 
+                style={styles.input} 
+                placeholder="Enter calories (e.g. 450)"
+                placeholderTextColor={colors.textSecondary}
+                value={calorieInput}
+                onChangeText={setCalorieInput}
+                keyboardType="number-pad"
+              />
+              {calorieInput && (
+                <View style={styles.calorieInfo}>
+                  <Text style={styles.calorieInfoText}>
+                    Remaining: {dayData.targetCalories - parseInt(calorieInput)} / {dayData.targetCalories} cals
+                  </Text>
+                  <View style={styles.calorieBar}>
+                    <View 
+                      style={[
+                        styles.calorieBarFill,
+                        {
+                          width: `${Math.min((parseInt(calorieInput) / dayData.targetCalories) * 100, 100)}%`,
+                          backgroundColor: parseInt(calorieInput) > dayData.targetCalories ? '#FF6B6B' : '#4ECDC4'
+                        }
+                      ]}
+                    />
+                  </View>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* Notes */}
+          <View style={styles.inputGroup}>
+            <View style={styles.labelRow}>
+              <MaterialIcons name="description" size={20} color={colors.primary} />
+              <Text style={styles.label}>Notes (Optional)</Text>
+            </View>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              placeholder="e.g. Added extra rice, swapped for whole wheat..."
+              placeholderTextColor={colors.textSecondary}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+              value={descriptionInput}
+              onChangeText={setDescriptionInput}
+            />
+          </View>
+
+          {inputMethod === 'audio' && (
+            <View style={styles.audioSection}>
+              <Ionicons name="lock-closed" size={Math.min(hp(5), wp(12))} color="#CCCCCC" />
+              <Text style={styles.audioInstructions}>Voice input coming soon</Text>
+              <Text style={styles.comingSoonMessage}>We're working on voice recognition for meal logging</Text>
+            </View>
+          )}
+          {inputMethod === 'photo' && (
+            <View style={styles.audioSection}>
+              <Ionicons name="lock-closed" size={Math.min(hp(5), wp(12))} color="#CCCCCC" />
+              <Text style={styles.audioInstructions}>Photo input coming soon</Text>
+              <Text style={styles.comingSoonMessage}>We're working on AI food recognition</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.menuButtons}>
@@ -852,23 +927,11 @@ export default function DetailsDay () {
             <Text style={styles.backMenuText}>Back</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.submitMenuButton, (!calorieInput.trim() || isLoading) && {opacity: 0.5}]}
-            disabled={!calorieInput.trim() || isLoading}
+            style={[styles.submitMenuButton, (((!calorieInput.trim() && parseFloat(waterInput || '0') <= 0)) || isLoading) && {opacity: 0.5}]}
+            disabled={(((!calorieInput.trim() && parseFloat(waterInput || '0') <= 0)) || isLoading)}
             onPress={async () => {
-              if (!calorieInput.trim()) {
-                Alert.alert('Validation', 'Please enter calories for the meal');
-                return;
-              }
-
               setIsLoading(true);
               try {
-                if (!calorieInput.trim()) {
-                  Alert.alert('Validation', 'Please enter calories for the meal');
-                  return;
-                }
-
-                const calories = parseInt(calorieInput);
-                const foodName = selectedFoodItem?.name || 'Custom Meal';
                 const dayLogId = (dayData as any)._id || (props as any)._id;
 
                 if (!dayLogId) {
@@ -876,54 +939,83 @@ export default function DetailsDay () {
                   return;
                 }
 
-                // Add meal using existing addMeal API
-                const mealResponse = await dailyLogsApi.addMeal(
-                  dayLogId,
-                  foodName,
-                  parseFloat(mealQuantity || '1'),
-                  'portion',
-                  calories,
-                  undefined,
-                  undefined,
-                  undefined,
-                  descriptionInput
-                );
+                let hasMeal = false;
+                let hasWater = false;
+                let successMessages = [];
 
-                if (mealResponse) {
-                  const remainingCalories = dayData.targetCalories - calories;
-                  
-                  // Show success with haptic feedback
+                // Log meal if calories are entered
+                if (calorieInput.trim()) {
+                  const calories = parseInt(calorieInput);
+                  const foodName = selectedFoodItem?.name || 'Custom Meal';
+
+                  const mealResponse = await dailyLogsApi.addMeal(
+                    dayLogId,
+                    foodName,
+                    parseFloat(mealQuantity || '1'),
+                    'portion',
+                    calories,
+                    undefined,
+                    undefined,
+                    undefined,
+                    descriptionInput
+                  );
+
+                  if (mealResponse) {
+                    hasMeal = true;
+                    const remainingCalories = dayData.targetCalories - calories;
+                    successMessages.push(`${calories} calories logged`);
+                    
+                    setDayData((prev: any) => ({
+                      ...prev,
+                      achievedCalories: (prev.achievedCalories || 0) + calories,
+                      meals: prev.meals ? [...prev.meals, mealResponse] : [mealResponse],
+                    }));
+                  }
+                }
+
+                // Log water if amount is entered
+                const waterAmount = parseFloat(waterInput || '0');
+                if (waterAmount > 0) {
+                  const waterResponse = await dailyLogsApi.addWater(dayLogId, waterAmount);
+
+                  if (waterResponse) {
+                    hasWater = true;
+                    successMessages.push(`${waterAmount}L of water logged`);
+                    
+                    setDayData((prev: any) => ({
+                      ...prev,
+                      achieviedHydration: (prev.achieviedHydration || 0) + waterAmount,
+                    }));
+                  }
+                }
+
+                // Show combined success message
+                if (hasMeal || hasWater) {
                   Alert.alert(
-                    'Success! 🎉',
-                    `${calories} calories logged\nRemaining: ${Math.max(0, remainingCalories)} cals`,
+                    'Success! ✅',
+                    successMessages.join('\n'),
                     [{ text: 'OK', onPress: closeMenu }]
                   );
 
-                  // Reset form
+                  // Reset forms
                   setFoodSearch('');
                   setSelectedFoodItem(null);
                   setCalorieInput('');
                   setMealQuantity('1');
                   setDescriptionInput('');
-                  
-                  // Update day data with new achieved calories
-                  setDayData((prev: any) => ({
-                    ...prev,
-                    achievedCalories: (prev.achievedCalories || 0) + calories,
-                    meals: prev.meals ? [...prev.meals, mealResponse] : [mealResponse],
-                  }));
+                  setWaterInput('0.25');
                 } else {
-                  Alert.alert('Error', 'Failed to log meal. Please try again.');
+                  Alert.alert('Error', 'Please enter at least meal calories or water amount');
                 }
               } catch (error) {
-                console.error('Error logging meal:', error);
-                Alert.alert('Error', 'Failed to log meal. Please check your connection.');
+                console.error('Error logging:', error);
+                Alert.alert('Error', 'Failed to log entry. Please check your connection.');
               } finally {
                 setIsLoading(false);
               }
             }}
           >
-            <Text style={styles.submitMenuText}>Submit</Text>
+            <Text style={styles.submitMenuText}>Save Entry</Text>
             <Ionicons name="checkmark" size={Math.min(hp(2.2), wp(5))} color="white" />
           </TouchableOpacity>
         </View>
@@ -1768,6 +1860,248 @@ const getStyles = (colors: any) => StyleSheet.create({
         color: colors.textSecondary,
         marginTop: hp(0.8),
         textAlign: 'center',
+    },
+    // Water intake styles
+    waterOptionsContainer: {
+        gap: hp(1),
+        marginBottom: hp(2),
+    },
+    waterOptionButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: wp(3),
+        backgroundColor: colors.gray + '10',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: colors.primary + '30',
+        marginBottom: hp(0.8),
+    },
+    waterOptionText: {
+        marginLeft: wp(2),
+        fontSize: Math.min(hp(1.6), wp(4)),
+        color: colors.textPrimary,
+        fontWeight: '500',
+    },
+    customWaterSection: {
+        backgroundColor: colors.primary + '10',
+        padding: wp(3),
+        borderRadius: 10,
+        borderLeftWidth: 4,
+        borderLeftColor: '#4ECDC4',
+    },
+    inputLabel: {
+        fontSize: Math.min(hp(1.4), wp(3.2)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+        marginBottom: hp(1),
+    },
+    waterInputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(2),
+        marginBottom: hp(1),
+    },
+    quantityButton: {
+        width: wp(10),
+        height: wp(10),
+        borderRadius: wp(5),
+        backgroundColor: colors.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    quantityButtonText: {
+        fontSize: Math.min(hp(2.5), wp(6)),
+        fontWeight: 'bold',
+        color: 'white',
+    },
+    waterAmountInput: {
+        flex: 1,
+        borderWidth: 1,
+        borderColor: colors.gray + '50',
+        borderRadius: 8,
+        paddingHorizontal: wp(2),
+        paddingVertical: hp(0.8),
+        fontSize: 16,
+        color: colors.textPrimary,
+        textAlign: 'center',
+    },
+    waterDisplayText: {
+        fontSize: Math.min(hp(1.4), wp(3.5)),
+        color: colors.textSecondary,
+        textAlign: 'center',
+        marginTop: hp(0.8),
+        fontWeight: '500',
+    },
+    // New Dual Input Styles
+    sectionTitleText: {
+        fontSize: Math.min(hp(2), wp(5)),
+        fontWeight: 'bold',
+        color: colors.textPrimary,
+        marginBottom: hp(1.5),
+        marginLeft: wp(4),
+    },
+    dualInputContainer: {
+        flexDirection: 'row',
+        paddingHorizontal: wp(4),
+        marginBottom: hp(2),
+        gap: wp(3),
+    },
+    inputColumn: {
+        flex: 1,
+        backgroundColor: colors.cardBackground,
+        borderRadius: wp(3),
+        padding: wp(3),
+        borderWidth: 1,
+        borderColor: colors.borderColor || '#E5E7EB',
+    },
+    columnHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: hp(1),
+        gap: wp(2),
+    },
+    columnTitle: {
+        fontSize: Math.min(hp(1.8), wp(4.5)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+    },
+    miniSuggestionsSection: {
+        marginBottom: hp(1.2),
+    },
+    miniSuggestionsTitle: {
+        fontSize: Math.min(hp(1.2), wp(3)),
+        fontWeight: '500',
+        color: colors.textSecondary,
+        marginBottom: hp(0.5),
+    },
+    miniSuggestionsScroll: {
+        maxHeight: hp(6),
+    },
+    miniSuggestionCard: {
+        backgroundColor: colors.primary + '20',
+        paddingHorizontal: wp(2),
+        paddingVertical: hp(0.6),
+        borderRadius: wp(2),
+        marginRight: wp(1.5),
+        minWidth: wp(18),
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    miniSuggestionText: {
+        fontSize: Math.min(hp(1), wp(2.5)),
+        color: colors.primary,
+        fontWeight: '500',
+        textAlign: 'center',
+    },
+    miniSuggestionCals: {
+        fontSize: Math.min(hp(0.9), wp(2)),
+        color: colors.textSecondary,
+        marginTop: hp(0.2),
+    },
+    mealInput: {
+        backgroundColor: colors.inputBackground || '#F9FAFB',
+        borderWidth: 1,
+        borderColor: colors.borderColor || '#E5E7EB',
+        borderRadius: wp(2),
+        paddingHorizontal: wp(3),
+        paddingVertical: hp(0.8),
+        fontSize: Math.min(hp(1.4), wp(3.5)),
+        color: colors.textPrimary,
+        marginBottom: hp(0.8),
+    },
+    calorieInput: {
+        backgroundColor: colors.inputBackground || '#F9FAFB',
+        borderWidth: 1,
+        borderColor: colors.borderColor || '#E5E7EB',
+        borderRadius: wp(2),
+        paddingHorizontal: wp(3),
+        paddingVertical: hp(0.8),
+        fontSize: Math.min(hp(1.4), wp(3.5)),
+        color: colors.textPrimary,
+        marginBottom: hp(0.8),
+    },
+    foodResultsList: {
+        maxHeight: hp(12),
+        backgroundColor: colors.inputBackground || '#F9FAFB',
+        borderRadius: wp(2),
+        borderWidth: 1,
+        borderColor: colors.borderColor || '#E5E7EB',
+    },
+    foodResultItem: {
+        padding: wp(2.5),
+        borderBottomWidth: 1,
+        borderBottomColor: colors.borderColor || '#E5E7EB',
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    foodResultName: {
+        fontSize: Math.min(hp(1.2), wp(3)),
+        color: colors.textPrimary,
+        fontWeight: '500',
+        flex: 1,
+    },
+    foodResultCals: {
+        fontSize: Math.min(hp(1.1), wp(2.8)),
+        color: colors.primary,
+        fontWeight: '600',
+    },
+    miniWaterCard: {
+        backgroundColor: '#4ECDC4' + '20',
+        paddingHorizontal: wp(2),
+        paddingVertical: hp(0.6),
+        borderRadius: wp(2),
+        marginRight: wp(1.5),
+        minWidth: wp(18),
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        gap: wp(1),
+    },
+    miniWaterText: {
+        fontSize: Math.min(hp(1), wp(2.5)),
+        color: '#4ECDC4',
+        fontWeight: '500',
+        textAlign: 'center',
+    },
+    waterControlSection: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: hp(0.8),
+        gap: wp(2),
+    },
+    waterControlButton: {
+        width: wp(9),
+        height: wp(9),
+        borderRadius: wp(2),
+        backgroundColor: '#4ECDC4' + '20',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    waterControlText: {
+        fontSize: Math.min(hp(1.8), wp(4.5)),
+        color: '#4ECDC4',
+        fontWeight: 'bold',
+    },
+    waterInputField: {
+        flex: 1,
+        backgroundColor: colors.inputBackground || '#F9FAFB',
+        borderWidth: 1,
+        borderColor: '#4ECDC4',
+        borderRadius: wp(2),
+        paddingHorizontal: wp(3),
+        paddingVertical: hp(0.8),
+        fontSize: Math.min(hp(1.4), wp(3.5)),
+        color: colors.textPrimary,
+        textAlign: 'center',
+    },
+    waterDisplayLabel: {
+        fontSize: Math.min(hp(1.1), wp(2.8)),
+        color: colors.textSecondary,
+        textAlign: 'center',
+        marginTop: hp(0.5),
+        fontWeight: '500',
     },
 })
 

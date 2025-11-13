@@ -303,6 +303,78 @@ export const removeMeal = async (req, res) => {
   }
 };
 
+// Add water intake to daily log
+export const addWater = async (req, res) => {
+  try {
+    const { dayId } = req.params;
+    const { amount } = req.body;
+
+    // Validate input
+    if (amount === undefined || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid water amount. Must be greater than 0'
+      });
+    }
+
+    const dailyLog = await DailyLog.findById(dayId);
+    if (!dailyLog) {
+      return res.status(404).json({
+        success: false,
+        message: 'Daily log not found'
+      });
+    }
+
+    // Check if day is locked
+    if (dailyLog.lock) {
+      return res.status(403).json({
+        success: false,
+        message: 'This day is locked. Cannot add water to completed days.'
+      });
+    }
+
+    // Add water intake
+    const waterIntake = {
+      amount, // in liters
+      timestamp: new Date()
+    };
+
+    if (!dailyLog.waterIntake) {
+      dailyLog.waterIntake = [];
+    }
+    
+    dailyLog.waterIntake.push(waterIntake);
+    dailyLog.achievedHydration += amount;
+
+    // Save (will trigger pre-save hook for calculations)
+    await dailyLog.save();
+
+    // Update user's hydration history
+    if (dailyLog.userId) {
+      const user = await User.findById(dailyLog.userId);
+      if (user) {
+        user.nutritionHistory.totalHydrationConsumed = (user.nutritionHistory.totalHydrationConsumed || 0) + amount;
+        user.nutritionHistory.lastUpdated = new Date();
+        await user.save();
+        console.log(`[addWater] Updated hydration history for user ${dailyLog.userId}`);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Water intake logged successfully',
+      data: dailyLog
+    });
+  } catch (error) {
+    console.error('Error adding water:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error adding water intake',
+      error: error.message
+    });
+  }
+};
+
 // Update calorie level for the day
 export const updateCalorieLevel = async (req, res) => {
   try {
