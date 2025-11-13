@@ -254,4 +254,26 @@ export const dailyLogsApi = {
       throw error;
     }
   },
+
+  // Add water intake to a day
+  addWater: async (dayId: string, amount: number) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/daily-logs/${dayId}/water`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ amount }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to add water intake');
+      }
+      return data.data;
+    } catch (error) {
+      console.error('Error adding water:', error);
+      throw error;
+    }
+  },
 };

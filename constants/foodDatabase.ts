@@ -110,6 +110,17 @@ export const goalBasedSuggestions = {
   }
 };
 
+// Water intake database for hydration tracking
+export const waterIntakeDatabase = {
+  options: [
+    { name: 'Glass of Water (250ml)', amount: 0.25, unit: 'liters' },
+    { name: 'Bottle of Water (500ml)', amount: 0.5, unit: 'liters' },
+    { name: 'Large Bottle (1L)', amount: 1.0, unit: 'liters' },
+    { name: 'Cup of Water (200ml)', amount: 0.2, unit: 'liters' },
+    { name: 'Sip (50ml)', amount: 0.05, unit: 'liters' },
+  ]
+};
+
 // Get all foods flattened for search
 export const getAllFoods = () => {
   const all = [

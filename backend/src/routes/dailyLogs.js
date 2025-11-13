@@ -1,14 +1,15 @@
 import express from 'express';
 import {
-    addMeal,
-    completeDay,
-    createWeeklyPlan,
-    getDailyLog,
-    getWeeklyProgress,
-    removeMeal,
-    saveCompletedWeekToUser,
-    updateCalorieLevel,
-    updateHydration
+  addMeal,
+  addWater,
+  completeDay,
+  createWeeklyPlan,
+  getDailyLog,
+  getWeeklyProgress,
+  removeMeal,
+  saveCompletedWeekToUser,
+  updateCalorieLevel,
+  updateHydration
 } from '../controllers/dailyLogController.js';
 
 const router = express.Router();
@@ -27,6 +28,9 @@ router.get('/:dayId', getDailyLog);
 
 // Add meal to a day
 router.post('/:dayId/meal', addMeal);
+
+// Add water intake to a day
+router.post('/:dayId/water', addWater);
 
 // Remove meal from a day
 router.delete('/:dayId/meal/:mealId', removeMeal);
