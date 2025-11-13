@@ -1,8 +1,8 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import jwt from 'jsonwebtoken';
-import User from '../models/User.js';
 import DailyLog from '../models/DailyLog.js';
+import User from '../models/User.js';
 import WeeklyTracking from '../models/WeeklyTracking.js';
 
 const router = express.Router();
