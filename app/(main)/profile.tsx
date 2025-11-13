@@ -1,8 +1,9 @@
 import AppHeader from "@/components/AppHeader";
 import { useAppointments } from "@/contexts/AppointmentContext";
+import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import {
   heightPercentageToDP as hp,
@@ -17,6 +18,19 @@ export default function ProfileScreen() {
   const upcomingAppointments = getUpcomingAppointments();
   const activeAppointments = getActiveAppointments();
   const [selectedTab, setSelectedTab] = useState('overview');
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const userData = await tokenStorage.getUser();
+        setUser(userData);
+      } catch (error) {
+        console.error('Error loading user:', error);
+      }
+    };
+    loadUser();
+  }, []);
 
   // Mock data for additional features
   const completedAppointments = appointments.filter(apt => apt.status === 'completed');
@@ -92,14 +106,14 @@ export default function ProfileScreen() {
             color: '#333',
             marginBottom: hp(0.5),
           }}>
-            John Doe
+            {user?.username || "User"}
           </Text>
           
           <Text style={{
             fontSize: hp(1.8),
             color: '#666',
           }}>
-            john.doe@example.com
+            {user?.email || "user@example.com"}
           </Text>
         </View>
 
