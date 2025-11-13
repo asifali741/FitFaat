@@ -16,6 +16,12 @@ const router = express.Router();
 // Create a new weekly plan
 router.post('/weekly-plan', createWeeklyPlan);
 
+// Complete a day (with optional week completion)
+router.post('/complete-day', completeDay);
+
+// Get weekly progress (must come before /:dayId to avoid conflicts)
+router.get('/progress/:weeklyTrackingId', getWeeklyProgress);
+
 // Get daily log details
 router.get('/:dayId', getDailyLog);
 
@@ -30,12 +36,6 @@ router.put('/:dayId/calorie-level', updateCalorieLevel);
 
 // Update hydration
 router.put('/:dayId/hydration', updateHydration);
-
-// Complete a day (with optional week completion)
-router.post('/complete-day', completeDay);
-
-// Get weekly progress
-router.get('/progress/:weeklyTrackingId', getWeeklyProgress);
 
 // Complete and save week to user profile
 router.post('/complete-week/:weeklyTrackingId', async (req, res) => {
