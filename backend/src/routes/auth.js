@@ -2,6 +2,8 @@ import express from 'express';
 import { body, validationResult } from 'express-validator';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import DailyLog from '../models/DailyLog.js';
+import WeeklyTracking from '../models/WeeklyTracking.js';
 
 const router = express.Router();
 
@@ -70,6 +72,72 @@ router.post(
         password
       });
 
+      console.log('[signup] User created, now creating 7-day weekly plan...');
+
+      // Auto-create 7-day weekly plan immediately upon signup
+      try {
+        const weekStart = new Date();
+        weekStart.setHours(0, 0, 0, 0);
+        
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        weekEnd.setHours(23, 59, 59, 999);
+
+        const baseTargetCalories = 2000;
+        const baseTargetHydration = 2500;
+
+        // Create 7 daily logs
+        const dailyLogs = [];
+        for (let day = 1; day <= 7; day++) {
+          const logDate = new Date(weekStart);
+          logDate.setDate(logDate.getDate() + (day - 1));
+
+          const dailyLog = new DailyLog({
+            userId: user._id,
+            dayNumber: day,
+            date: logDate.toISOString().split('T')[0],
+            targetCalories: baseTargetCalories,
+            achievedCalories: 0,
+            calorieLevel: 3,
+            targetHydration: baseTargetHydration,
+            achievedHydration: 0,
+            meals: [],
+            status: day === 1 ? 'active' : 'locked',
+            lock: false,
+            isCompleted: false,
+            completionPercentage: 0,
+            calorieCompletionPercentage: 0,
+            hydrationCompletionPercentage: 0,
+            performanceRating: 'not-started',
+            calorieSurplus: 0
+          });
+
+          const savedLog = await dailyLog.save();
+          dailyLogs.push(savedLog._id);
+        }
+
+        // Create weekly tracking document
+        const weeklyTracking = new WeeklyTracking({
+          userId: user._id,
+          weekStartDate: weekStart,
+          weekEndDate: weekEnd,
+          baseTargetCalories,
+          baseTargetHydration,
+          dailyLogs: dailyLogs,
+          status: 'active'
+        });
+
+        const savedWeekly = await weeklyTracking.save();
+        console.log('[signup] Weekly plan created with ID:', savedWeekly._id);
+
+        // Update user with weeklyTrackingId
+        user.currentWeeklyTrackingId = savedWeekly._id;
+        await user.save();
+      } catch (error) {
+        console.error('[signup] Error creating weekly plan:', error.message);
+        // Don't fail signup if weekly plan creation fails
+      }
+
       // Create token
       const token = jwt.sign(
         { id: user._id },
@@ -83,7 +151,8 @@ router.post(
         user: {
           id: user._id,
           email: user.email,
-          username: user.username
+          username: user.username,
+          weeklyTrackingId: user.currentWeeklyTrackingId
         }
       });
     } catch (err) {
