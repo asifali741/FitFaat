@@ -1,13 +1,12 @@
 import AppHeader from "@/components/AppHeader";
-import BlueLoader from "@/components/common/BlueLoader";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
-import { Days } from "./_Day";
+import { Days } from "./Day";
 export type Day = {
   dayNo: number,
   date: string,
@@ -116,7 +115,7 @@ export default function DayPlan () {
   },[]);
 
   const loadJson = async ({data, timestamp} : {data:jsonResponse, timestamp: Date}) =>{
-    let entry : keyof jsonResponse
+    var entry : keyof jsonResponse
     for (const key in data)
     {
       entry = key as keyof jsonResponse
@@ -142,7 +141,7 @@ export default function DayPlan () {
     }}
   const callApi = async () =>{
     //save data from api into local and state variable 
-    let data = {
+    var data = {
       day01: FinishedDay,
       day02: ActiveDay,
       day03: { dayNo: 3, date: '2025-08-26', achievedCalories : 0, achieviedHydration: 0, targetCalories: 0, targetHydration: 0, remarks: '', duration: 0, status: "locked"} as Day, 
@@ -190,15 +189,18 @@ export default function DayPlan () {
   {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.primary }]}>
-        <AppHeader 
-          title="FitFaat Dashboard"
-          showStepIndicator={false}
-          showBackButton={false}
-        />
+        {/* Header */}
+        <View style={[styles.header, { backgroundColor: colors.primary }]}>
+        <View style={styles.spacer} />
+          <Text style={[styles.headerTitle, { color: colors.textOnPrimary }]}>FitFaat Dashboard</Text>
+          <View style={styles.spacer} />
+        </View>
 
         {/* Loading Content */}
         <View style={[styles.content, { backgroundColor: colors.screenColor }]}>
-          <BlueLoader fullScreen text="Loading dashboard..." />
+          <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
         </View>
       </SafeAreaView>
     )
@@ -236,10 +238,28 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: Math.min(wp(5), 20),
+    paddingVertical: Math.min(hp(1.8), 15),
+    minHeight: hp(7),
+  },
+  headerTitle: {
+    fontSize: Math.min(hp(2.5), wp(6.2)),
+    fontWeight: "bold",
+    textAlign: "center",
+    flex: 1,
+    marginHorizontal: wp(2),
+  },
   content: {
     flex: 1,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
+  },
+  spacer: {
+    width: wp(18),
   },
   list: {
     flexGrow: 1,

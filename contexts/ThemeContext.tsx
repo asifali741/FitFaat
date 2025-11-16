@@ -53,9 +53,9 @@ const lightColors = {
   buttonText: "#FFFFFF",
   
   // Drawer Colors
-  drawerBackground: "#FFFFFF",
+  drawerBackground: "#26867C",
   drawerActiveTabColor: "#4CAF50",
-  drawerTintColor: "#26867C",
+  drawerTintColor: "#FFFFFF",
   
   // Status Colors
   activeStatus: "#4CAF50",
@@ -122,8 +122,8 @@ const darkColors = {
   buttonText: "#FFFFFF",
   
   // Drawer Colors
-  drawerBackground: "#1E1E1E",
-  drawerActiveTabColor: "#2E7D32",
+  drawerBackground: "#1A1A1A",
+  drawerActiveTabColor: "#4CAF50",
   drawerTintColor: "#FFFFFF",
   
   // Status Colors

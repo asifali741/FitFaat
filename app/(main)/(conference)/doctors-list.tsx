@@ -4,9 +4,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { colorsSheet } from "../(settings)/_ui_elements";
-import { getDoctorsByDate } from "./_doctorsData";
-import AnimatedButton, { AnimatedBackButton } from "@/components/common/AnimatedButton";
+import { colorsSheet } from "../(settings)/ui_elements";
+import { getDoctorsByDate } from "./doctorsData";
 
 export default function DoctorsListScreen() {
   const router = useRouter();
@@ -23,9 +22,9 @@ export default function DoctorsListScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <AnimatedBackButton onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colorsSheet.textOnPrimary} />
-        </AnimatedBackButton>
+        </TouchableOpacity>
         <Text style={styles.headerTitle}>Consultants Available</Text>
         <View style={styles.spacer} />
       </View>
@@ -56,9 +55,8 @@ export default function DoctorsListScreen() {
             </View>
           ) : (
             doctors.map((doctor) => (
-              <AnimatedButton
+              <TouchableOpacity
                 key={doctor.id}
-                animationType="scale"
                 style={styles.doctorCard}
                 onPress={() => handleDoctorSelect(doctor.id)}
               >
@@ -70,7 +68,7 @@ export default function DoctorsListScreen() {
                   <Text style={styles.doctorEmail}>{doctor.email}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={24} color={colorsSheet.textSecondary} />
-              </AnimatedButton>
+              </TouchableOpacity>
             ))
           )}
         </ScrollView>

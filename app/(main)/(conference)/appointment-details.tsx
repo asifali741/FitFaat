@@ -7,7 +7,7 @@ import React, { useEffect, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { colorsSheet } from "../(settings)/_ui_elements";
+import { colorsSheet } from "../(settings)/ui_elements";
 
 export default function AppointmentDetailsScreen() {
   const router = useRouter();
@@ -15,18 +15,11 @@ export default function AppointmentDetailsScreen() {
   const { appointments, updateAppointmentStatus } = useAppointments();
   const { appointmentId } = useLocalSearchParams();
   const [appointment, setAppointment] = useState<Appointment | null>(null);
-  const [canStartCall, setCanStartCall] = useState(false); // Initially disabled until timer completes
+  const [canStartCall, setCanStartCall] = useState(false);
 
   useEffect(() => {
     if (appointmentId) {
       const foundAppointment = appointments.find(apt => apt.id === appointmentId);
-      
-      // If appointment is cancelled, redirect back to main conference screen
-      if (foundAppointment && foundAppointment.status === 'cancelled') {
-        router.replace('/(main)/(conference)');
-        return;
-      }
-      
       setAppointment(foundAppointment || null);
     }
   }, [appointmentId, appointments]);
@@ -43,20 +36,11 @@ export default function AppointmentDetailsScreen() {
   };
 
   const handleStartCall = () => {
-    if (!appointment) return;
-    
-    // Generate unique call ID
-    const callId = `appointment_${appointment.id}_${Date.now()}`;
-    
-    // Navigate to custom video call screen with all controls
-    router.push({
-      pathname: "/(main)/(conference)/custom-video-call" as any,
-      params: {
-        callId: callId,
-        userName: "Patient", // You can replace with actual user name from context
-        doctorName: appointment.doctorName || "Doctor"
-      }
-    });
+    Alert.alert(
+      "Start Call",
+      "This would initiate a video call with the doctor. (Video call functionality not implemented)",
+      [{ text: "OK" }]
+    );
   };
 
   const handleCancelAppointment = () => {
@@ -225,15 +209,13 @@ export default function AppointmentDetailsScreen() {
             </TouchableOpacity>
           )}
 
-          {appointment.status !== 'cancelled' && (
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={handleCancelAppointment}
-            >
-              <Ionicons name="close-circle" size={20} color={colorsSheet.error} />
-              <Text style={styles.cancelButtonText}>Cancel Appointment</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={handleCancelAppointment}
+          >
+            <Ionicons name="close-circle" size={20} color={colorsSheet.error} />
+            <Text style={styles.cancelButtonText}>Cancel Appointment</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -387,7 +369,7 @@ const styles = StyleSheet.create({
   },
   actionButtons: {
     marginTop: hp(2),
-    marginBottom: hp(8),
+    marginBottom: hp(4),
   },
   startCallButton: {
     flexDirection: "row",

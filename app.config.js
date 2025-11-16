@@ -64,9 +64,6 @@ export default {
     extra: {
       OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
       EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY, // 👈 optional but helpful
-      eas: {
-        projectId: "a7b74a8e-19af-42c8-9d0c-a07995838e5f"
-      }
     },
   },
 };

@@ -1,5 +1,5 @@
 import AppHeader from "@/components/AppHeader";
-import { useAuth, useUser } from "@clerk/clerk-expo";
+import { useAuth } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DrawerActions, useNavigation } from "@react-navigation/native";
@@ -13,8 +13,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 export default function Settings() {
   const navigation = useNavigation();
   const router = useRouter();
-  const { signOut } = useAuth();
-  const { user } = useUser();
+  const { signOut, user } = useAuth();
   const { isDarkMode, toggleDarkMode, colors } = useTheme();
   const [notifications, setNotifications] = useState(true);
   const [locationServices, setLocationServices] = useState(true);
@@ -43,7 +42,11 @@ export default function Settings() {
         break;
       
       case "Workout Preferences":
-        router.push("/(exercises)/workout");
+        Alert.alert(
+          "Workout Preferences",
+          "Customize your workout experience including difficulty levels, exercise types, and scheduling.",
+          [{ text: "OK" }]
+        );
         break;
       
       case "Diet Preferences":

@@ -1,10 +1,9 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { authApi } from '../../utils/auth/authApi';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useFonts } from 'expo-font';
 
 export default function Login() {
   const [identifier, setIdentifier] = useState('');
@@ -13,17 +12,6 @@ export default function Login() {
   const router = useRouter();
   const { colors, isDarkMode } = useTheme();
   const styles = getStyles(colors, isDarkMode);
-  
-  const [fontsLoaded] = useFonts({
-    Pacifico: require("../../assets/fonts/Pacifico-Regular.ttf"),
-    LoraRegular: require("../../assets/fonts/static/Lora-Regular.ttf"),
-    LoraBold: require("../../assets/fonts/static/Lora-Bold.ttf"),
-    LoraSemiBold: require("../../assets/fonts/static/Lora-SemiBold.ttf"),
-  });
-
-  if (!fontsLoaded) {
-    return null;
-  }
 
   const handleLogin = async () => {
     try {
@@ -67,15 +55,6 @@ export default function Login() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.formContainer}>
-            {/* Logo Section */}
-            <View style={styles.logoSection}>
-              <Text style={styles.logoText}>FitFaat</Text>
-              <Image
-                source={require("../../assets/images/logo.png")}
-                style={styles.logoImage}
-              />
-            </View>
-            
             <View style={styles.header}>
               <Text style={styles.title}>Welcome Back!</Text>
               <Text style={styles.subtitle}>Sign in to continue to FitFaat</Text>
@@ -114,12 +93,12 @@ export default function Login() {
               <Text style={styles.buttonText}>{isLoading ? 'Logging in...' : 'Login'}</Text>
             </TouchableOpacity>
 
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Don&apos;t have an account? </Text>
-          <TouchableOpacity onPress={() => router.push("/email-signup")}>
-            <Text style={styles.linkText}>Sign Up</Text>
-          </TouchableOpacity>
-        </View>
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>Don't have an account? </Text>
+              <TouchableOpacity onPress={() => router.push("/auth/email-signup")}>
+                <Text style={styles.linkText}>Sign Up</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -137,42 +116,24 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'flex-start',
-    paddingTop: 5,
+    justifyContent: 'center',
   },
   formContainer: {
     padding: 24,
-    paddingTop: 0,
-  },
-  logoSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    minHeight: 500,
     justifyContent: 'center',
-    marginBottom: 20,
-  },
-  logoText: {
-    fontFamily: 'Pacifico',
-    fontSize: 36,
-    color: colors.primary,
-    marginRight: 12,
-  },
-  logoImage: {
-    width: 50,
-    height: 50,
-    resizeMode: 'contain',
   },
   header: {
-    marginBottom: 25,
+    marginBottom: 40,
   },
   title: {
     fontSize: Math.min(32, 28),
-    fontFamily: 'LoraBold',
+    fontWeight: '800',
     color: colors.textPrimary,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: Math.min(16, 15),
-    fontFamily: 'LoraRegular',
     color: colors.textSecondary,
   },
   inputContainer: {
@@ -180,7 +141,7 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    fontFamily: 'LoraSemiBold',
+    fontWeight: '600',
     color: colors.textPrimary,
     marginBottom: 8,
   },
@@ -192,7 +153,6 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 16,
     fontSize: 16,
-    fontFamily: 'LoraRegular',
     color: colors.textPrimary,
     backgroundColor: isDarkMode ? colors.cardBackground : '#FFFFFF',
   },
@@ -216,7 +176,7 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   buttonText: {
     color: '#FFFFFF',
     fontSize: 18,
-    fontFamily: 'LoraBold',
+    fontWeight: '700',
   },
   footer: {
     flexDirection: 'row',
@@ -226,12 +186,11 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   },
   footerText: {
     fontSize: 15,
-    fontFamily: 'LoraRegular',
     color: colors.textSecondary,
   },
   linkText: {
     fontSize: 15,
-    fontFamily: 'LoraBold',
     color: colors.primary,
+    fontWeight: '700',
   },
 });

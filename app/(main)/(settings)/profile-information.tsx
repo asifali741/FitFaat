@@ -71,7 +71,7 @@ export default function ProfileInformation() {
       <Text style={styles.label}>{label}</Text>
       {isEditing && editable ? (
         <TextInput
-          style={[styles.input, multiline && styles.multilineInput, { color: colors.textPrimary }]}
+          style={[styles.input, multiline && styles.multilineInput]}
           value={value}
           onChangeText={(text) => setFormData({ ...formData, [field]: text })}
           placeholder={`Enter ${label.toLowerCase()}`}
@@ -322,12 +322,10 @@ const getStyles = (colors: any) => StyleSheet.create({
     marginBottom: hp(2),
   },
   infoField: {
-    backgroundColor: colors.cardBackground,
+    backgroundColor: 'white',
     padding: wp(4),
     borderRadius: hp(1.5),
     marginBottom: hp(1),
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
   },
   label: {
     fontSize: hp(1.4),
@@ -341,9 +339,9 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   input: {
     fontSize: hp(1.8),
-    backgroundColor: colors.inputBackground || colors.screenColor,
+    color: colors.textPrimary,
     borderWidth: 1,
-    borderColor: colors.inputBorder || colors.cardBorder,
+    borderColor: colors.gray,
     borderRadius: hp(1),
     paddingHorizontal: wp(3),
     paddingVertical: hp(1),
@@ -373,7 +371,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     marginTop: hp(1),
   },
   cancelButtonText: {
-    color: colors.error,
+    color: colors.buttonText,
     fontSize: hp(1.8),
     fontWeight: '600',
   },

@@ -1,43 +1,24 @@
 import AppHeader from "@/components/AppHeader";
-import { useAppointments } from "@/contexts/AppointmentContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useEffect } from "react";
+import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
-import { LinearGradient } from "expo-linear-gradient";
-import { colorsSheet } from "../(settings)/_ui_elements";
 
 export default function ConferenceScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-  const { appointments } = useAppointments();
   const styles = getStyles(colors);
-
-  useEffect(() => {
-    // Check if there are any active or scheduled appointments (NOT cancelled or completed ones)
-    const activeOrScheduled = appointments.filter(
-      apt => apt.status === 'scheduled' || apt.status === 'active'
-    );
-
-    // Only redirect if there are non-cancelled/non-completed appointments
-    if (activeOrScheduled.length > 0) {
-      router.replace({
-        pathname: '/(main)/(conference)/appointment-details',
-        params: { appointmentId: activeOrScheduled[0].id }
-      });
-    }
-    // If no active/scheduled appointments, stay on the main conference screen
-    // This ensures cancelled appointments don't trigger a redirect
-  }, [appointments]);
 
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader 
         title="Video Conference"
-        showStepIndicator={false}
+        showStepIndicator={true}
+        currentStep={1}
+        totalSteps={3}
       />
 
       {/* Main Content */}
@@ -73,18 +54,10 @@ export default function ConferenceScreen() {
         {/* Action Button */}
         <View style={styles.buttonContainer}>
           <TouchableOpacity 
-            style={styles.gradientButtonContainer}
+            style={styles.scheduleButton}
             onPress={() => router.push('/(main)/(conference)/schedule-appointment')}
-            activeOpacity={0.8}
           >
-            <LinearGradient
-              colors={[colorsSheet.primary, colorsSheet.primaryLight, colorsSheet.accent]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.gradientButton}
-            >
-              <Text style={styles.gradientButtonText}>Schedule Appointment 📅</Text>
-            </LinearGradient>
+            <Text style={styles.scheduleButtonText}>Schedule Appointment 📅</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -173,34 +146,32 @@ const getStyles = (colors: any) => StyleSheet.create({
     flex: 1,
   },
   buttonContainer: {
-    paddingBottom: hp(5),
-    marginTop: hp(-2),
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: wp(4),
+    paddingBottom: hp(3),
   },
-  gradientButtonContainer: {
-    borderRadius: 30,
-    overflow: "hidden",
+  scheduleButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: Math.min(hp(2.2), wp(5.5)),
+    paddingHorizontal: wp(6),
+    borderRadius: 25,
+    alignItems: "center",
+    justifyContent: "center",
     shadowColor: colors.primary,
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 3,
     },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowRadius: 6,
+    elevation: 6,
   },
-  gradientButton: {
-    paddingVertical: Math.min(hp(2.2), wp(5.5)),
-    paddingHorizontal: Math.min(wp(8), 35),
-    borderRadius: 30,
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: hp(6),
-  },
-  gradientButtonText: {
+  scheduleButtonText: {
     color: colors.white,
-    fontSize: Math.min(hp(2.2), wp(5.5)),
-    fontWeight: "700",
-    letterSpacing: 0.5,
+    fontSize: Math.min(hp(2.1), wp(5.2)),
+    fontWeight: "600",
+    letterSpacing: 0.3,
   },
   spacer: {
     width: wp(18),

@@ -5,8 +5,6 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
 import { useTheme } from '@/contexts/ThemeContext';
-import { HEADER_PADDING_HORIZONTAL, HEADER_PADDING_VERTICAL } from '@/constants/ui';
-import AnimatedButton, { AnimatedBackButton, AnimatedIconButton } from '@/components/common/AnimatedButton';
 
 interface AppHeaderProps {
   title: string;
@@ -16,7 +14,6 @@ interface AppHeaderProps {
   totalSteps?: number;
   onBackPress?: () => void;
   showMenuButton?: boolean;
-  rightComponent?: React.ReactNode;
 }
 
 export default function AppHeader({
@@ -27,7 +24,6 @@ export default function AppHeader({
   totalSteps = 6,
   onBackPress,
   showMenuButton = true,
-  rightComponent,
 }: AppHeaderProps) {
   const navigation = useNavigation();
   const router = useRouter();
@@ -50,27 +46,25 @@ export default function AppHeader({
       {/* Top Bar */}
       <View style={[styles.topBar, { backgroundColor: colors.primary }]}>
         {showMenuButton ? (
-          <AnimatedIconButton
+          <TouchableOpacity 
             style={styles.menuButton}
             onPress={openDrawer}
           >
             <Ionicons name="menu" size={24} color={colors.textOnPrimary} />
-          </AnimatedIconButton>
+          </TouchableOpacity>
         ) : (
           <View style={styles.spacer} />
         )}
         
         <Text style={[styles.title, { color: colors.textOnPrimary }]}>{title}</Text>
         
-        {rightComponent ? (
-          rightComponent
-        ) : showBackButton ? (
-          <AnimatedBackButton
+        {showBackButton ? (
+          <TouchableOpacity 
             style={styles.backButton}
             onPress={handleBackPress}
           >
             <Ionicons name="arrow-back" size={24} color={colors.textOnPrimary} />
-          </AnimatedBackButton>
+          </TouchableOpacity>
         ) : (
           <View style={styles.spacer} />
         )}
@@ -104,15 +98,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: HEADER_PADDING_HORIZONTAL,
-    paddingVertical: HEADER_PADDING_VERTICAL,
+    paddingHorizontal: wp(5),
+    paddingVertical: hp(2),
   },
   menuButton: {
     padding: 8,
   },
   title: {
     fontSize: hp(2.5),
-    fontWeight: '700',
+    fontWeight: 'bold',
     flex: 1,
     textAlign: 'center',
   },

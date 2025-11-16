@@ -4,8 +4,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { colorsSheet } from "../(settings)/_ui_elements";
-import { getDoctorById } from "./_doctorsData";
+import { colorsSheet } from "../(settings)/ui_elements";
+import { getDoctorById } from "./doctorsData";
 
 export default function DoctorDetailsScreen() {
   const router = useRouter();

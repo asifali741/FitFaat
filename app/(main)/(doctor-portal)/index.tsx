@@ -6,13 +6,10 @@ import React from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useTheme } from "@/contexts/ThemeContext";
+import { colorsSheet } from "../(settings)/ui_elements";
 
 export default function DoctorPortal() {
   const router = useRouter();
-  const { colors } = useTheme();
-  
-  const styles = getStyles(colors);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -37,17 +34,17 @@ export default function DoctorPortal() {
         {/* Features */}
         <View style={styles.featuresContainer}>
           <View style={styles.featureItem}>
-            <Ionicons name="videocam" size={30} color={colors.primary} />
+            <Ionicons name="videocam" size={30} color={colorsSheet.primary} />
             <Text style={styles.featureText}>Video Consultations</Text>
           </View>
           
           <View style={styles.featureItem}>
-            <Ionicons name="people" size={30} color={colors.primaryLight} />
+            <Ionicons name="people" size={30} color={colorsSheet.primaryLight} />
             <Text style={styles.featureText}>Patient Management</Text>
           </View>
           
           <View style={styles.featureItem}>
-            <Ionicons name="nutrition" size={30} color={colors.secondary} />
+            <Ionicons name="nutrition" size={30} color={colorsSheet.secondary} />
             <Text style={styles.featureText}>Diet Plan Creation</Text>
           </View>
         </View>
@@ -60,7 +57,7 @@ export default function DoctorPortal() {
             activeOpacity={0.8}
           >
             <LinearGradient
-              colors={[colors.primary, colors.primaryLight, colors.accent]}
+              colors={['#26867C', '#4CAF50', '#66BB6A']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.gradientButton}
@@ -74,10 +71,10 @@ export default function DoctorPortal() {
   );
 }
 
-const getStyles = (colors: any) => StyleSheet.create({
+const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primary,
+    backgroundColor: colorsSheet.primary,
   },
   header: {
     flexDirection: "row",
@@ -85,7 +82,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: wp(5),
     paddingVertical: hp(2),
-    backgroundColor: colors.primary,
+    backgroundColor: colorsSheet.primary,
   },
   menuButton: {
     padding: 8,
@@ -93,13 +90,13 @@ const getStyles = (colors: any) => StyleSheet.create({
   headerTitle: {
     fontSize: Math.min(hp(2.5), wp(6)),
     fontWeight: "bold",
-    color: colors.textOnPrimary,
+    color: colorsSheet.textOnPrimary,
     textAlign: "center",
     flex: 1,
   },
   content: {
     flex: 1,
-    backgroundColor: colors.screenColor,
+    backgroundColor: colorsSheet.screenColor,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     paddingTop: hp(4),
@@ -117,14 +114,14 @@ const getStyles = (colors: any) => StyleSheet.create({
   welcomeTitle: {
     fontSize: Math.min(hp(2.8), wp(7)),
     fontWeight: "bold",
-    color: colors.textPrimary,
+    color: colorsSheet.textPrimary,
     textAlign: "center",
     marginBottom: hp(1),
     paddingHorizontal: wp(2),
   },
   welcomeSubtitle: {
     fontSize: Math.min(hp(1.8), wp(4.5)),
-    color: colors.textSecondary,
+    color: colorsSheet.textSecondary,
     textAlign: "center",
     lineHeight: Math.min(hp(2.5), wp(6)),
     paddingHorizontal: wp(6),
@@ -137,13 +134,13 @@ const getStyles = (colors: any) => StyleSheet.create({
     alignItems: "center",
     paddingVertical: hp(2),
     paddingHorizontal: wp(4),
-    backgroundColor: colors.primarySoft,
+    backgroundColor: colorsSheet.primarySoft,
     borderRadius: 15,
     marginBottom: hp(1.5),
   },
   featureText: {
     fontSize: hp(2),
-    color: colors.textOnCard,
+    color: colorsSheet.textOnCard,
     marginLeft: wp(4),
     fontWeight: "500",
   },
@@ -155,7 +152,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     borderRadius: 30,
     overflow: "hidden",
     marginBottom: hp(2),
-    shadowColor: colors.shadowMedium,
+    shadowColor: colorsSheet.primary,
     shadowOffset: {
       width: 0,
       height: 4,
@@ -165,16 +162,15 @@ const getStyles = (colors: any) => StyleSheet.create({
     elevation: 8,
   },
   gradientButton: {
-    paddingVertical: Math.min(hp(2.2), wp(5.5)),
-    paddingHorizontal: Math.min(wp(8), 35),
+    paddingVertical: hp(2.5),
+    paddingHorizontal: wp(8),
     borderRadius: 30,
     alignItems: "center",
     justifyContent: "center",
-    minHeight: hp(6),
   },
   gradientButtonText: {
-    color: colors.white,
-    fontSize: Math.min(hp(2.2), wp(5.5)),
+    color: colorsSheet.white,
+    fontSize: hp(2.4),
     fontWeight: "700",
     letterSpacing: 0.5,
   },

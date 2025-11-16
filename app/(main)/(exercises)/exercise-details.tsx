@@ -96,55 +96,45 @@ export default function ExerciseDetails() {
 
   if (!exerciseData) {
     return (
-      <View style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity 
-              style={styles.backButton}
-              onPress={handleBackPress}
-            >
-              <Ionicons name="arrow-back" size={24} color={colors.textOnPrimary} />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Exercise Details</Text>
-            <View style={styles.spacer} />
-          </View>
-        </SafeAreaView>
-        
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.screenColor }}>
-          <Text>Error loading exercise details</Text>
-          <TouchableOpacity onPress={handleBackPress}>
-            <Text style={{ color: '#FF6B6B', marginTop: 20 }}>Go Back</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity 
             style={styles.backButton}
             onPress={handleBackPress}
           >
-            <Ionicons name="arrow-back" size={24} color={colors.textOnPrimary} />
+            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Exercise Details</Text>
           <View style={styles.spacer} />
         </View>
+        
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.cardBackground }}>
+          <Text>Error loading exercise details</Text>
+          <TouchableOpacity onPress={handleBackPress}>
+            <Text style={{ color: '#FF6B6B', marginTop: 20 }}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={handleBackPress}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Exercise Details</Text>
+        <View style={styles.spacer} />
+      </View>
 
       {/* Main Content */}
-      <ScrollView
-        style={styles.content}
-        showsVerticalScrollIndicator={false} 
-        contentContainerStyle={{ 
-          paddingBottom: hp(5),
-        }}
-      >
+      <View style={styles.content}>
         <Image
           source={{ uri: exerciseData.gifUrl }}
           contentFit="cover"
@@ -156,7 +146,13 @@ export default function ExerciseDetails() {
           }}
         />
       
-      <View style={{ paddingTop: hp(3) }}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={{ 
+          paddingBottom: hp(5),
+          paddingTop: hp(3),
+        }}
+      >
         <Text 
           style={{
             fontSize: hp(3),
@@ -302,19 +298,16 @@ export default function ExerciseDetails() {
             </Text>
           </TouchableOpacity>
         </View>
-      </View>
       </ScrollView>
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.screenColor,
-  },
-  safeArea: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: "row",
@@ -322,7 +315,8 @@ const getStyles = (colors: any) => StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: Math.min(wp(5), 20),
     paddingVertical: Math.min(hp(2), 16),
-    backgroundColor: colors.primary,
+    backgroundColor: colors.background,
+    minHeight: hp(8),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -338,7 +332,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   headerTitle: {
     fontSize: Math.min(hp(2.8), wp(6.5)),
     fontWeight: "bold",
-    color: colors.textOnPrimary,
+    color: colors.textPrimary,
     textAlign: "center",
     flex: 1,
     letterSpacing: 0.5,

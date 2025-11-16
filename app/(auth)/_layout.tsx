@@ -20,8 +20,6 @@ export default function AuthLayout() {
         name="index"
         options={{
           headerShown: false,
-          animation: 'slide_from_bottom',
-          presentation: 'card',
         }}
       />
       <Stack.Screen 
@@ -31,8 +29,6 @@ export default function AuthLayout() {
           title: 'Login',
           headerTintColor: '#007AFF',
           headerBackTitle: 'Back',
-          animation: 'slide_from_right',
-          presentation: 'modal',
         }}
         listeners={{
           focus: () => console.log('Login screen focused'),
@@ -45,8 +41,6 @@ export default function AuthLayout() {
           title: 'Sign Up',
           headerTintColor: '#007AFF',
           headerBackTitle: 'Back',
-          animation: 'slide_from_right',
-          presentation: 'modal',
         }}
         listeners={{
           focus: () => console.log('Signup screen focused'),
