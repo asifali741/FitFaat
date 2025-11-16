@@ -4,43 +4,26 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { colorsSheet } from "../(settings)/_ui_elements";
-import { getDoctorById } from "./_doctorsData";
+import { colorsSheet } from "../(settings)/ui_elements";
+import { getDoctorById } from "./doctorsData";
 
 export default function AppointmentSummaryScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams();
-  
-  // Extract and validate parameters
-  const doctorId = Array.isArray(params.doctorId) ? params.doctorId[0] : params.doctorId;
-  const date = Array.isArray(params.date) ? params.date[0] : params.date;
-  const time = Array.isArray(params.time) ? params.time[0] : params.time;
-  const problem = Array.isArray(params.problem) ? params.problem[0] : params.problem;
-  
+  const { doctorId, date, time, problem } = useLocalSearchParams<{ 
+    doctorId: string; 
+    date: string;
+    time: string;
+    problem: string;
+  }>();
   const doctor = getDoctorById(doctorId);
   
   // Calculate time until appointment
   const [timeRemaining, setTimeRemaining] = useState("");
-  const [isCallReady, setIsCallReady] = useState(true); // Set to true for testing
+  const [isCallReady, setIsCallReady] = useState(false);
 
   useEffect(() => {
-    if (!date || !time) return;
-    
     const calculateTimeRemaining = () => {
-      // Parse date string safely
-      let appointmentDateTime: Date;
-      try {
-        appointmentDateTime = new Date(date + " " + time);
-        // Check if date is valid
-        if (isNaN(appointmentDateTime.getTime())) {
-          throw new Error("Invalid date");
-        }
-      } catch (error) {
-        console.error("Error parsing appointment date:", error);
-        setTimeRemaining("Invalid date");
-        return;
-      }
-      
+      const appointmentDateTime = new Date(date + " " + time);
       const now = new Date();
       const diff = appointmentDateTime.getTime() - now.getTime();
 
@@ -128,22 +111,11 @@ export default function AppointmentSummaryScreen() {
             <View style={styles.summaryTextContainer}>
               <Text style={styles.summaryLabel}>Date</Text>
               <Text style={styles.summaryValue}>
-                {date && typeof date === 'string' ? (
-                  (() => {
-                    try {
-                      const parsedDate = new Date(date);
-                      return isNaN(parsedDate.getTime()) 
-                        ? date 
-                        : parsedDate.toLocaleDateString("en-GB", {
-                            day: "2-digit",
-                            month: "long",
-                            year: "numeric"
-                          });
-                    } catch (error) {
-                      return date;
-                    }
-                  })()
-                ) : 'N/A'}
+                {new Date(date).toLocaleDateString("en-GB", {
+                  day: "2-digit",
+                  month: "long",
+                  year: "numeric"
+                })}
               </Text>
             </View>
           </View>
@@ -177,22 +149,6 @@ export default function AppointmentSummaryScreen() {
         <TouchableOpacity 
           style={[styles.callButton, !isCallReady && styles.callButtonDisabled]}
           disabled={!isCallReady}
-          onPress={() => {
-            if (isCallReady) {
-              // Generate unique call ID
-              const callId = `appointment_${doctorId}_${Date.now()}`;
-              
-              // Navigate to custom video call screen with all controls
-              router.push({
-                pathname: "/(main)/(conference)/custom-video-call" as any,
-                params: {
-                  callId: callId,
-                  userName: "Patient", // You can replace with actual user name
-                  doctorName: doctor?.name || "Doctor"
-                }
-              });
-            }
-          }}
         >
           <Ionicons 
             name="videocam" 

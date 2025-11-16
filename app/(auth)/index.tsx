@@ -6,7 +6,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import "../../global.css";
 import { useSocialAuth } from '../../hooks/useSocialAuth';
 import { useTheme } from '@/contexts/ThemeContext';
-import AnimatedButton from '@/components/common/AnimatedButton';
 import {
   widthPercentageToDP as wp,
   heightPercentageToDP as hp,
@@ -24,8 +23,6 @@ export default function Index() {
     Pacifico: require("../../assets/fonts/Pacifico-Regular.ttf"),
     LoraItalic: require("../../assets/fonts/static/Lora-Italic.ttf"),
     LoraRegular: require("../../assets/fonts/static/Lora-Regular.ttf"),
-    LoraBold: require("../../assets/fonts/static/Lora-Bold.ttf"),
-    LoraSemiBold: require("../../assets/fonts/static/Lora-SemiBold.ttf"),
   });
 
   const iRef = useRef(0); // <-- useRef to persist value
@@ -81,17 +78,17 @@ export default function Index() {
         </View>
         
         <View style={styles.buttonContainer}>
-          <AnimatedButton
-            animationType="bounce"
+          <TouchableOpacity 
             onPress={handleGoogleAuth} 
             style={styles.googleButton}
+            activeOpacity={0.8}
           >
             <Image
               source={require("../../assets/images/goog.png")}
               style={styles.googleLogo}
             />
             <Text style={styles.googleButtonText}>Continue with Google</Text>
-          </AnimatedButton>
+          </TouchableOpacity>
 
           <View style={styles.dividerContainer}>
             <View style={styles.divider} />
@@ -99,21 +96,21 @@ export default function Index() {
             <View style={styles.divider} />
           </View>
 
-          <AnimatedButton
-            animationType="scale"
+          <TouchableOpacity
             onPress={() => router.push('/email-login')}
             style={styles.emailButton}
+            activeOpacity={0.8}
           >
             <Text style={styles.emailButtonText}>Login with Email</Text>
-          </AnimatedButton>
+          </TouchableOpacity>
 
-          <AnimatedButton
-            animationType="pulse"
+          <TouchableOpacity
             onPress={() => router.push('/email-signup')}
             style={styles.signupButton}
+            activeOpacity={0.8}
           >
             <Text style={styles.signupButtonText}>Create New Account</Text>
-          </AnimatedButton>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </View>
@@ -133,12 +130,10 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   },
   bannerImage: {
     width: wp(100),
-    height: hp(33),
-    minHeight: 250,
-    maxHeight: 400,
+    height: hp(30),
+    minHeight: 200,
+    maxHeight: 350,
     resizeMode: "cover",
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
   },
   contentContainer: {
     paddingHorizontal: wp(6),
@@ -157,14 +152,14 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
     color: colors.textPrimary,
   },
   logoStyle: {
-    width: 50,
-    height: 50,
+    width: Math.min(wp(20), 100),
+    height: Math.min(hp(8), 80),
     marginLeft: wp(2),
     resizeMode: "contain",
   },
   paragraphText: {
     textAlign: "center",
-    fontFamily: "LoraRegular",
+    fontFamily: "LoraItalic",
     fontSize: Math.min(hp(1.8), 16),
     color: colors.textSecondary,
     lineHeight: Math.min(hp(2.6), 24),
@@ -199,7 +194,7 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   },
   googleButtonText: {
     fontSize: Math.min(hp(2), 16),
-    fontFamily: "LoraSemiBold",
+    fontWeight: "600",
     color: isDarkMode ? colors.textPrimary : "#1F2937",
     flexShrink: 1,
   },
@@ -216,8 +211,8 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   dividerText: {
     marginHorizontal: 16,
     fontSize: Math.min(hp(1.8), 14),
-    fontFamily: "LoraRegular",
     color: colors.textSecondary,
+    fontWeight: "500",
   },
   emailButton: {
     backgroundColor: colors.primary,
@@ -235,7 +230,7 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   },
   emailButtonText: {
     fontSize: Math.min(hp(2), 16),
-    fontFamily: "LoraBold",
+    fontWeight: "700",
     color: "#FFFFFF",
   },
   signupButton: {
@@ -250,7 +245,7 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   },
   signupButtonText: {
     fontSize: Math.min(hp(2), 16),
-    fontFamily: "LoraBold",
+    fontWeight: "700",
     color: colors.primary,
   },
 });

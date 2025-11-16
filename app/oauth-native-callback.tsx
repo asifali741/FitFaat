@@ -1,31 +1,33 @@
-import BlueLoader from "@/components/common/BlueLoader";
-import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useRouter } from "expo-router";
 import { useEffect } from "react";
+import { ActivityIndicator, Text, View } from "react-native";
 
 export default function OAuthCallback() {
   const router = useRouter();
-  const { isSignedIn } = useAuth();
-  const { user } = useUser();
 
   useEffect(() => {
     // The OAuth flow should have completed by now
+    // The AuthGate in _layout.tsx will handle the proper routing
+    // based on whether the user is new or existing
     console.log("OAuth callback received, redirecting...");
     
-    // Small delay to ensure the auth state is updated, then redirect directly
+    // Small delay to ensure the auth state is updated
     setTimeout(() => {
-      if (isSignedIn && user) {
-        const hasCompletedOnboarding = user.unsafeMetadata?.hasCompletedOnboarding;
-        if (hasCompletedOnboarding) {
-          router.replace("/(main)/(dashboard)");
-        } else {
-          router.replace("/DietSection");
-        }
-      } else {
-        router.replace("/(auth)");
-      }
-    }, 500);
-  }, [isSignedIn, user]);
+      router.replace("/");
+    }, 1000);
+  }, []);
 
-  return <BlueLoader fullScreen text="Completing sign in..." />;
+  return (
+    <View style={{ 
+      flex: 1, 
+      justifyContent: "center", 
+      alignItems: "center",
+      backgroundColor: "#fff" 
+    }}>
+      <ActivityIndicator size="large" color="#0000ff" />
+      <Text style={{ marginTop: 20, fontSize: 16 }}>
+        Completing sign in...
+      </Text>
+    </View>
+  );
 }

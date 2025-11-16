@@ -1,9 +1,9 @@
 import AppHeader from "@/components/AppHeader";
+import { ScreenSceneWrapper } from "@/components/common/ScreenTiltAnimation";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useState } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import AnimatedButton from "@/components/common/AnimatedButton";
 import {
     heightPercentageToDP as hp,
     widthPercentageToDP as wp,
@@ -55,6 +55,7 @@ export default function WorkoutScreen() {
   const styles = getStyles(colors);
   
   return (
+    <ScreenSceneWrapper>
     <SafeAreaView style={styles.container}>
       <AppHeader 
         title="Premium Workouts"
@@ -64,8 +65,7 @@ export default function WorkoutScreen() {
       {/* Header Right Actions */}
       <View style={styles.headerRight}>
         {/* Favorites Heart with Count */}
-        <AnimatedButton
-          animationType="pulse"
+        <TouchableOpacity 
           onPress={handleFavoritesPress}
           style={styles.favoritesButton}
         >
@@ -79,11 +79,11 @@ export default function WorkoutScreen() {
               </View>
             )}
           </View>
-        </AnimatedButton>
+        </TouchableOpacity>
         
-        <AnimatedButton animationType="bounce" style={styles.premiumButton}>
+        <TouchableOpacity style={styles.premiumButton}>
           <Text style={styles.premiumText}>👑</Text>
-        </AnimatedButton>
+        </TouchableOpacity>
       </View>
 
       {/* Main Content */}
@@ -99,9 +99,8 @@ export default function WorkoutScreen() {
 
             <View style={styles.bodyPartsGrid}>
               {MainImages.map((item, index) => (
-                <AnimatedButton
+                <TouchableOpacity
                   key={index}
-                  animationType="scale"
                   onPress={() => handleBodyPartPress(item)}
                   style={styles.bodyPartCard}
                 >
@@ -114,14 +113,29 @@ export default function WorkoutScreen() {
                   <Text style={styles.bodyPartDescription}>
                     {item?.description}
                   </Text>
-                </AnimatedButton>
+                </TouchableOpacity>
               ))}
             </View>
           </View>
 
+          {/* Premium Features */}
+          <View style={styles.premiumFeaturesSection}>
+            <Text style={styles.premiumFeaturesTitle}>
+              Premium Features
+            </Text>
+            
+            <Text style={styles.premiumFeaturesText}>
+              • Personalized workout plans{'\n'}
+              • Advanced exercise library{'\n'}
+              • Progress tracking{'\n'}
+              • Video demonstrations{'\n'}
+              • Nutrition guidance
+            </Text>
+          </View>
         </ScrollView>
       </View>
     </SafeAreaView>
+    </ScreenSceneWrapper>
   );
 }
 
@@ -138,7 +152,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     paddingVertical: hp(2),
     backgroundColor: colors.primary,
     minHeight: hp(8),
-    shadowColor: colors.shadowMedium,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -150,10 +164,10 @@ const getStyles = (colors: any) => StyleSheet.create({
   headerRight: {
     position: 'absolute',
     right: wp(5),
-    top: hp(2.5),
+    top: hp(2),
     flexDirection: "row",
     alignItems: "center",
-    gap: wp(3),
+    gap: wp(2),
     zIndex: 10,
   },
   headerTitle: {
@@ -163,27 +177,24 @@ const getStyles = (colors: any) => StyleSheet.create({
     textAlign: "center",
     flex: 1,
     letterSpacing: 0.5,
+    textShadowColor: 'rgba(0, 0, 0, 0.1)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   favoritesButton: {
     position: 'relative',
+    marginRight: wp(1),
   },
   favoritesContainer: {
-    width: hp(4.5),
-    height: hp(4.5),
-    backgroundColor: colors.cardBackground,
+    width: hp(5),
+    height: hp(5),
+    backgroundColor: colors.white,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: hp(2.25),
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    shadowColor: colors.shadowMedium,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 3,
+    borderRadius: hp(1.2),
   },
   heartIcon: {
-    fontSize: hp(2.5),
+    fontSize: hp(2.2),
   },
   badge: {
     position: 'absolute',
@@ -196,7 +207,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: colors.screenColor,
+    borderColor: colors.white,
   },
   badgeText: {
     color: colors.white,
@@ -211,7 +222,6 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   bodyPartsSection: {
     paddingHorizontal: wp(4),
-    paddingTop: hp(2),
   },
   sectionTitle: {
     fontSize: Math.min(hp(3.2), wp(8)),
@@ -225,7 +235,6 @@ const getStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-around',
-    paddingBottom: hp(3),
   },
   bodyPartCard: {
     width: Math.min(wp(42), 160),
@@ -233,7 +242,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     marginBottom: hp(2),
     borderRadius: hp(2.5),
     backgroundColor: colors.cardBackground,
-    shadowColor: colors.shadowMedium,
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 6,
@@ -260,22 +269,43 @@ const getStyles = (colors: any) => StyleSheet.create({
     textAlign: 'center',
     fontSize: Math.min(hp(1.4), wp(3.5)),
   },
-  premiumButton: {
+  premiumFeaturesSection: {
+    marginHorizontal: wp(4),
+    marginTop: hp(3),
+    marginBottom: hp(5),
     backgroundColor: colors.cardBackground,
-    width: hp(4.5),
-    height: hp(4.5),
-    borderRadius: hp(2.25),
-    alignItems: "center",
-    justifyContent: "center",
+    borderRadius: hp(2),
+    padding: hp(3),
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
     borderWidth: 1,
     borderColor: colors.cardBorder,
-    shadowColor: colors.shadowMedium,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 3,
+  },
+  premiumFeaturesTitle: {
+    fontSize: hp(2.5),
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: hp(2),
+    color: colors.textPrimary,
+  },
+  premiumFeaturesText: {
+    fontSize: hp(1.8),
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: hp(2.5),
+  },
+  premiumButton: {
+    backgroundColor: colors.white,
+    width: hp(5),
+    height: hp(5),
+    borderRadius: hp(1.2),
+    alignItems: "center",
+    justifyContent: "center",
   },
   premiumText: {
-    fontSize: hp(2.5),
+    fontSize: hp(2.2),
   },
 });

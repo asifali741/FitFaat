@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, FlatList, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, StyleSheet } from "react-native";
 import React, { useEffect, useState } from "react";
 import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -7,13 +7,12 @@ import {
   widthPercentageToDP as wp,
   heightPercentageToDP as hp,
 } from "react-native-responsive-screen";
-import { useNavigation , DrawerActions } from "@react-navigation/native";
-
+import { useNavigation } from "@react-navigation/native";
+import { DrawerActions } from "@react-navigation/native";
 import { useTheme } from "@/contexts/ThemeContext";
 import { fetchExercisesByBodyPart } from "../../../api/exerciseDB";
 import { dummyData } from "../../../constants/list";
 import { Image } from "expo-image";
-import BlueLoader from "@/components/common/BlueLoader";
 
 const bodyPartMap = {
   "Biceps": "upper arms",
@@ -156,46 +155,47 @@ export default function ExercisesScreen() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity 
-              style={styles.backButton}
-              onPress={handleBackPress}
-            >
-              <Ionicons name="arrow-back" size={24} color={colors.textOnPrimary} />
-            </TouchableOpacity>
-            {/* Dynamic title based on selected body part */}
-            <Text style={styles.headerTitle}>{(bodypart || name) as string} Exercises</Text>
-            <View style={styles.spacer} />
-          </View>
-        </SafeAreaView>
-
-        {/* Loading Content */}
-        <View style={styles.content}>
-          <BlueLoader fullScreen text="Loading exercises..." />
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity 
             style={styles.backButton}
             onPress={handleBackPress}
           >
-            <Ionicons name="arrow-back" size={24} color={colors.textOnPrimary} />
+            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
           {/* Dynamic title based on selected body part */}
           <Text style={styles.headerTitle}>{(bodypart || name) as string} Exercises</Text>
           <View style={styles.spacer} />
         </View>
+
+        {/* Loading Content */}
+        <View style={styles.content}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>
+              Loading exercises...
+            </Text>
+          </View>
+        </View>
       </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={handleBackPress}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+        </TouchableOpacity>
+        {/* Dynamic title based on selected body part */}
+        <Text style={styles.headerTitle}>{(bodypart || name) as string} Exercises</Text>
+        <View style={styles.spacer} />
+      </View>
 
       {/* Main Content */}
       <View style={styles.content}>
@@ -218,17 +218,14 @@ export default function ExercisesScreen() {
           )}
         />
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.screenColor,
-  },
-  safeArea: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.cardBackground,
   },
   header: {
     flexDirection: "row",
@@ -236,7 +233,8 @@ const getStyles = (colors: any) => StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: Math.min(wp(5), 20),
     paddingVertical: Math.min(hp(2), 16),
-    backgroundColor: colors.primary,
+    backgroundColor: colors.cardBackground, // Green header background
+    minHeight: hp(8),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -252,7 +250,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   headerTitle: {
     fontSize: Math.min(hp(2.8), wp(6.5)),
     fontWeight: "bold",
-    color: colors.textOnPrimary,
+    color: colors.textPrimary,
     textAlign: "center",
     flex: 1,
     letterSpacing: 0.5,

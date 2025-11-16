@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { colorsSheet } from "./_ui_elements";
+import { colorsSheet } from "./ui_elements";
 
 export default function PrivacySecurity() {
   const [privacySettings, setPrivacySettings] = useState({

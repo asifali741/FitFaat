@@ -1,10 +1,9 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { authApi } from '../../utils/auth/authApi';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useFonts } from 'expo-font';
 
 export default function Signup() {
   const [email, setEmail] = useState('');
@@ -21,17 +20,6 @@ export default function Signup() {
   const router = useRouter();
   const { colors, isDarkMode } = useTheme();
   const styles = getStyles(colors, isDarkMode);
-  
-  const [fontsLoaded] = useFonts({
-    Pacifico: require("../../assets/fonts/Pacifico-Regular.ttf"),
-    LoraRegular: require("../../assets/fonts/static/Lora-Regular.ttf"),
-    LoraBold: require("../../assets/fonts/static/Lora-Bold.ttf"),
-    LoraSemiBold: require("../../assets/fonts/static/Lora-SemiBold.ttf"),
-  });
-
-  if (!fontsLoaded) {
-    return null;
-  }
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/;
@@ -154,15 +142,6 @@ export default function Signup() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.formContainer}>
-            {/* Logo Section */}
-            <View style={styles.logoSection}>
-              <Text style={styles.logoText}>FitFaat</Text>
-              <Image
-                source={require("../../assets/images/logo.png")}
-                style={styles.logoImage}
-              />
-            </View>
-            
             <View style={styles.header}>
               <Text style={styles.title}>Create Account</Text>
               <Text style={styles.subtitle}>Join FitFaat and start your fitness journey</Text>
@@ -244,7 +223,7 @@ export default function Signup() {
 
             <View style={styles.footer}>
               <Text style={styles.footerText}>Already have an account? </Text>
-              <TouchableOpacity onPress={() => router.push("/email-login")}>
+              <TouchableOpacity onPress={() => router.push("/auth/email-login")}>
                 <Text style={styles.linkText}>Login</Text>
               </TouchableOpacity>
             </View>
@@ -265,43 +244,22 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'flex-start',
-    paddingTop: 5,
   },
   formContainer: {
     padding: 24,
-    paddingTop: 0,
     paddingBottom: 40,
   },
-  logoSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
-  },
-  logoText: {
-    fontFamily: 'Pacifico',
-    fontSize: 36,
-    color: colors.primary,
-    marginRight: 12,
-  },
-  logoImage: {
-    width: 50,
-    height: 50,
-    resizeMode: 'contain',
-  },
   header: {
-    marginBottom: 20,
+    marginBottom: 32,
   },
   title: {
     fontSize: Math.min(32, 28),
-    fontFamily: 'LoraBold',
+    fontWeight: '800',
     color: colors.textPrimary,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: Math.min(16, 15),
-    fontFamily: 'LoraRegular',
     color: colors.textSecondary,
   },
   inputContainer: {
@@ -309,7 +267,7 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    fontFamily: 'LoraSemiBold',
+    fontWeight: '600',
     color: colors.textPrimary,
     marginBottom: 8,
   },
@@ -321,7 +279,6 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 16,
     fontSize: 16,
-    fontFamily: 'LoraRegular',
     color: colors.textPrimary,
     backgroundColor: isDarkMode ? colors.cardBackground : '#FFFFFF',
   },
@@ -332,7 +289,6 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   errorText: {
     color: colors.error,
     fontSize: 13,
-    fontFamily: 'LoraRegular',
     marginTop: 6,
     marginLeft: 4,
   },
@@ -356,7 +312,7 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   buttonText: {
     color: '#FFFFFF',
     fontSize: 18,
-    fontFamily: 'LoraBold',
+    fontWeight: '700',
   },
   footer: {
     flexDirection: 'row',
@@ -366,12 +322,11 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   },
   footerText: {
     fontSize: 15,
-    fontFamily: 'LoraRegular',
     color: colors.textSecondary,
   },
   linkText: {
     fontSize: 15,
-    fontFamily: 'LoraBold',
     color: colors.primary,
+    fontWeight: '700',
   },
 });
