@@ -7,8 +7,7 @@ import { useRouter } from "expo-router";
 import React from "react";
 import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import {
-  heightPercentageToDP as hp,
-  widthPercentageToDP as wp,
+  heightPercentageToDP as hp
 } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getStarted } from "../../components/getStarted";
