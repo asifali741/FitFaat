@@ -195,7 +195,7 @@ export default function DayPlan () {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.primary }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.screenColor }]}>
       <AppHeader 
         title="FitFaat Dashboard"
         showStepIndicator={false}
@@ -215,17 +215,19 @@ export default function DayPlan () {
 
       {/* Main Content */}
       <View style={[styles.content, { backgroundColor: colors.screenColor }]}>
-        <ScrollView style={styles.list}
-                    contentContainerStyle={{ paddingBottom: 50 }}
-                    showsVerticalScrollIndicator={false} 
-                    showsHorizontalScrollIndicator={false} 
-                    >
-            {
-      //calling 7 <Day> components with jsonResponse useState data
-              daysArray.map((dayData, index) => (
-                  <Days key={index} props={dayData} onDayPress={navigateToDayDetails}/>)
-                  )
-            }
+        <ScrollView 
+          style={styles.list}
+          contentContainerStyle={{ paddingBottom: 50 }}
+          showsVerticalScrollIndicator={false} 
+          showsHorizontalScrollIndicator={false}
+          scrollEventThrottle={16}
+        >
+          {
+            //calling 7 <Day> components with jsonResponse useState data
+            daysArray.map((dayData, index) => (
+              <Days key={index} props={dayData} onDayPress={navigateToDayDetails}/>
+            ))
+          }
         </ScrollView>
       </View>
     </SafeAreaView>
@@ -242,34 +244,34 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: Math.min(wp(5), 20),
-    paddingVertical: Math.min(hp(1.8), 15),
-    minHeight: hp(7),
+    paddingVertical: Math.min(hp(2), 16),
+    minHeight: hp(8),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
   },
   headerTitle: {
-    fontSize: Math.min(hp(2.5), wp(6.2)),
-    fontWeight: "bold",
+    fontSize: Math.min(hp(2.8), wp(7)),
+    fontWeight: "800",
     textAlign: "center",
     flex: 1,
     marginHorizontal: wp(2),
+    letterSpacing: 0.5,
   },
   content: {
     flex: 1,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    overflow: 'hidden',
   },
   spacer: {
     width: wp(18),
   },
   list: {
-    flexGrow: 1,
+    flex: 1,
     width: "100%",
-    alignSelf: "center",
-    marginTop: "2%",
-    marginBottom: "3%",
-    borderRadius: 0,
-    backgroundColor: "transparent",
-    elevation: 0,
-    shadowOpacity: 0,
   },
 });
 
