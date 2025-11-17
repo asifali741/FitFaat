@@ -73,7 +73,7 @@ export default function AppHeader({
               onPress={onNotificationPress}
             >
               <Ionicons name="notifications" size={24} color={colors.textOnPrimary} />
-              {notificationCount && notificationCount > 0 && (
+              {notificationCount > 0 && (
                 <View style={[styles.badge, { backgroundColor: '#FF6B6B' }]}>
                   <Text style={styles.badgeText}>
                     {notificationCount > 99 ? '99+' : notificationCount}
