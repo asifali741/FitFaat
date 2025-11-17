@@ -1,15 +1,15 @@
+import { useTheme } from "@/contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, {
-  useAnimatedProps,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring
+    useAnimatedProps,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring
 } from "react-native-reanimated";
 import Svg, { Circle, Defs, LinearGradient, Stop, Text as SvgText } from "react-native-svg";
 import { DashFonts, rs } from "../(settings)/ui_elements";
-import { useTheme } from "@/contexts/ThemeContext";
 import { Day } from "./types";
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 interface ProgressCircleProps {
