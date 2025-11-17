@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import AppHeader from "@/components/AppHeader";
 import { useDoctorRegistration } from "@/hooks/useDoctorRegistration";
 import { Ionicons } from "@expo/vector-icons";
@@ -56,14 +57,40 @@ export default function DoctorPortal() {
 
     // No previous application
     router.push('/(main)/(doctor-portal)/register-form');
+=======
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import React from "react";
+import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
+import { LinearGradient } from "expo-linear-gradient";
+import { colorsSheet } from "../(settings)/ui_elements";
+import { useNavigation } from "@react-navigation/native";
+import { DrawerActions } from "@react-navigation/native";
+
+export default function DoctorPortal() {
+  const router = useRouter();
+  const navigation = useNavigation();
+
+  const openDrawer = () => {
+    navigation.dispatch(DrawerActions.openDrawer());
+>>>>>>> parent of 1220d0d... Merge pull request #5 from asifali741/merge/asif-into-main
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <AppHeader 
-        title="Doctor Portal"
-        showStepIndicator={false}
-      />
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.menuButton}
+          onPress={openDrawer}
+        >
+          <Ionicons name="menu" size={24} color={colorsSheet.textOnPrimary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Doctor Portal</Text>
+        <View style={styles.spacer} />
+      </View>
 
       {/* Main Content */}
       <View style={styles.content}>

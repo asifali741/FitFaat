@@ -8,19 +8,9 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, StatusBar, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
-const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
-
-console.log('Clerk Key Status:', publishableKey ? 'Found' : 'Missing');
-console.log('Key Length:', publishableKey?.length || 0);
-
-if (!publishableKey) {
-  throw new Error(
-    'Missing Publishable Key. Please set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env'
-  );
-}
-
 export default function RootLayout() {
   return (
+<<<<<<< HEAD
     // {/* NOTIFICATION FUNCTIONALITY DISABLED FOR NOW */}
     // <NotificationProvider>
       <ClerkProvider tokenCache={tokenCache} publishableKey={publishableKey}> 
@@ -44,6 +34,16 @@ function ThemedApp() {
         <AuthGate/>
       </SafeScreen>
     </>
+=======
+    <ClerkProvider tokenCache={tokenCache} publishableKey={process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY}> 
+      <SafeAreaProvider>
+      <StatusBar barStyle="dark-content"/>
+        <SafeScreen>
+          <AuthGate/>
+        </SafeScreen>
+      </SafeAreaProvider>
+    </ClerkProvider>
+>>>>>>> parent of 1220d0d... Merge pull request #5 from asifali741/merge/asif-into-main
   );
 }
 function AuthGate() {
