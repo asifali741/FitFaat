@@ -2,7 +2,7 @@ import { dataScreenStyles } from "@/components/dataScreenStyles";
 import { useCustomOnboarding } from "@/hooks/useCustomOnboarding";
 import { Ionicons } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ActivityIndicator, Alert, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -51,6 +51,46 @@ export default function Index() {
     LoraItalic: require("../../assets/fonts/static/Lora-Italic.ttf"),
     LoraRegular: require("../../assets/fonts/static/Lora-Regular.ttf"),
   });
+
+  // Calculate age automatically when birth date changes
+  useEffect(() => {
+    const { day, month, year } = birthDate;
+    
+    // Check if all birth date fields are filled
+    if (day && month && year && year.length === 4) {
+      const dayNum = parseInt(day, 10);
+      const monthNum = parseInt(month, 10);
+      const yearNum = parseInt(year, 10);
+      
+      // Validate date ranges
+      if (dayNum >= 1 && dayNum <= 31 && monthNum >= 1 && monthNum <= 12 && yearNum >= 1900 && yearNum <= new Date().getFullYear()) {
+        // Check if it's a valid date
+        const birthDateObj = new Date(yearNum, monthNum - 1, dayNum);
+        
+        // Verify the date is valid (handles cases like Feb 31)
+        if (birthDateObj.getDate() === dayNum && birthDateObj.getMonth() === monthNum - 1) {
+          const today = new Date();
+          let calculatedAge = today.getFullYear() - yearNum;
+          
+          // Adjust age if birthday hasn't occurred yet this year
+          const birthdayThisYear = new Date(today.getFullYear(), monthNum - 1, dayNum);
+          if (today < birthdayThisYear) {
+            calculatedAge--;
+          }
+          
+          // Only update if age is valid (between 13 and 120)
+          if (calculatedAge >= 13 && calculatedAge <= 120) {
+            setAge(calculatedAge.toString());
+          } else if (calculatedAge < 13) {
+            setAge('');
+            // Don't show alert while user is typing
+          } else {
+            setAge('');
+          }
+        }
+      }
+    }
+  }, [birthDate]);
 
   // Handle height input with automatic dot formatting
   const handleHeightChange = (text: string) => {
@@ -344,15 +384,20 @@ export default function Index() {
 
           {/* Age */}
           <View>
-            <Text style={dataScreenStyles.subHeading}>Age *</Text>
+            <Text style={dataScreenStyles.subHeading}>Age (Auto-calculated) *</Text>
             <TextInput
-              style={dataScreenStyles.mainTextInput}
-              placeholder="Enter your age"
+              style={[dataScreenStyles.mainTextInput, { backgroundColor: '#F3F4F6', color: '#6B7280' }]}
+              placeholder="Age will be calculated from DOB"
               keyboardType="numeric"
               maxLength={3}
               value={age}
-              onChangeText={(text) => setAge(text.replace(/\D/g, '').slice(0,3))}
+              editable={false}
             />
+            {age && (
+              <Text style={{ fontSize: hp(1.5), color: '#10B981', marginTop: hp(0.5), marginLeft: wp(1) }}>
+                ✓ Age calculated: {age} years old
+              </Text>
+            )}
           </View>
 
           {/* Fitness Goal Selection */}
