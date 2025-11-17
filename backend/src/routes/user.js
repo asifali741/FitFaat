@@ -8,6 +8,40 @@ import WeeklyTracking from '../models/WeeklyTracking.js';
 
 const router = express.Router();
 
+// Activity level multipliers for TDEE calculation
+const ACTIVITY_FACTORS = {
+  sedentary: 1.2,     // Little or no exercise
+  light: 1.375,       // Light exercise 1-3 days/week
+  moderate: 1.55,     // Moderate exercise 3-5 days/week
+  active: 1.725,      // Heavy exercise 6-7 days/week
+  veryActive: 1.9     // Very heavy exercise, physical job
+};
+
+// Helper function to calculate daily water intake in ml
+function calculateHydrationGoal(weight, activityLevel = 'moderate', gender = 'male') {
+  // Base: 30-35ml per kg of body weight
+  let mlPerKg = 33; // Average
+  
+  // Adjust based on activity level
+  if (activityLevel === 'active' || activityLevel === 'veryActive') {
+    mlPerKg = 40; // More active people need more water
+  } else if (activityLevel === 'sedentary') {
+    mlPerKg = 30; // Less active need less
+  }
+  
+  // Base calculation
+  let hydrationMl = weight * mlPerKg;
+  
+  // Round to nearest 100ml for cleaner numbers
+  hydrationMl = Math.round(hydrationMl / 100) * 100;
+  
+  // Cap between reasonable limits (1500ml - 4000ml)
+  if (hydrationMl < 1500) hydrationMl = 1500;
+  if (hydrationMl > 4000) hydrationMl = 4000;
+  
+  return hydrationMl;
+}
+
 // @route   PUT /api/user/onboarding
 // @desc    Update user information after onboarding
 // @access  Private
@@ -66,7 +100,8 @@ router.put(
       bmr = gender === 'male' ? bmr + 5 : bmr - 161;
 
       // Calculate TDEE with moderate activity level as default
-      const activityFactor = 1.55; // moderate activity level
+      const activityLevel = 'moderate'; // default for onboarding
+      const activityFactor = ACTIVITY_FACTORS[activityLevel];
       const tdee = bmr * activityFactor;
 
       // Calculate goal calories based on fitness goal
@@ -84,8 +119,9 @@ router.put(
       }
       goalCalories = Math.round(goalCalories);
 
-      // Calculate hydration goal (in liters)
-      const hydrationGoal = Math.round((w * 0.033) * 100) / 100;
+      // Calculate hydration goal (in ml)
+      const hydrationGoalInMl = calculateHydrationGoal(w, activityLevel, gender);
+      const hydrationGoal = hydrationGoalInMl / 1000; // Convert to liters for storage
 
       user.userInfo = {
         name,
@@ -106,9 +142,6 @@ router.put(
       try {
         const currentWeeklyTracking = await WeeklyTracking.findById(user.currentWeeklyTrackingId);
         if (currentWeeklyTracking) {
-          // Convert hydrationGoal from liters to ml (assuming frontend expects ml)
-          const hydrationGoalInMl = Math.round(hydrationGoal * 1000);
-          
           // Update all daily logs in the current week
           await DailyLog.updateMany(
             { _id: { $in: currentWeeklyTracking.dailyLogs } },
@@ -125,7 +158,7 @@ router.put(
           currentWeeklyTracking.baseTargetHydration = hydrationGoalInMl;
           await currentWeeklyTracking.save();
           
-          console.log('[onboarding] Updated daily logs with personalized values - Calories:', goalCalories, 'Hydration:', hydrationGoalInMl);
+          console.log('[onboarding] Updated daily logs with personalized values - Calories:', goalCalories, 'Hydration (ml):', hydrationGoalInMl);
         }
       } catch (err) {
         console.error('[onboarding] Error updating daily logs:', err.message);
@@ -168,15 +201,6 @@ router.put(
     }
   }
 );
-
-// Constants for activity level multipliers
-const ACTIVITY_FACTORS = {
-  sedentary: 1.2,     // Little or no exercise
-  light: 1.375,       // Light exercise/sports 1-3 days/week
-  moderate: 1.55,     // Moderate exercise/sports 3-5 days/week
-  active: 1.725,      // Hard exercise/sports 6-7 days/week
-  veryActive: 1.9     // Very hard exercise/sports & physical job or training twice per day
-};
 
 // @route   POST /api/user/update-bmi-summary
 // @desc    Update user's BMI summary including goal calories and hydration
@@ -229,8 +253,9 @@ router.post(
           break;
       }
 
-      // Calculate hydration goal (in liters)
-      const hydrationGoal = Math.round((weight * 0.033) * 100) / 100;
+      // Calculate hydration goal (in ml)
+      const hydrationGoalInMl = calculateHydrationGoal(weight, activityLevel, gender);
+      const hydrationGoal = hydrationGoalInMl / 1000; // Convert to liters for storage
 
       // Update user model
       const user = await User.findById(req.user.id);

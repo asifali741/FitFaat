@@ -217,8 +217,8 @@ router.post(
         weekEnd.setDate(weekEnd.getDate() + 6);
         weekEnd.setHours(23, 59, 59, 999);
 
-        const baseTargetCalories = 2000;
-        const baseTargetHydration = 2500;
+        const baseTargetCalories = 2000; // Default until user completes onboarding
+        const baseTargetHydration = 2500; // Default 2.5L (reasonable for average adult)
 
         // Create 7 daily logs
         const dailyLogs = [];
