@@ -59,6 +59,10 @@ export default function ProfileScreen() {
     { title: "Chat History", icon: "💬", color: colorsSheet.info, action: () => router.push('/(main)/(chatbot)/chat-history') },
     { title: "Health Records", icon: "📋", color: colorsSheet.secondary, action: () => console.log("Health Records") },
     { title: "Emergency Contact", icon: "🚨", color: colorsSheet.error, action: () => console.log("Emergency Contact") },
+    { title: "Book Appointment", icon: "📅", color: colorsSheet.primary, action: () => router.push('/(main)/(conference)') },
+    { title: "Chat History", icon: "💬", color: colorsSheet.info, action: () => router.push('/(main)/(chatbot)/chat-history') },
+    { title: "Health Records", icon: "📋", color: colorsSheet.secondary, action: () => console.log("Health Records") },
+    { title: "Emergency Contact", icon: "🚨", color: colorsSheet.error, action: () => console.log("Emergency Contact") },
   ];
 
   return (
@@ -90,8 +94,27 @@ export default function ProfileScreen() {
             elevation: 5,
             marginBottom: hp(2),
           }}>
+          <View style={{
+            width: hp(15),
+            height: hp(15),
+            borderRadius: hp(7.5),
+            backgroundColor: 'white',
+            justifyContent: 'center',
+            alignItems: 'center',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.1,
+            shadowRadius: 8,
+            elevation: 5,
+            marginBottom: hp(2),
+          }}>
             <Image 
               source={require("../../assets/images/Default_Profile.png")}
+              style={{
+                width: hp(12),
+                height: hp(12),
+                borderRadius: hp(6),
+              }}
               style={{
                 width: hp(12),
                 height: hp(12),
@@ -127,11 +150,26 @@ export default function ProfileScreen() {
           <View style={{ alignItems: 'center' }}>
             <Text style={{ fontSize: hp(2.5), fontWeight: 'bold', color: '#FF6B6B' }}>12</Text>
             <Text style={{ fontSize: hp(1.6), color: '#666' }}>Workouts</Text>
+        <View style={{
+          flexDirection: 'row',
+          justifyContent: 'space-around',
+          marginHorizontal: wp(8),
+          marginBottom: hp(4),
+        }}>
+          <View style={{ alignItems: 'center' }}>
+            <Text style={{ fontSize: hp(2.5), fontWeight: 'bold', color: '#FF6B6B' }}>12</Text>
+            <Text style={{ fontSize: hp(1.6), color: '#666' }}>Workouts</Text>
           </View>
           <View style={{ alignItems: 'center' }}>
             <Text style={{ fontSize: hp(2.5), fontWeight: 'bold', color: '#FF6B6B' }}>5</Text>
             <Text style={{ fontSize: hp(1.6), color: '#666' }}>Favorites</Text>
+          <View style={{ alignItems: 'center' }}>
+            <Text style={{ fontSize: hp(2.5), fontWeight: 'bold', color: '#FF6B6B' }}>5</Text>
+            <Text style={{ fontSize: hp(1.6), color: '#666' }}>Favorites</Text>
           </View>
+          <View style={{ alignItems: 'center' }}>
+            <Text style={{ fontSize: hp(2.5), fontWeight: 'bold', color: '#FF6B6B' }}>24</Text>
+            <Text style={{ fontSize: hp(1.6), color: '#666' }}>Days Active</Text>
           <View style={{ alignItems: 'center' }}>
             <Text style={{ fontSize: hp(2.5), fontWeight: 'bold', color: '#FF6B6B' }}>24</Text>
             <Text style={{ fontSize: hp(1.6), color: '#666' }}>Days Active</Text>
@@ -218,6 +256,8 @@ export default function ProfileScreen() {
                     <View style={styles.historyCardHeader}>
                       <View style={styles.historyIcon}>
                         <Ionicons name="checkmark-circle" size={20} color={colorsSheet.success} />
+                      <View style={styles.historyIcon}>
+                        <Ionicons name="checkmark-circle" size={20} color={colorsSheet.success} />
                       </View>
                       <View style={styles.historyInfo}>
                         <Text style={styles.historyTitle}>Completed Consultation</Text>
@@ -242,6 +282,8 @@ export default function ProfileScreen() {
                     onPress={() => router.push(`/(main)/(conference)/appointment-details?appointmentId=${appointment.id}`)}
                   >
                     <View style={styles.historyCardHeader}>
+                      <View style={styles.historyIcon}>
+                        <Ionicons name="close-circle" size={20} color={colorsSheet.error} />
                       <View style={styles.historyIcon}>
                         <Ionicons name="close-circle" size={20} color={colorsSheet.error} />
                       </View>
@@ -290,6 +332,7 @@ export default function ProfileScreen() {
                   {achievement.earned && (
                     <View style={styles.achievementBadge}>
                       <Ionicons name="checkmark" size={16} color={colorsSheet.textOnPrimary} />
+                      <Ionicons name="checkmark" size={16} color={colorsSheet.textOnPrimary} />
                     </View>
                   )}
                 </View>
@@ -311,6 +354,8 @@ export default function ProfileScreen() {
                 onPress={() => router.push(`/(main)/(conference)/appointment-details?appointmentId=${appointment.id}`)}
               >
                 <View style={styles.appointmentHeader}>
+                  <View style={styles.appointmentIcon}>
+                    <Ionicons name="videocam" size={20} color={colorsSheet.textOnPrimary} />
                   <View style={styles.appointmentIcon}>
                     <Ionicons name="videocam" size={20} color={colorsSheet.textOnPrimary} />
                   </View>
@@ -339,6 +384,8 @@ export default function ProfileScreen() {
                 <View style={styles.appointmentHeader}>
                   <View style={styles.appointmentIcon}>
                     <Ionicons name="calendar" size={20} color={colorsSheet.primary} />
+                  <View style={styles.appointmentIcon}>
+                    <Ionicons name="calendar" size={20} color={colorsSheet.primary} />
                   </View>
                   <View style={styles.appointmentInfo}>
                     <Text style={styles.appointmentTitle}>Upcoming Appointment</Text>
@@ -365,12 +412,15 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colorsSheet.primary,
     backgroundColor: colorsSheet.primary,
   },
   content: {
     flex: 1,
+    backgroundColor: colorsSheet.screenColor,
     backgroundColor: colorsSheet.screenColor,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
@@ -383,13 +433,16 @@ const styles = StyleSheet.create({
     fontSize: hp(2.2),
     fontWeight: 'bold',
     color: '#333',
+    color: '#333',
     marginBottom: hp(2),
   },
   appointmentCard: {
     backgroundColor: 'white',
+    backgroundColor: 'white',
     borderRadius: hp(2),
     padding: hp(2),
     marginBottom: hp(1.5),
+    shadowColor: '#000',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -397,8 +450,11 @@ const styles = StyleSheet.create({
     elevation: 3,
     borderLeftWidth: 4,
     borderLeftColor: colorsSheet.primary,
+    borderLeftColor: colorsSheet.primary,
   },
   activeAppointmentCard: {
+    backgroundColor: colorsSheet.primarySoft,
+    borderLeftColor: colorsSheet.success,
     backgroundColor: colorsSheet.primarySoft,
     borderLeftColor: colorsSheet.success,
   },
@@ -412,6 +468,7 @@ const styles = StyleSheet.create({
     height: hp(4),
     borderRadius: hp(2),
     backgroundColor: colorsSheet.primary,
+    backgroundColor: colorsSheet.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: wp(3),
@@ -423,13 +480,16 @@ const styles = StyleSheet.create({
     fontSize: hp(1.8),
     fontWeight: 'bold',
     color: '#333',
+    color: '#333',
     marginBottom: 2,
   },
   appointmentSubtitle: {
     fontSize: hp(1.4),
     color: '#666',
+    color: '#666',
   },
   appointmentStatus: {
+    backgroundColor: colorsSheet.primary,
     backgroundColor: colorsSheet.primary,
     paddingHorizontal: wp(3),
     paddingVertical: hp(0.5),
@@ -439,6 +499,7 @@ const styles = StyleSheet.create({
     fontSize: hp(1.2),
     fontWeight: 'bold',
     color: colorsSheet.textOnPrimary,
+    color: colorsSheet.textOnPrimary,
   },
   appointmentDetails: {
     marginLeft: hp(5),
@@ -447,15 +508,18 @@ const styles = StyleSheet.create({
     fontSize: hp(1.6),
     fontWeight: '600',
     color: '#333',
+    color: '#333',
     marginBottom: 2,
   },
   appointmentTime: {
     fontSize: hp(1.4),
     color: '#666',
+    color: '#666',
     marginBottom: 2,
   },
   appointmentSpecialty: {
     fontSize: hp(1.3),
+    color: colorsSheet.primary,
     color: colorsSheet.primary,
     fontWeight: '500',
   },
@@ -463,10 +527,12 @@ const styles = StyleSheet.create({
   tabContainer: {
     flexDirection: 'row',
     backgroundColor: 'white',
+    backgroundColor: 'white',
     marginHorizontal: wp(5),
     marginBottom: hp(2),
     borderRadius: hp(2),
     padding: hp(0.5),
+    shadowColor: '#000',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -481,13 +547,16 @@ const styles = StyleSheet.create({
   },
   activeTab: {
     backgroundColor: colorsSheet.primary,
+    backgroundColor: colorsSheet.primary,
   },
   tabText: {
     fontSize: hp(1.6),
     fontWeight: '600',
     color: '#666',
+    color: '#666',
   },
   activeTabText: {
+    color: colorsSheet.textOnPrimary,
     color: colorsSheet.textOnPrimary,
   },
   // Health Statistics Styles
@@ -502,10 +571,12 @@ const styles = StyleSheet.create({
   statCard: {
     flex: 1,
     backgroundColor: 'white',
+    backgroundColor: 'white',
     borderRadius: hp(2),
     padding: hp(2),
     alignItems: 'center',
     marginHorizontal: wp(1),
+    shadowColor: '#000',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -516,10 +587,12 @@ const styles = StyleSheet.create({
     fontSize: hp(2.5),
     fontWeight: 'bold',
     color: colorsSheet.primary,
+    color: colorsSheet.primary,
     marginBottom: hp(0.5),
   },
   statLabel: {
     fontSize: hp(1.4),
+    color: '#666',
     color: '#666',
     textAlign: 'center',
   },
@@ -536,10 +609,12 @@ const styles = StyleSheet.create({
   quickActionCard: {
     width: '48%',
     backgroundColor: 'white',
+    backgroundColor: 'white',
     borderRadius: hp(2),
     padding: hp(2),
     marginBottom: hp(1.5),
     borderLeftWidth: 4,
+    shadowColor: '#000',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -554,6 +629,7 @@ const styles = StyleSheet.create({
     fontSize: hp(1.6),
     fontWeight: '600',
     color: '#333',
+    color: '#333',
   },
   // History Styles
   historySection: {
@@ -567,13 +643,16 @@ const styles = StyleSheet.create({
     fontSize: hp(1.8),
     fontWeight: 'bold',
     color: '#333',
+    color: '#333',
     marginBottom: hp(1.5),
   },
   historyCard: {
     backgroundColor: 'white',
+    backgroundColor: 'white',
     borderRadius: hp(2),
     padding: hp(2),
     marginBottom: hp(1.5),
+    shadowColor: '#000',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -583,9 +662,11 @@ const styles = StyleSheet.create({
   completedCard: {
     borderLeftWidth: 4,
     borderLeftColor: colorsSheet.success,
+    borderLeftColor: colorsSheet.success,
   },
   cancelledCard: {
     borderLeftWidth: 4,
+    borderLeftColor: colorsSheet.error,
     borderLeftColor: colorsSheet.error,
   },
   historyCardHeader: {
@@ -603,18 +684,22 @@ const styles = StyleSheet.create({
     fontSize: hp(1.6),
     fontWeight: 'bold',
     color: '#333',
+    color: '#333',
     marginBottom: 2,
   },
   historySubtitle: {
     fontSize: hp(1.4),
     color: '#666',
+    color: '#666',
   },
   historyDate: {
     fontSize: hp(1.3),
     color: '#999',
+    color: '#999',
   },
   historySpecialty: {
     fontSize: hp(1.3),
+    color: colorsSheet.primary,
     color: colorsSheet.primary,
     fontWeight: '500',
   },
@@ -631,10 +716,12 @@ const styles = StyleSheet.create({
     fontSize: hp(2),
     fontWeight: 'bold',
     color: '#333',
+    color: '#333',
     marginBottom: hp(1),
   },
   emptyStateSubtitle: {
     fontSize: hp(1.6),
+    color: '#666',
     color: '#666',
     textAlign: 'center',
   },
@@ -651,10 +738,12 @@ const styles = StyleSheet.create({
   achievementCard: {
     width: '48%',
     backgroundColor: 'white',
+    backgroundColor: 'white',
     borderRadius: hp(2),
     padding: hp(2),
     marginBottom: hp(1.5),
     alignItems: 'center',
+    shadowColor: '#000',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -664,6 +753,7 @@ const styles = StyleSheet.create({
   },
   achievementEarned: {
     borderWidth: 2,
+    borderColor: colorsSheet.success,
     borderColor: colorsSheet.success,
   },
   achievementLocked: {
@@ -681,12 +771,15 @@ const styles = StyleSheet.create({
   },
   achievementTitleEarned: {
     color: '#333',
+    color: '#333',
   },
   achievementTitleLocked: {
+    color: '#999',
     color: '#999',
   },
   achievementDescription: {
     fontSize: hp(1.3),
+    color: '#666',
     color: '#666',
     textAlign: 'center',
     lineHeight: hp(1.8),
@@ -695,6 +788,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: hp(1),
     right: hp(1),
+    backgroundColor: colorsSheet.success,
     backgroundColor: colorsSheet.success,
     borderRadius: hp(1),
     width: hp(2),

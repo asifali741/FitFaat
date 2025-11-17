@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
+import React, { useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -22,22 +23,30 @@ type ControlsProps = {
 };
 
 export default function Controls({ onAddMessage }: ControlsProps) {
+export default function Controls({ onAddMessage }: ControlsProps) {
   const [content, setContent] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSend = async () => {
     if (content.trim()) {
       try {
+      try {
         setIsLoading(true);
         
         // Add user message to storage
         if (onAddMessage) {
           onAddMessage(content, true);
+          onAddMessage(content, true);
         }
+        
+        setContent(""); // Clear input immediately for better UX
         
         setContent(""); // Clear input immediately for better UX
 
         // Get AI response
+        const response = await callGemini(content);
+        
+        // Add AI response to storage
         const response = await callGemini(content);
         
         // Add AI response to storage
@@ -58,10 +67,22 @@ export default function Controls({ onAddMessage }: ControlsProps) {
   };
 
   return (
-    <View style={styles.wrapper}>
+    <KeyboardAwareScrollView
+      style={styles.wrapper}
+      keyboardShouldPersistTaps="handled"
+      enableOnAndroid={true}
+      enableAutomaticScroll={true}
+      extraScrollHeight={hp(12)}
+      keyboardOpeningTime={0}
+      viewIsInsideTabBar={true}
+      enableResetScrollToCoords={false}
+      contentContainerStyle={{ flex: 1, justifyContent: 'flex-end' }}
+      showsVerticalScrollIndicator={false}
+    >
       <View style={styles.container}>
         <TextInput
           style={styles.input}
+          placeholder="Type a message..."
           placeholder="Type a message..."
           placeholderTextColor="#999"
           onChangeText={setContent}
@@ -75,7 +96,14 @@ export default function Controls({ onAddMessage }: ControlsProps) {
           onPress={handleSend} 
           style={[styles.sendButton, isLoading && { opacity: 0.7 }]}
           disabled={isLoading}
+          style={[styles.sendButton, isLoading && { opacity: 0.7 }]}
+          disabled={isLoading}
         >
+          {isLoading ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Ionicons name="send" size={20} color="#fff" />
+          )}
           {isLoading ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
@@ -83,7 +111,7 @@ export default function Controls({ onAddMessage }: ControlsProps) {
           )}
         </TouchableOpacity>
       </View>
-    </View>
+    </KeyboardAwareScrollView>
   );
 }
 
@@ -110,8 +138,14 @@ const styles = StyleSheet.create({
     height: hp(5),
     fontSize: hp(2.2),
     paddingHorizontal: hp(1.5),
+    height: hp(5),
+    fontSize: hp(2.2),
+    paddingHorizontal: hp(1.5),
   },
   sendButton: {
+    height: hp(4.7),
+    width: hp(4.7),
+    borderRadius: hp(2.35),
     height: hp(4.7),
     width: hp(4.7),
     borderRadius: hp(2.35),

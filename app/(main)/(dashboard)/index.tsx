@@ -269,6 +269,9 @@ const styles = StyleSheet.create({
   spacer: {
     width: wp(18),
   },
+  spacer: {
+    width: wp(18),
+  },
   list: {
     flex: 1,
     width: "100%",

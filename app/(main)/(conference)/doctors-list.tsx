@@ -23,7 +23,9 @@ export default function DoctorsListScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colorsSheet.textOnPrimary} />
+        </TouchableOpacity>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Consultants Available</Text>
         <View style={styles.spacer} />
@@ -56,6 +58,7 @@ export default function DoctorsListScreen() {
           ) : (
             doctors.map((doctor) => (
               <TouchableOpacity
+              <TouchableOpacity
                 key={doctor.id}
                 style={styles.doctorCard}
                 onPress={() => handleDoctorSelect(doctor.id)}
@@ -68,6 +71,7 @@ export default function DoctorsListScreen() {
                   <Text style={styles.doctorEmail}>{doctor.email}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={24} color={colorsSheet.textSecondary} />
+              </TouchableOpacity>
               </TouchableOpacity>
             ))
           )}

@@ -8,7 +8,7 @@ import { useRouter } from "expo-router";
 import { Drawer } from "expo-router/drawer";
 import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { colorsSheet as color } from "./(settings)/_ui_elements";
+import { colorsSheet as color } from "./(settings)/ui_elements";
 type DrawerSceneWrapperProps = DrawerContentComponentProps;
 
 export default function MainLayout() {

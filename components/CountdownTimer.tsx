@@ -1,4 +1,4 @@
-import { colorsSheet } from '@/app/(main)/(settings)/_ui_elements';
+import { colorsSheet } from '@/app/(main)/(settings)/ui_elements';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
