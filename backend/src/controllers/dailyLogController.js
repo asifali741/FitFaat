@@ -422,7 +422,7 @@ export const updateCalorieLevel = async (req, res) => {
 export const updateHydration = async (req, res) => {
   try {
     const { dayId } = req.params;
-    const { hydrationAmount } = req.body;
+    const { hydrationAmount } = req.body; // Expected in liters (L)
 
     if (hydrationAmount === undefined) {
       return res.status(400).json({
@@ -439,7 +439,7 @@ export const updateHydration = async (req, res) => {
       });
     }
 
-    dailyLog.achievedHydration = hydrationAmount;
+    dailyLog.achievedHydration = hydrationAmount; // Stored in liters (L)
     await dailyLog.save();
 
     res.status(200).json({

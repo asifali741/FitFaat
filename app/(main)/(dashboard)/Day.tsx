@@ -77,7 +77,7 @@ const ActiveDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}) 
         </View>
         <View style={styles.modernStatusItem}>
           <Ionicons name="water" size={16} color="#4A90E2" />
-          <Text style={styles.modernStatusText}>Hydration: {info.achieviedHydration}</Text>
+          <Text style={styles.modernStatusText}>Hydration: {info.achieviedHydration}L</Text>
         </View>
       </View>
 

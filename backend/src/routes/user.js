@@ -142,23 +142,23 @@ router.put(
       try {
         const currentWeeklyTracking = await WeeklyTracking.findById(user.currentWeeklyTrackingId);
         if (currentWeeklyTracking) {
-          // Update all daily logs in the current week
+          // Update all daily logs in the current week (hydration in liters)
           await DailyLog.updateMany(
             { _id: { $in: currentWeeklyTracking.dailyLogs } },
             {
               $set: {
                 targetCalories: goalCalories,
-                targetHydration: hydrationGoalInMl
+                targetHydration: hydrationGoal
               }
             }
           );
           
-          // Also update the weekly tracking document with new targets
+          // Also update the weekly tracking document with new targets (hydration in liters)
           currentWeeklyTracking.baseTargetCalories = goalCalories;
-          currentWeeklyTracking.baseTargetHydration = hydrationGoalInMl;
+          currentWeeklyTracking.baseTargetHydration = hydrationGoal;
           await currentWeeklyTracking.save();
           
-          console.log('[onboarding] Updated daily logs with personalized values - Calories:', goalCalories, 'Hydration (ml):', hydrationGoalInMl);
+          console.log('[onboarding] Updated daily logs with personalized values - Calories:', goalCalories, 'Hydration (L):', hydrationGoal);
         }
       } catch (err) {
         console.error('[onboarding] Error updating daily logs:', err.message);
@@ -275,6 +275,28 @@ router.post(
         activityLevel
       };
       await user.save();
+
+      // Update daily logs and weekly tracking with new hydration goal (in liters)
+      try {
+        const currentWeeklyTracking = await WeeklyTracking.findById(user.currentWeeklyTrackingId);
+        if (currentWeeklyTracking) {
+          await DailyLog.updateMany(
+            { _id: { $in: currentWeeklyTracking.dailyLogs } },
+            {
+              $set: {
+                targetCalories: Math.round(goalCalories),
+                targetHydration: hydrationGoal
+              }
+            }
+          );
+          
+          currentWeeklyTracking.baseTargetCalories = Math.round(goalCalories);
+          currentWeeklyTracking.baseTargetHydration = hydrationGoal;
+          await currentWeeklyTracking.save();
+        }
+      } catch (updateErr) {
+        console.error('Failed to update daily logs:', updateErr);
+      }
 
       // If a diet plan exists, update its metrics too
       try {

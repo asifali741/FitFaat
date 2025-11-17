@@ -17,12 +17,12 @@ const weeklyTrackingSchema = new mongoose.Schema({
   baseTargetCalories: {
     type: Number,
     required: true,
-    default: 2000
+    default: 2000 // in kcal
   },
   baseTargetHydration: {
     type: Number,
     required: true,
-    default: 2.5
+    default: 2.5 // in liters (L)
   },
   // References to 7 daily logs
   dailyLogs: [
