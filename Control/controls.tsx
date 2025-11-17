@@ -1,13 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
-import React, { useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    StyleSheet,
+    TextInput,
+    TouchableOpacity,
+    View
 } from "react-native";
 import { heightPercentageToDP as hp } from "react-native-responsive-screen";
 import { callGemini } from '../utils/api';
@@ -19,58 +18,32 @@ type Message = {
 };
 
 type ControlsProps = {
-  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  onAddMessage?: (text: string, isUser: boolean) => void;
 };
 
-<<<<<<< HEAD
 export default function Controls({ onAddMessage }: ControlsProps) {
-export default function Controls({ onAddMessage }: ControlsProps) {
-=======
-export default function Controls({ setMessages }: ControlsProps) {
->>>>>>> parent of 1220d0d... Merge pull request #5 from asifali741/merge/asif-into-main
   const [content, setContent] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSend = async () => {
     if (content.trim()) {
       try {
-      try {
         setIsLoading(true);
-<<<<<<< HEAD
         
         // Add user message to storage
         if (onAddMessage) {
           onAddMessage(content, true);
-          onAddMessage(content, true);
         }
-        
-=======
-        // Add user message
-        const userMessage = { role: "user" as const, content, createdAt: new Date() };
-        setMessages(prevMessages => [...prevMessages, userMessage]);
->>>>>>> parent of 1220d0d... Merge pull request #5 from asifali741/merge/asif-into-main
-        setContent(""); // Clear input immediately for better UX
         
         setContent(""); // Clear input immediately for better UX
 
         // Get AI response
         const response = await callGemini(content);
         
-<<<<<<< HEAD
-        // Add AI response to storage
-        const response = await callGemini(content);
-        
         // Add AI response to storage
         if (onAddMessage) {
           onAddMessage(response, false);
         }
-=======
-        // Add AI response
-        setMessages(prevMessages => [
-          ...prevMessages,
-          { role: "assistant" as const, content: response, createdAt: new Date() }
-        ]);
->>>>>>> parent of 1220d0d... Merge pull request #5 from asifali741/merge/asif-into-main
       } catch (error) {
         Alert.alert(
           "Error",
@@ -85,22 +58,10 @@ export default function Controls({ setMessages }: ControlsProps) {
   };
 
   return (
-    <KeyboardAwareScrollView
-      style={styles.wrapper}
-      keyboardShouldPersistTaps="handled"
-      enableOnAndroid={true}
-      enableAutomaticScroll={true}
-      extraScrollHeight={hp(12)}
-      keyboardOpeningTime={0}
-      viewIsInsideTabBar={true}
-      enableResetScrollToCoords={false}
-      contentContainerStyle={{ flex: 1, justifyContent: 'flex-end' }}
-      showsVerticalScrollIndicator={false}
-    >
+    <View style={styles.wrapper}>
       <View style={styles.container}>
         <TextInput
           style={styles.input}
-          placeholder="Type a message..."
           placeholder="Type a message..."
           placeholderTextColor="#999"
           onChangeText={setContent}
@@ -114,14 +75,7 @@ export default function Controls({ setMessages }: ControlsProps) {
           onPress={handleSend} 
           style={[styles.sendButton, isLoading && { opacity: 0.7 }]}
           disabled={isLoading}
-          style={[styles.sendButton, isLoading && { opacity: 0.7 }]}
-          disabled={isLoading}
         >
-          {isLoading ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <Ionicons name="send" size={20} color="#fff" />
-          )}
           {isLoading ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
@@ -129,7 +83,7 @@ export default function Controls({ setMessages }: ControlsProps) {
           )}
         </TouchableOpacity>
       </View>
-    </KeyboardAwareScrollView>
+    </View>
   );
 }
 
@@ -156,14 +110,8 @@ const styles = StyleSheet.create({
     height: hp(5),
     fontSize: hp(2.2),
     paddingHorizontal: hp(1.5),
-    height: hp(5),
-    fontSize: hp(2.2),
-    paddingHorizontal: hp(1.5),
   },
   sendButton: {
-    height: hp(4.7),
-    width: hp(4.7),
-    borderRadius: hp(2.35),
     height: hp(4.7),
     width: hp(4.7),
     borderRadius: hp(2.35),

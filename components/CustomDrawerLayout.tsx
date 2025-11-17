@@ -3,12 +3,7 @@ import { useAuth } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
 import {
   DrawerContentComponentProps,
-<<<<<<< HEAD
   DrawerItem
-=======
-  DrawerContentScrollView,
-  DrawerItem,
->>>>>>> parent of 1220d0d... Merge pull request #5 from asifali741/merge/asif-into-main
 } from "@react-navigation/drawer";
 import { useRef, useState } from "react";
 import { Image, Pressable, StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -18,7 +13,7 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { DrawerFonts } from "../app/(main)/(settings)/ui_elements";
+import { DrawerFonts } from "../app/(main)/(settings)/_ui_elements";
 type DrawerSceneWrapperProps = DrawerContentComponentProps;
 const userName = 'NAME' // fetch from Authentication Token
 export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
@@ -126,29 +121,6 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
           }}
         />
         <DrawerItem
-          label="Settings"
-          onPress={() => props.navigation.navigate('(settings)')}
-          labelStyle={{
-            marginLeft: 8,
-            fontSize: 18,
-            fontFamily: "PoppinsMedium500",
-            color: colors.textOnPrimary,
-          }}
-          style={{
-            marginHorizontal: 12,
-            marginVertical: 1,
-            borderRadius: 25,
-            paddingHorizontal: 20,
-            paddingVertical: 8,
-            minHeight: 45,
-<<<<<<< HEAD
-            backgroundColor: isExercisesActive() ? colors.drawerActiveTabColor : 'transparent',
-=======
-            backgroundColor: isRouteActive('(settings)') ? color.drawerActiveTabColor : 'transparent',
->>>>>>> parent of 1220d0d... Merge pull request #5 from asifali741/merge/asif-into-main
-          }}
-        />
-        <DrawerItem
           label="Workouts 👑"
           onPress={() => props.navigation.navigate('(exercises)/workout')}
           labelStyle={{
@@ -164,11 +136,7 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
             paddingHorizontal: 20,
             paddingVertical: 8,
             minHeight: 45,
-<<<<<<< HEAD
-            backgroundColor: isRouteActive('(doctor-portal)') ? colors.drawerActiveTabColor : 'transparent',
-=======
-            backgroundColor: isExercisesActive() ? color.drawerActiveTabColor : 'transparent',
->>>>>>> parent of 1220d0d... Merge pull request #5 from asifali741/merge/asif-into-main
+            backgroundColor: isExercisesActive() ? colors.drawerActiveTabColor : 'transparent',
           }}
         />
         <DrawerItem
@@ -187,11 +155,26 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
             paddingHorizontal: 20,
             paddingVertical: 8,
             minHeight: 45,
-<<<<<<< HEAD
+            backgroundColor: isRouteActive('(doctor-portal)') ? colors.drawerActiveTabColor : 'transparent',
+          }}
+        />
+        <DrawerItem
+          label="Settings"
+          onPress={() => props.navigation.navigate('(settings)')}
+          labelStyle={{
+            marginLeft: 8,
+            fontSize: 18,
+            fontFamily: "PoppinsMedium500",
+            color: colors.textOnPrimary,
+          }}
+          style={{
+            marginHorizontal: 12,
+            marginVertical: 1,
+            borderRadius: 25,
+            paddingHorizontal: 20,
+            paddingVertical: 8,
+            minHeight: 45,
             backgroundColor: isRouteActive('(settings)') ? colors.drawerActiveTabColor : 'transparent',
-=======
-            backgroundColor: isRouteActive('(doctor-portal)') ? color.drawerActiveTabColor : 'transparent',
->>>>>>> parent of 1220d0d... Merge pull request #5 from asifali741/merge/asif-into-main
           }}
         />
       </View>

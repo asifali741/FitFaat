@@ -47,7 +47,7 @@ export default function ExerciseDetails() {
       if (favorites && exerciseData) {
         const favoritesList = JSON.parse(favorites);
         console.log('Checking favorite status for:', exerciseData.name, 'ID:', exerciseData.id);
-        console.log('Current favorites:', favoritesList.map(f => ({ name: f.name, id: f.id })));
+        console.log('Current favorites:', favoritesList.map((f: any) => ({ name: f.name, id: f.id })));
         const isAlreadyFavorite = favoritesList.some((fav: any) => fav.id === exerciseData.id);
         console.log('Is favorite?', isAlreadyFavorite);
         setIsFavorite(isAlreadyFavorite);

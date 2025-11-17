@@ -92,7 +92,6 @@ export default function DetailsDay () {
     };
 
     //states to track changes
-    const [adviceInput, setAdviceInput] = useState<string>('');
     const [updateInput, setUpdateInput] = useState<string>('');
     const [timer, setTimer] = useState<string>(getRemainingTime())
     
@@ -184,25 +183,116 @@ export default function DetailsDay () {
     const handleUpdate = () => {
         //Main api calling
     }
+
+    // Image picker functions
+    const pickImage = async () => {
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [4, 3],
+            quality: 0.8,
+        });
+
+        if (!result.canceled) {
+            setSelectedImage(result.assets[0].uri);
+        }
+    };
+
+    const takePhoto = async () => {
+        const result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [4, 3],
+            quality: 0.8,
+        });
+
+        if (!result.canceled) {
+            setSelectedImage(result.assets[0].uri);
+        }
+    };
+
+    // Audio recording functions
+    const startRecording = async () => {
+        try {
+            // Request permissions properly
+            const { status } = await Audio.requestPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Permission Denied', 'Audio recording permission is required');
+                return;
+            }
+            
+            await Audio.setAudioModeAsync({
+                allowsRecordingIOS: true,
+                playsInSilentModeIOS: true,
+                staysActiveInBackground: true,
+                shouldDuckAndroid: true,
+                playThroughEarpieceAndroid: false
+            });
+
+            const { recording } = await Audio.Recording.createAsync(
+                Audio.RecordingOptionsPresets.HIGH_QUALITY
+            );
+            setRecording(recording);
+            setIsRecording(true);
+        } catch (err: any) {
+            console.error('Failed to start recording', err);
+            Alert.alert('Failed to start recording', err?.message || 'Unknown error occurred');
+        }
+    };
+
+    const stopRecording = async () => {
+        if (!recording) return;
+        
+        try {
+            setIsRecording(false);
+            await recording.stopAndUnloadAsync();
+            await Audio.setAudioModeAsync({
+                allowsRecordingIOS: false,
+            });
+            const uri = recording.getURI();
+            setAudioUri(uri);
+            setRecording(undefined);
+        } catch (err: any) {
+            console.error('Failed to stop recording', err);
+            Alert.alert('Failed to stop recording', err?.message || 'Unknown error occurred');
+        }
+    };
+
+    const handleMediaAction = () => {
+        Alert.alert(
+            "Add Media",
+            "Choose how you want to add media",
+            [
+                { text: "Take Photo", onPress: takePhoto },
+                { text: "Choose from Gallery", onPress: pickImage },
+                { text: "Cancel", style: "cancel" }
+            ]
+        );
+    };
     const styles = useMemo(() => getStyles(colors), [colors]);
     //output
     return (
-  <View style={{ flex: 1, paddingBottom: insets.bottom, backgroundColor: colors.screenColor }}>
+  <View style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom, backgroundColor: colors.screenColor }}>
     {!showMenu ? (
-      <AnimatedScrollView
-        showsVerticalScrollIndicator={false}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 10}}
-        style={{ flex: 1, opacity: fade, backgroundColor: colors.screenColor }}
+      <Animated.View
+        style={{ flex: 1, opacity: fade, backgroundColor: colors.screenColor, paddingHorizontal: 10 }}
       >
         <View style={styles.heading}>
-          <View style={styles.dayDateWrapper}>
-            <Text style={[styles.title, {color:colors.black}]}>Day: 0{props.dayNo}</Text>
-            <Text style={styles.date}>{props.date}</Text>
+          <View style={styles.headerContent}>
+            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+              <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+            </TouchableOpacity>
+            <View style={styles.dayDateWrapper}>
+              <View style={styles.dayBadge}>
+                <Text style={styles.dayNumber}>0{props.dayNo}</Text>
+              </View>
+              <View style={styles.dateInfo}>
+                <Text style={styles.dayLabel}>Day {props.dayNo}</Text>
+                <Text style={styles.date}>{props.date}</Text>
+              </View>
+            </View>
+            <View style={{ width: 40 }} />
           </View>
-          <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backButtonText}>← Back</Text>
-          </Pressable>
         </View>
 
         <ScrollView 
@@ -1112,13 +1202,10 @@ const getStyles = (colors: any) => StyleSheet.create({
         paddingBottom: hp(3),
     },
     centerBody:{
-        //borderColor: 'hsla(0, 1%, 27%, 1.00)',
-        justifyContent:'flex-start',
+        flex: 1,
+        justifyContent:'space-between',
     },
-    circletext:{
-        width: '80%',
-        marginLeft:'10%',
-        //alignContent: 'center',
+    topSection: {
         alignItems: 'center',
         marginBottom: hp(2),
     },
@@ -1382,8 +1469,23 @@ const getStyles = (colors: any) => StyleSheet.create({
     menuOverlay: {
         flex: 1,
         backgroundColor: colors.screenColor,
-        padding: 20,
-        justifyContent: "center",
+    },
+    menuScrollContent: {
+        flexGrow: 1,
+        paddingHorizontal: wp(5),
+        paddingTop: hp(3),
+        paddingBottom: hp(2),
+        justifyContent: 'space-between',
+    },
+    menuContent: {
+        flex: 1,
+    },
+    menuHeader: {
+        alignItems: "center",
+        marginBottom: hp(2),
+        paddingBottom: hp(1.5),
+        borderBottomWidth: 1,
+        borderBottomColor: colors.gray + '30',
     },
     menuTitle: {
         fontSize: Math.min(hp(2.8), wp(6.5)),
@@ -1643,16 +1745,20 @@ const getStyles = (colors: any) => StyleSheet.create({
     menuButtons: {
         flexDirection: "row",
         justifyContent: "space-between",
-        marginTop: 30,
+        marginTop: hp(1),
+        marginBottom: hp(1.5),
+        gap: wp(3),
     },
     backMenuButton: {
         flex: 1,
-        marginRight: 10,
-        paddingVertical: 12,
-        borderWidth: 1,
-        borderColor: "#02ABFF",
-        borderRadius: 8,
+        flexDirection: "row",
+        paddingVertical: hp(1.6),
+        borderWidth: 1.5,
+        borderColor: colors.primary,
+        borderRadius: 12,
         alignItems: "center",
+        justifyContent: "center",
+        gap: wp(1.5),
     },
     backMenuText: {
         color: colors.primary,
@@ -1661,11 +1767,17 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     submitMenuButton: {
         flex: 1,
-        marginLeft: 10,
-        backgroundColor: "#02ABFF",
-        paddingVertical: 12,
-        borderRadius: 8,
+        flexDirection: "row",
+        backgroundColor: colors.primary,
+        paddingVertical: hp(1.6),
+        borderRadius: 12,
         alignItems: "center",
+        justifyContent: "center",
+        gap: wp(1.5),
+        shadowColor: colors.primary,
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 4,
     },
     submitMenuText: {
         color: "#fff",
@@ -2385,23 +2497,6 @@ const ProgressCircle = (CircleProps: ProgressCircleProps) =>{
     
     return(
         //<View style={{ width: "80%", aspectRatio: 1, alignSelf: "center" }}>
-        <Svg width="100%" height={'100%'} viewBox="0 0 120 120" style={{ maxWidth: 200, alignSelf: "center"}}>
-        {/* Background circle of Calories */}
-        <Circle  cx="60"  cy="60"  r={outerRadius}
-                stroke="#E5E7EB"  strokeWidth="10"  fill="transparent"/>
-        {/* Calories progress */}
-        <AnimatedCircle  cx="60" cy="60" r={outerRadius}
-            stroke={colorsSheet.progressBarColor}  strokeWidth="10"  fill="transparent"
-            strokeDasharray={outerCircumference} //total
-            animatedProps={animatedCalProps}
-            strokeLinecap="round"transform= "rotate(-90 60 60)" />
-        {/* Hydration Circcle */}
-        <AnimatedCircle cx="60" cy="60" r={innerRadius}
-            stroke="#3B82F6"  strokeWidth="10" fill="transparent"
-            strokeDasharray={innerCircumference} 
-            animatedProps={animatedHydrationProps}
-            strokeLinecap="round" transform="rotate(-90 60 60)"/> 
-        </Svg>
         <Svg width="100%" height={'100%'} viewBox="0 0 120 120" style={{ maxWidth: 200, alignSelf: "center"}}>
         {/* Background circle of Calories */}
         <Circle  cx="60"  cy="60"  r={outerRadius}

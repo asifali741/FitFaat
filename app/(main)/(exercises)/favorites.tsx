@@ -15,7 +15,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 export default function FavoritesScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-  const [favorites, setFavorites] = useState([]);
+  const [favorites, setFavorites] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const handleBackPress = () => {
