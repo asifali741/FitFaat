@@ -23,7 +23,7 @@ export default function ConferenceScreen() {
     // If there are active/scheduled appointments, redirect to the first one
     if (activeOrScheduled.length > 0) {
       router.replace({
-        pathname: '/(main)/(conference)/appointment-details',
+        pathname: '/(main)/(conference)/appointment-details' as any,
         params: { appointmentId: activeOrScheduled[0].id }
       });
     }

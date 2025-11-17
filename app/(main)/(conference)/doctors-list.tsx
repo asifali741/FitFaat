@@ -14,7 +14,7 @@ export default function DoctorsListScreen() {
 
   const handleDoctorSelect = (doctorId: string) => {
     router.push({
-      pathname: "/(main)/(conference)/doctor-details",
+      pathname: "/(main)/(conference)/doctor-details" as any,
       params: { doctorId, date }
     });
   };
