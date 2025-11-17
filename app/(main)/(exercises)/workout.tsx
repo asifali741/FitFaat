@@ -1,12 +1,13 @@
-import AppHeader from "@/components/AppHeader";
 import { ScreenSceneWrapper } from "@/components/common/ScreenTiltAnimation";
+import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DrawerActions, useNavigation } from "@react-navigation/native";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useState } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import {
-    heightPercentageToDP as hp,
-    widthPercentageToDP as wp,
+  heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
 } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -15,7 +16,12 @@ import { MainImages } from "../../../constants/list";
 export default function WorkoutScreen() {
   const { colors } = useTheme();
   const router = useRouter();
+  const navigation = useNavigation();
   const [favoritesCount, setFavoritesCount] = useState(0);
+
+  const openDrawer = () => {
+    navigation.dispatch(DrawerActions.openDrawer());
+  };
 
   // Update favorites count when screen comes into focus
   useFocusEffect(
@@ -57,33 +63,39 @@ export default function WorkoutScreen() {
   return (
     <ScreenSceneWrapper>
     <SafeAreaView style={styles.container}>
-      <AppHeader 
-        title="Premium Workouts"
-        showStepIndicator={false}
-      />
       
-      {/* Header Right Actions */}
-      <View style={styles.headerRight}>
-        {/* Favorites Heart with Count */}
+      {/* Header */}
+      <View style={styles.header}>
         <TouchableOpacity 
-          onPress={handleFavoritesPress}
-          style={styles.favoritesButton}
+          style={styles.menuButton}
+          onPress={openDrawer}
         >
-          <View style={styles.favoritesContainer}>
-            <Text style={styles.heartIcon}>❤️</Text>
-            {favoritesCount > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>
-                  {favoritesCount > 99 ? '99+' : favoritesCount}
-                </Text>
-              </View>
-            )}
-          </View>
+          <Ionicons name="menu" size={24} color={colorsSheet.textOnPrimary} />
         </TouchableOpacity>
+        <Text style={styles.headerTitle}>Premium Workouts</Text>
         
-        <TouchableOpacity style={styles.premiumButton}>
-          <Text style={styles.premiumText}>👑</Text>
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          {/* Favorites Heart with Count */}
+          <TouchableOpacity 
+            onPress={handleFavoritesPress}
+            style={styles.favoritesButton}
+          >
+            <View style={styles.favoritesContainer}>
+              <Text style={styles.heartIcon}>❤️</Text>
+              {favoritesCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {favoritesCount > 99 ? '99+' : favoritesCount}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.premiumButton}>
+            <Text style={styles.premiumText}>👑</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Main Content */}
@@ -162,13 +174,9 @@ const getStyles = (colors: any) => StyleSheet.create({
     padding: 8,
   },
   headerRight: {
-    position: 'absolute',
-    right: wp(5),
-    top: hp(2),
     flexDirection: "row",
     alignItems: "center",
     gap: wp(2),
-    zIndex: 10,
   },
   headerTitle: {
     fontSize: Math.min(hp(2.8), wp(6.5)),

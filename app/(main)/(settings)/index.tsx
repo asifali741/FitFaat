@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import AppHeader from "@/components/AppHeader";
 import { useTheme } from "@/contexts/ThemeContext";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
@@ -30,11 +31,25 @@ export default function Settings() {
     };
     loadUser();
   }, []);
+=======
+import React from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import { DrawerActions } from "@react-navigation/native";
+import { colorsSheet } from "./ui_elements";
+
+export default function Settings() {
+  const navigation = useNavigation();
+>>>>>>> parent of 1220d0d... Merge pull request #5 from asifali741/merge/asif-into-main
 
   const openDrawer = () => {
     navigation.dispatch(DrawerActions.openDrawer());
   };
 
+<<<<<<< HEAD
   const handleSettingPress = (setting: string) => {
     switch (setting) {
       case "Profile Information":
@@ -524,10 +539,28 @@ export default function Settings() {
               <Ionicons name="trash-outline" size={24} color={colors.error} />
               <Text style={[styles.deleteAccountText, { color: colors.error }]}>Delete Account</Text>
             </TouchableOpacity>
-        </View>
+=======
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.menuButton}
+          onPress={openDrawer}
+        >
+          <Ionicons name="menu" size={24} color={colorsSheet.textOnPrimary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Settings</Text>
+        <View style={styles.spacer} />
+      </View>
 
-          <View style={{ height: hp(4) }} />
-        </ScrollView>
+      {/* Main Content */}
+      <View style={styles.content}>
+        <View style={styles.placeholderContainer}>
+          <Text style={styles.placeholderText}>Settings Screen</Text>
+          <Text style={styles.placeholderSubText}>Coming Soon...</Text>
+>>>>>>> parent of 1220d0d... Merge pull request #5 from asifali741/merge/asif-into-main
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -537,15 +570,37 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: Math.min(wp(5), 20),
+    paddingVertical: Math.min(hp(1.8), 15),
+    backgroundColor: colorsSheet.primary,
+    minHeight: hp(7),
+  },
+  menuButton: {
+    padding: Math.min(wp(2), 10),
+    minWidth: wp(10),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitle: {
+    fontSize: Math.min(hp(2.5), wp(6)),
+    fontWeight: "bold",
+    color: colorsSheet.textOnPrimary,
+    textAlign: "center",
+    flex: 1,
+  },
   content: {
     flex: 1,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
   },
-  section: {
-    marginTop: hp(2),
-    marginHorizontal: wp(5),
+  spacer: {
+    width: wp(18),
   },
+<<<<<<< HEAD
   sectionTitle: {
     fontSize: hp(2.2),
     fontWeight: 'bold',
@@ -580,8 +635,15 @@ const styles = StyleSheet.create({
     marginRight: wp(4),
   },
   settingText: {
+=======
+  placeholderContainer: {
+>>>>>>> parent of 1220d0d... Merge pull request #5 from asifali741/merge/asif-into-main
     flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: wp(8),
   },
+<<<<<<< HEAD
   settingTitle: {
     fontSize: hp(1.8),
     fontWeight: '600',
@@ -633,5 +695,17 @@ const styles = StyleSheet.create({
     fontSize: hp(1.8),
     fontWeight: '600',
     marginLeft: wp(2),
+=======
+  placeholderText: {
+    fontSize: Math.min(hp(3), wp(7.5)),
+    fontWeight: "bold",
+    color: colorsSheet.textPrimary,
+    marginBottom: hp(1),
+  },
+  placeholderSubText: {
+    fontSize: Math.min(hp(2), wp(5)),
+    color: colorsSheet.textSecondary,
+    textAlign: "center",
+>>>>>>> parent of 1220d0d... Merge pull request #5 from asifali741/merge/asif-into-main
   },
 });

@@ -1,12 +1,17 @@
+<<<<<<< HEAD
 import AppHeader from "@/components/AppHeader";
 import NewsModalPopup from "@/components/NewsModalPopup";
 import { useNews } from "@/contexts/NewsContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { dailyLogsApi } from "@/utils/dailyLogsApi";
+=======
+import { Ionicons } from "@expo/vector-icons";
+>>>>>>> parent of 1220d0d... Merge pull request #5 from asifali741/merge/asif-into-main
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DrawerActions, useNavigation } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Days } from "./_Day";
@@ -56,11 +61,18 @@ const checkLocalStorage = async () => {
 //Main Component
 export default function DayPlan () {
   const router = useRouter();
+<<<<<<< HEAD
   const { colors } = useTheme();
   const { news, unreadCount, markNewsAsRead } = useNews();
+=======
+  const navigation = useNavigation();
+>>>>>>> parent of 1220d0d... Merge pull request #5 from asifali741/merge/asif-into-main
   const [JsonResponse, setJsonResponse] = useState<null|jsonResponse>(null);
   const [showNewsModal, setShowNewsModal] = useState(false);
 
+  const openDrawer = () => {
+    navigation.dispatch(DrawerActions.openDrawer());
+  };
   //Get Data from API or Local Storage
   useEffect( () => { 
     const fetchData =async () => {
@@ -164,10 +176,22 @@ export default function DayPlan () {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.primary }]}>
         {/* Header */}
+<<<<<<< HEAD
         <View style={[styles.header, { backgroundColor: colors.primary }]}>
         <View style={styles.spacer} />
           <Text style={[styles.headerTitle, { color: colors.textOnPrimary }]}>FitFaat Dashboard</Text>
           <View style={styles.spacer} />
+=======
+        <View style={dashboardStyles.header}>
+          <TouchableOpacity 
+            style={dashboardStyles.menuButton}
+            onPress={openDrawer}
+          >
+            <Ionicons name="menu" size={24} color={colorsSheet.textOnPrimary} />
+          </TouchableOpacity>
+          <Text style={dashboardStyles.headerTitle}>FitFaat Dashboard</Text>
+          <View style={dashboardStyles.spacer} />
+>>>>>>> parent of 1220d0d... Merge pull request #5 from asifali741/merge/asif-into-main
         </View>
 
         {/* Loading Content */}
@@ -195,6 +219,7 @@ export default function DayPlan () {
   };
 
   return (
+<<<<<<< HEAD
     <SafeAreaView style={[styles.container, { backgroundColor: colors.screenColor }]}>
       <AppHeader 
         title="FitFaat Dashboard"
@@ -212,6 +237,20 @@ export default function DayPlan () {
         newsList={news}
         onNewsRead={handleNewsRead}
       />
+=======
+    <SafeAreaView style={dashboardStyles.container}>
+      {/* Header */}
+      <View style={dashboardStyles.header}>
+        <TouchableOpacity 
+          style={dashboardStyles.menuButton}
+          onPress={openDrawer}
+        >
+          <Ionicons name="menu" size={24} color={colorsSheet.textOnPrimary} />
+        </TouchableOpacity>
+        <Text style={dashboardStyles.headerTitle}>FitFaat Dashboard</Text>
+        <View style={dashboardStyles.spacer} />
+      </View>
+>>>>>>> parent of 1220d0d... Merge pull request #5 from asifali741/merge/asif-into-main
 
       {/* Main Content */}
       <View style={[styles.content, { backgroundColor: colors.screenColor }]}>

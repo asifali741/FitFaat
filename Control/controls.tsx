@@ -2,12 +2,12 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import React, { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
 import { heightPercentageToDP as hp } from "react-native-responsive-screen";
 import { callGemini } from '../utils/api';
@@ -19,11 +19,15 @@ type Message = {
 };
 
 type ControlsProps = {
-  onAddMessage?: (text: string, isUser: boolean) => void;
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
 };
 
+<<<<<<< HEAD
 export default function Controls({ onAddMessage }: ControlsProps) {
 export default function Controls({ onAddMessage }: ControlsProps) {
+=======
+export default function Controls({ setMessages }: ControlsProps) {
+>>>>>>> parent of 1220d0d... Merge pull request #5 from asifali741/merge/asif-into-main
   const [content, setContent] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -32,6 +36,7 @@ export default function Controls({ onAddMessage }: ControlsProps) {
       try {
       try {
         setIsLoading(true);
+<<<<<<< HEAD
         
         // Add user message to storage
         if (onAddMessage) {
@@ -39,6 +44,11 @@ export default function Controls({ onAddMessage }: ControlsProps) {
           onAddMessage(content, true);
         }
         
+=======
+        // Add user message
+        const userMessage = { role: "user" as const, content, createdAt: new Date() };
+        setMessages(prevMessages => [...prevMessages, userMessage]);
+>>>>>>> parent of 1220d0d... Merge pull request #5 from asifali741/merge/asif-into-main
         setContent(""); // Clear input immediately for better UX
         
         setContent(""); // Clear input immediately for better UX
@@ -46,6 +56,7 @@ export default function Controls({ onAddMessage }: ControlsProps) {
         // Get AI response
         const response = await callGemini(content);
         
+<<<<<<< HEAD
         // Add AI response to storage
         const response = await callGemini(content);
         
@@ -53,6 +64,13 @@ export default function Controls({ onAddMessage }: ControlsProps) {
         if (onAddMessage) {
           onAddMessage(response, false);
         }
+=======
+        // Add AI response
+        setMessages(prevMessages => [
+          ...prevMessages,
+          { role: "assistant" as const, content: response, createdAt: new Date() }
+        ]);
+>>>>>>> parent of 1220d0d... Merge pull request #5 from asifali741/merge/asif-into-main
       } catch (error) {
         Alert.alert(
           "Error",
