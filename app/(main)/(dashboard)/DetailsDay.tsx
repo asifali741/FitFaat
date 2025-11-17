@@ -218,17 +218,17 @@ export default function DetailsDay () {
                 android_ripple={{ color: "rgba(0,0,0,0.06)" }}
               >
                 <ProgressCircle
-                  achievedCalories={props.achievedCalories}
-                  achieviedHydration={props.achieviedHydration}
-                  targetCalories={props.targetCalories}
-                  targetHydration={props.targetHydration}
+                  achievedCalories={dayData.achievedCalories}
+                  achieviedHydration={dayData.achieviedHydration}
+                  targetCalories={dayData.targetCalories}
+                  targetHydration={dayData.targetHydration}
                 />
               </Pressable>
             </View>
 
-            {props.remarks && (
+            {dayData.remarks && (
               <View style={styles.remarksContainer}>
-                <Text style={styles.remarksText}>{String(props.remarks)}</Text>
+                <Text style={styles.remarksText}>{String(dayData.remarks)}</Text>
               </View>
             )}
           </View>
@@ -245,12 +245,12 @@ export default function DetailsDay () {
                     </View>
                     <View style={styles.goalRowContainer}>
                       <View style={styles.goalItem}>
-                        <Text style={styles.statValue}>{props.targetCalories}</Text>
+                        <Text style={styles.statValue}>{dayData.targetCalories}</Text>
                         <Text style={styles.statUnit}>cals</Text>
                       </View>
                       <View style={styles.goalDivider} />
                       <View style={styles.goalItem}>
-                        <Text style={styles.statValue}>{props.targetHydration}</Text>
+                        <Text style={styles.statValue}>{dayData.targetHydration}</Text>
                         <Text style={styles.statUnit}>liters</Text>
                       </View>
                     </View>
@@ -261,7 +261,7 @@ export default function DetailsDay () {
                       <Ionicons name="flame" size={Math.min(hp(2.2), wp(5.5))} color="#FF6B6B" />
                       <Text style={styles.statLabel}>Calories</Text>
                     </View>
-                    <Text style={styles.statValue}>{props.achievedCalories}</Text>
+                    <Text style={styles.statValue}>{dayData.achievedCalories}</Text>
                     <Text style={styles.statUnit}>cals</Text>
                   </View>
 
@@ -270,7 +270,7 @@ export default function DetailsDay () {
                       <Ionicons name="water" size={Math.min(hp(2.2), wp(5.5))} color="#4ECDC4" />
                       <Text style={styles.statLabel}>Hydration</Text>
                     </View>
-                    <Text style={styles.statValue}>{props.achieviedHydration}</Text>
+                    <Text style={styles.statValue}>{dayData.achieviedHydration}</Text>
                     <Text style={styles.statUnit}>liters</Text>
                   </View>
 
@@ -292,17 +292,18 @@ export default function DetailsDay () {
                     </View>
                     <View style={styles.progressBarContainer}>
                       <View 
+                        key={`cal-active-${dayData.achievedCalories}`}
                         style={[
                           styles.progressBar, 
                           { 
-                            width: `${Math.min((props.achievedCalories / props.targetCalories) * 100, 100)}%`,
+                            width: `${Math.min((dayData.achievedCalories / dayData.targetCalories) * 100, 100)}%`,
                             backgroundColor: '#FF6B6B'
                           }
                         ]} 
                       />
                     </View>
                     <Text style={styles.progressPercentage}>
-                      {Math.round((props.achievedCalories / props.targetCalories) * 100)}%
+                      {calculatePercentage(dayData.achievedCalories, dayData.targetCalories)}%
                     </Text>
                   </View>
                   
@@ -313,30 +314,30 @@ export default function DetailsDay () {
                     </View>
                     <View style={styles.progressBarContainer}>
                       <View 
+                        key={`hydration-active-${dayData.achieviedHydration}`}
                         style={[
                           styles.progressBar, 
                           { 
-                            width: `${Math.min((props.achieviedHydration / props.targetHydration) * 100, 100)}%`,
+                            width: `${Math.min((dayData.achieviedHydration / dayData.targetHydration) * 100, 100)}%`,
                             backgroundColor: '#4ECDC4'
                           }
                         ]} 
                       />
                     </View>
                     <Text style={styles.progressPercentage}>
-                      {Math.round((props.achieviedHydration / props.targetHydration) * 100)}%
+                      {calculatePercentage(dayData.achieviedHydration, dayData.targetHydration)}%
                     </Text>
                   </View>
                 </View>
               </View>
 
-              <AnimatedTouchable
-                style={[styles.trayButton, {backgroundColor: colors.primary}, trackMealAnimatedStyle]} 
-                onPress={handleTrackMealPress}
-                activeOpacity={0.8}
+              <TouchableOpacity
+                style={[styles.trayButton, {backgroundColor: colors.primary}]} 
+                onPress={openMenu}
               >
                 <Ionicons name="add-circle" size={20} color="white" />
                 <Text style={styles.trayButtonText}>Track Meal</Text>
-              </AnimatedTouchable>
+              </TouchableOpacity>
             </>
           ) : (
             <>
@@ -349,12 +350,12 @@ export default function DetailsDay () {
                     </View>
                     <View style={styles.goalRowContainer}>
                       <View style={styles.goalItem}>
-                        <Text style={styles.statValue}>{props.targetCalories}</Text>
+                        <Text style={styles.statValue}>{dayData.targetCalories}</Text>
                         <Text style={styles.statUnit}>cals</Text>
                       </View>
                       <View style={styles.goalDivider} />
                       <View style={styles.goalItem}>
-                        <Text style={styles.statValue}>{props.targetHydration}</Text>
+                        <Text style={styles.statValue}>{dayData.targetHydration}</Text>
                         <Text style={styles.statUnit}>liters</Text>
                       </View>
                     </View>
@@ -365,7 +366,7 @@ export default function DetailsDay () {
                       <Ionicons name="flame" size={Math.min(hp(2.2), wp(5.5))} color="#FF6B6B" />
                       <Text style={styles.statLabel}>Calories</Text>
                     </View>
-                    <Text style={styles.statValue}>{props.achievedCalories}</Text>
+                    <Text style={styles.statValue}>{dayData.achievedCalories}</Text>
                     <Text style={styles.statUnit}>cals</Text>
                   </View>
 
@@ -374,7 +375,7 @@ export default function DetailsDay () {
                       <Ionicons name="water" size={Math.min(hp(2.2), wp(5.5))} color="#4ECDC4" />
                       <Text style={styles.statLabel}>Hydration</Text>
                     </View>
-                    <Text style={styles.statValue}>{props.achieviedHydration}</Text>
+                    <Text style={styles.statValue}>{dayData.achieviedHydration}</Text>
                     <Text style={styles.statUnit}>liters</Text>
                   </View>
 
@@ -396,17 +397,18 @@ export default function DetailsDay () {
                     </View>
                     <View style={styles.progressBarContainer}>
                       <View 
+                        key={`cal-inactive-${dayData.achievedCalories}`}
                         style={[
                           styles.progressBar, 
                           { 
-                            width: `${Math.min((props.achievedCalories / props.targetCalories) * 100, 100)}%`,
+                            width: `${Math.min((dayData.achievedCalories / dayData.targetCalories) * 100, 100)}%`,
                             backgroundColor: '#FF6B6B'
                           }
                         ]} 
                       />
                     </View>
                     <Text style={styles.progressPercentage}>
-                      {Math.round((props.achievedCalories / props.targetCalories) * 100)}%
+                      {calculatePercentage(dayData.achievedCalories, dayData.targetCalories)}%
                     </Text>
                   </View>
                   
@@ -417,30 +419,31 @@ export default function DetailsDay () {
                     </View>
                     <View style={styles.progressBarContainer}>
                       <View 
+                        key={`hydration-inactive-${dayData.achieviedHydration}`}
                         style={[
                           styles.progressBar, 
                           { 
-                            width: `${Math.min((props.achieviedHydration / props.targetHydration) * 100, 100)}%`,
+                            width: `${Math.min((dayData.achieviedHydration / dayData.targetHydration) * 100, 100)}%`,
                             backgroundColor: '#4ECDC4'
                           }
                         ]} 
                       />
                     </View>
                     <Text style={styles.progressPercentage}>
-                      {Math.round((props.achieviedHydration / props.targetHydration) * 100)}%
+                      {calculatePercentage(dayData.achieviedHydration, dayData.targetHydration)}%
                     </Text>
                   </View>
                 </View>
               </View>
 
               {/* Congratulations Message for 100% Completion */}
-              {props.achievedCalories >= props.targetCalories && 
-               props.achieviedHydration >= props.targetHydration && (
+              {dayData.achievedCalories >= dayData.targetCalories && 
+               dayData.achieviedHydration >= dayData.targetHydration && (
                 <View style={styles.congratsContainer}>
                   <Ionicons name="trophy" size={Math.min(hp(4), wp(10))} color="#FFD700" />
                   <Text style={styles.congratsTitle}>Congratulations! 🎉</Text>
                   <Text style={styles.congratsText}>
-                    You&apos;ve achieved your daily goals! Keep up the great work!
+                    You've achieved your daily goals! Keep up the great work!
                   </Text>
                 </View>
               )}
@@ -464,8 +467,30 @@ export default function DetailsDay () {
             Track Your Meal
           </Text>
           <Text style={styles.menuSubtitle}>
-            Choose how you&apos;d like to log your meal
+            Choose how you'd like to log your meal
           </Text>
+        </View>
+
+        {/* Tracking Mode Selector - Professional Toggle */}
+        <View style={styles.trackingModeSection}>
+          <Text style={styles.trackingModeTitle}>What would you like to track?</Text>
+          <View style={styles.modeToggleContainer}>
+            <TouchableOpacity 
+              style={[styles.modeButton, trackingMode === 'meal' && styles.modeButtonActive]}
+              onPress={() => setTrackingMode('meal')}
+            >
+              <Ionicons name="fast-food-outline" size={22} color={trackingMode === 'meal' ? colors.primary : colors.textSecondary} />
+              <Text style={[styles.modeButtonText, trackingMode === 'meal' && styles.modeButtonTextActive]}>Meal</Text>
+            </TouchableOpacity>
+            <View style={styles.modeButtonDivider} />
+            <TouchableOpacity 
+              style={[styles.modeButton, trackingMode === 'hydration' && styles.modeButtonActive]}
+              onPress={() => setTrackingMode('hydration')}
+            >
+              <Ionicons name="water-outline" size={22} color={trackingMode === 'hydration' ? '#4ECDC4' : colors.textSecondary} />
+              <Text style={[styles.modeButtonText, trackingMode === 'hydration' && styles.modeButtonTextActive]}>Hydration</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.menuContent}>
@@ -515,246 +540,498 @@ export default function DetailsDay () {
             )}
           </View>
 
-          {/* Input Method Selection */}
-          <View style={styles.inputMethodSection}>
-            <Text style={styles.sectionTitle}>How would you like to add your meal?</Text>
-            <View style={styles.inputMethodButtons}>
-              <TouchableOpacity
-                style={[
-                  styles.inputMethodButton,
-                  inputMethod === 'text' && styles.inputMethodButtonActive
-                ]}
-                onPress={() => setInputMethod('text')}
-              >
-                <Ionicons 
-                  name="create-outline" 
-                  size={24} 
-                  color={inputMethod === 'text' ? 'white' : colors.primary} 
-                />
-                <Text style={[
-                  styles.inputMethodText,
-                  inputMethod === 'text' && styles.inputMethodTextActive
-                ]}>
-                  Type
-                </Text>
-              </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[
-                  styles.inputMethodButton,
-                  inputMethod === 'audio' && styles.inputMethodButtonActive
-                ]}
-                onPress={() => setInputMethod('audio')}
-              >
-                <Ionicons 
-                  name="mic-outline" 
-                  size={24} 
-                  color={inputMethod === 'audio' ? 'white' : colors.primary} 
-                />
-                <Text style={[
-                  styles.inputMethodText,
-                  inputMethod === 'audio' && styles.inputMethodTextActive
-                ]}>
-                  Voice
-                </Text>
-              </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[
-                  styles.inputMethodButton,
-                  inputMethod === 'photo' && styles.inputMethodButtonActive
-                ]}
-                onPress={() => setInputMethod('photo')}
+          {/* Dual Input Section - Dynamic based on tracking mode */}
+          <View style={styles.sectionTitle}>
+            <Text style={styles.sectionTitleText}>
+              {trackingMode === 'meal' ? 'Add Meal' : 'Add Water'}
+            </Text>
+          </View>
+
+          <View style={styles.dualInputContainer}>
+            {/* LEFT COLUMN - MEAL INPUT (Shown when tracking meal) */}
+            {trackingMode === 'meal' && (
+            <View style={styles.inputColumn}>
+              <View style={styles.columnHeader}>
+                <Ionicons name="fast-food-outline" size={20} color={colors.primary} />
+                <Text style={styles.columnTitle}>Meal</Text>
+              </View>
+
+              {/* Meal Suggestions */}
+              <View style={styles.miniSuggestionsSection}>
+                <Text style={styles.miniSuggestionsTitle}>Quick Pick</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.miniSuggestionsScroll}>
+                  {suggestedFoods.slice(0, 4).map((food, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.miniSuggestionCard}
+                      onPress={() => {
+                        setSelectedFoodItem(food);
+                        setCalorieInput(String(food.calories));
+                      }}
+                    >
+                      <Text style={styles.miniSuggestionText}>{food.name}</Text>
+                      <Text style={styles.miniSuggestionCals}>{food.calories}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              {/* Meal Input Fields */}
+              <TextInput 
+                style={styles.mealInput}
+                placeholder="Search food..."
+                placeholderTextColor={colors.textSecondary}
+                value={foodSearch}
+                onChangeText={setFoodSearch}
+              />
+              
+              <TextInput
+                style={styles.calorieInput}
+                placeholder="Calories"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="decimal-pad"
+                value={calorieInput}
+                onChangeText={setCalorieInput}
+              />
+
+              {showFoodSearch && filteredFoods.length > 0 && (
+                <ScrollView style={styles.foodResultsList} nestedScrollEnabled>
+                  {filteredFoods.slice(0, 3).map((food, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.foodResultItem}
+                      onPress={() => {
+                        setSelectedFoodItem(food);
+                        setCalorieInput(String(food.calories));
+                        setFoodSearch('');
+                      }}
+                    >
+                      <Text style={styles.foodResultName}>{food.name}</Text>
+                      <Text style={styles.foodResultCals}>{food.calories} cals</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+            )}
+
+            {/* RIGHT COLUMN - WATER INPUT (Shown when tracking hydration) */}
+            {trackingMode === 'hydration' && (
+            <View style={styles.inputColumn}>
+              <View style={styles.columnHeader}>
+                <Ionicons name="water" size={20} color="#4ECDC4" />
+                <Text style={styles.columnTitle}>Water</Text>
+              </View>
+
+              {/* Water Quick Suggestions */}
+              <View style={styles.miniSuggestionsSection}>
+                <Text style={styles.miniSuggestionsTitle}>Quick Pick</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.miniSuggestionsScroll}>
+                  {waterIntakeDatabase.options.map((option) => (
+                    <TouchableOpacity
+                      key={option.name}
+                      style={styles.miniWaterCard}
+                      onPress={() => setWaterInput(option.amount.toString())}
+                    >
+                      <Ionicons name="water" size={16} color="#4ECDC4" />
+                      <Text style={styles.miniWaterText}>{option.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              {/* Glass Counter Display */}
+              <View style={styles.glassCounterSection}>
+                <View style={styles.glassCounterHeader}>
+                  <Ionicons name="water" size={18} color="#4ECDC4" />
+                  <Text style={styles.glassCounterTitle}>Glasses</Text>
+                </View>
+                <View style={styles.glassCounterDisplay}>
+                  <Text style={styles.glassCount}>
+                    {Math.round((parseFloat(waterInput || '0') / 0.25) * 10) / 10}
+                  </Text>
+                  <Text style={styles.glassLabel}>glasses (250ml each)</Text>
+                </View>
+              </View>
+
+              {/* Water Input with +/- by Glass */}
+              <View style={styles.waterControlSection}>
+                <TouchableOpacity 
+                  style={styles.waterControlButton}
+                  onPress={() => {
+                    const current = parseFloat(waterInput) || 0;
+                    setWaterInput(Math.max(0, current - 0.25).toFixed(2));
+                  }}
+                >
+                  <Ionicons name="remove" size={18} color="#4ECDC4" />
+                </TouchableOpacity>
+                <View style={styles.waterInputDisplay}>
+                  <TextInput
+                    style={styles.waterInputField}
+                    value={waterInput}
+                    onChangeText={setWaterInput}
+                    keyboardType="decimal-pad"
+                    placeholder="0.25"
+                  />
+                  <Text style={styles.waterUnitLabel}>L</Text>
+                </View>
+                <TouchableOpacity 
+                  style={styles.waterControlButton}
+                  onPress={() => {
+                    const current = parseFloat(waterInput) || 0;
+                    setWaterInput((current + 0.25).toFixed(2));
+                  }}
+                >
+                  <Ionicons name="add" size={18} color="#4ECDC4" />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.waterDisplayLabel}>
+                {waterInput}L ({Math.round(parseFloat(waterInput || '0') * 1000)}ml)
+              </Text>
+
+              {/* Hydration Progress Indicator */}
+              <View style={styles.hydrationProgressSection}>
+                <View style={styles.hydrationProgressHeader}>
+                  <Text style={styles.hydrationProgressTitle}>Today's Hydration</Text>
+                  <Text style={styles.hydrationProgressPercent}>
+                    {calculatePercentage(dayData.achieviedHydration + parseFloat(waterInput || '0'), dayData.targetHydration)}%
+                  </Text>
+                </View>
+                <View style={styles.hydrationProgressBar}>
+                  <View
+                    style={[
+                      styles.hydrationProgressFill,
+                      {
+                        width: `${Math.min(((dayData.achieviedHydration + parseFloat(waterInput || '0')) / dayData.targetHydration) * 100, 100)}%`
+                      }
+                    ]}
+                  />
+                </View>
+                <View style={styles.hydrationProgressText}>
+                  <Text style={styles.hydrationProgressCurrent}>
+                    {dayData.achieviedHydration}L logged
+                  </Text>
+                  <Text style={styles.hydrationProgressTarget}>
+                    Goal: {dayData.targetHydration}L
+                  </Text>
+                </View>
+              </View>
+            </View>
+            )}
+          </View>
+
+          {/* Search Results Section */}
+          {showFoodSearch && (
+            <View style={styles.suggestionsSection}>
+              <Text style={styles.suggestionTitle}>Your Daily Goal Suggestions</Text>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                style={styles.suggestionsScroll}
+                contentContainerStyle={styles.suggestionsContent}
               >
-                <Ionicons 
-                  name="camera-outline" 
-                  size={24} 
-                  color={inputMethod === 'photo' ? 'white' : colors.primary} 
-                />
-                <Text style={[
-                  styles.inputMethodText,
-                  inputMethod === 'photo' && styles.inputMethodTextActive
-                ]}>
-                  Photo
-                </Text>
-              </TouchableOpacity>
+                {suggestedFoods.map((food, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.suggestionCard}
+                    onPress={() => {
+                      setSelectedFoodItem(food);
+                      setCalorieInput(String(food.calories));
+                    }}
+                  >
+                    <Text style={styles.suggestionFoodName}>{food.name}</Text>
+                    <Text style={styles.suggestionCalories}>{food.calories} cals</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Detailed Food Search & Selection (Old UI - kept for reference) */}
+          <View style={styles.inputGroup}>
+            <View style={styles.labelRow}>
+              <Ionicons name="fast-food-outline" size={20} color={colors.primary} />
+              <Text style={styles.label}>Search for food</Text>
+            </View>
+            <View style={styles.searchContainer}>
+              <TextInput 
+                style={styles.searchInput}
+                placeholder="e.g. Chicken, Rice, Bread..."
+                placeholderTextColor={colors.textSecondary}
+                value={foodSearch}
+                onChangeText={setFoodSearch}
+              />
+              {foodSearch.length > 0 && (
+                <TouchableOpacity onPress={() => { setFoodSearch(''); setShowFoodSearch(false); }}>
+                  <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Food Search Results */}
+            {showFoodSearch && filteredFoods.length > 0 && (
+              <View style={styles.searchResults}>
+                {filteredFoods.slice(0, 8).map((food, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.resultItem}
+                    onPress={() => {
+                      setSelectedFoodItem(food);
+                      setCalorieInput(String(Math.round(food.calories * parseFloat(mealQuantity || '1'))));
+                      setFoodSearch('');
+                      setShowFoodSearch(false);
+                    }}
+                  >
+                    <View style={styles.resultInfo}>
+                      <Text style={styles.resultFoodName}>{food.name}</Text>
+                      <Text style={styles.resultCategory}>{food.category}</Text>
+                    </View>
+                    <Text style={styles.resultCalories}>{Math.round(food.calories * parseFloat(mealQuantity || '1'))} cals</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {showFoodSearch && foodSearch.length > 0 && filteredFoods.length === 0 && (
+              <Text style={styles.noResults}>No foods found. Enter custom calories below.</Text>
+            )}
+          </View>
+
+          {/* Selected Food Display */}
+          {selectedFoodItem && (
+            <View style={styles.selectedFoodBox}>
+              <View style={styles.selectedFoodHeader}>
+                <Ionicons name="checkmark-circle" size={24} color={colors.success} />
+                <View style={styles.selectedFoodInfo}>
+                  <Text style={styles.selectedFoodName}>{selectedFoodItem.name}</Text>
+                  <Text style={styles.selectedFoodCalories}>
+                    {Math.round(selectedFoodItem.calories * parseFloat(mealQuantity || '1'))} calories
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => setSelectedFoodItem(null)}>
+                  <Ionicons name="trash-outline" size={20} color={colors.error} />
+                </TouchableOpacity>
+              </View>
+              
+              {/* Quantity Adjuster */}
+              <View style={styles.quantitySection}>
+                <Text style={styles.quantityLabel}>Quantity (portions):</Text>
+                <View style={styles.quantityInputRow}>
+                  <TouchableOpacity 
+                    style={styles.quantityBtn}
+                    onPress={() => {
+                      const q = Math.max(0.5, parseFloat(mealQuantity || '1') - 0.5);
+                      setMealQuantity(String(q));
+                      setCalorieInput(String(Math.round(selectedFoodItem.calories * q)));
+                    }}
+                  >
+                    <Text style={styles.quantityBtnText}>−</Text>
+                  </TouchableOpacity>
+                  <TextInput
+                    style={styles.quantityInput}
+                    value={mealQuantity}
+                    onChangeText={(text) => {
+                      setMealQuantity(text);
+                      if (text && !isNaN(parseFloat(text))) {
+                        setCalorieInput(String(Math.round(selectedFoodItem.calories * parseFloat(text))));
+                      }
+                    }}
+                    keyboardType="decimal-pad"
+                  />
+                  <TouchableOpacity 
+                    style={styles.quantityBtn}
+                    onPress={() => {
+                      const q = parseFloat(mealQuantity || '1') + 0.5;
+                      setMealQuantity(String(q));
+                      setCalorieInput(String(Math.round(selectedFoodItem.calories * q)));
+                    }}
+                  >
+                    <Text style={styles.quantityBtnText}>+</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Manual Calorie Input */}
+          <View style={styles.inputGroup}>
+            <View style={styles.labelRow}>
+              <Ionicons name="flame-outline" size={20} color="#FF6B6B" />
+              <Text style={styles.label}>Calories</Text>
+            </View>
+            <View style={styles.calorieInputContainer}>
+              <TextInput 
+                style={styles.input} 
+                placeholder="Enter calories (e.g. 450)"
+                placeholderTextColor={colors.textSecondary}
+                value={calorieInput}
+                onChangeText={setCalorieInput}
+                keyboardType="number-pad"
+              />
+              {calorieInput && (
+                <View style={styles.calorieInfo}>
+                  <Text style={styles.calorieInfoText}>
+                    Remaining: {dayData.targetCalories - parseInt(calorieInput)} / {dayData.targetCalories} cals
+                  </Text>
+                  <View style={styles.calorieBar}>
+                    <View 
+                      style={[
+                        styles.calorieBarFill,
+                        {
+                          width: `${Math.min((parseInt(calorieInput) / dayData.targetCalories) * 100, 100)}%`,
+                          backgroundColor: parseInt(calorieInput) > dayData.targetCalories ? '#FF6B6B' : '#4ECDC4'
+                        }
+                      ]}
+                    />
+                  </View>
+                </View>
+              )}
             </View>
           </View>
 
-          {/* Dynamic Input Based on Selection */}
-          <View style={styles.dynamicInputSection}>
-            {inputMethod === 'text' && (
-              <>
-                <View style={styles.inputGroup}>
-                  <View style={styles.labelRow}>
-                    <Ionicons name="fast-food-outline" size={20} color={colors.primary} />
-                    <Text style={styles.label}>What did you eat?</Text>
-                  </View>
-                  <TextInput 
-                    style={styles.input} 
-                    placeholder="e.g. Grilled chicken with vegetables"
-                    placeholderTextColor={colors.textSecondary}
-                    value={foodNameInput}
-                    onChangeText={setFoodNameInput}
-                  />
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <View style={styles.labelRow}>
-                    <Ionicons name="document-text-outline" size={20} color={colors.primary} />
-                    <Text style={styles.label}>Add Details</Text>
-                  </View>
-                  <TextInput
-                    style={[styles.input, styles.textArea]}
-                    placeholder="Portion size, ingredients, cooking method..."
-                    placeholderTextColor={colors.textSecondary}
-                    multiline
-                    numberOfLines={6}
-                    textAlignVertical="top"
-                    value={descriptionInput}
-                    onChangeText={setDescriptionInput}
-                  />
-                </View>
-              </>
-            )}
-
-            {inputMethod === 'audio' && (
-              <View style={styles.audioSection}>
-                <Text style={styles.audioInstructions}>
-                  {isRecording 
-                    ? "Recording... Describe your meal" 
-                    : audioUri 
-                    ? "Voice note recorded! You can re-record if needed."
-                    : "Tap the microphone to start recording"}
-                </Text>
-                
-                <View style={styles.audioRecordContainer}>
-                  <TouchableOpacity
-                    style={[
-                      styles.audioRecordButton,
-                      isRecording && styles.audioRecordButtonActive
-                    ]}
-                    onPress={isRecording ? stopRecording : startRecording}
-                    activeOpacity={0.7}
-                  >
-                    {isRecording ? (
-                      <View style={styles.stopIconContainer}>
-                        <View style={styles.stopIcon} />
-                      </View>
-                    ) : (
-                      <Ionicons 
-                        name="mic" 
-                        size={Math.min(hp(4), wp(9))} 
-                        color="white" 
-                      />
-                    )}
-                  </TouchableOpacity>
-                  
-                  {isRecording && (
-                    <View style={styles.recordingIndicator}>
-                      <View style={styles.recordingDot} />
-                      <Text style={styles.recordingText}>Recording...</Text>
-                    </View>
-                  )}
-                </View>
-
-                {audioUri && (
-                  <View style={styles.audioPreview}>
-                    <View style={styles.audioPreviewLeft}>
-                      <Ionicons name="checkmark-circle" size={24} color={colors.success} />
-                      <Text style={styles.audioPreviewText}>Voice note saved</Text>
-                    </View>
-                    <TouchableOpacity 
-                      style={styles.clearButton}
-                      onPress={() => setAudioUri(null)}
-                    >
-                      <Ionicons name="trash-outline" size={18} color={colors.error} />
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            )}
-
-            {inputMethod === 'photo' && (
-              <View style={styles.photoSection}>
-                <Text style={styles.photoInstructions}>
-                  {selectedImage 
-                    ? "Photo selected! You can change it if needed."
-                    : "Take a photo or select from gallery"}
-                </Text>
-                
-                <View style={styles.photoButtons}>
-                  <TouchableOpacity
-                    style={styles.photoButton}
-                    onPress={takePhoto}
-                  >
-                    <Ionicons name="camera" size={32} color={colors.primary} />
-                    <Text style={styles.photoButtonText}>Take Photo</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.photoButton}
-                    onPress={pickImage}
-                  >
-                    <Ionicons name="images" size={32} color={colors.primary} />
-                    <Text style={styles.photoButtonText}>From Gallery</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {selectedImage && (
-                  <View style={styles.photoPreview}>
-                    <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-                    <Text style={styles.photoPreviewText}>Photo attached</Text>
-                    <TouchableOpacity onPress={() => setSelectedImage(null)}>
-                      <Text style={styles.clearText}>Remove</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                {/* Text field for photo description */}
-                {selectedImage && (
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.optionalLabel}>Describe your meal</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="What is this meal? Include portion size and ingredients"
-                      placeholderTextColor={colors.textSecondary}
-                      value={descriptionInput}
-                      onChangeText={setDescriptionInput}
-                    />
-                  </View>
-                )}
-              </View>
-            )}
+          {/* Notes */}
+          <View style={styles.inputGroup}>
+            <View style={styles.labelRow}>
+              <MaterialIcons name="description" size={20} color={colors.primary} />
+              <Text style={styles.label}>Notes (Optional)</Text>
+            </View>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              placeholder="e.g. Added extra rice, swapped for whole wheat..."
+              placeholderTextColor={colors.textSecondary}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+              value={descriptionInput}
+              onChangeText={setDescriptionInput}
+            />
           </View>
 
+          {inputMethod === 'audio' && (
+            <View style={styles.audioSection}>
+              <Ionicons name="lock-closed" size={Math.min(hp(5), wp(12))} color="#CCCCCC" />
+              <Text style={styles.audioInstructions}>Voice input coming soon</Text>
+              <Text style={styles.comingSoonMessage}>We're working on voice recognition for meal logging</Text>
+            </View>
+          )}
+          {inputMethod === 'photo' && (
+            <View style={styles.audioSection}>
+              <Ionicons name="lock-closed" size={Math.min(hp(5), wp(12))} color="#CCCCCC" />
+              <Text style={styles.audioInstructions}>Photo input coming soon</Text>
+              <Text style={styles.comingSoonMessage}>We're working on AI food recognition</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.menuButtons}>
-          <AnimatedTouchable 
-            style={[styles.backMenuButton, backAnimatedStyle]} 
-            onPress={handleBackMenuPress}
-            activeOpacity={0.8}
-          >
+          <TouchableOpacity style={styles.backMenuButton} onPress={closeMenu}>
             <Ionicons name="arrow-back" size={Math.min(hp(2.2), wp(5))} color={colors.primary} />
             <Text style={styles.backMenuText}>Back</Text>
-          </AnimatedTouchable>
-          <View style={{ flex: 1, position: 'relative' }}>
-            <AnimatedTouchable
-              style={[styles.submitMenuButton, submitAnimatedStyle]}
-              onPress={handleSubmitPress}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.submitMenuText}>Submit</Text>
-              <Ionicons name="checkmark" size={Math.min(hp(2.2), wp(5))} color="white" />
-            </AnimatedTouchable>
-            <Animated.View 
-              style={[styles.submitSuccessOverlay, submitSuccessOverlayStyle]}
-              pointerEvents="none"
-            >
-              <Ionicons name="checkmark-circle" size={Math.min(hp(6), wp(13))} color={colors.success} />
-            </Animated.View>
-          </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.submitMenuButton, (((!calorieInput.trim() && parseFloat(waterInput || '0') <= 0)) || isLoading) && {opacity: 0.5}]}
+            disabled={(((!calorieInput.trim() && parseFloat(waterInput || '0') <= 0)) || isLoading)}
+            onPress={async () => {
+              setIsLoading(true);
+              try {
+                const dayLogId = (dayData as any)._id || (props as any)._id;
+
+                if (!dayLogId) {
+                  Alert.alert('Error', 'Unable to find day log. Please refresh and try again.');
+                  return;
+                }
+
+                let hasMeal = false;
+                let hasWater = false;
+                let successMessages = [];
+                let updatedDayData: any = { ...dayData };
+
+                // Log meal if calories are entered
+                if (calorieInput.trim()) {
+                  const calories = parseInt(calorieInput);
+                  const foodName = selectedFoodItem?.name || 'Custom Meal';
+
+                  const mealResponse = await dailyLogsApi.addMeal(
+                    dayLogId,
+                    foodName,
+                    parseFloat(mealQuantity || '1'),
+                    'portion',
+                    calories,
+                    undefined,
+                    undefined,
+                    undefined,
+                    descriptionInput
+                  );
+
+                  if (mealResponse) {
+                    hasMeal = true;
+                    successMessages.push(`${calories} calories logged`);
+                    
+                    updatedDayData = {
+                      ...updatedDayData,
+                      achievedCalories: (updatedDayData.achievedCalories || 0) + calories,
+                      meals: updatedDayData.meals ? [...updatedDayData.meals, mealResponse] : [mealResponse],
+                    };
+                  }
+                }
+
+                // Log water if amount is entered
+                const waterAmount = parseFloat(waterInput || '0');
+                if (waterAmount > 0) {
+                  const waterResponse = await dailyLogsApi.addWater(dayLogId, waterAmount);
+
+                  if (waterResponse) {
+                    hasWater = true;
+                    successMessages.push(`${waterAmount}L of water logged`);
+                    
+                    // Update with full response data to ensure accuracy
+                    updatedDayData = {
+                      ...updatedDayData,
+                      achieviedHydration: waterResponse.achieviedHydration || (updatedDayData.achieviedHydration || 0) + waterAmount,
+                      waterIntake: waterResponse.waterIntake || updatedDayData.waterIntake,
+                    };
+                  }
+                }
+
+                // Show combined success message
+                if (hasMeal || hasWater) {
+                  // Update state once with all changes
+                  setDayData(updatedDayData);
+                  
+                  // Reset forms immediately
+                  setFoodSearch('');
+                  setSelectedFoodItem(null);
+                  setCalorieInput('');
+                  setMealQuantity('1');
+                  setDescriptionInput('');
+                  setWaterInput('0.25');
+                  
+                  // Use setTimeout to ensure state updates are processed
+                  setTimeout(() => {
+                    closeMenu();
+                    
+                    Alert.alert(
+                      'Success! ✅',
+                      successMessages.join('\n')
+                    );
+                  }, 100);
+                } else {
+                  Alert.alert('Error', 'Please enter at least meal calories or water amount');
+                }
+              } catch (error) {
+                console.error('Error logging:', error);
+                Alert.alert('Error', 'Failed to log entry. Please check your connection.');
+              } finally {
+                setIsLoading(false);
+              }
+            }}
+          >
+            <Text style={styles.submitMenuText}>Save Entry</Text>
+            <Ionicons name="checkmark" size={Math.min(hp(2.2), wp(5))} color="white" />
+          </TouchableOpacity>
         </View>
       </KeyboardAwareScrollView>
     )}
@@ -767,6 +1044,7 @@ const getStyles = (colors: any) => StyleSheet.create({
         paddingHorizontal: HEADER_PADDING_HORIZONTAL,
         paddingVertical: HEADER_PADDING_VERTICAL,
         marginBottom: 8,
+        backgroundColor: colors.screenColor,
     },
     headerContent: {
         flexDirection: 'row',
@@ -780,47 +1058,58 @@ const getStyles = (colors: any) => StyleSheet.create({
         justifyContent: 'center',
     },
     dayBadge: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
+        width: 60,
+        height: 60,
+        borderRadius: 30,
         backgroundColor: colors.primary,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 12,
+        marginRight: 16,
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.35,
+        shadowRadius: 10,
+        elevation: 6,
     },
     dayNumber: {
-        fontSize: 20,
-        fontFamily: 'LoraBold',
+        fontSize: 24,
+        fontWeight: '800',
         color: 'white',
+        letterSpacing: 0.5,
     },
     dateInfo: {
         justifyContent: 'center',
     },
     dayLabel: {
-        fontSize: 20,
-        fontFamily: 'LoraBold',
+        fontSize: 18,
+        fontWeight: '700',
         color: colors.textPrimary,
         letterSpacing: 0.3,
     },
     date: {
-        fontSize: 14,
-        fontFamily: 'LoraRegular',
+        fontSize: 13,
+        fontWeight: '500',
         color: colors.textSecondary,
-        marginTop: 2,
+        marginTop: 4,
     },
     backButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         backgroundColor: colors.cardBackground,
         justifyContent: 'center',
         alignItems: 'center',
+        shadowColor: "#000",
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 2,
     },
     scrollView: {
         flex: 1,
     },
     scrollContent: {
-        paddingBottom: hp(2),
+        paddingBottom: hp(3),
     },
     centerBody:{
         //borderColor: 'hsla(0, 1%, 27%, 1.00)',
@@ -831,216 +1120,243 @@ const getStyles = (colors: any) => StyleSheet.create({
         marginLeft:'10%',
         //alignContent: 'center',
         alignItems: 'center',
-        marginBottom: hp(1),
+        marginBottom: hp(2),
     },
     circleWrapper: {
         alignItems: 'center',
         justifyContent: 'center',
+        shadowColor: "#000",
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 4,
     },
     circleButton: {
-        height: Math.min(hp(17), wp(35)),
-        width: Math.min(hp(17), wp(35)),
+        height: Math.min(hp(20), wp(40)),
+        width: Math.min(hp(20), wp(40)),
     },
     remarksContainer: {
-        marginTop: hp(0.8),
-        marginBottom: 0,
+        marginTop: hp(1.5),
+        marginBottom: hp(1),
         paddingHorizontal: wp(4),
-        paddingVertical: hp(0.6),
-        backgroundColor: colors.primary + '10',
-        borderRadius: 8,
-        borderLeftWidth: 3,
+        paddingVertical: hp(1.2),
+        backgroundColor: colors.primary + '12',
+        borderRadius: 12,
+        borderLeftWidth: 4,
         borderLeftColor: colors.primary,
-        marginHorizontal: wp(5),
+        marginHorizontal: wp(4),
+        shadowColor: colors.primary,
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 2,
     },
     remarksText: {
-        fontSize: Math.min(hp(1.6), wp(3.8)),
-        fontFamily: 'LoraRegular',
+        fontSize: Math.min(hp(1.5), wp(3.6)),
         fontStyle: 'italic',
         color: colors.textPrimary,
         textAlign: 'center',
+        fontWeight: '500',
     },
     infoOuterBox:{
-        paddingHorizontal: wp(3),
+        paddingHorizontal: wp(4),
+        marginVertical: hp(1.5),
     },
     statsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: Math.min(hp(1), wp(2)),
+        gap: Math.min(hp(1.2), wp(2.5)),
         justifyContent: 'space-between',
+        marginBottom: hp(1.5),
     },
     statCard: {
         width: '48%',
-        minHeight: Math.min(hp(13), wp(28)),
-        maxHeight: Math.min(hp(13), wp(28)),
+        minHeight: Math.min(hp(14), wp(30)),
+        maxHeight: Math.min(hp(14), wp(30)),
         backgroundColor: colors.cardBackground,
-        borderRadius: 12,
-        padding: Math.min(hp(1.2), wp(2.8)),
+        borderRadius: 14,
+        padding: Math.min(hp(1.4), wp(3)),
         alignItems: 'center',
         justifyContent: 'center',
         shadowColor: "#000",
-        shadowOpacity: 0.06,
-        shadowRadius: 4,
-        shadowOffset: { width: 0, height: 1 },
-        elevation: 2,
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 3,
         borderWidth: 1,
-        borderColor: colors.gray + '20',
+        borderColor: colors.gray + '15',
+        overflow: 'hidden',
     },
     statCardHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: wp(1),
+        gap: wp(1.2),
         marginBottom: hp(0.8),
     },
     statCardContent: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: wp(1),
-        marginBottom: hp(0.3),
+        gap: wp(1.2),
+        marginBottom: hp(0.6),
     },
     goalRowContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-around',
         width: '100%',
-        paddingHorizontal: wp(2),
+        paddingHorizontal: wp(1.5),
     },
     goalItem: {
         alignItems: 'center',
         flex: 1,
     },
     goalDivider: {
-        width: 1,
+        width: 1.5,
         height: hp(4),
-        backgroundColor: colors.gray + '40',
-        marginHorizontal: wp(1),
+        backgroundColor: colors.gray + '30',
+        marginHorizontal: wp(1.5),
     },
     statLabel: {
-        fontSize: Math.min(hp(1.3), wp(3)),
-        fontFamily: 'LoraSemiBold',
+        fontSize: Math.min(hp(1.2), wp(2.8)),
+        fontWeight: '700',
         color: colors.textSecondary,
-        marginTop: hp(0.3),
-        marginBottom: hp(0.3),
+        marginTop: hp(0.2),
+        marginBottom: hp(0.2),
         textTransform: 'uppercase',
-        letterSpacing: 0.3,
+        letterSpacing: 0.4,
     },
     statValue: {
-        fontSize: Math.min(hp(2.2), wp(5.2)),
-        fontFamily: 'LoraBold',
+        fontSize: Math.min(hp(2.4), wp(5.5)),
+        fontWeight: 'bold',
         color: colors.textPrimary,
         marginBottom: hp(0.1),
     },
     statValueLarge: {
-        fontSize: Math.min(hp(1.8), wp(4.2)),
-        fontFamily: 'LoraBold',
+        fontSize: Math.min(hp(2), wp(4.5)),
+        fontWeight: 'bold',
         color: colors.textPrimary,
+        letterSpacing: 0.3,
     },
     statUnit: {
-        fontSize: Math.min(hp(1.1), wp(2.5)),
-        fontFamily: 'LoraRegular',
+        fontSize: Math.min(hp(1), wp(2.3)),
         color: colors.textSecondary,
         marginBottom: hp(0.2),
+        fontWeight: '500',
     },
     input: {
-        borderWidth: 1,
-        borderColor: colors.gray + '50',
-        borderRadius: 10,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
+        borderWidth: 1.5,
+        borderColor: colors.gray + '40',
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
         backgroundColor: colors.cardBackground,
         color: colors.textPrimary,
-        fontSize: 16,
-        fontFamily: 'LoraRegular',
+        fontSize: 15,
+        fontWeight: '500',
     },
     trayButton: {
         flexDirection: 'row',
         backgroundColor: colors.primary,
-        paddingVertical: hp(1.4),
+        paddingVertical: hp(1.6),
         paddingHorizontal: wp(6),
-        marginHorizontal: wp(3),
-        marginTop: hp(1),
-        marginBottom: hp(0.5),
-        borderRadius: 12,
+        marginHorizontal: wp(4),
+        marginTop: hp(1.5),
+        marginBottom: hp(1),
+        borderRadius: 14,
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 8,
+        gap: 10,
         shadowColor: colors.primary,
-        shadowOpacity: 0.3,
-        shadowRadius: 6,
-        shadowOffset: { width: 0, height: 2 },
-        elevation: 4,
+        shadowOpacity: 0.35,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 5,
     },
     trayButtonText: {
         color: '#fff',
-        fontSize: Math.min(hp(1.8), wp(4.2)),
-        fontFamily: 'LoraBold',
+        fontSize: Math.min(hp(1.7), wp(4)),
+        fontWeight: '700',
+        letterSpacing: 0.3,
     },
     congratsContainer: {
         backgroundColor: colors.success + '15',
         borderRadius: 16,
         padding: hp(2),
-        marginHorizontal: wp(3),
-        marginTop: hp(1.5),
-        marginBottom: hp(0.5),
+        marginHorizontal: wp(4),
+        marginTop: hp(2),
+        marginBottom: hp(1),
         alignItems: 'center',
         borderWidth: 2,
         borderColor: colors.success + '40',
+        shadowColor: colors.success,
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 3,
     },
     congratsTitle: {
         fontSize: Math.min(hp(2.2), wp(5.5)),
-        fontFamily: 'LoraBold',
+        fontWeight: 'bold',
         color: colors.success,
         marginTop: hp(1),
         marginBottom: hp(0.5),
     },
     congratsText: {
         fontSize: Math.min(hp(1.6), wp(3.8)),
-        fontFamily: 'LoraRegular',
         color: colors.textPrimary,
         textAlign: 'center',
         lineHeight: Math.min(hp(2.2), wp(5)),
     },
     progressSection: {
-        marginTop: hp(1.5),
-        gap: hp(1.2),
+        marginTop: hp(2),
+        gap: hp(1.5),
+        marginHorizontal: wp(4),
     },
     progressItem: {
         backgroundColor: colors.cardBackground,
-        borderRadius: 12,
-        padding: Math.min(hp(1.5), wp(3.5)),
+        borderRadius: 14,
+        padding: Math.min(hp(1.6), wp(3.8)),
         shadowColor: "#000",
-        shadowOpacity: 0.06,
-        shadowRadius: 4,
-        shadowOffset: { width: 0, height: 1 },
-        elevation: 2,
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 3,
         borderWidth: 1,
-        borderColor: colors.gray + '20',
+        borderColor: colors.gray + '15',
+        overflow: 'hidden',
     },
     progressHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: wp(1.5),
-        marginBottom: hp(0.8),
+        gap: wp(1.8),
+        marginBottom: hp(1),
     },
     progressLabel: {
         fontSize: Math.min(hp(1.5), wp(3.5)),
-        fontFamily: 'LoraSemiBold',
+        fontWeight: '700',
         color: colors.textPrimary,
+        letterSpacing: 0.2,
     },
     progressBarContainer: {
-        height: hp(1),
-        backgroundColor: colors.gray + '20',
-        borderRadius: hp(0.5),
+        height: hp(1.4),
+        backgroundColor: colors.gray + '15',
+        borderRadius: 8,
         overflow: 'hidden',
-        marginBottom: hp(0.6),
+        marginBottom: hp(0.8),
+        shadowColor: "#000",
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        shadowOffset: { width: 0, height: 1 },
+        elevation: 1,
     },
     progressBar: {
         height: '100%',
-        borderRadius: hp(0.5),
+        borderRadius: 8,
     },
     progressPercentage: {
-        fontSize: Math.min(hp(1.8), wp(4.2)),
-        fontFamily: 'LoraBold',
-        color: colors.textPrimary,
+        fontSize: Math.min(hp(1.9), wp(4.5)),
+        fontWeight: 'bold',
+        color: colors.primary,
         textAlign: 'right',
     },
     Foodtray: {
@@ -1071,13 +1387,12 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     menuTitle: {
         fontSize: Math.min(hp(2.8), wp(6.5)),
-        fontFamily: 'LoraBold',
+        fontWeight: "700",
         marginTop: hp(0.8),
         color: colors.textPrimary,
     },
     menuSubtitle: {
         fontSize: Math.min(hp(1.6), wp(3.8)),
-        fontFamily: 'LoraRegular',
         color: colors.textSecondary,
         marginTop: hp(0.4),
     },
@@ -1091,7 +1406,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     label: {
         fontSize: Math.min(hp(1.8), wp(4.2)),
-        fontFamily: 'LoraSemiBold',
+        fontWeight: "600",
         marginLeft: wp(2),
         color: colors.textPrimary,
     },
@@ -1105,7 +1420,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     sectionTitle: {
         fontSize: Math.min(hp(1.8), wp(4.2)),
-        fontFamily: 'LoraSemiBold',
+        fontWeight: "600",
         color: colors.textPrimary,
         marginBottom: hp(1),
     },
@@ -1131,12 +1446,40 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     inputMethodText: {
         fontSize: Math.min(hp(1.6), wp(3.6)),
-        fontFamily: 'LoraSemiBold',
+        fontWeight: "600",
         color: colors.textPrimary,
         marginTop: hp(0.3),
     },
     inputMethodTextActive: {
         color: 'white',
+    },
+    disabledButton: {
+        flex: 1,
+        paddingVertical: hp(1.5),
+        paddingHorizontal: wp(2),
+        borderRadius: 12,
+        backgroundColor: colors.gray + '10',
+        borderWidth: 2,
+        borderColor: colors.gray + '30',
+        alignItems: "center",
+        gap: hp(0.4),
+        opacity: 0.6,
+    },
+    disabledButtonText: {
+        fontSize: Math.min(hp(1.6), wp(3.6)),
+        fontWeight: "600",
+        color: '#CCCCCC',
+        marginTop: hp(0.3),
+    },
+    comingSoonBadge: {
+        fontSize: Math.min(hp(1.2), wp(2.8)),
+        fontWeight: "600",
+        color: '#FF9500',
+        marginTop: hp(0.2),
+        paddingHorizontal: wp(1.5),
+        paddingVertical: hp(0.2),
+        backgroundColor: '#FF950010',
+        borderRadius: 4,
     },
     dynamicInputSection: {
         flex: 1,
@@ -1150,7 +1493,6 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     audioInstructions: {
         fontSize: Math.min(hp(1.8), wp(4.2)),
-        fontFamily: 'LoraRegular',
         color: colors.textSecondary,
         textAlign: 'center',
         marginBottom: hp(3),
@@ -1206,7 +1548,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     recordingText: {
         fontSize: Math.min(hp(1.6), wp(3.8)),
-        fontFamily: 'LoraSemiBold',
+        fontWeight: '600',
         color: '#FF3B30',
     },
     audioPreview: {
@@ -1229,7 +1571,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     audioPreviewText: {
         color: colors.success,
-        fontFamily: 'LoraSemiBold',
+        fontWeight: '600',
         fontSize: Math.min(hp(1.7), wp(4)),
     },
     clearButton: {
@@ -1244,7 +1586,6 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     photoInstructions: {
         fontSize: Math.min(hp(1.7), wp(4)),
-        fontFamily: 'LoraRegular',
         color: colors.textSecondary,
         textAlign: 'center',
         marginBottom: hp(2),
@@ -1268,7 +1609,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     photoButtonText: {
         fontSize: Math.min(hp(1.6), wp(3.6)),
-        fontFamily: 'LoraRegular',
+        fontWeight: '500',
         color: colors.textPrimary,
     },
     photoPreview: {
@@ -1284,16 +1625,10 @@ const getStyles = (colors: any) => StyleSheet.create({
     photoPreviewText: {
         flex: 1,
         color: colors.success,
-        fontFamily: 'LoraRegular',
-    },
-    clearText: {
-        color: colors.error,
-        fontFamily: 'LoraSemiBold',
-        fontSize: 14,
+        fontWeight: '500',
     },
     optionalLabel: {
         fontSize: 14,
-        fontFamily: 'LoraRegular',
         color: colors.textSecondary,
         marginBottom: 8,
     },
@@ -1321,7 +1656,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     backMenuText: {
         color: colors.primary,
-        fontFamily: 'LoraSemiBold',
+        fontWeight: "600",
         fontSize: Math.min(hp(1.8), wp(4.2)),
     },
     submitMenuButton: {
@@ -1334,18 +1669,8 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     submitMenuText: {
         color: "#fff",
-        fontFamily: 'LoraBold',
+        fontWeight: "700",
         fontSize: Math.min(hp(1.8), wp(4.2)),
-    },
-    submitSuccessOverlay: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: 'transparent',
     },
     timePickerButton: {
         flexDirection: 'row',
@@ -1354,7 +1679,6 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     timePickerText: {
         fontSize: 16,
-        fontFamily: 'LoraRegular',
         color: colors.textPrimary,
     },
     timeDoneButton: {
@@ -1367,7 +1691,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     timeDoneText: {
         color: 'white',
-        fontFamily: 'LoraSemiBold',
+        fontWeight: '600',
         fontSize: 16,
     },
     // Suggestion styles
@@ -2061,6 +2385,23 @@ const ProgressCircle = (CircleProps: ProgressCircleProps) =>{
     
     return(
         //<View style={{ width: "80%", aspectRatio: 1, alignSelf: "center" }}>
+        <Svg width="100%" height={'100%'} viewBox="0 0 120 120" style={{ maxWidth: 200, alignSelf: "center"}}>
+        {/* Background circle of Calories */}
+        <Circle  cx="60"  cy="60"  r={outerRadius}
+                stroke="#E5E7EB"  strokeWidth="10"  fill="transparent"/>
+        {/* Calories progress */}
+        <AnimatedCircle  cx="60" cy="60" r={outerRadius}
+            stroke={colorsSheet.progressBarColor}  strokeWidth="10"  fill="transparent"
+            strokeDasharray={outerCircumference} //total
+            animatedProps={animatedCalProps}
+            strokeLinecap="round"transform= "rotate(-90 60 60)" />
+        {/* Hydration Circcle */}
+        <AnimatedCircle cx="60" cy="60" r={innerRadius}
+            stroke="#3B82F6"  strokeWidth="10" fill="transparent"
+            strokeDasharray={innerCircumference} 
+            animatedProps={animatedHydrationProps}
+            strokeLinecap="round" transform="rotate(-90 60 60)"/> 
+        </Svg>
         <Svg width="100%" height={'100%'} viewBox="0 0 120 120" style={{ maxWidth: 200, alignSelf: "center"}}>
         {/* Background circle of Calories */}
         <Circle  cx="60"  cy="60"  r={outerRadius}
