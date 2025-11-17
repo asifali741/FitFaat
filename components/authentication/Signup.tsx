@@ -151,7 +151,7 @@ export default function Signup() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          scrollEnabled={false}
+          scrollEnabled={true}
           nestedScrollEnabled={false}
           scrollEventThrottle={16}
         >
