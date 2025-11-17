@@ -22,7 +22,7 @@ export default function DoctorDetailsScreen() {
 
   const handleBookAppointment = () => {
     router.push({
-      pathname: "/(main)/(conference)/booking-confirmation",
+      pathname: "/(main)/(conference)/booking-confirmation" as any,
       params: { doctorId, date }
     });
   };

@@ -10,7 +10,7 @@ import Animated, {
 import Svg, { Circle, Defs, LinearGradient, Stop, Text as SvgText } from "react-native-svg";
 import { DashFonts, rs } from "../(settings)/ui_elements";
 import { useTheme } from "@/contexts/ThemeContext";
-import { Day } from "./DayPlan";
+import { Day } from "./types";
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 interface ProgressCircleProps {
   progress: number;
