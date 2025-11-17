@@ -32,15 +32,15 @@ const dailyLogSchema = new mongoose.Schema({
     default: 0 // Positive = surplus carried over, Negative = deficit carried over
   },
   
-  // Hydration Tracking
+  // Hydration Tracking (in liters)
   targetHydration: {
     type: Number,
     required: true,
-    default: 2.5 // in liters
+    default: 2.5 // in liters (L)
   },
   achievedHydration: {
     type: Number,
-    default: 0
+    default: 0 // in liters (L)
   },
   
   // Meals/Food Tracking
