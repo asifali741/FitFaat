@@ -124,6 +124,7 @@ export default function DetailsDay () {
     const [mealQuantity, setMealQuantity] = useState<string>('1');
     const [waterInput, setWaterInput] = useState<string>('0.25'); // Default to 250ml glass
     const [showWaterTab, setShowWaterTab] = useState(false);
+    const [trackingMode, setTrackingMode] = useState<'meal' | 'hydration'>('meal');
     
     // Initialize suggested foods based on user's goal
     useEffect(() => {
@@ -560,6 +561,28 @@ export default function DetailsDay () {
           </Text>
         </View>
 
+        {/* Tracking Mode Selector - Professional Toggle */}
+        <View style={styles.trackingModeSection}>
+          <Text style={styles.trackingModeTitle}>What would you like to track?</Text>
+          <View style={styles.modeToggleContainer}>
+            <TouchableOpacity 
+              style={[styles.modeButton, trackingMode === 'meal' && styles.modeButtonActive]}
+              onPress={() => setTrackingMode('meal')}
+            >
+              <Ionicons name="fast-food-outline" size={22} color={trackingMode === 'meal' ? colors.primary : colors.textSecondary} />
+              <Text style={[styles.modeButtonText, trackingMode === 'meal' && styles.modeButtonTextActive]}>Meal</Text>
+            </TouchableOpacity>
+            <View style={styles.modeButtonDivider} />
+            <TouchableOpacity 
+              style={[styles.modeButton, trackingMode === 'hydration' && styles.modeButtonActive]}
+              onPress={() => setTrackingMode('hydration')}
+            >
+              <Ionicons name="water-outline" size={22} color={trackingMode === 'hydration' ? '#4ECDC4' : colors.textSecondary} />
+              <Text style={[styles.modeButtonText, trackingMode === 'hydration' && styles.modeButtonTextActive]}>Hydration</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <View style={styles.menuContent}>
 
           {/* Time Selection */}
@@ -606,6 +629,203 @@ export default function DetailsDay () {
               </TouchableOpacity>
             )}
           </View>
+
+          {/* Dynamic Section Title */}
+          <View style={styles.sectionTitle}>
+            <Text style={styles.sectionTitleText}>
+              {trackingMode === 'meal' ? 'Add Meal' : 'Add Water'}
+            </Text>
+          </View>
+
+          {/* ===== MEAL TRACKING MODE ===== */}
+          {trackingMode === 'meal' && (
+            <View>
+              {/* Meal Suggestions */}
+              <View style={styles.miniSuggestionsSection}>
+                <Text style={styles.miniSuggestionsTitle}>Quick Pick</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.miniSuggestionsScroll}>
+                  {suggestedFoods.slice(0, 4).map((food, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.miniSuggestionCard}
+                      onPress={() => {
+                        setSelectedFoodItem(food);
+                        setCalorieInput(String(food.calories));
+                      }}
+                    >
+                      <Text style={styles.miniSuggestionText}>{food.name}</Text>
+                      <Text style={styles.miniSuggestionCals}>{food.calories}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              {/* Meal Input Fields */}
+              <TextInput 
+                style={styles.mealInput}
+                placeholder="Search food..."
+                placeholderTextColor={colors.textSecondary}
+                value={foodSearch}
+                onChangeText={setFoodSearch}
+              />
+              
+              <TextInput
+                style={styles.calorieInput}
+                placeholder="Calories"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="decimal-pad"
+                value={calorieInput}
+                onChangeText={setCalorieInput}
+              />
+
+              {showFoodSearch && filteredFoods.length > 0 && (
+                <ScrollView style={styles.foodResultsList} nestedScrollEnabled>
+                  {filteredFoods.slice(0, 3).map((food, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.foodResultItem}
+                      onPress={() => {
+                        setSelectedFoodItem(food);
+                        setCalorieInput(String(food.calories));
+                        setFoodSearch('');
+                      }}
+                    >
+                      <Text style={styles.foodResultName}>{food.name}</Text>
+                      <Text style={styles.foodResultCals}>{food.calories} cals</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+
+              {/* Meal Progress */}
+              <View style={styles.calProgressSection}>
+                <View style={styles.calProgressHeader}>
+                  <Text style={styles.calProgressTitle}>Today's Calories</Text>
+                  <Text style={styles.calProgressPercent}>
+                    {calculatePercentage(dayData.achieviedCalorie + parseFloat(calorieInput || '0'), dayData.targetCalorie)}%
+                  </Text>
+                </View>
+                <View style={styles.calProgressBar}>
+                  <View
+                    style={[
+                      styles.calProgressFill,
+                      {
+                        width: `${Math.min(((dayData.achieviedCalorie + parseFloat(calorieInput || '0')) / dayData.targetCalorie) * 100, 100)}%`
+                      }
+                    ]}
+                  />
+                </View>
+                <View style={styles.calProgressText}>
+                  <Text style={styles.calProgressCurrent}>
+                    {dayData.achieviedCalorie} cal logged
+                  </Text>
+                  <Text style={styles.calProgressTarget}>
+                    Goal: {dayData.targetCalorie} cal
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* ===== HYDRATION TRACKING MODE ===== */}
+          {trackingMode === 'hydration' && (
+            <View>
+              {/* Water Quick Suggestions */}
+              <View style={styles.miniSuggestionsSection}>
+                <Text style={styles.miniSuggestionsTitle}>Quick Pick</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.miniSuggestionsScroll}>
+                  {waterIntakeDatabase.options.map((option) => (
+                    <TouchableOpacity
+                      key={option.name}
+                      style={styles.miniWaterCard}
+                      onPress={() => setWaterInput(option.amount.toString())}
+                    >
+                      <Ionicons name="water" size={16} color="#4ECDC4" />
+                      <Text style={styles.miniWaterText}>{option.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              {/* Glass Counter Display */}
+              <View style={styles.glassCounterSection}>
+                <View style={styles.glassCounterHeader}>
+                  <Ionicons name="water" size={18} color="#4ECDC4" />
+                  <Text style={styles.glassCounterTitle}>Glasses</Text>
+                </View>
+                <View style={styles.glassCounterDisplay}>
+                  <Text style={styles.glassCount}>
+                    {Math.round((parseFloat(waterInput || '0') / 0.25) * 10) / 10}
+                  </Text>
+                  <Text style={styles.glassLabel}>glasses (250ml each)</Text>
+                </View>
+              </View>
+
+              {/* Water Input with +/- by Glass */}
+              <View style={styles.waterControlSection}>
+                <TouchableOpacity 
+                  style={styles.waterControlButton}
+                  onPress={() => {
+                    const current = parseFloat(waterInput) || 0;
+                    setWaterInput(Math.max(0, current - 0.25).toFixed(2));
+                  }}
+                >
+                  <Ionicons name="remove" size={18} color="#4ECDC4" />
+                </TouchableOpacity>
+                <View style={styles.waterInputDisplay}>
+                  <TextInput
+                    style={styles.waterInputField}
+                    value={waterInput}
+                    onChangeText={setWaterInput}
+                    keyboardType="decimal-pad"
+                    placeholder="0.25"
+                  />
+                  <Text style={styles.waterUnitLabel}>L</Text>
+                </View>
+                <TouchableOpacity 
+                  style={styles.waterControlButton}
+                  onPress={() => {
+                    const current = parseFloat(waterInput) || 0;
+                    setWaterInput((current + 0.25).toFixed(2));
+                  }}
+                >
+                  <Ionicons name="add" size={18} color="#4ECDC4" />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.waterDisplayLabel}>
+                {waterInput}L ({Math.round(parseFloat(waterInput || '0') * 1000)}ml)
+              </Text>
+
+              {/* Hydration Progress Indicator */}
+              <View style={styles.hydrationProgressSection}>
+                <View style={styles.hydrationProgressHeader}>
+                  <Text style={styles.hydrationProgressTitle}>Today's Hydration</Text>
+                  <Text style={styles.hydrationProgressPercent}>
+                    {calculatePercentage(dayData.achieviedHydration + parseFloat(waterInput || '0'), dayData.targetHydration)}%
+                  </Text>
+                </View>
+                <View style={styles.hydrationProgressBar}>
+                  <View
+                    style={[
+                      styles.hydrationProgressFill,
+                      {
+                        width: `${Math.min(((dayData.achieviedHydration + parseFloat(waterInput || '0')) / dayData.targetHydration) * 100, 100)}%`
+                      }
+                    ]}
+                  />
+                </View>
+                <View style={styles.hydrationProgressText}>
+                  <Text style={styles.hydrationProgressCurrent}>
+                    {dayData.achieviedHydration}L logged
+                  </Text>
+                  <Text style={styles.hydrationProgressTarget}>
+                    Goal: {dayData.targetHydration}L
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
 
           {/* Dual Input Section - Meal & Water */}
           <View style={styles.sectionTitle}>
@@ -2313,6 +2533,113 @@ const getStyles = (colors: any) => StyleSheet.create({
         fontWeight: '500',
     },
     hydrationProgressTarget: {
+        fontSize: Math.min(hp(1), wp(2.5)),
+        color: colors.textSecondary,
+    },
+    // Tracking Mode Selector Styles
+    trackingModeSection: {
+        backgroundColor: colors.gray + '08',
+        borderRadius: 12,
+        padding: wp(4),
+        marginBottom: hp(2),
+        borderWidth: 1,
+        borderColor: colors.primary + '20',
+    },
+    trackingModeTitle: {
+        fontSize: Math.min(hp(1.5), wp(3.5)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+        marginBottom: hp(1.5),
+        letterSpacing: 0.3,
+    },
+    modeToggleContainer: {
+        flexDirection: 'row',
+        backgroundColor: colors.gray + '05',
+        borderRadius: 10,
+        padding: wp(2),
+        gap: wp(1),
+        alignItems: 'center',
+    },
+    modeButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: hp(1.2),
+        paddingHorizontal: wp(3),
+        borderRadius: 8,
+        backgroundColor: 'transparent',
+        gap: wp(1.5),
+    },
+    modeButtonActive: {
+        backgroundColor: colors.primary + '15',
+        borderWidth: 2,
+        borderColor: colors.primary,
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.15,
+        shadowRadius: 5,
+        elevation: 3,
+    },
+    modeButtonText: {
+        fontSize: Math.min(hp(1.4), wp(3.2)),
+        fontWeight: '600',
+        color: colors.textSecondary,
+    },
+    modeButtonTextActive: {
+        color: colors.primary,
+        fontWeight: '700',
+    },
+    modeButtonDivider: {
+        width: 1,
+        height: hp(2),
+        backgroundColor: colors.gray + '30',
+    },
+    // Calorie Progress Styles
+    calProgressSection: {
+        marginTop: hp(1.5),
+        marginBottom: hp(2),
+        paddingHorizontal: wp(2),
+    },
+    calProgressHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: hp(0.8),
+    },
+    calProgressTitle: {
+        fontSize: Math.min(hp(1.3), wp(3)),
+        fontWeight: '700',
+        color: colors.textPrimary,
+    },
+    calProgressPercent: {
+        fontSize: Math.min(hp(1.2), wp(2.8)),
+        fontWeight: '700',
+        color: colors.primary,
+    },
+    calProgressBar: {
+        height: 8,
+        backgroundColor: colors.gray + '20',
+        borderRadius: 4,
+        marginBottom: hp(0.8),
+        overflow: 'hidden',
+    },
+    calProgressFill: {
+        height: '100%',
+        backgroundColor: colors.primary,
+        borderRadius: 4,
+    },
+    calProgressText: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        gap: wp(2),
+    },
+    calProgressCurrent: {
+        fontSize: Math.min(hp(1), wp(2.5)),
+        color: colors.primary,
+        fontWeight: '500',
+    },
+    calProgressTarget: {
         fontSize: Math.min(hp(1), wp(2.5)),
         color: colors.textSecondary,
     },
