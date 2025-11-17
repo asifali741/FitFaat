@@ -80,26 +80,64 @@ export default function DoctorPortal() {
 
         {/* Features */}
         <View style={styles.featuresContainer}>
-          <View style={styles.featureItem}>
-            <Ionicons name="videocam" size={30} color={colorsSheet.primary} />
-            <Text style={styles.featureText}>Video Consultations</Text>
-          </View>
-          
           <TouchableOpacity 
-            style={styles.featureItem}
-            onPress={() => router.push('/(main)/(doctor-portal)/patient-management')}
+            style={[styles.featureItem, doctorStatus !== 'approved' && styles.featureItemDisabled]}
+            disabled={doctorStatus !== 'approved'}
+            activeOpacity={doctorStatus === 'approved' ? 0.7 : 1}
           >
-            <Ionicons name="people" size={30} color={colorsSheet.primaryLight} />
-            <Text style={styles.featureText}>Appointments Management</Text>
-            <View style={styles.featureBadge}>
-              <Text style={styles.featureBadgeText}>New</Text>
-            </View>
+            <Ionicons 
+              name="videocam" 
+              size={30} 
+              color={doctorStatus === 'approved' ? colorsSheet.primary : colorsSheet.textSecondary} 
+            />
+            <Text style={[styles.featureText, doctorStatus !== 'approved' && styles.featureTextDisabled]}>
+              Video Consultations
+            </Text>
+            {doctorStatus !== 'approved' && (
+              <Ionicons name="lock-closed" size={20} color={colorsSheet.textSecondary} style={styles.lockIcon} />
+            )}
           </TouchableOpacity>
           
-          <View style={styles.featureItem}>
-            <Ionicons name="nutrition" size={30} color={colorsSheet.secondary} />
-            <Text style={styles.featureText}>Diet Plan Creation</Text>
-          </View>
+          <TouchableOpacity 
+            style={[styles.featureItem, doctorStatus !== 'approved' && styles.featureItemDisabled]}
+            onPress={() => doctorStatus === 'approved' && router.push('/(main)/(doctor-portal)/patient-management')}
+            disabled={doctorStatus !== 'approved'}
+            activeOpacity={doctorStatus === 'approved' ? 0.7 : 1}
+          >
+            <Ionicons 
+              name="people" 
+              size={30} 
+              color={doctorStatus === 'approved' ? colorsSheet.primaryLight : colorsSheet.textSecondary} 
+            />
+            <Text style={[styles.featureText, doctorStatus !== 'approved' && styles.featureTextDisabled]}>
+              Appointments Management
+            </Text>
+            {doctorStatus === 'approved' ? (
+              <View style={styles.featureBadge}>
+                <Text style={styles.featureBadgeText}>New</Text>
+              </View>
+            ) : (
+              <Ionicons name="lock-closed" size={20} color={colorsSheet.textSecondary} style={styles.lockIcon} />
+            )}
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.featureItem, doctorStatus !== 'approved' && styles.featureItemDisabled]}
+            disabled={doctorStatus !== 'approved'}
+            activeOpacity={doctorStatus === 'approved' ? 0.7 : 1}
+          >
+            <Ionicons 
+              name="nutrition" 
+              size={30} 
+              color={doctorStatus === 'approved' ? colorsSheet.secondary : colorsSheet.textSecondary} 
+            />
+            <Text style={[styles.featureText, doctorStatus !== 'approved' && styles.featureTextDisabled]}>
+              Diet Plan Creation
+            </Text>
+            {doctorStatus !== 'approved' && (
+              <Ionicons name="lock-closed" size={20} color={colorsSheet.textSecondary} style={styles.lockIcon} />
+            )}
+          </TouchableOpacity>
         </View>
 
         {/* Action Buttons */}
@@ -194,11 +232,22 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     marginBottom: hp(1.5),
   },
+  featureItemDisabled: {
+    opacity: 0.5,
+    backgroundColor: colorsSheet.cardBackground,
+  },
   featureText: {
     fontSize: hp(2),
     color: colorsSheet.textOnCard,
     marginLeft: wp(4),
     fontWeight: "500",
+    flex: 1,
+  },
+  featureTextDisabled: {
+    color: colorsSheet.textSecondary,
+  },
+  lockIcon: {
+    marginLeft: 'auto',
   },
   featureBadge: {
     backgroundColor: colorsSheet.primary,

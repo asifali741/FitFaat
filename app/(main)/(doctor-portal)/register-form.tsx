@@ -1,16 +1,18 @@
 import { useTheme } from '@/contexts/ThemeContext';
 import { useDoctorRegistration } from '@/hooks/useDoctorRegistration';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
 
@@ -136,29 +138,52 @@ export default function DoctorRegistrationForm() {
   };
 
   const styles = getStyles(colors);
+  const [fadeAnim] = useState(new Animated.Value(0));
+
+  React.useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
+  }, []);
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Doctor Registration</Text>
-        <Text style={styles.headerSubtitle}>Complete your profile to join our platform</Text>
-      </View>
+      <LinearGradient
+        colors={[colors.primary, colors.primary + 'DD', colors.primary + '99']}
+        style={styles.header}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        <View style={styles.headerContent}>
+          <View style={styles.headerIconContainer}>
+            <Ionicons name="medkit" size={hp(4)} color="white" />
+          </View>
+          <Text style={styles.headerTitle}>Doctor Registration</Text>
+          <Text style={styles.headerSubtitle}>Join our healthcare platform and make a difference</Text>
+        </View>
+      </LinearGradient>
 
       {successMessage && (
-        <View style={styles.successBanner}>
+        <Animated.View style={[styles.successBanner, { opacity: fadeAnim }]}>
           <Ionicons name="checkmark-circle" size={24} color="white" />
           <Text style={styles.successText}>{successMessage}</Text>
-        </View>
+        </Animated.View>
       )}
 
       {error && (
-        <View style={styles.errorBanner}>
+        <Animated.View style={[styles.errorBanner, { opacity: fadeAnim }]}>
           <Ionicons name="close-circle" size={24} color="white" />
           <Text style={styles.errorText}>{error}</Text>
-        </View>
+        </Animated.View>
       )}
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.scrollView} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
         {/* Personal Information Section */}
         <TouchableOpacity
           style={styles.sectionHeader}
@@ -495,56 +520,93 @@ const getStyles = (colors: any) =>
       backgroundColor: colors.primary,
     },
     header: {
-      backgroundColor: colors.primary,
-      padding: wp(5),
-      paddingTop: hp(3),
+      paddingTop: hp(6),
+      paddingBottom: hp(4),
+      paddingHorizontal: wp(5),
+    },
+    headerContent: {
+      alignItems: 'center',
+    },
+    headerIconContainer: {
+      width: hp(8),
+      height: hp(8),
+      borderRadius: hp(4),
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: hp(2),
+      elevation: 4,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
     },
     headerTitle: {
-      fontSize: hp(3),
+      fontSize: hp(3.2),
       fontWeight: 'bold',
-      color: colors.textOnPrimary,
-      marginBottom: hp(0.5),
+      color: 'white',
+      marginBottom: hp(1),
+      textAlign: 'center',
+      letterSpacing: 0.5,
     },
     headerSubtitle: {
-      fontSize: hp(1.6),
-      color: colors.textSecondary,
+      fontSize: hp(1.8),
+      color: 'rgba(255, 255, 255, 0.9)',
+      textAlign: 'center',
+      paddingHorizontal: wp(10),
     },
     successBanner: {
       flexDirection: 'row',
       backgroundColor: '#4CAF50',
       padding: wp(4),
-      marginHorizontal: wp(2),
-      borderRadius: hp(1),
-      alignItems: 'center',
+      marginHorizontal: wp(4),
       marginTop: hp(2),
+      borderRadius: hp(1.5),
+      alignItems: 'center',
+      elevation: 3,
+      shadowColor: '#4CAF50',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 3,
     },
     successText: {
       color: 'white',
-      marginLeft: wp(2),
-      fontSize: hp(1.6),
+      marginLeft: wp(3),
+      fontSize: hp(1.7),
       flex: 1,
+      fontWeight: '500',
     },
     errorBanner: {
       flexDirection: 'row',
       backgroundColor: '#F44336',
       padding: wp(4),
-      marginHorizontal: wp(2),
-      borderRadius: hp(1),
-      alignItems: 'center',
+      marginHorizontal: wp(4),
       marginTop: hp(2),
+      borderRadius: hp(1.5),
+      alignItems: 'center',
+      elevation: 3,
+      shadowColor: '#F44336',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 3,
     },
     errorText: {
       color: 'white',
-      marginLeft: wp(2),
-      fontSize: hp(1.6),
+      marginLeft: wp(3),
+      fontSize: hp(1.7),
       flex: 1,
+      fontWeight: '500',
     },
     scrollView: {
       flex: 1,
       backgroundColor: colors.screenColor,
-      borderTopLeftRadius: hp(3),
-      borderTopRightRadius: hp(3),
-      padding: wp(5),
+      borderTopLeftRadius: hp(4),
+      borderTopRightRadius: hp(4),
+      marginTop: hp(2),
+    },
+    scrollContent: {
+      paddingHorizontal: wp(5),
+      paddingTop: hp(3),
     },
     sectionHeader: {
       flexDirection: 'row',
@@ -553,156 +615,208 @@ const getStyles = (colors: any) =>
       padding: wp(4),
       borderRadius: hp(2),
       marginBottom: hp(2),
-      elevation: 2,
+      elevation: 3,
       shadowColor: '#000',
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.08,
+      shadowRadius: 6,
+      borderLeftWidth: 4,
+      borderLeftColor: colors.primary,
     },
     sectionTitle: {
-      fontSize: hp(2),
-      fontWeight: '600',
+      fontSize: hp(2.2),
+      fontWeight: '700',
       color: colors.textPrimary,
       marginLeft: wp(3),
       flex: 1,
+      letterSpacing: 0.3,
     },
     sectionContent: {
       backgroundColor: colors.cardBackground,
-      padding: wp(4),
+      padding: wp(5),
       borderRadius: hp(2),
-      marginBottom: hp(2),
+      marginBottom: hp(2.5),
+      elevation: 2,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
     },
     label: {
-      fontSize: hp(1.6),
+      fontSize: hp(1.7),
       fontWeight: '600',
       color: colors.textPrimary,
-      marginBottom: hp(0.8),
-      marginTop: hp(1),
+      marginBottom: hp(1),
+      marginTop: hp(1.5),
+      letterSpacing: 0.2,
     },
     input: {
       backgroundColor: colors.inputBackground,
       borderWidth: 1,
       borderColor: colors.cardBorder,
-      borderRadius: hp(1),
-      padding: hp(1.5),
-      fontSize: hp(1.6),
+      borderRadius: hp(1.2),
+      padding: hp(1.8),
+      fontSize: hp(1.7),
       color: colors.textPrimary,
-      marginBottom: hp(1),
+      marginBottom: hp(1.5),
+      elevation: 1,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.03,
+      shadowRadius: 2,
     },
     textArea: {
-      height: hp(10),
+      height: hp(12),
       textAlignVertical: 'top',
+      paddingTop: hp(1.8),
     },
     row: {
       flexDirection: 'row',
       justifyContent: 'space-between',
+      gap: wp(3),
     },
     halfWidth: {
-      width: '48%',
+      flex: 1,
     },
     selectContainer: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
+      gap: wp(2),
+      marginBottom: hp(1.5),
     },
     selectButton: {
       flex: 1,
-      paddingVertical: hp(1),
-      paddingHorizontal: wp(2),
-      borderRadius: hp(1),
+      paddingVertical: hp(1.3),
+      paddingHorizontal: wp(3),
+      borderRadius: hp(1.2),
       borderWidth: 1,
       borderColor: colors.cardBorder,
       backgroundColor: colors.inputBackground,
-      marginHorizontal: wp(0.5),
       alignItems: 'center',
+      justifyContent: 'center',
+      elevation: 1,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.03,
+      shadowRadius: 2,
     },
     selectButtonActive: {
       backgroundColor: colors.primary,
       borderColor: colors.primary,
+      elevation: 3,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3,
     },
     selectButtonText: {
-      fontSize: hp(1.2),
+      fontSize: hp(1.4),
       color: colors.textSecondary,
       textAlign: 'center',
+      fontWeight: '500',
     },
     selectButtonTextActive: {
-      color: colors.textOnPrimary,
-      fontWeight: '600',
+      color: 'white',
+      fontWeight: '700',
     },
     horizontalScroll: {
-      marginBottom: hp(1),
+      marginBottom: hp(1.5),
+      paddingVertical: hp(0.5),
     },
     tag: {
-      paddingVertical: hp(0.8),
-      paddingHorizontal: wp(3),
-      borderRadius: hp(2),
+      paddingVertical: hp(1),
+      paddingHorizontal: wp(4),
+      borderRadius: hp(2.5),
       borderWidth: 1,
       borderColor: colors.cardBorder,
       backgroundColor: colors.inputBackground,
-      marginRight: wp(2),
+      marginRight: wp(2.5),
       marginBottom: hp(1),
+      elevation: 1,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.03,
+      shadowRadius: 2,
     },
     tagActive: {
       backgroundColor: colors.primary,
       borderColor: colors.primary,
+      elevation: 3,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 3,
     },
     tagText: {
-      fontSize: hp(1.4),
+      fontSize: hp(1.5),
       color: colors.textSecondary,
+      fontWeight: '500',
     },
     tagTextActive: {
-      color: colors.textOnPrimary,
-      fontWeight: '600',
+      color: 'white',
+      fontWeight: '700',
     },
     checkboxContainer: {
       flexDirection: 'row',
       flexWrap: 'wrap',
       marginBottom: hp(2),
+      gap: wp(4),
     },
     checkboxItem: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginRight: wp(5),
       marginBottom: hp(1),
     },
     checkbox: {
-      width: hp(2.5),
-      height: hp(2.5),
-      borderRadius: hp(0.5),
+      width: hp(2.8),
+      height: hp(2.8),
+      borderRadius: hp(0.7),
       borderWidth: 2,
       borderColor: colors.primary,
       justifyContent: 'center',
       alignItems: 'center',
-      marginRight: wp(2),
+      marginRight: wp(2.5),
+      backgroundColor: colors.inputBackground,
     },
     checkboxChecked: {
       backgroundColor: colors.primary,
+      elevation: 2,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.2,
+      shadowRadius: 2,
     },
     checkboxLabel: {
-      fontSize: hp(1.6),
+      fontSize: hp(1.7),
       color: colors.textPrimary,
+      fontWeight: '500',
     },
     submitButton: {
       flexDirection: 'row',
       backgroundColor: colors.primary,
-      padding: hp(2),
-      borderRadius: hp(2),
+      padding: hp(2.2),
+      borderRadius: hp(1.5),
       alignItems: 'center',
       justifyContent: 'center',
-      marginVertical: hp(2),
-      elevation: 4,
-      shadowColor: '#000',
-      shadowOpacity: 0.2,
-      shadowRadius: 4,
+      marginVertical: hp(3),
+      marginHorizontal: wp(2),
+      elevation: 6,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 6,
     },
     submitButtonDisabled: {
       opacity: 0.6,
+      elevation: 2,
     },
     submitButtonText: {
-      color: colors.textOnPrimary,
-      fontSize: hp(2),
+      color: 'white',
+      fontSize: hp(2.1),
       fontWeight: '700',
       marginLeft: wp(2),
+      letterSpacing: 0.5,
     },
     bottomPadding: {
-      height: hp(5),
+      height: hp(3),
     },
   });
