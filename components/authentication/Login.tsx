@@ -1,7 +1,7 @@
 import { useTheme } from '@/contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { authApi } from '../../utils/auth/authApi';
@@ -12,6 +12,11 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  
+  const identifierRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
+  
   const router = useRouter();
   const { colors, isDarkMode } = useTheme();
   const styles = getStyles(colors, isDarkMode);
@@ -54,9 +59,13 @@ export default function Login() {
         style={styles.keyboardView}
       >
         <ScrollView 
+          ref={scrollRef}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          scrollEnabled={false}
+          nestedScrollEnabled={false}
+          scrollEventThrottle={16}
         >
           {/* Decorative Header */}
           <View style={styles.decorativeHeader}>
@@ -90,15 +99,17 @@ export default function Login() {
                   style={styles.inputIcon}
                 />
                 <TextInput
+                  ref={identifierRef}
                   style={styles.input}
                   placeholder="your@email.com"
                   placeholderTextColor={colors.textLight}
                   value={identifier}
                   onChangeText={setIdentifier}
-                  onFocus={() => setFocusedField('identifier')}
-                  onBlur={() => setFocusedField(null)}
+                  onSubmitEditing={() => passwordRef.current?.focus()}
                   autoCapitalize="none"
                   editable={!isLoading}
+                  returnKeyType="next"
+                  blurOnSubmit={false}
                 />
               </View>
             </View>
@@ -122,15 +133,16 @@ export default function Login() {
                   style={styles.inputIcon}
                 />
                 <TextInput
+                  ref={passwordRef}
                   style={styles.input}
                   placeholder="••••••••"
                   placeholderTextColor={colors.textLight}
                   value={password}
                   onChangeText={setPassword}
-                  onFocus={() => setFocusedField('password')}
-                  onBlur={() => setFocusedField(null)}
                   secureTextEntry={!showPassword}
                   editable={!isLoading}
+                  returnKeyType="done"
+                  blurOnSubmit={true}
                 />
                 <TouchableOpacity 
                   onPress={() => setShowPassword(!showPassword)}
