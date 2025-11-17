@@ -76,24 +76,9 @@ export default function ProfileInformation() {
     try {
       setIsLoadingData(true);
       
-      console.log("=== PROFILE DATA FETCH DEBUG ===");
-      console.log("Step 1: Getting token from SecureStore...");
-      
-      // Get token from SecureStore (where it's actually saved)
       const token = await SecureStore.getItemAsync('fitfaat_auth_token');
       
-      console.log("Step 2: Token check");
-      console.log("API_URL:", API_URL);
-      console.log("Token exists:", !!token);
-      if (token) {
-        console.log("Token preview:", token.substring(0, 30) + "...");
-      }
-      console.log("Is Clerk User:", isClerkUser);
-      
       if (!token) {
-        console.log("❌ No auth token found in SecureStore");
-        console.log("💡 Please log out and log in again to save the token");
-        
         Alert.alert(
           "Authentication Required", 
           "No authentication token found. Please log out and log in again.",
@@ -108,13 +93,6 @@ export default function ProfileInformation() {
       }
 
       const url = `${API_URL}/api/user/profile`;
-      console.log("Step 3: Making API call");
-      console.log("📡 URL:", url);
-      console.log("📡 Headers:", {
-        Authorization: `Bearer ${token.substring(0, 20)}...`,
-        "Content-Type": "application/json",
-      });
-
       const response = await fetch(url, {
         method: "GET",
         headers: {
@@ -123,61 +101,25 @@ export default function ProfileInformation() {
         },
       });
 
-      console.log("Step 4: Response received");
-      console.log("📥 Status:", response.status);
-      console.log("📥 Status Text:", response.statusText);
-      console.log("📥 OK:", response.ok);
-      
-      const responseText = await response.text();
-      console.log("📥 Raw response:", responseText);
-      
-      let data;
-      try {
-        data = JSON.parse(responseText);
-        console.log("Step 5: Parsed response data");
-        console.log("📦 Success:", data.success);
-        console.log("📦 Message:", data.message);
-        if (data.data) {
-          console.log("📦 Has user data:", !!data.data.user);
-          console.log("📦 User ID:", data.data.user?.id);
-          console.log("📦 Username:", data.data.user?.username);
-          console.log("📦 Email:", data.data.user?.email);
-          console.log("📦 Name:", data.data.user?.userInfo?.name);
-        }
-      } catch (parseError) {
-        console.error("❌ Failed to parse JSON response:", parseError);
-        Alert.alert("Error", "Invalid response from server");
-        return;
-      }
+      const data = await response.json();
       
       if (data.success) {
         setBackendUserData(data.data);
-        console.log("✅ Backend user data set successfully!");
       } else {
-        console.error("❌ API returned error:", data.message);
         Alert.alert("Error", data.message || "Failed to load profile data");
       }
     } catch (error) {
-      console.error("❌ CRITICAL ERROR in fetchBackendUserData");
-      console.error("Error type:", typeof error);
-      console.error("Error:", error);
-      
       let errorMessage = "Unknown error occurred";
       
       if (error instanceof Error) {
         errorMessage = error.message;
-        console.error("Error message:", error.message);
-        console.error("Error stack:", error.stack);
-      } else if (typeof error === 'string') {
-        errorMessage = error;
       }
       
       Alert.alert(
         "Connection Error", 
-        `Failed to connect to server.\n\nError: ${errorMessage}\n\nPlease check:\n1. Backend is running\n2. Correct API URL: ${API_URL}`
+        `Failed to connect to server. Please check if backend is running.`
       );
     } finally {
-      console.log("=== FETCH COMPLETE ===");
       setIsLoadingData(false);
     }
   };
@@ -375,13 +317,6 @@ export default function ProfileInformation() {
                 <Text style={styles.sectionTitle}>Account Information</Text>
                 
                 <View style={styles.infoField}>
-                  <Text style={styles.label}>Username</Text>
-                  <Text style={[styles.value, styles.highlightValue]}>
-                    @{backendUserData.user.username}
-                  </Text>
-                </View>
-
-                <View style={styles.infoField}>
                   <Text style={styles.label}>Full Name</Text>
                   <Text style={[styles.value, styles.highlightValue]}>
                     {backendUserData.user.userInfo?.name || "Not provided"}
@@ -395,7 +330,9 @@ export default function ProfileInformation() {
 
                 <View style={styles.infoField}>
                   <Text style={styles.label}>User ID</Text>
-                  <Text style={styles.value}>{backendUserData.user.id}</Text>
+                  <Text style={[styles.value, styles.highlightValue]}>
+                    #{backendUserData.user.username}
+                  </Text>
                 </View>
 
                 <View style={styles.infoField}>
