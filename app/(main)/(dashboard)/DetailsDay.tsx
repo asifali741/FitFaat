@@ -630,210 +630,18 @@ export default function DetailsDay () {
             )}
           </View>
 
-          {/* Dynamic Section Title */}
+
+
+          {/* Dual Input Section - Dynamic based on tracking mode */}
           <View style={styles.sectionTitle}>
             <Text style={styles.sectionTitleText}>
               {trackingMode === 'meal' ? 'Add Meal' : 'Add Water'}
             </Text>
           </View>
 
-          {/* ===== MEAL TRACKING MODE ===== */}
-          {trackingMode === 'meal' && (
-            <View>
-              {/* Meal Suggestions */}
-              <View style={styles.miniSuggestionsSection}>
-                <Text style={styles.miniSuggestionsTitle}>Quick Pick</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.miniSuggestionsScroll}>
-                  {suggestedFoods.slice(0, 4).map((food, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={styles.miniSuggestionCard}
-                      onPress={() => {
-                        setSelectedFoodItem(food);
-                        setCalorieInput(String(food.calories));
-                      }}
-                    >
-                      <Text style={styles.miniSuggestionText}>{food.name}</Text>
-                      <Text style={styles.miniSuggestionCals}>{food.calories}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-
-              {/* Meal Input Fields */}
-              <TextInput 
-                style={styles.mealInput}
-                placeholder="Search food..."
-                placeholderTextColor={colors.textSecondary}
-                value={foodSearch}
-                onChangeText={setFoodSearch}
-              />
-              
-              <TextInput
-                style={styles.calorieInput}
-                placeholder="Calories"
-                placeholderTextColor={colors.textSecondary}
-                keyboardType="decimal-pad"
-                value={calorieInput}
-                onChangeText={setCalorieInput}
-              />
-
-              {showFoodSearch && filteredFoods.length > 0 && (
-                <ScrollView style={styles.foodResultsList} nestedScrollEnabled>
-                  {filteredFoods.slice(0, 3).map((food, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={styles.foodResultItem}
-                      onPress={() => {
-                        setSelectedFoodItem(food);
-                        setCalorieInput(String(food.calories));
-                        setFoodSearch('');
-                      }}
-                    >
-                      <Text style={styles.foodResultName}>{food.name}</Text>
-                      <Text style={styles.foodResultCals}>{food.calories} cals</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              )}
-
-              {/* Meal Progress */}
-              <View style={styles.calProgressSection}>
-                <View style={styles.calProgressHeader}>
-                  <Text style={styles.calProgressTitle}>Today's Calories</Text>
-                  <Text style={styles.calProgressPercent}>
-                    {calculatePercentage(dayData.achieviedCalorie + parseFloat(calorieInput || '0'), dayData.targetCalorie)}%
-                  </Text>
-                </View>
-                <View style={styles.calProgressBar}>
-                  <View
-                    style={[
-                      styles.calProgressFill,
-                      {
-                        width: `${Math.min(((dayData.achieviedCalorie + parseFloat(calorieInput || '0')) / dayData.targetCalorie) * 100, 100)}%`
-                      }
-                    ]}
-                  />
-                </View>
-                <View style={styles.calProgressText}>
-                  <Text style={styles.calProgressCurrent}>
-                    {dayData.achieviedCalorie} cal logged
-                  </Text>
-                  <Text style={styles.calProgressTarget}>
-                    Goal: {dayData.targetCalorie} cal
-                  </Text>
-                </View>
-              </View>
-            </View>
-          )}
-
-          {/* ===== HYDRATION TRACKING MODE ===== */}
-          {trackingMode === 'hydration' && (
-            <View>
-              {/* Water Quick Suggestions */}
-              <View style={styles.miniSuggestionsSection}>
-                <Text style={styles.miniSuggestionsTitle}>Quick Pick</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.miniSuggestionsScroll}>
-                  {waterIntakeDatabase.options.map((option) => (
-                    <TouchableOpacity
-                      key={option.name}
-                      style={styles.miniWaterCard}
-                      onPress={() => setWaterInput(option.amount.toString())}
-                    >
-                      <Ionicons name="water" size={16} color="#4ECDC4" />
-                      <Text style={styles.miniWaterText}>{option.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-
-              {/* Glass Counter Display */}
-              <View style={styles.glassCounterSection}>
-                <View style={styles.glassCounterHeader}>
-                  <Ionicons name="water" size={18} color="#4ECDC4" />
-                  <Text style={styles.glassCounterTitle}>Glasses</Text>
-                </View>
-                <View style={styles.glassCounterDisplay}>
-                  <Text style={styles.glassCount}>
-                    {Math.round((parseFloat(waterInput || '0') / 0.25) * 10) / 10}
-                  </Text>
-                  <Text style={styles.glassLabel}>glasses (250ml each)</Text>
-                </View>
-              </View>
-
-              {/* Water Input with +/- by Glass */}
-              <View style={styles.waterControlSection}>
-                <TouchableOpacity 
-                  style={styles.waterControlButton}
-                  onPress={() => {
-                    const current = parseFloat(waterInput) || 0;
-                    setWaterInput(Math.max(0, current - 0.25).toFixed(2));
-                  }}
-                >
-                  <Ionicons name="remove" size={18} color="#4ECDC4" />
-                </TouchableOpacity>
-                <View style={styles.waterInputDisplay}>
-                  <TextInput
-                    style={styles.waterInputField}
-                    value={waterInput}
-                    onChangeText={setWaterInput}
-                    keyboardType="decimal-pad"
-                    placeholder="0.25"
-                  />
-                  <Text style={styles.waterUnitLabel}>L</Text>
-                </View>
-                <TouchableOpacity 
-                  style={styles.waterControlButton}
-                  onPress={() => {
-                    const current = parseFloat(waterInput) || 0;
-                    setWaterInput((current + 0.25).toFixed(2));
-                  }}
-                >
-                  <Ionicons name="add" size={18} color="#4ECDC4" />
-                </TouchableOpacity>
-              </View>
-
-              <Text style={styles.waterDisplayLabel}>
-                {waterInput}L ({Math.round(parseFloat(waterInput || '0') * 1000)}ml)
-              </Text>
-
-              {/* Hydration Progress Indicator */}
-              <View style={styles.hydrationProgressSection}>
-                <View style={styles.hydrationProgressHeader}>
-                  <Text style={styles.hydrationProgressTitle}>Today's Hydration</Text>
-                  <Text style={styles.hydrationProgressPercent}>
-                    {calculatePercentage(dayData.achieviedHydration + parseFloat(waterInput || '0'), dayData.targetHydration)}%
-                  </Text>
-                </View>
-                <View style={styles.hydrationProgressBar}>
-                  <View
-                    style={[
-                      styles.hydrationProgressFill,
-                      {
-                        width: `${Math.min(((dayData.achieviedHydration + parseFloat(waterInput || '0')) / dayData.targetHydration) * 100, 100)}%`
-                      }
-                    ]}
-                  />
-                </View>
-                <View style={styles.hydrationProgressText}>
-                  <Text style={styles.hydrationProgressCurrent}>
-                    {dayData.achieviedHydration}L logged
-                  </Text>
-                  <Text style={styles.hydrationProgressTarget}>
-                    Goal: {dayData.targetHydration}L
-                  </Text>
-                </View>
-              </View>
-            </View>
-          )}
-
-          {/* Dual Input Section - Meal & Water */}
-          <View style={styles.sectionTitle}>
-            <Text style={styles.sectionTitleText}>Add Meal & Water</Text>
-          </View>
-
           <View style={styles.dualInputContainer}>
-            {/* LEFT COLUMN - MEAL INPUT */}
+            {/* LEFT COLUMN - MEAL INPUT (Shown when tracking meal) */}
+            {trackingMode === 'meal' && (
             <View style={styles.inputColumn}>
               <View style={styles.columnHeader}>
                 <Ionicons name="fast-food-outline" size={20} color={colors.primary} />
@@ -897,8 +705,10 @@ export default function DetailsDay () {
                 </ScrollView>
               )}
             </View>
+            )}
 
-            {/* RIGHT COLUMN - WATER INPUT */}
+            {/* RIGHT COLUMN - WATER INPUT (Shown when tracking hydration) */}
+            {trackingMode === 'hydration' && (
             <View style={styles.inputColumn}>
               <View style={styles.columnHeader}>
                 <Ionicons name="water" size={20} color="#4ECDC4" />
@@ -1000,6 +810,7 @@ export default function DetailsDay () {
                 </View>
               </View>
             </View>
+            )}
           </View>
 
           {/* Search Results Section */}
