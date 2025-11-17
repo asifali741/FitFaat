@@ -1,7 +1,7 @@
 import { useTheme } from '@/contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { authApi } from '../../utils/auth/authApi';
@@ -21,6 +21,13 @@ export default function Signup() {
     password: '',
     confirmPassword: ''
   });
+  const scrollRef = useRef<ScrollView>(null);
+  
+  const emailRef = useRef<TextInput>(null);
+  const usernameRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
+  const confirmPasswordRef = useRef<TextInput>(null);
+  
   const router = useRouter();
   const { colors, isDarkMode } = useTheme();
   const styles = getStyles(colors, isDarkMode);
@@ -140,9 +147,13 @@ export default function Signup() {
         style={styles.keyboardView}
       >
         <ScrollView 
+          ref={scrollRef}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          scrollEnabled={false}
+          nestedScrollEnabled={false}
+          scrollEventThrottle={16}
         >
           {/* Decorative Header */}
           <View style={styles.decorativeHeader}>
@@ -192,6 +203,7 @@ export default function Signup() {
                   style={styles.inputIcon}
                 />
                 <TextInput
+                  ref={emailRef}
                   style={styles.input}
                   placeholder="your@email.com"
                   placeholderTextColor={colors.textLight}
@@ -200,11 +212,12 @@ export default function Signup() {
                     setEmail(text);
                     setErrors(prev => ({ ...prev, email: '' }));
                   }}
-                  onFocus={() => setFocusedField('email')}
-                  onBlur={() => setFocusedField(null)}
+                  onSubmitEditing={() => usernameRef.current?.focus()}
                   autoCapitalize="none"
                   keyboardType="email-address"
                   editable={!isLoading}
+                  returnKeyType="next"
+                  blurOnSubmit={false}
                 />
               </View>
               {errors.email && (
@@ -230,6 +243,7 @@ export default function Signup() {
                   style={styles.inputIcon}
                 />
                 <TextInput
+                  ref={usernameRef}
                   style={styles.input}
                   placeholder="Choose a username"
                   placeholderTextColor={colors.textLight}
@@ -238,10 +252,11 @@ export default function Signup() {
                     setUsername(text);
                     setErrors(prev => ({ ...prev, username: '' }));
                   }}
-                  onFocus={() => setFocusedField('username')}
-                  onBlur={() => setFocusedField(null)}
+                  onSubmitEditing={() => passwordRef.current?.focus()}
                   autoCapitalize="none"
                   editable={!isLoading}
+                  returnKeyType="next"
+                  blurOnSubmit={false}
                 />
               </View>
               {errors.username && (
@@ -267,6 +282,7 @@ export default function Signup() {
                   style={styles.inputIcon}
                 />
                 <TextInput
+                  ref={passwordRef}
                   style={styles.input}
                   placeholder="••••••••"
                   placeholderTextColor={colors.textLight}
@@ -275,10 +291,11 @@ export default function Signup() {
                     setPassword(text);
                     setErrors(prev => ({ ...prev, password: '' }));
                   }}
-                  onFocus={() => setFocusedField('password')}
-                  onBlur={() => setFocusedField(null)}
+                  onSubmitEditing={() => confirmPasswordRef.current?.focus()}
                   secureTextEntry={!showPassword}
                   editable={!isLoading}
+                  returnKeyType="next"
+                  blurOnSubmit={false}
                 />
                 <TouchableOpacity 
                   onPress={() => setShowPassword(!showPassword)}
@@ -314,6 +331,7 @@ export default function Signup() {
                   style={styles.inputIcon}
                 />
                 <TextInput
+                  ref={confirmPasswordRef}
                   style={styles.input}
                   placeholder="••••••••"
                   placeholderTextColor={colors.textLight}
@@ -322,10 +340,10 @@ export default function Signup() {
                     setConfirmPassword(text);
                     setErrors(prev => ({ ...prev, confirmPassword: '' }));
                   }}
-                  onFocus={() => setFocusedField('confirmPassword')}
-                  onBlur={() => setFocusedField(null)}
                   secureTextEntry={!showConfirmPassword}
                   editable={!isLoading}
+                  returnKeyType="done"
+                  blurOnSubmit={true}
                 />
                 <TouchableOpacity 
                   onPress={() => setShowConfirmPassword(!showConfirmPassword)}
