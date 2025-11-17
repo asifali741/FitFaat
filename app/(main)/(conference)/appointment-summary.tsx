@@ -133,22 +133,11 @@ export default function AppointmentSummaryScreen() {
             <View style={styles.summaryTextContainer}>
               <Text style={styles.summaryLabel}>Date</Text>
               <Text style={styles.summaryValue}>
-                {date && typeof date === 'string' ? (
-                  (() => {
-                    try {
-                      const parsedDate = new Date(date);
-                      return isNaN(parsedDate.getTime()) 
-                        ? date 
-                        : parsedDate.toLocaleDateString("en-GB", {
-                            day: "2-digit",
-                            month: "long",
-                            year: "numeric"
-                          });
-                    } catch (error) {
-                      return date;
-                    }
-                  })()
-                ) : 'N/A'}
+                {new Date(date).toLocaleDateString("en-GB", {
+                  day: "2-digit",
+                  month: "long",
+                  year: "numeric"
+                })}
               </Text>
             </View>
           </View>

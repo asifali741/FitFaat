@@ -13,7 +13,7 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { DrawerFonts } from "../app/(main)/(settings)/_ui_elements";
+import { DrawerFonts } from "../app/(main)/(settings)/ui_elements";
 type DrawerSceneWrapperProps = DrawerContentComponentProps;
 const userName = 'NAME' // fetch from Authentication Token
 export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {

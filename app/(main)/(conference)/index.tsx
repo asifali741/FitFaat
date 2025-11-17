@@ -3,7 +3,7 @@ import { useAppointments } from "@/contexts/AppointmentContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useEffect } from "react";
+import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -11,7 +11,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function ConferenceScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-  const { appointments } = useAppointments();
   const styles = getStyles(colors);
 
   useEffect(() => {
@@ -33,6 +32,9 @@ export default function ConferenceScreen() {
     <SafeAreaView style={styles.container}>
       <AppHeader 
         title="Video Conference"
+        showStepIndicator={true}
+        currentStep={1}
+        totalSteps={3}
         showStepIndicator={true}
         currentStep={1}
         totalSteps={3}
@@ -175,7 +177,18 @@ const getStyles = (colors: any) => StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: wp(4),
     paddingBottom: hp(3),
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: wp(4),
+    paddingBottom: hp(3),
   },
+  scheduleButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: Math.min(hp(2.2), wp(5.5)),
+    paddingHorizontal: wp(6),
+    borderRadius: 25,
+    alignItems: "center",
+    justifyContent: "center",
   scheduleButton: {
     backgroundColor: colors.primary,
     paddingVertical: Math.min(hp(2.2), wp(5.5)),
@@ -187,8 +200,11 @@ const getStyles = (colors: any) => StyleSheet.create({
     shadowOffset: {
       width: 0,
       height: 3,
+      height: 3,
     },
     shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 6,
     shadowRadius: 6,
     elevation: 6,
   },

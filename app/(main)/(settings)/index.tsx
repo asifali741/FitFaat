@@ -54,7 +54,11 @@ export default function Settings() {
         break;
       
       case "Workout Preferences":
-        router.push("/(exercises)/workout");
+        Alert.alert(
+          "Workout Preferences",
+          "Customize your workout experience including difficulty levels, exercise types, and scheduling.",
+          [{ text: "OK" }]
+        );
         break;
       
       case "Diet Preferences":

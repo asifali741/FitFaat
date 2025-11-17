@@ -126,8 +126,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: HEADER_PADDING_HORIZONTAL,
-    paddingVertical: HEADER_PADDING_VERTICAL,
+    paddingHorizontal: wp(5),
+    paddingVertical: hp(2),
   },
   menuButton: {
     padding: 8,
