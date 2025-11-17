@@ -1,18 +1,14 @@
 import { DrawerSceneWrapper } from "@/components/CustomDrawerLayout";
-<<<<<<< HEAD
 import { AppointmentProvider } from "@/contexts/AppointmentContext";
 import { ChatbotStorageProvider } from "@/contexts/ChatbotStorage";
 import { NewsProvider } from "@/contexts/NewsContext";
 import { authApi } from "@/utils/auth/authApi";
-=======
-import { useAuth } from "@clerk/clerk-expo";
->>>>>>> parent of 1220d0d... Merge pull request #5 from asifali741/merge/asif-into-main
 import { DrawerContentComponentProps } from "@react-navigation/drawer";
 import { useRouter } from "expo-router";
 import { Drawer } from "expo-router/drawer";
 import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { colorsSheet as color } from "./(settings)/ui_elements";
+import { colorsSheet as color } from "./(settings)/_ui_elements";
 type DrawerSceneWrapperProps = DrawerContentComponentProps;
 
 export default function MainLayout() {
@@ -35,12 +31,9 @@ export default function MainLayout() {
       checkAuth();
     }, []);
     return <GestureHandlerRootView style={{ flex: 1 }}>
-<<<<<<< HEAD
   <AppointmentProvider>
   <ChatbotStorageProvider>
   <NewsProvider>
-=======
->>>>>>> parent of 1220d0d... Merge pull request #5 from asifali741/merge/asif-into-main
   <Drawer
     detachInactiveScreens={true}
     drawerContent={(props) => <DrawerSceneWrapper {...props} />}
@@ -84,12 +77,9 @@ export default function MainLayout() {
     <Drawer.Screen name="(exercises)/workout" options={{ title: "Workouts 👑" }} />
     <Drawer.Screen name="(doctor-portal)" options={{ title: "Join as Doctor 👨‍⚕️" }} />
   </Drawer>
-<<<<<<< HEAD
   </NewsProvider>
   </ChatbotStorageProvider>
   </AppointmentProvider>
-=======
->>>>>>> parent of 1220d0d... Merge pull request #5 from asifali741/merge/asif-into-main
 </GestureHandlerRootView>
 
 }

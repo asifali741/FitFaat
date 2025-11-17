@@ -1,29 +1,17 @@
-<<<<<<< HEAD
 import AppHeader from "@/components/AppHeader";
 import { useAppointments } from "@/contexts/AppointmentContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-=======
->>>>>>> parent of 1220d0d... Merge pull request #5 from asifali741/merge/asif-into-main
-import React from "react";
+import React, { useEffect } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-<<<<<<< HEAD
-=======
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
-import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
-import { colorsSheet } from "../(settings)/ui_elements";
-import { useNavigation } from "@react-navigation/native";
-import { DrawerActions } from "@react-navigation/native";
->>>>>>> parent of 1220d0d... Merge pull request #5 from asifali741/merge/asif-into-main
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ConferenceScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-<<<<<<< HEAD
+  const { appointments } = useAppointments();
   const styles = getStyles(colors);
 
   useEffect(() => {
@@ -48,31 +36,7 @@ export default function ConferenceScreen() {
         showStepIndicator={true}
         currentStep={1}
         totalSteps={3}
-        showStepIndicator={true}
-        currentStep={1}
-        totalSteps={3}
       />
-=======
-  const navigation = useNavigation();
-
-  const openDrawer = () => {
-    navigation.dispatch(DrawerActions.openDrawer());
-  };
-
-  return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.menuButton}
-          onPress={openDrawer}
-        >
-          <Ionicons name="menu" size={24} color={colorsSheet.textOnPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Video Conference</Text>
-        <View style={styles.spacer} />
-      </View>
->>>>>>> parent of 1220d0d... Merge pull request #5 from asifali741/merge/asif-into-main
 
       {/* Main Content */}
       <View style={styles.content}>
@@ -106,14 +70,10 @@ export default function ConferenceScreen() {
 
         {/* Action Button */}
         <View style={styles.buttonContainer}>
-<<<<<<< HEAD
           <TouchableOpacity 
             style={styles.scheduleButton}
             onPress={() => router.push('/(main)/(conference)/doctor-time-date-selection')}
           >
-=======
-          <TouchableOpacity style={styles.scheduleButton}>
->>>>>>> parent of 1220d0d... Merge pull request #5 from asifali741/merge/asif-into-main
             <Text style={styles.scheduleButtonText}>Schedule Appointment 📅</Text>
           </TouchableOpacity>
 
@@ -215,18 +175,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: wp(4),
     paddingBottom: hp(3),
-    flex: 1,
-    justifyContent: "center",
-    paddingHorizontal: wp(4),
-    paddingBottom: hp(3),
   },
-  scheduleButton: {
-    backgroundColor: colors.primary,
-    paddingVertical: Math.min(hp(2.2), wp(5.5)),
-    paddingHorizontal: wp(6),
-    borderRadius: 25,
-    alignItems: "center",
-    justifyContent: "center",
   scheduleButton: {
     backgroundColor: colors.primary,
     paddingVertical: Math.min(hp(2.2), wp(5.5)),
@@ -238,11 +187,8 @@ const getStyles = (colors: any) => StyleSheet.create({
     shadowOffset: {
       width: 0,
       height: 3,
-      height: 3,
     },
     shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 6,
     shadowRadius: 6,
     elevation: 6,
   },

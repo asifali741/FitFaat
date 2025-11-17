@@ -34,12 +34,8 @@ const bodyPartMap = {
 };
 
 export default function ExercisesScreen() {
-<<<<<<< HEAD
   const { colors } = useTheme();
   const [exercises, setExercises] = useState<any[]>([]);
-=======
-  const [exercises, setExercises] = useState([]);
->>>>>>> parent of 1220d0d... Merge pull request #5 from asifali741/merge/asif-into-main
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const navigation = useNavigation();
@@ -60,7 +56,7 @@ export default function ExercisesScreen() {
     setLoading(true);
     console.log("Fetching exercises for:", bodyPartName);
     
-    const apiBodyPart = bodyPartMap[bodyPartName];
+    const apiBodyPart = (bodyPartMap as any)[bodyPartName];
     if (!apiBodyPart) {
       console.log("Invalid body part:", bodyPartName);
       setExercises(dummyData); // Use dummy data as fallback
