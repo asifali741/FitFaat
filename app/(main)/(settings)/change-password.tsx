@@ -1,7 +1,10 @@
 import AppHeader from "@/components/AppHeader";
+import { useTheme } from "@/contexts/ThemeContext";
 import { useUser } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import Constants from "expo-constants";
+import * as SecureStore from 'expo-secure-store';
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -15,11 +18,24 @@ import {
 } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useTheme } from "@/contexts/ThemeContext";
+
+const ENV = Constants.expoConfig?.extra;
+
+const getAPIURL = () => {
+  const envUrl = ENV?.EXPO_PUBLIC_BACKEND_API_URL;
+  if (envUrl) {
+    return envUrl.replace(/\/api\/?$/, '');
+  }
+  const defaultHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
+  return `http://${defaultHost}:5001`;
+};
+
+const API_URL = getAPIURL();
 
 export default function ChangePassword() {
   const { colors } = useTheme();
-  const { user } = useUser();
+  const { user, isLoaded } = useUser();
+  const [isClerkUser, setIsClerkUser] = useState(false);
   
   const [formData, setFormData] = useState({
     currentPassword: "",
@@ -41,6 +57,14 @@ export default function ChangePassword() {
   
   const [isChanging, setIsChanging] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
+
+  useEffect(() => {
+    if (user && isLoaded) {
+      setIsClerkUser(true);
+    } else {
+      setIsClerkUser(false);
+    }
+  }, [user, isLoaded]);
 
   const checkPasswordStrength = (password: string) => {
     let strength = 0;
@@ -86,27 +110,69 @@ export default function ChangePassword() {
     
     setIsChanging(true);
     try {
-      // In a real app, you would call Clerk's password update API
-      // await user?.updatePassword({
-      //   currentPassword: formData.currentPassword,
-      //   newPassword: formData.newPassword,
-      // });
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      Alert.alert(
-        "Success", 
-        "Your password has been changed successfully. Please sign in with your new password.",
-        [{ text: "OK", onPress: () => {
-          // Reset form
-          setFormData({
-            currentPassword: "",
-            newPassword: "",
-            confirmPassword: "",
-          });
-        }}]
-      );
+      if (isClerkUser) {
+        // Clerk user - use Clerk's API
+        await user?.updatePassword({
+          currentPassword: formData.currentPassword,
+          newPassword: formData.newPassword,
+        });
+        
+        Alert.alert(
+          "Success", 
+          "Your password has been changed successfully.",
+          [{ text: "OK", onPress: () => {
+            setFormData({
+              currentPassword: "",
+              newPassword: "",
+              confirmPassword: "",
+            });
+          }}]
+        );
+      } else {
+        // Backend email user - use backend API
+        const token = await SecureStore.getItemAsync('fitfaat_auth_token');
+        
+        if (!token) {
+          Alert.alert("Error", "Authentication required. Please log in again.");
+          return;
+        }
+
+        const response = await fetch(`${API_URL}/api/user/change-password`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            currentPassword: formData.currentPassword,
+            newPassword: formData.newPassword,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          Alert.alert(
+            "Success", 
+            "Your password has been changed successfully. Please log in with your new password.",
+            [{ 
+              text: "OK", 
+              onPress: async () => {
+                // Clear stored credentials and redirect to login
+                await SecureStore.deleteItemAsync('fitfaat_auth_token');
+                await SecureStore.deleteItemAsync('fitfaat_user');
+                setFormData({
+                  currentPassword: "",
+                  newPassword: "",
+                  confirmPassword: "",
+                });
+              }
+            }]
+          );
+        } else {
+          Alert.alert("Error", data.message || "Failed to change password");
+        }
+      }
     } catch (error: any) {
       Alert.alert("Error", error.message || "Failed to change password");
     } finally {
@@ -144,11 +210,27 @@ export default function ChangePassword() {
           style={{ flex: 1 }}
         >
           <ScrollView showsVerticalScrollIndicator={false}>
+            {/* Authentication Method Badge */}
+            <View style={styles.authBadgeContainer}>
+              <View style={[styles.authBadge, { backgroundColor: isClerkUser ? colors.primary : colors.secondary }]}>
+                <Ionicons 
+                  name={isClerkUser ? "logo-google" : "mail"} 
+                  size={16} 
+                  color="white" 
+                />
+                <Text style={styles.authBadgeText}>
+                  {isClerkUser ? "Clerk Authentication" : "Email Authentication"}
+                </Text>
+              </View>
+            </View>
+
             {/* Security Notice */}
             <View style={styles.securityNotice}>
-              <Ionicons name="shield-checkmark" size={24} color={colors.primary} />
+              <Ionicons name="shield-checkmark" size={26} color={colors.primary} />
               <Text style={styles.securityText}>
-                For your security, you'll need to sign in again after changing your password
+                {isClerkUser 
+                  ? "For your security, you'll need to sign in again after changing your password"
+                  : "After changing your password, you will be logged out. Please log in with your new password."}
               </Text>
             </View>
 
@@ -363,21 +445,53 @@ const getStyles = (colors: any) => StyleSheet.create({
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
   },
+  authBadgeContainer: {
+    alignItems: 'center',
+    paddingTop: hp(2),
+    paddingBottom: hp(1),
+  },
+  authBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: hp(1),
+    paddingHorizontal: wp(5),
+    borderRadius: hp(3),
+    gap: wp(2),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  authBadgeText: {
+    color: 'white',
+    fontSize: hp(1.6),
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
   securityNotice: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.primarySoft,
+    backgroundColor: colors.primary + '15',
     marginHorizontal: wp(5),
-    marginTop: hp(3),
-    padding: wp(4),
-    borderRadius: hp(1.5),
+    marginTop: hp(2),
+    padding: wp(4.5),
+    borderRadius: hp(2),
+    borderLeftWidth: 4,
+    borderLeftColor: colors.primary,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
   },
   securityText: {
     flex: 1,
     fontSize: hp(1.6),
     color: colors.primary,
     marginLeft: wp(3),
-    lineHeight: hp(2.2),
+    lineHeight: hp(2.4),
+    fontWeight: '600',
   },
   form: {
     marginTop: hp(3),
@@ -387,106 +501,130 @@ const getStyles = (colors: any) => StyleSheet.create({
     marginBottom: hp(2.5),
   },
   label: {
-    fontSize: hp(1.6),
-    fontWeight: '600',
+    fontSize: hp(1.7),
+    fontWeight: '700',
     color: colors.textPrimary,
     marginBottom: hp(1),
+    letterSpacing: 0.3,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'white',
-    borderRadius: hp(1.5),
-    borderWidth: 1,
-    borderColor: colors.primary + '20',
+    borderRadius: hp(1.8),
+    borderWidth: 1.5,
+    borderColor: colors.primary + '30',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   input: {
     flex: 1,
     paddingHorizontal: wp(4),
-    paddingVertical: hp(1.8),
+    paddingVertical: hp(2),
     fontSize: hp(1.8),
     color: colors.textPrimary,
+    fontWeight: '600',
   },
   eyeButton: {
-    padding: wp(3),
+    padding: wp(3.5),
   },
   errorText: {
-    fontSize: hp(1.4),
+    fontSize: hp(1.5),
     color: colors.error,
-    marginTop: hp(0.5),
+    marginTop: hp(0.7),
     marginLeft: wp(2),
+    fontWeight: '600',
   },
   strengthContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: hp(1),
+    marginTop: hp(1.2),
   },
   strengthBars: {
     flexDirection: 'row',
     flex: 1,
-    gap: wp(1),
+    gap: wp(1.5),
   },
   strengthBar: {
     flex: 1,
-    height: hp(0.5),
+    height: hp(0.7),
     backgroundColor: colors.textSecondary + '30',
-    borderRadius: hp(0.25),
+    borderRadius: hp(0.35),
   },
   strengthText: {
-    fontSize: hp(1.4),
-    fontWeight: '600',
-    marginLeft: wp(2),
+    fontSize: hp(1.5),
+    fontWeight: '700',
+    marginLeft: wp(3),
+    letterSpacing: 0.5,
   },
   requirements: {
     marginHorizontal: wp(5),
-    marginTop: hp(2),
+    marginTop: hp(2.5),
     backgroundColor: 'white',
-    padding: wp(4),
-    borderRadius: hp(1.5),
+    padding: wp(5),
+    borderRadius: hp(2),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
   },
   requirementsTitle: {
-    fontSize: hp(1.6),
-    fontWeight: '600',
+    fontSize: hp(1.8),
+    fontWeight: '800',
     color: colors.textPrimary,
-    marginBottom: hp(1.5),
+    marginBottom: hp(2),
+    letterSpacing: 0.3,
   },
   requirementItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: hp(1),
+    marginBottom: hp(1.2),
   },
   requirementText: {
-    fontSize: hp(1.4),
+    fontSize: hp(1.5),
     color: colors.textSecondary,
-    marginLeft: wp(2),
+    marginLeft: wp(2.5),
+    fontWeight: '500',
   },
   requirementMet: {
     color: colors.success,
-    fontWeight: '500',
+    fontWeight: '700',
   },
   changeButton: {
     backgroundColor: colors.primary,
     marginHorizontal: wp(5),
-    marginTop: hp(3),
-    paddingVertical: hp(2),
-    borderRadius: hp(1.5),
+    marginTop: hp(3.5),
+    paddingVertical: hp(2.2),
+    borderRadius: hp(2),
     alignItems: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 5,
   },
   changeButtonDisabled: {
     opacity: 0.6,
   },
   changeButtonText: {
     color: 'white',
-    fontSize: hp(1.8),
-    fontWeight: '600',
+    fontSize: hp(1.9),
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   forgotButton: {
     alignItems: 'center',
-    marginTop: hp(2),
+    marginTop: hp(2.5),
+    paddingVertical: hp(1),
   },
   forgotButtonText: {
     fontSize: hp(1.6),
     color: colors.primary,
-    fontWeight: '500',
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
 });
