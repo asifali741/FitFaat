@@ -3,8 +3,10 @@ import { useCustomOnboarding } from "@/hooks/useCustomOnboarding";
 import { Ionicons } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
 import React, { useState } from "react";
-import { ActivityIndicator, Alert, Image, Text, TextInput, TouchableOpacity, View } from "react-native";
-import { heightPercentageToDP as hp } from "react-native-responsive-screen";
+import { ActivityIndicator, Alert, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
+import { SafeAreaView } from "react-native-safe-area-context";
+
 /**
  * INFORMATION FORM SCREEN!!!!
  */
@@ -13,22 +15,22 @@ const data = [
     id: 1,
     name: "Weight Loss",
     icon: "flame-outline",
-    color: "red",
-    description: "Burn fat and achieve a lean",
+    color: "#FF6B6B",
+    description: "Burn fat and achieve a lean physique",
   },
   {
     id: 2,
     name: "Muscle Gain",
     icon: "barbell-outline",
-    color: "black",
-    description: "Build muscle strength with effective training and nutrition",
+    color: "#4ECDC4",
+    description: "Build muscle strength and power",
   },
   {
     id: 3,
     name: "Weight Gain",
     icon: "restaurant-outline",
-    color: "green",
-    description: "Gain weight through balanced diet, exercise.",
+    color: "#FFD93D",
+    description: "Gain healthy weight efficiently",
   },
 ];
 
@@ -172,195 +174,253 @@ export default function Index() {
   if (!fontsLoaded) {
     return null;
   }
+  
   return (
-    <View style={dataScreenStyles.container}>
-      <View style={dataScreenStyles.headingandlogo}>
-        <Text style={dataScreenStyles.mainHeading}>FitFaat</Text>
-        <Image
-          source={require("../../assets/images/logo.png")}
-          style={dataScreenStyles.logoImage}
-        ></Image>
-      </View>
-      <View style={dataScreenStyles.mainBox}>
-        <Text style={dataScreenStyles.personalizedText}>
-          Enter your information to create a personalized meal plan
-        </Text>
-        <Text style={dataScreenStyles.subHeading}>Name *</Text>
-        <TextInput
-          placeholderTextColor={"#999"}
-          placeholder="Enter your full name"
-          style={dataScreenStyles.mainTextInput}
-          value={name}
-          onChangeText={setName}
-        />
-        <View style={dataScreenStyles.subContainer}>
-          <View>
-            {/* height */}
-            <Text style={dataScreenStyles.subsubHeading}>Height(ft) *</Text>
-            <TextInput
-              style={dataScreenStyles.miniTextInput}
-              placeholder="e.g. 5.66"
-              keyboardType="numeric"
-              maxLength={4}
-              value={height}
-              onChangeText={handleHeightChange}
-            />
-          </View>
-          <View>
-            {/* weight */}
-            <Text style={dataScreenStyles.subsubHeading}>Weight(kg) *</Text>
-            <TextInput
-              style={dataScreenStyles.miniTextInput}
-              placeholder="e.g. 77.4"
-              keyboardType="numeric"
-              maxLength={5}
-              value={weight}
-              onChangeText={setWeight}
-            />
-          </View>
-        </View>
-        <View>
-          <Text style={dataScreenStyles.genderHeading}>Gender *</Text>
-          <View style={dataScreenStyles.subContainer}>
-            <TouchableOpacity 
-              style={[
-                dataScreenStyles.genderSelection,
-                selectedGender === 'male' && { backgroundColor: '#e3f2fd', borderColor: '#2563eb', borderWidth: 2 }
-              ]}
-              onPress={() => setSelectedGender('male')}
-            >
-              <Ionicons name="male-outline" size={32} color="#2563eb" />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[
-                dataScreenStyles.genderSelection,
-                selectedGender === 'female' && { backgroundColor: '#fce4ec', borderColor: '#db2777', borderWidth: 2 }
-              ]}
-              onPress={() => setSelectedGender('female')}
-            >
-              <Ionicons name="female-outline" size={32} color="#db2777" />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[
-                dataScreenStyles.genderSelection,
-                selectedGender === 'other' && { backgroundColor: '#f3e5f5', borderColor: 'purple', borderWidth: 2 }
-              ]}
-              onPress={() => setSelectedGender('other')}
-            >
-              <Ionicons name="male-female-outline" size={32} color="purple" />
-            </TouchableOpacity>
-          </View>
-        </View>
-        <View>
-          <Text style={dataScreenStyles.subHeading}>Date of Birth *</Text>
-          <View style={dataScreenStyles.dob}>
-            <TextInput
-              style={dataScreenStyles.dobInput}
-              placeholder="DD"
-              keyboardType="numeric"
-              maxLength={2}
-              value={birthDate.day}
-              onChangeText={(text) => {
-                // clamp to numeric
-                const digits = text.replace(/\D/g, '').slice(0,2);
-                const m = parseInt(birthDate.month || '0', 10) || 0;
-                const y = parseInt(birthDate.year || String(new Date().getFullYear()), 10) || new Date().getFullYear();
-                const maxDay = m >=1 && m <=12 ? new Date(y, m, 0).getDate() : 31;
-                let val = parseInt(digits || '0', 10);
-                if (val > maxDay) val = maxDay;
-                setBirthDate(prev => ({ ...prev, day: val ? String(val) : '' }));
-              }}
-            />
-            <Text style={dataScreenStyles.dobText}>:</Text>
-            <TextInput
-              style={dataScreenStyles.dobInput}
-              placeholder="MM"
-              keyboardType="numeric"
-              maxLength={2}
-              value={birthDate.month}
-              onChangeText={(text) => {
-                const digits = text.replace(/\D/g, '').slice(0,2);
-                let val = parseInt(digits || '0', 10);
-                if (val > 12) val = 12;
-                setBirthDate(prev => ({ ...prev, month: val ? String(val) : '' }));
-              }}
-            />
-            <Text style={dataScreenStyles.dobText}>:</Text>
-            <TextInput
-              style={dataScreenStyles.dobInput}
-              placeholder="YYYY"
-              keyboardType="numeric"
-              maxLength={4}
-              value={birthDate.year}
-              onChangeText={(text) => {
-                const digits = text.replace(/\D/g, '').slice(0,4);
-                setBirthDate(prev => ({ ...prev, year: digits }));
-              }}
-            />
-          </View>
-        </View>
-        <View>
-          <Text style={dataScreenStyles.subHeading}>Age *</Text>
-          <TextInput
-            style={dataScreenStyles.mainTextInput}
-            placeholder="Enter your age"
-            keyboardType="numeric"
-            maxLength={3}
-            value={age}
-            onChangeText={(text) => setAge(text.replace(/\D/g, '').slice(0,3))}
+    <SafeAreaView style={dataScreenStyles.container}>
+      <ScrollView 
+        contentContainerStyle={{ paddingBottom: hp(3) }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Header */}
+        <View style={dataScreenStyles.headingandlogo}>
+          <Text style={dataScreenStyles.mainHeading}>FitFaat</Text>
+          <Image
+            source={require("../../assets/images/logo.png")}
+            style={dataScreenStyles.logoImage}
           />
         </View>
-        <Text style={dataScreenStyles.subHeading}>What&apos;s your Goal? *</Text>
-        <View style={dataScreenStyles.mappingCol}>
-          {data.map((item) => (
-            <TouchableOpacity 
-              key={item.id} 
-              style={[
-                dataScreenStyles.mapping,
-                selectedGoal === item.id && { 
-                  backgroundColor: '#f0f8ff', 
-                  borderColor: item.color, 
-                  borderWidth: 2 
-                }
-              ]}
-              onPress={() => setSelectedGoal(item.id)}
-            >
-              {/* Icon */}
-              <Ionicons
-                name={item.icon as keyof typeof Ionicons.glyphMap}
-                size={26}
-                color={item.color}
-                style={{ marginRight: hp(1) }}
-              />
 
-              {/* Text content */}
-              <View style={{ flexDirection: "column" }}>
-                <Text style={[
-                  dataScreenStyles.mappingHeading,
-                  selectedGoal === item.id && { fontWeight: 'bold' }
-                ]}>{item.name}</Text>
-                <Text style={dataScreenStyles.mappingHeadingName}>
-                  {item.description}
+        {/* Main Form Container */}
+        <View style={dataScreenStyles.mainBox}>
+          <Text style={dataScreenStyles.personalizedText}>
+            🎯 Create Your Personalized Meal Plan
+          </Text>
+
+          {/* Name Field */}
+          <View>
+            <Text style={dataScreenStyles.subHeading}>Full Name *</Text>
+            <TextInput
+              placeholderTextColor={"#A0AEC0"}
+              placeholder="Enter your full name"
+              style={dataScreenStyles.mainTextInput}
+              value={name}
+              onChangeText={setName}
+            />
+          </View>
+
+          {/* Height & Weight Row */}
+          <View style={dataScreenStyles.subContainer}>
+            <View style={{ flex: 1 }}>
+              <Text style={dataScreenStyles.subsubHeading}>Height (ft) *</Text>
+              <TextInput
+                style={dataScreenStyles.miniTextInput}
+                placeholder="5.66"
+                keyboardType="numeric"
+                maxLength={4}
+                value={height}
+                onChangeText={handleHeightChange}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={dataScreenStyles.subsubHeading}>Weight (kg) *</Text>
+              <TextInput
+                style={dataScreenStyles.miniTextInput}
+                placeholder="77.4"
+                keyboardType="numeric"
+                maxLength={5}
+                value={weight}
+                onChangeText={setWeight}
+              />
+            </View>
+          </View>
+
+          {/* Gender Selection */}
+          <View>
+            <Text style={dataScreenStyles.genderHeading}>Gender *</Text>
+            <View style={dataScreenStyles.subContainer}>
+              <TouchableOpacity 
+                style={[
+                  dataScreenStyles.genderSelection,
+                  selectedGender === 'male' && { 
+                    backgroundColor: '#E3F2FD', 
+                    borderColor: '#2563EB', 
+                    borderWidth: 2 
+                  }
+                ]}
+                onPress={() => setSelectedGender('male')}
+              >
+                <Ionicons 
+                  name="male-outline" 
+                  size={hp(3.5)} 
+                  color={selectedGender === 'male' ? '#2563EB' : '#A0AEC0'} 
+                />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[
+                  dataScreenStyles.genderSelection,
+                  selectedGender === 'female' && { 
+                    backgroundColor: '#FCE4EC', 
+                    borderColor: '#DB2777', 
+                    borderWidth: 2 
+                  }
+                ]}
+                onPress={() => setSelectedGender('female')}
+              >
+                <Ionicons 
+                  name="female-outline" 
+                  size={hp(3.5)} 
+                  color={selectedGender === 'female' ? '#DB2777' : '#A0AEC0'} 
+                />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[
+                  dataScreenStyles.genderSelection,
+                  selectedGender === 'other' && { 
+                    backgroundColor: '#F3E5F5', 
+                    borderColor: '#9C27B0', 
+                    borderWidth: 2 
+                  }
+                ]}
+                onPress={() => setSelectedGender('other')}
+              >
+                <Ionicons 
+                  name="male-female-outline" 
+                  size={hp(3.5)} 
+                  color={selectedGender === 'other' ? '#9C27B0' : '#A0AEC0'} 
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Date of Birth */}
+          <View>
+            <Text style={dataScreenStyles.subHeading}>Date of Birth *</Text>
+            <View style={dataScreenStyles.dob}>
+              <TextInput
+                style={dataScreenStyles.dobInput}
+                placeholder="DD"
+                keyboardType="numeric"
+                maxLength={2}
+                value={birthDate.day}
+                onChangeText={(text) => {
+                  const digits = text.replace(/\D/g, '').slice(0,2);
+                  const m = parseInt(birthDate.month || '0', 10) || 0;
+                  const y = parseInt(birthDate.year || String(new Date().getFullYear()), 10) || new Date().getFullYear();
+                  const maxDay = m >=1 && m <=12 ? new Date(y, m, 0).getDate() : 31;
+                  let val = parseInt(digits || '0', 10);
+                  if (val > maxDay) val = maxDay;
+                  setBirthDate(prev => ({ ...prev, day: val ? String(val) : '' }));
+                }}
+              />
+              <Text style={dataScreenStyles.dobText}>/</Text>
+              <TextInput
+                style={dataScreenStyles.dobInput}
+                placeholder="MM"
+                keyboardType="numeric"
+                maxLength={2}
+                value={birthDate.month}
+                onChangeText={(text) => {
+                  const digits = text.replace(/\D/g, '').slice(0,2);
+                  let val = parseInt(digits || '0', 10);
+                  if (val > 12) val = 12;
+                  setBirthDate(prev => ({ ...prev, month: val ? String(val) : '' }));
+                }}
+              />
+              <Text style={dataScreenStyles.dobText}>/</Text>
+              <TextInput
+                style={dataScreenStyles.dobInput}
+                placeholder="YYYY"
+                keyboardType="numeric"
+                maxLength={4}
+                value={birthDate.year}
+                onChangeText={(text) => {
+                  const digits = text.replace(/\D/g, '').slice(0,4);
+                  setBirthDate(prev => ({ ...prev, year: digits }));
+                }}
+              />
+            </View>
+          </View>
+
+          {/* Age */}
+          <View>
+            <Text style={dataScreenStyles.subHeading}>Age *</Text>
+            <TextInput
+              style={dataScreenStyles.mainTextInput}
+              placeholder="Enter your age"
+              keyboardType="numeric"
+              maxLength={3}
+              value={age}
+              onChangeText={(text) => setAge(text.replace(/\D/g, '').slice(0,3))}
+            />
+          </View>
+
+          {/* Fitness Goal Selection */}
+          <Text style={dataScreenStyles.subHeading}>What's Your Goal? *</Text>
+          <View style={dataScreenStyles.mappingCol}>
+            {data.map((item) => (
+              <TouchableOpacity 
+                key={item.id} 
+                style={[
+                  dataScreenStyles.mapping,
+                  selectedGoal === item.id && { 
+                    backgroundColor: '#F0F8FF', 
+                    borderColor: item.color, 
+                    borderWidth: 2 
+                  }
+                ]}
+                onPress={() => setSelectedGoal(item.id)}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name={item.icon as keyof typeof Ionicons.glyphMap}
+                  size={hp(3)}
+                  color={item.color}
+                  style={{ marginRight: hp(1.2) }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={[
+                    dataScreenStyles.mappingHeading,
+                    { color: item.color }
+                  ]}>
+                    {item.name}
+                  </Text>
+                  <Text style={dataScreenStyles.mappingHeadingName}>
+                    {item.description}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Submit Button */}
+          <TouchableOpacity
+            style={[
+              dataScreenStyles.generateButton,
+              isLoading && { opacity: 0.7 }
+            ]}
+            onPress={handleFormSubmit}
+            disabled={isLoading}
+            activeOpacity={0.85}
+          >
+            {isLoading ? (
+              <>
+                <ActivityIndicator color="white" size="small" />
+                <Text style={{ color: "white", fontSize: hp(1.8), marginLeft: wp(2), fontWeight: "600" }}>
+                  Creating Your Plan...
                 </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+              </>
+            ) : (
+              <>
+                <Text style={{ color: "white", fontSize: hp(1.8), fontWeight: "700" }}>
+                  Complete Setup
+                </Text>
+                <Ionicons name="arrow-forward" size={hp(2.2)} color="white" />
+              </>
+            )}
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          style={[
-            dataScreenStyles.generateButton,
-            isLoading && { opacity: 0.7 }
-          ]}
-          onPress={handleFormSubmit}
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <ActivityIndicator color="white" size="small" />
-          ) : (
-            <Text style={{ color: "white", fontSize: hp(2.2) }}>Complete Setup</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-    </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
