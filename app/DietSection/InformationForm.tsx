@@ -2,7 +2,7 @@ import { dataScreenStyles } from "@/components/dataScreenStyles";
 import { useCustomOnboarding } from "@/hooks/useCustomOnboarding";
 import { Ionicons } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
