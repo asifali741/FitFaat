@@ -36,6 +36,44 @@ api.interceptors.request.use(async (config) => {
 });
 
 export const authApi = {
+  // Send OTP to email
+  sendOTP: async (email: string) => {
+    try {
+      console.log('Sending OTP request:', { email });
+
+      const response = await api.post('/auth/send-otp', { email });
+      console.log('OTP sent:', response.data);
+
+      return response.data;
+    } catch (error: any) {
+      console.error('Send OTP error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      throw error;
+    }
+  },
+
+  // Verify OTP
+  verifyOTP: async (email: string, otp: string) => {
+    try {
+      console.log('Verifying OTP:', { email, otp });
+
+      const response = await api.post('/auth/verify-otp', { email, otp });
+      console.log('OTP verified:', response.data);
+
+      return response.data;
+    } catch (error: any) {
+      console.error('Verify OTP error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      throw error;
+    }
+  },
+
   // Register new user
   register: async (userData: { email: string; username: string; password: string }) => {
     try {

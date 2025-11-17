@@ -100,24 +100,24 @@ export default function Signup() {
       }
 
       setIsLoading(true);
-      console.log('Starting registration with:', { email, username });
+      console.log('Starting OTP flow with:', { email, username });
 
-      const response = await authApi.register({
-        email,
-        username,
-        password
-      });
-
-      console.log('Registration response:', response);
+      // Send OTP to email
+      const response = await authApi.sendOTP(email);
 
       if (response.success) {
-        // After successful registration, redirect to onboarding page
-        router.replace("/DietSection");
-      } else {
-        throw new Error(response.message || 'Registration failed');
+        // Navigate to OTP verification screen with user data
+        router.push({
+          pathname: '/(auth)/otp-verification' as any,
+          params: {
+            email,
+            username,
+            password
+          }
+        });
       }
     } catch (error: any) {
-      console.error('Registration error:', error);
+      console.error('Signup error:', error);
       
       if (error.response?.data) {
         // Handle server validation errors
@@ -129,7 +129,7 @@ export default function Signup() {
         } else if (serverError.message?.includes('username')) {
           setErrors(prev => ({ ...prev, username: serverError.message }));
         } else {
-          Alert.alert('Error', serverError.message || 'Registration failed');
+          Alert.alert('Error', serverError.message || 'Failed to send OTP');
         }
       } else {
         // Handle network or other errors
@@ -372,10 +372,10 @@ export default function Signup() {
               activeOpacity={0.8}
             >
               {isLoading ? (
-                <Text style={styles.buttonText}>Creating Account...</Text>
+                <Text style={styles.buttonText}>Sending OTP...</Text>
               ) : (
                 <View style={styles.buttonContent}>
-                  <Text style={styles.buttonText}>Create Account</Text>
+                  <Text style={styles.buttonText}>Send Verification Code</Text>
                   <Ionicons name="arrow-forward" size={20} color="#FFFFFF" style={styles.buttonIcon} />
                 </View>
               )}

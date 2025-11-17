@@ -2,13 +2,134 @@ import express from 'express';
 import { body, validationResult } from 'express-validator';
 import jwt from 'jsonwebtoken';
 import DailyLog from '../models/DailyLog.js';
+import OTP from '../models/OTP.js';
 import User from '../models/User.js';
 import WeeklyTracking from '../models/WeeklyTracking.js';
+import { generateOTP, sendOTPEmail, sendWelcomeEmail } from '../utils/emailService.js';
 
 const router = express.Router();
 
+// @route   POST /api/auth/send-otp
+// @desc    Send OTP to email for verification
+// @access  Public
+router.post(
+  '/send-otp',
+  [
+    body('email')
+      .isEmail()
+      .withMessage('Please include a valid email')
+      .normalizeEmail()
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ 
+          success: false, 
+          message: errors.array()[0].msg 
+        });
+      }
+
+      const { email } = req.body;
+
+      // Check if user already exists with verified email
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email is already registered'
+        });
+      }
+
+      // Generate OTP
+      const otp = generateOTP();
+      console.log('Generated OTP for', email, ':', otp);
+
+      // Delete any existing OTPs for this email
+      await OTP.deleteMany({ email });
+
+      // Save OTP to database
+      await OTP.create({
+        email,
+        otp
+      });
+
+      // Send OTP email
+      await sendOTPEmail(email, otp);
+
+      res.json({
+        success: true,
+        message: 'OTP sent to your email successfully'
+      });
+    } catch (err) {
+      console.error('Send OTP error:', err);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to send OTP. Please try again.'
+      });
+    }
+  }
+);
+
+// @route   POST /api/auth/verify-otp
+// @desc    Verify OTP before registration
+// @access  Public
+router.post(
+  '/verify-otp',
+  [
+    body('email')
+      .isEmail()
+      .withMessage('Please include a valid email')
+      .normalizeEmail(),
+    body('otp')
+      .isLength({ min: 6, max: 6 })
+      .withMessage('OTP must be 6 digits')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ 
+          success: false, 
+          message: errors.array()[0].msg 
+        });
+      }
+
+      const { email, otp } = req.body;
+
+      // Find the most recent OTP for this email
+      const otpRecord = await OTP.findOne({ 
+        email, 
+        otp 
+      }).sort({ createdAt: -1 });
+
+      if (!otpRecord) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid OTP. Please check and try again.'
+        });
+      }
+
+      // Mark OTP as verified
+      otpRecord.verified = true;
+      await otpRecord.save();
+
+      res.json({
+        success: true,
+        message: 'Email verified successfully'
+      });
+    } catch (err) {
+      console.error('Verify OTP error:', err);
+      res.status(500).json({
+        success: false,
+        message: 'Verification failed. Please try again.'
+      });
+    }
+  }
+);
+
 // @route   POST /api/auth/register
-// @desc    Register user
+// @desc    Register user (requires verified OTP)
 // @access  Public
 router.post(
   '/register',
@@ -46,6 +167,19 @@ router.post(
 
       const { email, username, password } = req.body;
       console.log('Parsed registration data:', { email, username });
+
+      // Check if OTP was verified for this email
+      const verifiedOTP = await OTP.findOne({ 
+        email, 
+        verified: true 
+      }).sort({ createdAt: -1 });
+
+      if (!verifiedOTP) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email not verified. Please verify your email with OTP first.'
+        });
+      }
 
       // Check if user exists
       let user = await User.findOne({ email });
@@ -136,6 +270,17 @@ router.post(
       } catch (error) {
         console.error('[signup] Error creating weekly plan:', error.message);
         // Don't fail signup if weekly plan creation fails
+      }
+
+      // Delete all OTPs for this email after successful registration
+      await OTP.deleteMany({ email });
+
+      // Send welcome email
+      try {
+        await sendWelcomeEmail(email, username);
+      } catch (emailError) {
+        console.error('Failed to send welcome email:', emailError);
+        // Don't fail registration if welcome email fails
       }
 
       // Create token
