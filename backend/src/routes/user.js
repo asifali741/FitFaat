@@ -453,4 +453,86 @@ router.get('/meal-history', protect, async (req, res) => {
   }
 });
 
+// @route   GET /api/user/profile
+// @desc    Get complete user profile with all details
+// @access  Private
+router.get('/profile', protect, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Calculate age from birthDate if available
+    let age = null;
+    if (user.userInfo?.birthDate) {
+      const { day, month, year } = user.userInfo.birthDate;
+      const today = new Date();
+      const birthDateObj = new Date(year, month - 1, day);
+      age = today.getFullYear() - birthDateObj.getFullYear();
+      const monthDiff = today.getMonth() - birthDateObj.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDateObj.getDate())) {
+        age--;
+      }
+    }
+
+    // Get latest daily log for current progress
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const latestLog = await DailyLog.findOne({
+      userId: req.user.id,
+      date: { $gte: today }
+    });
+
+    // Get weekly tracking for streak
+    const weeklyTracking = await WeeklyTracking.find({
+      userId: req.user.id
+    }).sort({ week: -1 }).limit(4);
+
+    res.json({
+      success: true,
+      data: {
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          createdAt: user.createdAt,
+          lastLogin: user.lastLogin,
+          isOnboardingComplete: user.isOnboardingComplete,
+          isDocregister: user.isDocregister,
+          userInfo: {
+            ...user.userInfo,
+            age: age
+          }
+        },
+        todayProgress: latestLog ? {
+          caloriesConsumed: latestLog.caloriesConsumed,
+          hydrationLevel: latestLog.hydrationLevel,
+          targetCalories: latestLog.targetCalories,
+          targetHydration: latestLog.targetHydration,
+          mealsLogged: latestLog.meals?.length || 0
+        } : null,
+        weeklyStats: weeklyTracking.map(week => ({
+          week: week.week,
+          year: week.year,
+          totalCalories: week.totalCalories,
+          averageHydration: week.averageHydration,
+          daysTracked: week.daysTracked
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching profile',
+      error: error.message
+    });
+  }
+});
+
 export default router;
