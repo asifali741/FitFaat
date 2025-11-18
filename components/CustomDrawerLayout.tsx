@@ -5,10 +5,10 @@ import {
   DrawerContentComponentProps,
   DrawerItem
 } from "@react-navigation/drawer";
+import Constants from 'expo-constants';
+import * as SecureStore from 'expo-secure-store';
 import { useEffect, useRef, useState } from "react";
 import { Image, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import * as SecureStore from 'expo-secure-store';
-import Constants from 'expo-constants';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
