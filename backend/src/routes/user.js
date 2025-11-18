@@ -1,10 +1,17 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
+import fs from 'fs';
+import path, { dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { protect } from '../middleware/auth.js';
+import upload from '../middleware/upload.js';
 import DailyLog from '../models/DailyLog.js';
 import DietPlan from '../models/DietPlan.js';
 import User from '../models/User.js';
 import WeeklyTracking from '../models/WeeklyTracking.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const router = express.Router();
 
@@ -504,6 +511,8 @@ router.get('/profile', protect, async (req, res) => {
           lastLogin: user.lastLogin,
           isOnboardingComplete: user.isOnboardingComplete,
           isDocregister: user.isDocregister,
+          profileImage: user.profileImage,
+          profileImageUrl: user.profileImage ? `/uploads/profiles/${user.profileImage}` : null,
           userInfo: {
             ...user.userInfo,
             age: age
@@ -603,5 +612,147 @@ router.put(
     }
   }
 );
+
+// @route   POST /api/user/upload-profile-picture
+// @desc    Upload or update profile picture
+// @access  Private
+router.post(
+  '/upload-profile-picture',
+  protect,
+  upload.single('profileImage'),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: 'No image file provided'
+        });
+      }
+
+      const user = await User.findById(req.user.id);
+      if (!user) {
+        // Delete uploaded file if user not found
+        fs.unlinkSync(req.file.path);
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      // Delete old profile image if exists
+      if (user.profileImage) {
+        const oldImagePath = path.join(__dirname, '../../uploads/profiles', user.profileImage);
+        if (fs.existsSync(oldImagePath)) {
+          fs.unlinkSync(oldImagePath);
+        }
+      }
+
+      // Update user with new profile image filename
+      user.profileImage = req.file.filename;
+      await user.save();
+
+      res.status(200).json({
+        success: true,
+        message: 'Profile picture uploaded successfully',
+        data: {
+          profileImage: req.file.filename,
+          imageUrl: `/uploads/profiles/${req.file.filename}`
+        }
+      });
+    } catch (error) {
+      // Delete uploaded file on error
+      if (req.file && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      console.error('Error uploading profile picture:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error uploading profile picture',
+        error: error.message
+      });
+    }
+  }
+);
+
+// @route   DELETE /api/user/delete-profile-picture
+// @desc    Delete profile picture
+// @access  Private
+router.delete('/delete-profile-picture', protect, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    if (!user.profileImage) {
+      return res.status(400).json({
+        success: false,
+        message: 'No profile picture to delete'
+      });
+    }
+
+    // Delete image file
+    const imagePath = path.join(__dirname, '../../uploads/profiles', user.profileImage);
+    if (fs.existsSync(imagePath)) {
+      fs.unlinkSync(imagePath);
+    }
+
+    // Remove from database
+    user.profileImage = null;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile picture deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting profile picture:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting profile picture',
+      error: error.message
+    });
+  }
+});
+
+// @route   GET /api/user/profile-picture
+// @desc    Get user's profile picture
+// @access  Private
+router.get('/profile-picture', protect, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('profileImage');
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    if (!user.profileImage) {
+      return res.status(404).json({
+        success: false,
+        message: 'No profile picture found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        profileImage: user.profileImage,
+        imageUrl: `/uploads/profiles/${user.profileImage}`
+      }
+    });
+  } catch (error) {
+    console.error('Error getting profile picture:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error getting profile picture',
+      error: error.message
+    });
+  }
+});
 
 export default router;

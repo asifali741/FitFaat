@@ -3,6 +3,8 @@ import dotenv from 'dotenv';
 import express from 'express';
 import mongoose from 'mongoose';
 import morgan from 'morgan';
+import path, { dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { errorHandler } from './middleware/error.js';
 import adminRoutes from './routes/admin.js';
 import adminAuthRoutes from './routes/adminAuth.js';
@@ -15,6 +17,9 @@ import newsRoutes from './routes/news.js';
 import pushTokenRoutes from './routes/pushToken.js';
 import userRoutes from './routes/user.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
 // Load env vars
 dotenv.config();
 
@@ -25,6 +30,9 @@ const app = express();
 app.use(cors());
 app.use(morgan('dev'));
 app.use(express.json());
+
+// Serve static files (uploaded images)
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Routes
 app.use('/api/auth', authRoutes);
