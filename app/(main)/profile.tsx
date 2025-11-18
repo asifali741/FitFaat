@@ -2,15 +2,30 @@ import AppHeader from "@/components/AppHeader";
 import { useAppointments } from "@/contexts/AppointmentContext";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
+import Constants from "expo-constants";
 import { useRouter } from "expo-router";
+import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from "react";
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import {
   heightPercentageToDP as hp,
   widthPercentageToDP as wp,
 } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colorsSheet } from "./(settings)/_ui_elements";
+
+const ENV = Constants.expoConfig?.extra;
+
+const getAPIURL = () => {
+  const envUrl = ENV?.EXPO_PUBLIC_BACKEND_API_URL;
+  if (envUrl) {
+    return envUrl.replace(/\/api\/?$/, '');
+  }
+  const defaultHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
+  return `http://${defaultHost}:5001`;
+};
+
+const API_URL = getAPIURL();
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -19,12 +34,34 @@ export default function ProfileScreen() {
   const activeAppointments = getActiveAppointments();
   const [selectedTab, setSelectedTab] = useState('overview');
   const [user, setUser] = useState<any>(null);
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const loadUser = async () => {
       try {
         const userData = await tokenStorage.getUser();
         setUser(userData);
+        
+        // Fetch profile image from backend
+        const token = await SecureStore.getItemAsync('fitfaat_auth_token');
+        if (token) {
+          try {
+            const response = await fetch(`${API_URL}/api/user/profile-picture`, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            });
+
+            const data = await response.json();
+            if (data.success && data.data.imageUrl) {
+              setProfileImageUrl(`${API_URL}${data.data.imageUrl}`);
+            }
+          } catch (error) {
+            console.log('No profile picture found, using default');
+          }
+        }
       } catch (error) {
         console.error('Error loading user:', error);
       }
@@ -89,9 +126,12 @@ export default function ProfileScreen() {
             shadowRadius: 8,
             elevation: 5,
             marginBottom: hp(2),
-          }}>
-            <Image 
-              source={require("../../assets/images/Default_Profile.png")}
+          }}>            <Image 
+              source={
+                profileImageUrl
+                  ? { uri: profileImageUrl }
+                  : require("../../assets/images/Default_Profile.png")
+              }
               style={{
                 width: hp(12),
                 height: hp(12),
