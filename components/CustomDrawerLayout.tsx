@@ -290,6 +290,7 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
 const Logout_Button = () => {
   const { colors } = useTheme();
   const { signOut } = useAuth();
+  const { user } = useUser();
   const baseText = "Logout".split(""); // Array of letters
   const [activeIndex, setActiveIndex] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -323,8 +324,22 @@ const Logout_Button = () => {
     animateLetter(0);
 
     try {
-      await signOut();
-      console.log("Signed out successfully");
+      // Check if user is logged in with Clerk
+      if (user) {
+        console.log("Logging out Clerk user");
+        await signOut();
+        console.log("Clerk user signed out successfully");
+      } else {
+        // Backend email/password user - clear token and navigate to auth
+        console.log("Logging out backend user");
+        await SecureStore.deleteItemAsync('fitfaat_auth_token');
+        await SecureStore.deleteItemAsync('fitfaat_user_data');
+        console.log("Backend user signed out successfully");
+        
+        // Navigate to auth screen (you'll need to import router)
+        const { router } = require('expo-router');
+        router.replace('/(auth)');
+      }
     } catch (err) {
       console.error("Error signing out:", err);
     }
