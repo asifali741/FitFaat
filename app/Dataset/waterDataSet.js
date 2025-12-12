@@ -1,4 +1,4 @@
-[
+export const drinksDataSet = [
   {
     "drink_name": "Mineral Water",
     "serving_size": "250 ml",
@@ -3351,6 +3351,6 @@
   {"food_name": "Peach Coconut Smoothie", "serving_size": "300 ml", "calories_kcal": 220, "protein_g": 5, "carbs_g": 36, "fat_g": 5, "hydration_percent": 82},
   {"food_name": "Blueberry Banana Juice", "serving_size": "300 ml", "calories_kcal": 230, "protein_g": 5, "carbs_g": 40, "fat_g": 5, "hydration_percent": 80},
   {"food_name": "Cucumber Pineapple Juice", "serving_size": "300 ml", "calories_kcal": 140, "protein_g": 2, "carbs_g": 30, "fat_g": 1, "hydration_percent": 95},
-  
+
 
 ]
