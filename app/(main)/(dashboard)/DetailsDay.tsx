@@ -6,6 +6,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { dailyLogsApi } from '@/utils/dailyLogsApi';
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { Audio } from 'expo-av';
+import Constants from 'expo-constants';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
@@ -134,6 +135,10 @@ export default function DetailsDay () {
     const [selectedDrink, setSelectedDrink] = useState<any>(null);
     const [drinkQuantity, setDrinkQuantity] = useState<string>('1');
     
+    // Image detection states
+    const [isDetectingDish, setIsDetectingDish] = useState(false);
+    const [detectedDishName, setDetectedDishName] = useState<string>('');
+    
     // Initialize suggested foods based on user's goal
     useEffect(() => {
       const userGoal = (props as any).userGoal || 3; // Default to maintenance
@@ -175,6 +180,106 @@ export default function DetailsDay () {
         setFilteredDrinks([]);
       }
     }, [drinkSearch]);
+
+    // Detect dish from image using Google Vision API
+    const detectDishFromImage = async () => {
+      try {
+        // Request permission
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission Required', 'Please allow access to your photos to use this feature.');
+          return;
+        }
+
+        // Pick image
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [4, 3],
+          quality: 0.8,
+        });
+
+        if (result.canceled || !result.assets || result.assets.length === 0) {
+          return;
+        }
+
+        setIsDetectingDish(true);
+        const imageUri = result.assets[0].uri;
+
+        // Prepare FormData
+        const formData = new FormData();
+        const filename = imageUri.split('/').pop() || 'image.jpg';
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+        formData.append('image', {
+          uri: imageUri,
+          name: filename,
+          type: type,
+        } as any);
+
+        // Get backend URL
+        const ENV = Constants.expoConfig?.extra;
+        const baseUrl = ENV?.EXPO_PUBLIC_BACKEND_API_URL || 'http://localhost:5001/api';
+        const apiUrl = baseUrl.replace('/api', '') + '/api/vision/detect-dish';
+
+        // Upload to backend
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+
+        const data = await response.json();
+
+        if (data.success && data.dish) {
+          const dishName = data.dish;
+          setDetectedDishName(dishName);
+          
+          // Auto-search in the food database
+          setFoodSearch(dishName);
+          
+          // Try to find exact or partial match
+          const query = dishName.toLowerCase();
+          const matches = pakistaniDishes.filter((dish: any) => {
+            const name = (dish.food_name || dish.name || '').toLowerCase();
+            return name.includes(query) || query.includes(name);
+          });
+
+          if (matches.length > 0) {
+            // Auto-select the best match
+            const bestMatch = matches[0];
+            setSelectedFoodItem(bestMatch);
+            const calories = bestMatch.calories_kcal || 0;
+            setCalorieInput(String(Math.round(calories * parseFloat(mealQuantity || '1'))));
+            setShowFoodSearch(false);
+            
+            Alert.alert(
+              'Dish Detected!',
+              `Found: ${bestMatch.food_name || bestMatch.name}\nCalories: ${calories} kcal\n\nYou can adjust the quantity and add the meal.`,
+              [{ text: 'OK' }]
+            );
+          } else {
+            // Show search results if no exact match
+            setShowFoodSearch(true);
+            Alert.alert(
+              'Dish Detected',
+              `Detected: ${dishName}\n\nPlease select from the search results or enter details manually.`,
+              [{ text: 'OK' }]
+            );
+          }
+        } else {
+          Alert.alert('Detection Failed', data.message || 'Could not detect a dish in the image. Please try another image or enter manually.');
+        }
+      } catch (error) {
+        console.error('Image detection error:', error);
+        Alert.alert('Error', 'Failed to process the image. Please try again.');
+      } finally {
+        setIsDetectingDish(false);
+      }
+    };
 
     // Ensure UI updates when dayData changes
     useEffect(() => {
@@ -643,6 +748,33 @@ export default function DetailsDay () {
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
+              </View>
+
+              {/* Image Upload Button */}
+              <View style={styles.fieldContainer}>
+                <TouchableOpacity
+                  style={styles.imageUploadButton}
+                  onPress={detectDishFromImage}
+                  disabled={isDetectingDish}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.imageUploadIconContainer}>
+                    <Ionicons 
+                      name={isDetectingDish ? "hourglass-outline" : "camera-outline"} 
+                      size={24} 
+                      color="#FFFFFF" 
+                    />
+                  </View>
+                  <View style={styles.imageUploadTextContainer}>
+                    <Text style={styles.imageUploadTitle}>
+                      {isDetectingDish ? 'Detecting Dish...' : '📸 Upload Image For Dish'}
+                    </Text>
+                    <Text style={styles.imageUploadSubtitle}>
+                      {isDetectingDish ? 'Processing with AI...' : 'Auto-detect food & calories'}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+                </TouchableOpacity>
               </View>
 
               {/* Search Food Field */}
@@ -2273,6 +2405,42 @@ const getStyles = (colors: any) => StyleSheet.create({
         marginBottom: hp(1),
         flexDirection: 'row',
         alignItems: 'center',
+    },
+    // Image Upload Button Styles
+    imageUploadButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.primary,
+        borderRadius: wp(3),
+        padding: wp(4),
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 5,
+        marginBottom: hp(1),
+    },
+    imageUploadIconContainer: {
+        width: wp(12),
+        height: wp(12),
+        borderRadius: wp(6),
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: wp(3),
+    },
+    imageUploadTextContainer: {
+        flex: 1,
+    },
+    imageUploadTitle: {
+        fontSize: Math.min(hp(1.8), wp(4.2)),
+        fontWeight: '700',
+        color: '#FFFFFF',
+        marginBottom: hp(0.3),
+    },
+    imageUploadSubtitle: {
+        fontSize: Math.min(hp(1.3), wp(3)),
+        color: 'rgba(255, 255, 255, 0.85)',
     },
     // Quick Pick Styles
     quickPickScroll: {

@@ -16,6 +16,7 @@ import doctorRoutes from './routes/doctors.js';
 import newsRoutes from './routes/news.js';
 import pushTokenRoutes from './routes/pushToken.js';
 import userRoutes from './routes/user.js';
+import visionRoutes from './routes/vision.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -45,6 +46,7 @@ app.use('/api/appointments', appointmentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/news', newsRoutes);
 app.use('/api/push-token', pushTokenRoutes);
+app.use('/api/vision', visionRoutes);
 
 // Error handler
 app.use(errorHandler);
