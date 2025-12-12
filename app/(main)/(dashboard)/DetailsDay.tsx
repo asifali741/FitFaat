@@ -1082,16 +1082,21 @@ export default function DetailsDay () {
                   const calories = parseInt(calorieInput);
                   const foodName = selectedFoodItem?.food_name || selectedFoodItem?.name || 'Custom Meal';
                   const servingSize = selectedFoodItem?.serving_size || 'portion';
+                  const quantity = parseFloat(mealQuantity || '1');
                   
-                  // Get nutrition values (already multiplied by quantity)
-                  const protein = selectedFoodItem?.protein_g;
-                  const carbs = selectedFoodItem?.carbs_g || selectedFoodItem?.carbohydrates_g;
-                  const fats = selectedFoodItem?.fat_g;
+                  // Calculate nutrition values multiplied by quantity
+                  const baseProtein = selectedFoodItem?.protein_g || 0;
+                  const baseCarbs = selectedFoodItem?.carbs_g || selectedFoodItem?.carbohydrates_g || 0;
+                  const baseFats = selectedFoodItem?.fat_g || 0;
+                  
+                  const protein = Math.round(baseProtein * quantity);
+                  const carbs = Math.round(baseCarbs * quantity);
+                  const fats = Math.round(baseFats * quantity);
 
                   const mealResponse = await dailyLogsApi.addMeal(
                     dayLogId,
                     foodName,
-                    parseFloat(mealQuantity || '1'),
+                    quantity,
                     servingSize,
                     calories,
                     protein,
