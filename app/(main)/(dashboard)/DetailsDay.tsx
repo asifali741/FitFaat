@@ -1,4 +1,5 @@
 import { pakistaniDishes } from '@/app/Dataset/dataSet';
+import { drinksDataSet } from '@/app/Dataset/waterDataSet';
 import { goalBasedSuggestions, waterIntakeDatabase } from '@/constants/foodDatabase';
 import { HEADER_PADDING_HORIZONTAL, HEADER_PADDING_VERTICAL } from '@/constants/ui';
 import { useTheme } from "@/contexts/ThemeContext";
@@ -126,6 +127,13 @@ export default function DetailsDay () {
     const [showWaterTab, setShowWaterTab] = useState(false);
     const [trackingMode, setTrackingMode] = useState<'meal' | 'hydration'>('meal');
     
+    // Drink search states
+    const [drinkSearch, setDrinkSearch] = useState<string>('');
+    const [filteredDrinks, setFilteredDrinks] = useState<any[]>([]);
+    const [showDrinkSearch, setShowDrinkSearch] = useState(false);
+    const [selectedDrink, setSelectedDrink] = useState<any>(null);
+    const [drinkQuantity, setDrinkQuantity] = useState<string>('1');
+    
     // Initialize suggested foods based on user's goal
     useEffect(() => {
       const userGoal = (props as any).userGoal || 3; // Default to maintenance
@@ -151,6 +159,22 @@ export default function DetailsDay () {
         setFilteredFoods([]);
       }
     }, [foodSearch]);
+
+    // Handle drink search with drinks dataset
+    useEffect(() => {
+      if (drinkSearch.trim().length > 1) {
+        const query = drinkSearch.toLowerCase();
+        const results = drinksDataSet.filter((drink: any) => {
+          const name = drink.drink_name || drink.food_name || '';
+          return name.toLowerCase().includes(query);
+        }).slice(0, 15);
+        setFilteredDrinks(results);
+        setShowDrinkSearch(true);
+      } else {
+        setShowDrinkSearch(false);
+        setFilteredDrinks([]);
+      }
+    }, [drinkSearch]);
 
     // Ensure UI updates when dayData changes
     useEffect(() => {
@@ -689,15 +713,177 @@ export default function DetailsDay () {
           {/* HYDRATION TRACKING MODE */}
           {trackingMode === 'hydration' && (
             <>
+              {/* Search Drinks */}
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>
+                  <Ionicons name="search" size={16} color="#4ECDC4" /> Search Drinks
+                </Text>
+                <View style={styles.searchInputContainer}>
+                  <Ionicons name="search-outline" size={20} color={colors.textSecondary} style={styles.searchIconLeft} />
+                  <TextInput 
+                    style={styles.searchInputField}
+                    placeholder="Search juice, milkshake, tea, coffee..."
+                    placeholderTextColor={colors.textSecondary}
+                    value={drinkSearch}
+                    onChangeText={setDrinkSearch}
+                  />
+                  {drinkSearch.length > 0 && (
+                    <TouchableOpacity onPress={() => { setDrinkSearch(''); setShowDrinkSearch(false); }} style={styles.searchClearButton}>
+                      <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
+              {/* Drink Search Results */}
+              {showDrinkSearch && filteredDrinks.length > 0 && (
+                <View style={styles.searchResultsContainer}>
+                  <Text style={styles.searchResultsHeader}>
+                    Found {filteredDrinks.length} drinks - Select one
+                  </Text>
+                  <ScrollView style={styles.searchResultsScroll} nestedScrollEnabled showsVerticalScrollIndicator={true}>
+                    {filteredDrinks.map((drink, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={styles.drinkResultCard}
+                        onPress={() => {
+                          setSelectedDrink(drink);
+                          const hydrationValue = ((drink.hydration_percent || 100) / 100) * 0.25; // Convert to liters
+                          setWaterInput(hydrationValue.toFixed(2));
+                          setDrinkSearch('');
+                          setShowDrinkSearch(false);
+                        }}
+                        activeOpacity={0.6}
+                      >
+                        <View style={styles.searchResultLeft}>
+                          <View style={styles.drinkResultIconBg}>
+                            <Ionicons name="cafe" size={18} color="#4ECDC4" />
+                          </View>
+                          <View style={styles.searchResultInfo}>
+                            <Text style={styles.searchResultTitle}>{drink.drink_name || drink.food_name}</Text>
+                            <View style={styles.drinkMetaRow}>
+                              <Text style={styles.searchResultMeta}>{drink.serving_size}</Text>
+                              <View style={styles.hydrationBadge}>
+                                <Ionicons name="water" size={12} color="#4ECDC4" />
+                                <Text style={styles.hydrationText}>{drink.hydration_percent}%</Text>
+                              </View>
+                            </View>
+                          </View>
+                        </View>
+                        <View style={styles.searchResultRight}>
+                          <Text style={styles.drinkCalValue}>{drink.calories_kcal}</Text>
+                          <Text style={styles.searchResultCalLabel}>cal</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
+              {/* Selected Drink Display */}
+              {selectedDrink && (
+                <View style={styles.selectedDrinkCard}>
+                  <View style={styles.selectedDrinkHeader}>
+                    <View style={styles.drinkIconLarge}>
+                      <Ionicons name="checkmark-circle" size={24} color="#4ECDC4" />
+                    </View>
+                    <View style={styles.selectedDrinkInfo}>
+                      <Text style={styles.selectedDrinkName}>{selectedDrink.drink_name || selectedDrink.food_name}</Text>
+                      <Text style={styles.selectedDrinkServing}>{selectedDrink.serving_size}</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => setSelectedDrink(null)} style={styles.removeDrinkBtn}>
+                      <Ionicons name="close" size={20} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Drink Nutrition Grid */}
+                  <View style={styles.drinkNutritionGrid}>
+                    <View style={styles.drinkNutritionItem}>
+                      <Ionicons name="water" size={16} color="#4ECDC4" />
+                      <Text style={styles.drinkNutritionValue}>{selectedDrink.hydration_percent}%</Text>
+                      <Text style={styles.drinkNutritionLabel}>hydration</Text>
+                    </View>
+                    <View style={styles.drinkNutritionItem}>
+                      <Ionicons name="flame" size={16} color="#FF6B6B" />
+                      <Text style={styles.drinkNutritionValue}>{Math.round(selectedDrink.calories_kcal * parseFloat(drinkQuantity || '1'))}</Text>
+                      <Text style={styles.drinkNutritionLabel}>cal</Text>
+                    </View>
+                    {selectedDrink.protein_g > 0 && (
+                      <View style={styles.drinkNutritionItem}>
+                        <Ionicons name="fitness" size={16} color="#4ECDC4" />
+                        <Text style={styles.drinkNutritionValue}>{Math.round(selectedDrink.protein_g * parseFloat(drinkQuantity || '1'))}</Text>
+                        <Text style={styles.drinkNutritionLabel}>protein</Text>
+                      </View>
+                    )}
+                    {selectedDrink.carbs_g > 0 && (
+                      <View style={styles.drinkNutritionItem}>
+                        <Ionicons name="leaf" size={16} color="#FFB347" />
+                        <Text style={styles.drinkNutritionValue}>{Math.round(selectedDrink.carbs_g * parseFloat(drinkQuantity || '1'))}</Text>
+                        <Text style={styles.drinkNutritionLabel}>carbs</Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Drink Quantity Controls */}
+                  <View style={styles.quantityControlSection}>
+                    <Text style={styles.quantityControlLabel}>Servings</Text>
+                    <View style={styles.quantityControls}>
+                      <TouchableOpacity 
+                        style={styles.quantityControlBtn}
+                        onPress={() => {
+                          const q = Math.max(0.5, parseFloat(drinkQuantity || '1') - 0.5);
+                          setDrinkQuantity(String(q));
+                          const hydrationValue = ((selectedDrink.hydration_percent || 100) / 100) * 0.25 * q;
+                          setWaterInput(hydrationValue.toFixed(2));
+                        }}
+                      >
+                        <Ionicons name="remove" size={18} color="#4ECDC4" />
+                      </TouchableOpacity>
+                      <View style={styles.quantityDisplay}>
+                        <TextInput
+                          style={styles.quantityDisplayInput}
+                          value={drinkQuantity}
+                          onChangeText={(text) => {
+                            setDrinkQuantity(text);
+                            if (text && !isNaN(parseFloat(text))) {
+                              const hydrationValue = ((selectedDrink.hydration_percent || 100) / 100) * 0.25 * parseFloat(text);
+                              setWaterInput(hydrationValue.toFixed(2));
+                            }
+                          }}
+                          keyboardType="decimal-pad"
+                        />
+                        <Text style={styles.quantityDisplayUnit}>servings</Text>
+                      </View>
+                      <TouchableOpacity 
+                        style={styles.quantityControlBtn}
+                        onPress={() => {
+                          const q = parseFloat(drinkQuantity || '1') + 0.5;
+                          setDrinkQuantity(String(q));
+                          const hydrationValue = ((selectedDrink.hydration_percent || 100) / 100) * 0.25 * q;
+                          setWaterInput(hydrationValue.toFixed(2));
+                        }}
+                      >
+                        <Ionicons name="add" size={18} color="#4ECDC4" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              )}
+
               {/* Quick Water Amounts */}
               <View style={styles.sectionContainer}>
-                <Text style={styles.sectionLabel}>Quick Add Water</Text>
+                <Text style={styles.sectionLabel}>
+                  <Ionicons name="water-outline" size={18} color="#4ECDC4" /> Quick Add Plain Water
+                </Text>
                 <View style={styles.waterQuickGrid}>
                   {waterIntakeDatabase.options.map((option) => (
                     <TouchableOpacity
                       key={option.name}
                       style={styles.waterQuickOption}
-                      onPress={() => setWaterInput(option.amount.toString())}
+                      onPress={() => {
+                        setWaterInput(option.amount.toString());
+                        setSelectedDrink(null);
+                      }}
                       activeOpacity={0.7}
                     >
                       <View style={styles.waterQuickIconBg}>
@@ -713,7 +899,7 @@ export default function DetailsDay () {
               {/* Water Amount Input */}
               <View style={styles.fieldContainer}>
                 <Text style={styles.fieldLabel}>
-                  <Ionicons name="water" size={16} color="#4ECDC4" /> Water Amount
+                  <Ionicons name="water" size={16} color="#4ECDC4" /> Hydration Amount
                 </Text>
                 <View style={styles.waterAmountSelector}>
                   <TouchableOpacity 
@@ -2247,6 +2433,152 @@ const getStyles = (colors: any) => StyleSheet.create({
         shadowOpacity: 0.15,
         shadowRadius: 6,
         elevation: 3,
+    },
+    // Drink Specific Styles
+    drinkResultCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: wp(4),
+        borderBottomWidth: 1,
+        borderBottomColor: colors.borderColor || '#E5E7EB',
+        backgroundColor: colors.cardBackground,
+    },
+    drinkResultIconBg: {
+        width: wp(10),
+        height: wp(10),
+        borderRadius: wp(5),
+        backgroundColor: '#4ECDC4' + '20',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: wp(3),
+    },
+    drinkMetaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(2),
+        marginTop: hp(0.3),
+    },
+    hydrationBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(1),
+        backgroundColor: '#4ECDC4' + '20',
+        paddingHorizontal: wp(2),
+        paddingVertical: hp(0.3),
+        borderRadius: wp(2),
+    },
+    hydrationText: {
+        fontSize: Math.min(hp(1.1), wp(2.6)),
+        fontWeight: '600',
+        color: '#4ECDC4',
+    },
+    drinkCalValue: {
+        fontSize: Math.min(hp(2), wp(4.8)),
+        fontWeight: '700',
+        color: '#4ECDC4',
+    },
+    selectedDrinkCard: {
+        marginBottom: hp(2),
+        backgroundColor: colors.cardBackground,
+        borderRadius: wp(4),
+        padding: wp(4),
+        borderWidth: 2,
+        borderColor: '#4ECDC4' + '40',
+        shadowColor: '#4ECDC4',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    selectedDrinkHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: hp(2),
+    },
+    drinkIconLarge: {
+        marginRight: wp(3),
+    },
+    selectedDrinkInfo: {
+        flex: 1,
+    },
+    selectedDrinkName: {
+        fontSize: Math.min(hp(1.8), wp(4.3)),
+        fontWeight: '700',
+        color: colors.textPrimary,
+        marginBottom: hp(0.3),
+    },
+    selectedDrinkServing: {
+        fontSize: Math.min(hp(1.3), wp(3)),
+        color: colors.textSecondary,
+    },
+    removeDrinkBtn: {
+        padding: wp(2),
+    },
+    drinkNutritionGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: wp(3),
+        marginBottom: hp(2),
+        paddingTop: hp(1.5),
+        borderTopWidth: 1,
+        borderTopColor: colors.borderColor || '#E5E7EB',
+    },
+    drinkNutritionItem: {
+        minWidth: wp(20),
+        alignItems: 'center',
+        gap: hp(0.5),
+    },
+    drinkNutritionValue: {
+        fontSize: Math.min(hp(1.8), wp(4.2)),
+        fontWeight: '700',
+        color: '#4ECDC4',
+    },
+    drinkNutritionLabel: {
+        fontSize: Math.min(hp(1.2), wp(2.8)),
+        color: colors.textSecondary,
+    },
+    quantityControlSection: {
+        marginTop: hp(1),
+    },
+    quantityControlLabel: {
+        fontSize: Math.min(hp(1.5), wp(3.5)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+        marginBottom: hp(1),
+    },
+    quantityControls: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: wp(3),
+    },
+    quantityControlBtn: {
+        padding: wp(2),
+        backgroundColor: colors.cardBackground,
+        borderRadius: wp(2),
+        borderWidth: 1,
+        borderColor: colors.borderColor || '#E5E7EB',
+    },
+    quantityDisplay: {
+        alignItems: 'center',
+        backgroundColor: colors.gray + '10',
+        paddingHorizontal: wp(4),
+        paddingVertical: hp(1),
+        borderRadius: wp(2),
+        minWidth: wp(25),
+    },
+    quantityDisplayInput: {
+        fontSize: Math.min(hp(2.5), wp(6)),
+        fontWeight: '700',
+        color: colors.textPrimary,
+        textAlign: 'center',
+        padding: 0,
+    },
+    quantityDisplayUnit: {
+        fontSize: Math.min(hp(1.2), wp(2.8)),
+        color: colors.textSecondary,
+        marginTop: hp(0.3),
     },
     // Water Styles
     waterQuickGrid: {
