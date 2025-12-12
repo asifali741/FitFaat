@@ -1,4 +1,5 @@
-import { goalBasedSuggestions, searchFoods, waterIntakeDatabase } from '@/constants/foodDatabase';
+import { pakistaniDishes } from '@/app/Dataset/dataSet';
+import { goalBasedSuggestions, waterIntakeDatabase } from '@/constants/foodDatabase';
 import { HEADER_PADDING_HORIZONTAL, HEADER_PADDING_VERTICAL } from '@/constants/ui';
 import { useTheme } from "@/contexts/ThemeContext";
 import { dailyLogsApi } from '@/utils/dailyLogsApi';
@@ -135,10 +136,15 @@ export default function DetailsDay () {
       }
     }, [props]);
     
-    // Handle food search
+    // Handle food search with Pakistani dishes dataset
     useEffect(() => {
-      if (foodSearch.trim()) {
-        const results = searchFoods(foodSearch);
+      if (foodSearch.trim().length > 1) {
+        const query = foodSearch.toLowerCase();
+        const results = pakistaniDishes.filter((dish: any) => {
+          const name = dish.food_name || dish.name || '';
+          const category = dish.category || '';
+          return name.toLowerCase().includes(query) || category.toLowerCase().includes(query);
+        }).slice(0, 15);
         setFilteredFoods(results);
         setShowFoodSearch(true);
       } else {
@@ -658,11 +664,11 @@ export default function DetailsDay () {
                       style={styles.miniSuggestionCard}
                       onPress={() => {
                         setSelectedFoodItem(food);
-                        setCalorieInput(String(food.calories));
+                        setCalorieInput(String(food.calories_kcal || food.calories));
                       }}
                     >
-                      <Text style={styles.miniSuggestionText}>{food.name}</Text>
-                      <Text style={styles.miniSuggestionCals}>{food.calories}</Text>
+                      <Text style={styles.miniSuggestionText}>{food.food_name || food.name}</Text>
+                      <Text style={styles.miniSuggestionCals}>{food.calories_kcal || food.calories}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
@@ -694,12 +700,13 @@ export default function DetailsDay () {
                       style={styles.foodResultItem}
                       onPress={() => {
                         setSelectedFoodItem(food);
-                        setCalorieInput(String(food.calories));
+                        const calories = food.calories_kcal || food.calories || 0;
+                        setCalorieInput(String(Math.round(calories * parseFloat(mealQuantity || '1'))));
                         setFoodSearch('');
                       }}
                     >
-                      <Text style={styles.foodResultName}>{food.name}</Text>
-                      <Text style={styles.foodResultCals}>{food.calories} cals</Text>
+                      <Text style={styles.foodResultName}>{food.food_name || food.name}</Text>
+                      <Text style={styles.foodResultCals}>{food.calories_kcal || food.calories} cals</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
@@ -870,16 +877,17 @@ export default function DetailsDay () {
                     style={styles.resultItem}
                     onPress={() => {
                       setSelectedFoodItem(food);
-                      setCalorieInput(String(Math.round(food.calories * parseFloat(mealQuantity || '1'))));
+                      const calories = food.calories_kcal || food.calories || 0;
+                      setCalorieInput(String(Math.round(calories * parseFloat(mealQuantity || '1'))));
                       setFoodSearch('');
                       setShowFoodSearch(false);
                     }}
                   >
                     <View style={styles.resultInfo}>
-                      <Text style={styles.resultFoodName}>{food.name}</Text>
-                      <Text style={styles.resultCategory}>{food.category}</Text>
+                      <Text style={styles.resultFoodName}>{food.food_name || food.name}</Text>
+                      <Text style={styles.resultCategory}>{food.category || (food.serving_size ? `Serving: ${food.serving_size}` : '')}</Text>
                     </View>
-                    <Text style={styles.resultCalories}>{Math.round(food.calories * parseFloat(mealQuantity || '1'))} cals</Text>
+                    <Text style={styles.resultCalories}>{Math.round((food.calories_kcal || food.calories || 0) * parseFloat(mealQuantity || '1'))} cals</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -896,15 +904,42 @@ export default function DetailsDay () {
               <View style={styles.selectedFoodHeader}>
                 <Ionicons name="checkmark-circle" size={24} color={colors.success} />
                 <View style={styles.selectedFoodInfo}>
-                  <Text style={styles.selectedFoodName}>{selectedFoodItem.name}</Text>
+                  <Text style={styles.selectedFoodName}>{selectedFoodItem.food_name || selectedFoodItem.name}</Text>
+                  <Text style={styles.selectedFoodServing}>
+                    {selectedFoodItem.serving_size || '100g'}
+                  </Text>
                   <Text style={styles.selectedFoodCalories}>
-                    {Math.round(selectedFoodItem.calories * parseFloat(mealQuantity || '1'))} calories
+                    {Math.round((selectedFoodItem.calories_kcal || selectedFoodItem.calories || 0) * parseFloat(mealQuantity || '1'))} calories
                   </Text>
                 </View>
                 <TouchableOpacity onPress={() => setSelectedFoodItem(null)}>
                   <Ionicons name="trash-outline" size={20} color={colors.error} />
                 </TouchableOpacity>
               </View>
+              
+              {/* Nutrition Breakdown */}
+              {(selectedFoodItem.protein_g || selectedFoodItem.carbs_g || selectedFoodItem.carbohydrates_g || selectedFoodItem.fat_g) && (
+                <View style={styles.nutritionBreakdown}>
+                  {selectedFoodItem.protein_g && (
+                    <View style={styles.nutritionItem}>
+                      <Text style={styles.nutritionLabel}>Protein</Text>
+                      <Text style={styles.nutritionValue}>{Math.round((selectedFoodItem.protein_g || 0) * parseFloat(mealQuantity || '1'))}g</Text>
+                    </View>
+                  )}
+                  {(selectedFoodItem.carbs_g || selectedFoodItem.carbohydrates_g) && (
+                    <View style={styles.nutritionItem}>
+                      <Text style={styles.nutritionLabel}>Carbs</Text>
+                      <Text style={styles.nutritionValue}>{Math.round((selectedFoodItem.carbs_g || selectedFoodItem.carbohydrates_g || 0) * parseFloat(mealQuantity || '1'))}g</Text>
+                    </View>
+                  )}
+                  {selectedFoodItem.fat_g && (
+                    <View style={styles.nutritionItem}>
+                      <Text style={styles.nutritionLabel}>Fat</Text>
+                      <Text style={styles.nutritionValue}>{Math.round((selectedFoodItem.fat_g || 0) * parseFloat(mealQuantity || '1'))}g</Text>
+                    </View>
+                  )}
+                </View>
+              )}
               
               {/* Quantity Adjuster */}
               <View style={styles.quantitySection}>
@@ -915,7 +950,8 @@ export default function DetailsDay () {
                     onPress={() => {
                       const q = Math.max(0.5, parseFloat(mealQuantity || '1') - 0.5);
                       setMealQuantity(String(q));
-                      setCalorieInput(String(Math.round(selectedFoodItem.calories * q)));
+                      const calories = selectedFoodItem.calories_kcal || selectedFoodItem.calories || 0;
+                      setCalorieInput(String(Math.round(calories * q)));
                     }}
                   >
                     <Text style={styles.quantityBtnText}>−</Text>
@@ -926,7 +962,8 @@ export default function DetailsDay () {
                     onChangeText={(text) => {
                       setMealQuantity(text);
                       if (text && !isNaN(parseFloat(text))) {
-                        setCalorieInput(String(Math.round(selectedFoodItem.calories * parseFloat(text))));
+                        const calories = selectedFoodItem.calories_kcal || selectedFoodItem.calories || 0;
+                        setCalorieInput(String(Math.round(calories * parseFloat(text))));
                       }
                     }}
                     keyboardType="decimal-pad"
@@ -936,7 +973,8 @@ export default function DetailsDay () {
                     onPress={() => {
                       const q = parseFloat(mealQuantity || '1') + 0.5;
                       setMealQuantity(String(q));
-                      setCalorieInput(String(Math.round(selectedFoodItem.calories * q)));
+                      const calories = selectedFoodItem.calories_kcal || selectedFoodItem.calories || 0;
+                      setCalorieInput(String(Math.round(calories * q)));
                     }}
                   >
                     <Text style={styles.quantityBtnText}>+</Text>
@@ -1042,17 +1080,23 @@ export default function DetailsDay () {
                 // Log meal if calories are entered
                 if (calorieInput.trim()) {
                   const calories = parseInt(calorieInput);
-                  const foodName = selectedFoodItem?.name || 'Custom Meal';
+                  const foodName = selectedFoodItem?.food_name || selectedFoodItem?.name || 'Custom Meal';
+                  const servingSize = selectedFoodItem?.serving_size || 'portion';
+                  
+                  // Get nutrition values (already multiplied by quantity)
+                  const protein = selectedFoodItem?.protein_g;
+                  const carbs = selectedFoodItem?.carbs_g || selectedFoodItem?.carbohydrates_g;
+                  const fats = selectedFoodItem?.fat_g;
 
                   const mealResponse = await dailyLogsApi.addMeal(
                     dayLogId,
                     foodName,
                     parseFloat(mealQuantity || '1'),
-                    'portion',
+                    servingSize,
                     calories,
-                    undefined,
-                    undefined,
-                    undefined,
+                    protein,
+                    carbs,
+                    fats,
                     descriptionInput
                   );
 
@@ -1933,6 +1977,33 @@ const getStyles = (colors: any) => StyleSheet.create({
         color: colors.success,
         fontWeight: '600',
         marginTop: hp(0.2),
+    },
+    selectedFoodServing: {
+        fontSize: Math.min(hp(1.2), wp(2.8)),
+        color: colors.textSecondary,
+        marginTop: hp(0.3),
+    },
+    nutritionBreakdown: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: wp(3),
+        marginTop: hp(1.2),
+        paddingTop: hp(1.2),
+        borderTopWidth: 1,
+        borderTopColor: colors.success + '20',
+    },
+    nutritionItem: {
+        minWidth: wp(20),
+    },
+    nutritionLabel: {
+        fontSize: Math.min(hp(1.2), wp(2.8)),
+        color: colors.textSecondary,
+        marginBottom: hp(0.3),
+    },
+    nutritionValue: {
+        fontSize: Math.min(hp(1.6), wp(3.8)),
+        fontWeight: '700',
+        color: colors.textPrimary,
     },
     // Quantity selector
     quantitySection: {

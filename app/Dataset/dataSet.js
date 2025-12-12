@@ -9,10 +9,7 @@
 //     "carbohydrates": "g / 100g"
 //   },
 
-
-{
-  
-  "dishes"[
+export const pakistaniDishes = [
     {
       "name": "Chicken Biryani",
       "category": "Rice Dish",
@@ -13057,5 +13054,4 @@
     "carbs_g": 15,
     "fat_g": 16
   }
-  ]
-} 
+]; 
