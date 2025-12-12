@@ -4,7 +4,6 @@ import { HEADER_PADDING_HORIZONTAL, HEADER_PADDING_VERTICAL } from '@/constants/
 import { useTheme } from "@/contexts/ThemeContext";
 import { dailyLogsApi } from '@/utils/dailyLogsApi';
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { Audio } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -558,24 +557,24 @@ export default function DetailsDay () {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.menuHeader}>
-          <Ionicons name="restaurant" size={Math.min(hp(3.5), wp(8))} color={colors.primary} />
+          <Ionicons name="nutrition" size={Math.min(hp(3.5), wp(8))} color={colors.primary} />
           <Text style={styles.menuTitle}>
-            Track Your Meal
+            Track Your Progress
           </Text>
           <Text style={styles.menuSubtitle}>
-            Choose how you'd like to log your meal
+            Choose what you'd like to log
           </Text>
         </View>
 
         {/* Tracking Mode Selector - Professional Toggle */}
         <View style={styles.trackingModeSection}>
-          <Text style={styles.trackingModeTitle}>What would you like to track?</Text>
+          <Text style={styles.trackingModeTitle}>What would you like to track today?</Text>
           <View style={styles.modeToggleContainer}>
             <TouchableOpacity 
               style={[styles.modeButton, trackingMode === 'meal' && styles.modeButtonActive]}
               onPress={() => setTrackingMode('meal')}
             >
-              <Ionicons name="fast-food-outline" size={22} color={trackingMode === 'meal' ? colors.primary : colors.textSecondary} />
+              <Ionicons name="fast-food-outline" size={22} color={trackingMode === 'meal' ? '#FFFFFF' : colors.textSecondary} />
               <Text style={[styles.modeButtonText, trackingMode === 'meal' && styles.modeButtonTextActive]}>Meal</Text>
             </TouchableOpacity>
             <View style={styles.modeButtonDivider} />
@@ -583,77 +582,16 @@ export default function DetailsDay () {
               style={[styles.modeButton, trackingMode === 'hydration' && styles.modeButtonActive]}
               onPress={() => setTrackingMode('hydration')}
             >
-              <Ionicons name="water-outline" size={22} color={trackingMode === 'hydration' ? '#4ECDC4' : colors.textSecondary} />
+              <Ionicons name="water-outline" size={22} color={trackingMode === 'hydration' ? '#FFFFFF' : colors.textSecondary} />
               <Text style={[styles.modeButtonText, trackingMode === 'hydration' && styles.modeButtonTextActive]}>Hydration</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         <View style={styles.menuContent}>
-
-          {/* Time Selection */}
-          <View style={styles.inputGroup}>
-            <View style={styles.labelRow}>
-              <Ionicons name="time-outline" size={20} color={colors.primary} />
-              <Text style={styles.label}>When did you eat?</Text>
-            </View>
-            <TouchableOpacity 
-              style={[styles.input, styles.timePickerButton]}
-              onPress={() => setShowTimePicker(true)}
-            >
-              <Text style={styles.timePickerText}>
-                {selectedTime.toLocaleTimeString('en-US', { 
-                  hour: '2-digit', 
-                  minute: '2-digit',
-                  hour12: true 
-                })}
-              </Text>
-              <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
-            
-            {showTimePicker && (
-              <DateTimePicker
-                value={selectedTime}
-                mode="time"
-                is24Hour={false}
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={(event, selectedDate) => {
-                  setShowTimePicker(Platform.OS === 'ios');
-                  if (selectedDate) {
-                    setSelectedTime(selectedDate);
-                  }
-                }}
-              />
-            )}
-            
-            {Platform.OS === 'ios' && showTimePicker && (
-              <TouchableOpacity
-                style={styles.timeDoneButton}
-                onPress={() => setShowTimePicker(false)}
-              >
-                <Text style={styles.timeDoneText}>Done</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-
-
-          {/* Dual Input Section - Dynamic based on tracking mode */}
-          <View style={styles.sectionTitle}>
-            <Text style={styles.sectionTitleText}>
-              {trackingMode === 'meal' ? 'Add Meal' : 'Add Water'}
-            </Text>
-          </View>
-
-          <View style={styles.dualInputContainer}>
-            {/* LEFT COLUMN - MEAL INPUT (Shown when tracking meal) */}
-            {trackingMode === 'meal' && (
-            <View style={styles.inputColumn}>
-              <View style={styles.columnHeader}>
-                <Ionicons name="fast-food-outline" size={20} color={colors.primary} />
-                <Text style={styles.columnTitle}>Meal</Text>
-              </View>
-
+          {/* MEAL TRACKING MODE */}
+          {trackingMode === 'meal' && (
+            <View style={styles.trackingContentCard}>
               {/* Meal Suggestions */}
               <View style={styles.miniSuggestionsSection}>
                 <Text style={styles.miniSuggestionsTitle}>Quick Pick</Text>
@@ -674,23 +612,20 @@ export default function DetailsDay () {
                 </ScrollView>
               </View>
 
-              {/* Meal Input Fields */}
-              <TextInput 
-                style={styles.mealInput}
-                placeholder="Search food..."
-                placeholderTextColor={colors.textSecondary}
-                value={foodSearch}
-                onChangeText={setFoodSearch}
-              />
-              
-              <TextInput
-                style={styles.calorieInput}
-                placeholder="Calories"
-                placeholderTextColor={colors.textSecondary}
-                keyboardType="decimal-pad"
-                value={calorieInput}
-                onChangeText={setCalorieInput}
-              />
+              {/* Food Search */}
+              <View style={styles.inputGroup}>
+                <View style={styles.labelRow}>
+                  <Ionicons name="search" size={20} color={colors.primary} />
+                  <Text style={styles.label}>Search Food</Text>
+                </View>
+                <TextInput 
+                  style={styles.input}
+                  placeholder="Search Pakistani dishes..."
+                  placeholderTextColor={colors.textSecondary}
+                  value={foodSearch}
+                  onChangeText={setFoodSearch}
+                />
+              </View>
 
               {showFoodSearch && filteredFoods.length > 0 && (
                 <ScrollView style={styles.foodResultsList} nestedScrollEnabled>
@@ -712,16 +647,11 @@ export default function DetailsDay () {
                 </ScrollView>
               )}
             </View>
-            )}
+          )}
 
-            {/* RIGHT COLUMN - WATER INPUT (Shown when tracking hydration) */}
-            {trackingMode === 'hydration' && (
-            <View style={styles.inputColumn}>
-              <View style={styles.columnHeader}>
-                <Ionicons name="water" size={20} color="#4ECDC4" />
-                <Text style={styles.columnTitle}>Water</Text>
-              </View>
-
+          {/* HYDRATION TRACKING MODE */}
+          {trackingMode === 'hydration' && (
+            <View style={styles.trackingContentCard}>
               {/* Water Quick Suggestions */}
               <View style={styles.miniSuggestionsSection}>
                 <Text style={styles.miniSuggestionsTitle}>Quick Pick</Text>
@@ -817,11 +747,10 @@ export default function DetailsDay () {
                 </View>
               </View>
             </View>
-            )}
-          </View>
+          )}
 
-          {/* Search Results Section */}
-          {showFoodSearch && (
+          {/* Search Results Section - Only for Meal Mode */}
+          {trackingMode === 'meal' && showFoodSearch && (
             <View style={styles.suggestionsSection}>
               <Text style={styles.suggestionTitle}>Your Daily Goal Suggestions</Text>
               <ScrollView 
@@ -847,59 +776,8 @@ export default function DetailsDay () {
             </View>
           )}
 
-          {/* Detailed Food Search & Selection (Old UI - kept for reference) */}
-          <View style={styles.inputGroup}>
-            <View style={styles.labelRow}>
-              <Ionicons name="fast-food-outline" size={20} color={colors.primary} />
-              <Text style={styles.label}>Search for food</Text>
-            </View>
-            <View style={styles.searchContainer}>
-              <TextInput 
-                style={styles.searchInput}
-                placeholder="e.g. Chicken, Rice, Bread..."
-                placeholderTextColor={colors.textSecondary}
-                value={foodSearch}
-                onChangeText={setFoodSearch}
-              />
-              {foodSearch.length > 0 && (
-                <TouchableOpacity onPress={() => { setFoodSearch(''); setShowFoodSearch(false); }}>
-                  <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {/* Food Search Results */}
-            {showFoodSearch && filteredFoods.length > 0 && (
-              <View style={styles.searchResults}>
-                {filteredFoods.slice(0, 8).map((food, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={styles.resultItem}
-                    onPress={() => {
-                      setSelectedFoodItem(food);
-                      const calories = food.calories_kcal || food.calories || 0;
-                      setCalorieInput(String(Math.round(calories * parseFloat(mealQuantity || '1'))));
-                      setFoodSearch('');
-                      setShowFoodSearch(false);
-                    }}
-                  >
-                    <View style={styles.resultInfo}>
-                      <Text style={styles.resultFoodName}>{food.food_name || food.name}</Text>
-                      <Text style={styles.resultCategory}>{food.category || (food.serving_size ? `Serving: ${food.serving_size}` : '')}</Text>
-                    </View>
-                    <Text style={styles.resultCalories}>{Math.round((food.calories_kcal || food.calories || 0) * parseFloat(mealQuantity || '1'))} cals</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-
-            {showFoodSearch && foodSearch.length > 0 && filteredFoods.length === 0 && (
-              <Text style={styles.noResults}>No foods found. Enter custom calories below.</Text>
-            )}
-          </View>
-
-          {/* Selected Food Display */}
-          {selectedFoodItem && (
+          {/* Selected Food Display - Only for Meal Mode */}
+          {trackingMode === 'meal' && selectedFoodItem && (
             <View style={styles.selectedFoodBox}>
               <View style={styles.selectedFoodHeader}>
                 <Ionicons name="checkmark-circle" size={24} color={colors.success} />
@@ -2170,6 +2048,16 @@ const getStyles = (colors: any) => StyleSheet.create({
         marginBottom: hp(2),
         gap: wp(3),
     },
+    trackingContentCard: {
+        backgroundColor: colors.cardBackground,
+        borderRadius: wp(4),
+        padding: wp(4),
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+    },
     inputColumn: {
         flex: 1,
         backgroundColor: colors.cardBackground,
@@ -2425,12 +2313,15 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     // Tracking Mode Selector Styles
     trackingModeSection: {
-        backgroundColor: colors.gray + '08',
-        borderRadius: 12,
-        padding: wp(4),
-        marginBottom: hp(2),
-        borderWidth: 1,
-        borderColor: colors.primary + '20',
+        backgroundColor: colors.cardBg,
+        borderRadius: 16,
+        padding: wp(5),
+        marginBottom: hp(2.5),
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 3,
     },
     trackingModeTitle: {
         fontSize: Math.min(hp(1.5), wp(3.5)),
@@ -2459,14 +2350,12 @@ const getStyles = (colors: any) => StyleSheet.create({
         gap: wp(1.5),
     },
     modeButtonActive: {
-        backgroundColor: colors.primary + '15',
-        borderWidth: 2,
-        borderColor: colors.primary,
+        backgroundColor: colors.primary,
         shadowColor: colors.primary,
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.15,
-        shadowRadius: 5,
-        elevation: 3,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 5,
     },
     modeButtonText: {
         fontSize: Math.min(hp(1.4), wp(3.2)),
@@ -2474,7 +2363,7 @@ const getStyles = (colors: any) => StyleSheet.create({
         color: colors.textSecondary,
     },
     modeButtonTextActive: {
-        color: colors.primary,
+        color: '#FFFFFF',
         fontWeight: '700',
     },
     modeButtonDivider: {
