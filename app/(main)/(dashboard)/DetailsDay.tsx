@@ -591,194 +591,201 @@ export default function DetailsDay () {
         <View style={styles.menuContent}>
           {/* MEAL TRACKING MODE */}
           {trackingMode === 'meal' && (
-            <View style={styles.trackingContentCard}>
-              {/* Meal Suggestions */}
-              <View style={styles.miniSuggestionsSection}>
-                <Text style={styles.miniSuggestionsTitle}>Quick Pick</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.miniSuggestionsScroll}>
-                  {suggestedFoods.slice(0, 4).map((food, index) => (
+            <>
+              {/* Quick Pick Suggestions */}
+              <View style={styles.sectionContainer}>
+                <Text style={styles.sectionLabel}>Quick Pick Favorites</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickPickScroll}>
+                  {suggestedFoods.slice(0, 6).map((food, index) => (
                     <TouchableOpacity
                       key={index}
-                      style={styles.miniSuggestionCard}
+                      style={styles.quickPickItem}
                       onPress={() => {
                         setSelectedFoodItem(food);
                         setCalorieInput(String(food.calories_kcal || food.calories));
-                      }}
-                    >
-                      <Text style={styles.miniSuggestionText}>{food.food_name || food.name}</Text>
-                      <Text style={styles.miniSuggestionCals}>{food.calories_kcal || food.calories}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-
-              {/* Food Search */}
-              <View style={styles.inputGroup}>
-                <View style={styles.labelRow}>
-                  <Ionicons name="search" size={20} color={colors.primary} />
-                  <Text style={styles.label}>Search Food</Text>
-                </View>
-                <TextInput 
-                  style={styles.input}
-                  placeholder="Search Pakistani dishes..."
-                  placeholderTextColor={colors.textSecondary}
-                  value={foodSearch}
-                  onChangeText={setFoodSearch}
-                />
-              </View>
-
-              {showFoodSearch && filteredFoods.length > 0 && (
-                <ScrollView style={styles.foodResultsList} nestedScrollEnabled>
-                  {filteredFoods.slice(0, 3).map((food, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={styles.foodResultItem}
-                      onPress={() => {
-                        setSelectedFoodItem(food);
-                        const calories = food.calories_kcal || food.calories || 0;
-                        setCalorieInput(String(Math.round(calories * parseFloat(mealQuantity || '1'))));
                         setFoodSearch('');
+                        setShowFoodSearch(false);
                       }}
+                      activeOpacity={0.7}
                     >
-                      <Text style={styles.foodResultName}>{food.food_name || food.name}</Text>
-                      <Text style={styles.foodResultCals}>{food.calories_kcal || food.calories} cals</Text>
+                      <View style={styles.quickPickIcon}>
+                        <Ionicons name="restaurant" size={20} color={colors.primary} />
+                      </View>
+                      <Text style={styles.quickPickName} numberOfLines={2}>{food.food_name || food.name}</Text>
+                      <View style={styles.quickPickCalories}>
+                        <Ionicons name="flame" size={12} color="#FF6B6B" />
+                        <Text style={styles.quickPickCalText}>{food.calories_kcal || food.calories}</Text>
+                      </View>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
+              </View>
+
+              {/* Search Food Field */}
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>
+                  <Ionicons name="search" size={16} color={colors.primary} /> Search Food
+                </Text>
+                <View style={styles.searchInputContainer}>
+                  <Ionicons name="search-outline" size={20} color={colors.textSecondary} style={styles.searchIconLeft} />
+                  <TextInput 
+                    style={styles.searchInputField}
+                    placeholder="Search Pakistani dishes, rice, chicken..."
+                    placeholderTextColor={colors.textSecondary}
+                    value={foodSearch}
+                    onChangeText={setFoodSearch}
+                  />
+                  {foodSearch.length > 0 && (
+                    <TouchableOpacity onPress={() => { setFoodSearch(''); setShowFoodSearch(false); }} style={styles.searchClearButton}>
+                      <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
+              {/* Search Results with Better Spacing */}
+              {showFoodSearch && filteredFoods.length > 0 && (
+                <View style={styles.searchResultsContainer}>
+                  <Text style={styles.searchResultsHeader}>
+                    Found {filteredFoods.length} items - Select one
+                  </Text>
+                  <ScrollView style={styles.searchResultsScroll} nestedScrollEnabled showsVerticalScrollIndicator={true}>
+                    {filteredFoods.slice(0, 10).map((food, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={styles.searchResultCard}
+                        onPress={() => {
+                          setSelectedFoodItem(food);
+                          const calories = food.calories_kcal || food.calories || 0;
+                          setCalorieInput(String(Math.round(calories * parseFloat(mealQuantity || '1'))));
+                          setFoodSearch('');
+                          setShowFoodSearch(false);
+                        }}
+                        activeOpacity={0.6}
+                      >
+                        <View style={styles.searchResultLeft}>
+                          <View style={styles.searchResultIconBg}>
+                            <Ionicons name="fast-food" size={18} color={colors.primary} />
+                          </View>
+                          <View style={styles.searchResultInfo}>
+                            <Text style={styles.searchResultTitle}>{food.food_name || food.name}</Text>
+                            <Text style={styles.searchResultMeta}>
+                              {food.serving_size || food.category || '100g'}
+                            </Text>
+                          </View>
+                        </View>
+                        <View style={styles.searchResultRight}>
+                          <Text style={styles.searchResultCalValue}>{food.calories_kcal || food.calories}</Text>
+                          <Text style={styles.searchResultCalLabel}>cal</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
               )}
-            </View>
+            </>
           )}
 
           {/* HYDRATION TRACKING MODE */}
           {trackingMode === 'hydration' && (
-            <View style={styles.trackingContentCard}>
-              {/* Water Quick Suggestions */}
-              <View style={styles.miniSuggestionsSection}>
-                <Text style={styles.miniSuggestionsTitle}>Quick Pick</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.miniSuggestionsScroll}>
+            <>
+              {/* Quick Water Amounts */}
+              <View style={styles.sectionContainer}>
+                <Text style={styles.sectionLabel}>Quick Add Water</Text>
+                <View style={styles.waterQuickGrid}>
                   {waterIntakeDatabase.options.map((option) => (
                     <TouchableOpacity
                       key={option.name}
-                      style={styles.miniWaterCard}
+                      style={styles.waterQuickOption}
                       onPress={() => setWaterInput(option.amount.toString())}
+                      activeOpacity={0.7}
                     >
-                      <Ionicons name="water" size={16} color="#4ECDC4" />
-                      <Text style={styles.miniWaterText}>{option.name}</Text>
+                      <View style={styles.waterQuickIconBg}>
+                        <Ionicons name="water" size={24} color="#4ECDC4" />
+                      </View>
+                      <Text style={styles.waterQuickLabel}>{option.name}</Text>
+                      <Text style={styles.waterQuickAmount}>{option.amount}L</Text>
                     </TouchableOpacity>
                   ))}
-                </ScrollView>
-              </View>
-
-              {/* Glass Counter Display */}
-              <View style={styles.glassCounterSection}>
-                <View style={styles.glassCounterHeader}>
-                  <Ionicons name="water" size={18} color="#4ECDC4" />
-                  <Text style={styles.glassCounterTitle}>Glasses</Text>
-                </View>
-                <View style={styles.glassCounterDisplay}>
-                  <Text style={styles.glassCount}>
-                    {Math.round((parseFloat(waterInput || '0') / 0.25) * 10) / 10}
-                  </Text>
-                  <Text style={styles.glassLabel}>glasses (250ml each)</Text>
                 </View>
               </View>
 
-              {/* Water Input with +/- by Glass */}
-              <View style={styles.waterControlSection}>
-                <TouchableOpacity 
-                  style={styles.waterControlButton}
-                  onPress={() => {
-                    const current = parseFloat(waterInput) || 0;
-                    setWaterInput(Math.max(0, current - 0.25).toFixed(2));
-                  }}
-                >
-                  <Ionicons name="remove" size={18} color="#4ECDC4" />
-                </TouchableOpacity>
-                <View style={styles.waterInputDisplay}>
-                  <TextInput
-                    style={styles.waterInputField}
-                    value={waterInput}
-                    onChangeText={setWaterInput}
-                    keyboardType="decimal-pad"
-                    placeholder="0.25"
-                  />
-                  <Text style={styles.waterUnitLabel}>L</Text>
+              {/* Water Amount Input */}
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>
+                  <Ionicons name="water" size={16} color="#4ECDC4" /> Water Amount
+                </Text>
+                <View style={styles.waterAmountSelector}>
+                  <TouchableOpacity 
+                    style={styles.waterAdjustButton}
+                    onPress={() => {
+                      const current = parseFloat(waterInput) || 0;
+                      setWaterInput(Math.max(0, current - 0.25).toFixed(2));
+                    }}
+                  >
+                    <Ionicons name="remove-circle" size={36} color="#4ECDC4" />
+                  </TouchableOpacity>
+                  
+                  <View style={styles.waterDisplayBox}>
+                    <TextInput
+                      style={styles.waterValueInput}
+                      value={waterInput}
+                      onChangeText={setWaterInput}
+                      keyboardType="decimal-pad"
+                      placeholder="0.00"
+                      placeholderTextColor={colors.textSecondary}
+                    />
+                    <Text style={styles.waterUnit}>Liters</Text>
+                    <Text style={styles.waterGlasses}>
+                      ≈ {Math.round((parseFloat(waterInput || '0') / 0.25) * 10) / 10} glasses
+                    </Text>
+                  </View>
+                  
+                  <TouchableOpacity 
+                    style={styles.waterAdjustButton}
+                    onPress={() => {
+                      const current = parseFloat(waterInput) || 0;
+                      setWaterInput((current + 0.25).toFixed(2));
+                    }}
+                  >
+                    <Ionicons name="add-circle" size={36} color="#4ECDC4" />
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity 
-                  style={styles.waterControlButton}
-                  onPress={() => {
-                    const current = parseFloat(waterInput) || 0;
-                    setWaterInput((current + 0.25).toFixed(2));
-                  }}
-                >
-                  <Ionicons name="add" size={18} color="#4ECDC4" />
-                </TouchableOpacity>
               </View>
 
-              <Text style={styles.waterDisplayLabel}>
-                {waterInput}L ({Math.round(parseFloat(waterInput || '0') * 1000)}ml)
-              </Text>
-
-              {/* Hydration Progress Indicator */}
-              <View style={styles.hydrationProgressSection}>
-                <View style={styles.hydrationProgressHeader}>
-                  <Text style={styles.hydrationProgressTitle}>Today's Hydration</Text>
-                  <Text style={styles.hydrationProgressPercent}>
+              {/* Hydration Progress */}
+              <View style={styles.progressContainer}>
+                <View style={styles.hydProgressHeader}>
+                  <Text style={styles.progressTitle}>Today's Progress</Text>
+                  <Text style={styles.progressPercent}>
                     {calculatePercentage(dayData.achieviedHydration + parseFloat(waterInput || '0'), dayData.targetHydration)}%
                   </Text>
                 </View>
-                <View style={styles.hydrationProgressBar}>
+                <View style={styles.progressBarBg}>
                   <View
                     style={[
-                      styles.hydrationProgressFill,
+                      styles.progressBarFg,
                       {
-                        width: `${Math.min(((dayData.achieviedHydration + parseFloat(waterInput || '0')) / dayData.targetHydration) * 100, 100)}%`
+                        width: `${Math.min(((dayData.achieviedHydration + parseFloat(waterInput || '0')) / dayData.targetHydration) * 100, 100)}%`,
+                        backgroundColor: '#4ECDC4'
                       }
                     ]}
                   />
                 </View>
-                <View style={styles.hydrationProgressText}>
-                  <Text style={styles.hydrationProgressCurrent}>
-                    {dayData.achieviedHydration}L logged
-                  </Text>
-                  <Text style={styles.hydrationProgressTarget}>
-                    Goal: {dayData.targetHydration}L
+                <View style={styles.progressStats}>
+                  <Text style={styles.progressCurrent}>
+                    {(dayData.achieviedHydration + parseFloat(waterInput || '0')).toFixed(2)}L of {dayData.targetHydration}L
                   </Text>
                 </View>
               </View>
-            </View>
+            </>
           )}
 
-          {/* Search Results Section - Only for Meal Mode */}
-          {trackingMode === 'meal' && showFoodSearch && (
-            <View style={styles.suggestionsSection}>
-              <Text style={styles.suggestionTitle}>Your Daily Goal Suggestions</Text>
-              <ScrollView 
-                horizontal 
-                showsHorizontalScrollIndicator={false}
-                style={styles.suggestionsScroll}
-                contentContainerStyle={styles.suggestionsContent}
-              >
-                {suggestedFoods.map((food, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={styles.suggestionCard}
-                    onPress={() => {
-                      setSelectedFoodItem(food);
-                      setCalorieInput(String(food.calories));
-                    }}
-                  >
-                    <Text style={styles.suggestionFoodName}>{food.name}</Text>
-                    <Text style={styles.suggestionCalories}>{food.calories} cals</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          )}
+
 
           {/* Selected Food Display - Only for Meal Mode */}
           {trackingMode === 'meal' && selectedFoodItem && (
-            <View style={styles.selectedFoodBox}>
+            <View style={styles.selectedFoodContainer}>
               <View style={styles.selectedFoodHeader}>
                 <Ionicons name="checkmark-circle" size={24} color={colors.success} />
                 <View style={styles.selectedFoodInfo}>
@@ -862,12 +869,12 @@ export default function DetailsDay () {
             </View>
           )}
 
-          {/* Manual Calorie Input */}
-          <View style={styles.inputGroup}>
-            <View style={styles.labelRow}>
-              <Ionicons name="flame-outline" size={20} color="#FF6B6B" />
-              <Text style={styles.label}>Calories</Text>
-            </View>
+          {/* Manual Calorie Input - Only for Meal Mode */}
+          {trackingMode === 'meal' && (
+          <View style={styles.fieldContainer}>
+            <Text style={styles.fieldLabel}>
+              <Ionicons name="flame-outline" size={16} color="#FF6B6B" /> Calories
+            </Text>
             <View style={styles.calorieInputContainer}>
               <TextInput 
                 style={styles.input} 
@@ -897,6 +904,7 @@ export default function DetailsDay () {
               )}
             </View>
           </View>
+          )}
 
           {/* Notes */}
           <View style={styles.inputGroup}>
@@ -2057,6 +2065,312 @@ const getStyles = (colors: any) => StyleSheet.create({
         shadowOpacity: 0.05,
         shadowRadius: 8,
         elevation: 2,
+    },
+    // New Professional Styles
+    sectionContainer: {
+        marginBottom: hp(2.5),
+    },
+    sectionLabel: {
+        fontSize: Math.min(hp(1.8), wp(4)),
+        fontWeight: '700',
+        color: colors.textPrimary,
+        marginBottom: hp(1.2),
+        letterSpacing: 0.3,
+    },
+    fieldContainer: {
+        marginBottom: hp(2.5),
+    },
+    fieldLabel: {
+        fontSize: Math.min(hp(1.6), wp(3.8)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+        marginBottom: hp(1),
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    // Quick Pick Styles
+    quickPickScroll: {
+        marginTop: hp(0.5),
+    },
+    quickPickItem: {
+        width: wp(28),
+        marginRight: wp(3),
+        padding: wp(3),
+        backgroundColor: colors.cardBackground,
+        borderRadius: wp(3),
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    quickPickIcon: {
+        width: wp(12),
+        height: wp(12),
+        borderRadius: wp(6),
+        backgroundColor: colors.primary + '15',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: hp(0.8),
+    },
+    quickPickName: {
+        fontSize: Math.min(hp(1.4), wp(3.2)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+        textAlign: 'center',
+        marginBottom: hp(0.5),
+        minHeight: hp(4),
+    },
+    quickPickCalories: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(1),
+    },
+    quickPickCalText: {
+        fontSize: Math.min(hp(1.3), wp(3)),
+        fontWeight: '700',
+        color: '#FF6B6B',
+    },
+    // Search Input Styles
+    searchInputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.cardBackground,
+        borderRadius: wp(3),
+        paddingHorizontal: wp(3),
+        paddingVertical: hp(1.2),
+        borderWidth: 1,
+        borderColor: colors.borderColor || '#E5E7EB',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 3,
+        elevation: 1,
+    },
+    searchIconLeft: {
+        marginRight: wp(2),
+    },
+    searchInputField: {
+        flex: 1,
+        fontSize: Math.min(hp(1.7), wp(4)),
+        color: colors.textPrimary,
+        padding: 0,
+    },
+    searchClearButton: {
+        padding: wp(1),
+    },
+    // Search Results Styles
+    searchResultsContainer: {
+        marginTop: hp(1),
+        backgroundColor: colors.cardBackground,
+        borderRadius: wp(3),
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 6,
+        elevation: 3,
+    },
+    searchResultsHeader: {
+        fontSize: Math.min(hp(1.4), wp(3.3)),
+        fontWeight: '600',
+        color: colors.textSecondary,
+        padding: wp(3),
+        backgroundColor: colors.gray + '10',
+        borderBottomWidth: 1,
+        borderBottomColor: colors.borderColor || '#E5E7EB',
+    },
+    searchResultsScroll: {
+        maxHeight: hp(35),
+    },
+    searchResultCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: wp(4),
+        borderBottomWidth: 1,
+        borderBottomColor: colors.borderColor || '#E5E7EB',
+        backgroundColor: colors.cardBackground,
+    },
+    searchResultLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+        marginRight: wp(3),
+    },
+    searchResultIconBg: {
+        width: wp(10),
+        height: wp(10),
+        borderRadius: wp(5),
+        backgroundColor: colors.primary + '15',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: wp(3),
+    },
+    searchResultInfo: {
+        flex: 1,
+    },
+    searchResultTitle: {
+        fontSize: Math.min(hp(1.7), wp(4)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+        marginBottom: hp(0.3),
+    },
+    searchResultMeta: {
+        fontSize: Math.min(hp(1.3), wp(3)),
+        color: colors.textSecondary,
+    },
+    searchResultRight: {
+        alignItems: 'flex-end',
+    },
+    searchResultCalValue: {
+        fontSize: Math.min(hp(2), wp(4.8)),
+        fontWeight: '700',
+        color: '#FF6B6B',
+    },
+    searchResultCalLabel: {
+        fontSize: Math.min(hp(1.2), wp(2.8)),
+        color: colors.textSecondary,
+        marginTop: hp(0.2),
+    },
+    // Selected Food Container
+    selectedFoodContainer: {
+        marginBottom: hp(2),
+        backgroundColor: colors.cardBackground,
+        borderRadius: wp(4),
+        padding: wp(4),
+        borderWidth: 2,
+        borderColor: colors.success + '30',
+        shadowColor: colors.success,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
+        elevation: 3,
+    },
+    // Water Styles
+    waterQuickGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: wp(3),
+        marginTop: hp(1),
+    },
+    waterQuickOption: {
+        width: wp(42),
+        padding: wp(4),
+        backgroundColor: colors.cardBackground,
+        borderRadius: wp(3),
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#4ECDC4' + '20',
+        shadowColor: '#4ECDC4',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    waterQuickIconBg: {
+        marginBottom: hp(1),
+    },
+    waterQuickLabel: {
+        fontSize: Math.min(hp(1.5), wp(3.5)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+        marginBottom: hp(0.5),
+    },
+    waterQuickAmount: {
+        fontSize: Math.min(hp(1.8), wp(4.2)),
+        fontWeight: '700',
+        color: '#4ECDC4',
+    },
+    waterAmountSelector: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: hp(1),
+    },
+    waterAdjustButton: {
+        padding: wp(2),
+    },
+    waterDisplayBox: {
+        flex: 1,
+        backgroundColor: colors.cardBackground,
+        borderRadius: wp(4),
+        padding: wp(4),
+        alignItems: 'center',
+        marginHorizontal: wp(2),
+        borderWidth: 2,
+        borderColor: '#4ECDC4',
+        shadowColor: '#4ECDC4',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        elevation: 3,
+    },
+    waterValueInput: {
+        fontSize: Math.min(hp(4), wp(10)),
+        fontWeight: '700',
+        color: '#4ECDC4',
+        textAlign: 'center',
+        padding: 0,
+        minWidth: wp(20),
+    },
+    waterUnit: {
+        fontSize: Math.min(hp(1.6), wp(3.8)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+        marginTop: hp(0.5),
+    },
+    waterGlasses: {
+        fontSize: Math.min(hp(1.3), wp(3)),
+        color: colors.textSecondary,
+        marginTop: hp(0.3),
+    },
+    // Progress Styles
+    progressContainer: {
+        marginTop: hp(2),
+        padding: wp(4),
+        backgroundColor: colors.cardBackground,
+        borderRadius: wp(3),
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    hydProgressHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: hp(1),
+    },
+    progressTitle: {
+        fontSize: Math.min(hp(1.6), wp(3.8)),
+        fontWeight: '700',
+        color: colors.textPrimary,
+    },
+    progressPercent: {
+        fontSize: Math.min(hp(1.8), wp(4.2)),
+        fontWeight: '700',
+        color: '#4ECDC4',
+    },
+    progressBarBg: {
+        height: hp(1.2),
+        backgroundColor: colors.gray + '30',
+        borderRadius: hp(0.6),
+        overflow: 'hidden',
+    },
+    progressBarFg: {
+        height: '100%',
+        borderRadius: hp(0.6),
+    },
+    progressStats: {
+        marginTop: hp(0.8),
+    },
+    progressCurrent: {
+        fontSize: Math.min(hp(1.4), wp(3.2)),
+        color: colors.textSecondary,
+        fontWeight: '500',
     },
     inputColumn: {
         flex: 1,
