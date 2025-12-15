@@ -221,9 +221,9 @@ export default function DetailsDay () {
         // Get backend URL
         const ENV = Constants.expoConfig?.extra;
         const baseUrl = ENV?.EXPO_PUBLIC_BACKEND_API_URL || 'http://localhost:5001/api';
-        const apiUrl = baseUrl.replace('/api', '') + '/api/vision/detect-dish';
+        const apiUrl = baseUrl.replace('/api', '') + '/api/food-detect/upload';
 
-        // Upload to backend
+        // Upload to backend (Clarifai food detection)
         const response = await fetch(apiUrl, {
           method: 'POST',
           body: formData,
@@ -234,8 +234,8 @@ export default function DetailsDay () {
 
         const data = await response.json();
 
-        if (data.success && data.dish) {
-          const dishName = data.dish;
+        if (data.success && data.foodName) {
+          const dishName = data.foodName;
           setDetectedDishName(dishName);
           
           // Auto-search in the food database
@@ -257,16 +257,16 @@ export default function DetailsDay () {
             setShowFoodSearch(false);
             
             Alert.alert(
-              'Dish Detected!',
-              `Found: ${bestMatch.food_name || bestMatch.name}\nCalories: ${calories} kcal\n\nYou can adjust the quantity and add the meal.`,
+              'Food Detected! 🎯',
+              `Found: ${bestMatch.food_name || bestMatch.name}\nCalories: ${calories} kcal\nConfidence: ${Math.round(data.confidence * 100)}%\n\nYou can adjust the quantity and add the meal.`,
               [{ text: 'OK' }]
             );
           } else {
             // Show search results if no exact match
             setShowFoodSearch(true);
             Alert.alert(
-              'Dish Detected',
-              `Detected: ${dishName}\n\nPlease select from the search results or enter details manually.`,
+              'Food Detected',
+              `Detected: ${dishName}\nConfidence: ${Math.round(data.confidence * 100)}%\n\nPlease select from the search results or enter details manually.`,
               [{ text: 'OK' }]
             );
           }
