@@ -1,4 +1,5 @@
 import AppHeader from "@/components/AppHeader";
+import { BottomTabBar } from "@/components/BottomTabBar";
 import { useAppointments } from "@/contexts/AppointmentContext";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,8 +9,8 @@ import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from "react";
 import { Image, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import {
-  heightPercentageToDP as hp,
-  widthPercentageToDP as wp,
+    heightPercentageToDP as hp,
+    widthPercentageToDP as wp,
 } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colorsSheet } from "./(settings)/_ui_elements";
@@ -99,15 +100,16 @@ export default function ProfileScreen() {
   ];
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
-      <AppHeader 
-        title="My Profile"
-        showStepIndicator={false}
-        showMenuButton={true}
-      />
+    <View style={{ flex: 1 }}>
+      <SafeAreaView style={styles.container} edges={['bottom']}>
+        <AppHeader 
+          title="My Profile"
+          showStepIndicator={false}
+          showMenuButton={true}
+        />
 
-      <View style={styles.content}>
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <View style={styles.content}>
+          <ScrollView showsVerticalScrollIndicator={false}>
         {/* Profile Picture Section */}
         <View style={{
           alignItems: 'center',
@@ -401,6 +403,8 @@ export default function ProfileScreen() {
         </ScrollView>
       </View>
     </SafeAreaView>
+    <BottomTabBar />
+    </View>
   );
 }
 
