@@ -97,6 +97,25 @@ export default function DoctorPortal() {
               <Ionicons name="lock-closed" size={20} color={colorsSheet.textSecondary} style={styles.lockIcon} />
             )}
           </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.featureItem, doctorStatus !== 'approved' && styles.featureItemDisabled]}
+            disabled={doctorStatus !== 'approved'}
+            onPress={() => doctorStatus === 'approved' && router.push('/(main)/(doctor-portal)/all-chats')}
+            activeOpacity={doctorStatus === 'approved' ? 0.7 : 1}
+          >
+            <Ionicons 
+              name="chatbubbles" 
+              size={30} 
+              color={doctorStatus === 'approved' ? colorsSheet.primary : colorsSheet.textSecondary} 
+            />
+            <Text style={[styles.featureText, doctorStatus !== 'approved' && styles.featureTextDisabled]}>
+              All Chats
+            </Text>
+            {doctorStatus !== 'approved' && (
+              <Ionicons name="lock-closed" size={20} color={colorsSheet.textSecondary} style={styles.lockIcon} />
+            )}
+          </TouchableOpacity>
           
           <TouchableOpacity 
             style={[styles.featureItem, doctorStatus !== 'approved' && styles.featureItemDisabled]}

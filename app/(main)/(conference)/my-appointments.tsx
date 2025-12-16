@@ -1,4 +1,5 @@
 import AppHeader from '@/components/AppHeader';
+import ChatButton from '@/components/ChatButton';
 import { useTheme } from '@/contexts/ThemeContext';
 import { authApi } from '@/utils/auth/authApi';
 import { Ionicons } from '@expo/vector-icons';
@@ -432,6 +433,17 @@ export default function MyAppointmentsScreen() {
 
                 {/* Action Buttons */}
                 <View style={styles.section}>
+                  {/* Chat Button - Shows only for confirmed appointments */}
+                  {selectedAppointment.status === 'confirmed' && (
+                    <View style={styles.chatButtonContainer}>
+                      <ChatButton 
+                        appointmentId={selectedAppointment._id} 
+                        size="large"
+                        style={styles.chatButton}
+                      />
+                    </View>
+                  )}
+
                   {selectedAppointment.status !== 'cancelled' &&
                     selectedAppointment.status !== 'completed' && (
                       <>
@@ -770,6 +782,13 @@ const getStyles = (colors: any) =>
       fontSize: hp(1.6),
       color: colors.textPrimary,
       lineHeight: hp(2.4),
+    },
+    chatButtonContainer: {
+      marginBottom: hp(2),
+      alignItems: 'center',
+    },
+    chatButton: {
+      width: '100%',
     },
     actionButton: {
       flexDirection: 'row',

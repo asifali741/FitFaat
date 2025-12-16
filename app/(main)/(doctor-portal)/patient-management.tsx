@@ -1,4 +1,5 @@
 import AppHeader from '@/components/AppHeader';
+import ChatButton from '@/components/ChatButton';
 import { authApi } from '@/utils/auth/authApi';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -144,6 +145,28 @@ export default function PatientManagementScreen() {
       Alert.alert('Error', error.message || 'Failed to reject appointment');
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const grantChatAccess = async (appointmentId: string) => {
+    try {
+      const response = await authApi.grantChatAccess(appointmentId);
+      
+      if (response.success) {
+        Alert.alert('Success', 'Chat access granted to user');
+        fetchDoctorAppointments();
+        if (selectedAppointment && selectedAppointment._id === appointmentId) {
+          setSelectedAppointment({
+            ...selectedAppointment,
+            chatAccessGrantedAt: response.chatAccessGrantedAt
+          });
+        }
+      } else {
+        Alert.alert('Error', response.message || 'Failed to grant access');
+      }
+    } catch (error) {
+      console.error('Failed to grant chat access:', error);
+      Alert.alert('Error', 'Failed to grant chat access');
     }
   };
 
@@ -455,6 +478,33 @@ export default function PatientManagementScreen() {
                 </View>
 
                 {/* Action Buttons */}
+                {/* Chat Button - Shows only for confirmed appointments */}
+                {selectedAppointment.status === 'confirmed' && (
+                  <View style={styles.chatSection}>
+                    <ChatButton 
+                      appointmentId={selectedAppointment._id} 
+                      size="large"
+                      style={styles.chatButton}
+                    />
+                    
+                    {!selectedAppointment.chatAccessGrantedAt && (
+                      <TouchableOpacity
+                        style={styles.grantAccessButton}
+                        onPress={() => grantChatAccess(selectedAppointment._id)}
+                      >
+                        <Ionicons name="key" size={20} color="#FFF" />
+                        <Text style={styles.grantAccessButtonText}>Grant Chat Access to User</Text>
+                      </TouchableOpacity>
+                    )}
+                    
+                    {selectedAppointment.chatAccessGrantedAt && (
+                      <Text style={styles.accessGrantedText}>
+                        ✓ Chat access granted
+                      </Text>
+                    )}
+                  </View>
+                )}
+
                 {selectedAppointment.status === 'pending' && (
                   <View style={styles.actionSection}>
                     <TouchableOpacity
@@ -926,6 +976,36 @@ const getStyles = () =>
     statusValue: {
       fontSize: hp(1.8),
       fontWeight: 'bold',
+    },
+    chatSection: {
+      marginBottom: hp(2),
+      alignItems: 'center',
+    },
+    chatButton: {
+      width: '100%',
+    },
+    grantAccessButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#28a745',
+      paddingVertical: hp(1.5),
+      paddingHorizontal: wp(4),
+      borderRadius: 8,
+      marginTop: hp(1),
+      width: '100%',
+      gap: 8,
+    },
+    grantAccessButtonText: {
+      color: '#FFF',
+      fontSize: wp(3.5),
+      fontWeight: '600',
+    },
+    accessGrantedText: {
+      color: '#28a745',
+      fontSize: wp(3.5),
+      fontWeight: '500',
+      marginTop: hp(1),
     },
     actionSection: {
       gap: hp(1.2),
