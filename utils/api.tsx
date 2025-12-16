@@ -1,8 +1,18 @@
 // Utility to call the Gemini model hosted on openrouter.ai
 import Constants from 'expo-constants';
+import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 
 // Get API key from .env via Expo's Constants
 const ENV = Constants.expoConfig?.extra;
+
+// Get backend API URL
+const getBackendApiUrl = (): string => {
+  if (Platform.OS === 'android') {
+    return 'http://10.0.2.2:5001/api';
+  }
+  return 'http://localhost:5001/api';
+};
 
 // Helper function to check if query is a greeting or thanks/help
 function isGreetingQuery(query: string): boolean {
@@ -275,6 +285,137 @@ export async function callGemini(
   }
   if (choice?.text) return String(choice.text);
   return JSON.stringify(data);
+}
+
+/**
+ * Send message to health-only AI chatbot backend
+ * Uses Google Gemini API with health-guard filtering
+ */
+export async function sendChatbotMessage(
+  message: string,
+  sessionId?: string
+): Promise<{
+  userMessage: {
+    role: 'user';
+    content: string;
+    source: string;
+    timestamp: string;
+  };
+  aiResponse: {
+    role: 'assistant';
+    content: string;
+    source: 'food_dataset' | 'exercise_dataset' | 'gemini_ai';
+    timestamp: string;
+  };
+}> {
+  try {
+    // Get auth token
+    const token = await SecureStore.getItemAsync('fitfaat_auth_token');
+    if (!token) {
+      throw new Error('Authentication required. Please log in.');
+    }
+
+    const apiUrl = getBackendApiUrl();
+    const endpoint = `${apiUrl}/chatbot/message`;
+
+    console.log('🤖 Sending message to chatbot:', { message, sessionId, endpoint });
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        message: message.trim(),
+        ...(sessionId && { sessionId }),
+      }),
+    });
+
+    const responseText = await response.text();
+    console.log('📥 Backend response status:', response.status);
+
+    if (!response.ok) {
+      let errorMessage = 'Failed to get chatbot response';
+      
+      try {
+        const errorData = JSON.parse(responseText);
+        errorMessage = errorData.message || errorMessage;
+      } catch (e) {
+        errorMessage = responseText || errorMessage;
+      }
+
+      if (response.status === 401) {
+        throw new Error('Session expired. Please log in again.');
+      }
+      
+      throw new Error(errorMessage);
+    }
+
+    const data = JSON.parse(responseText);
+    console.log('✅ Chatbot response received:', {
+      success: data.success,
+      hasData: !!data.data,
+      source: data.data?.aiResponse?.source,
+      contentLength: data.data?.aiResponse?.content?.length,
+    });
+
+    // Backend returns data in data.data format
+    return data.data;
+  } catch (error) {
+    console.error('❌ Chatbot API error:', error);
+    
+    if (error instanceof Error) {
+      throw error;
+    }
+    
+    throw new Error('Network error. Please check your connection.');
+  }
+}
+
+/**
+ * Get chat history
+ */
+export async function getChatHistory(
+  limit: number = 50,
+  sessionId?: string
+): Promise<Array<{
+  role: 'user' | 'assistant';
+  content: string;
+  source: string;
+  timestamp: string;
+}>> {
+  try {
+    const token = await SecureStore.getItemAsync('fitfaat_auth_token');
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    const apiUrl = getBackendApiUrl();
+    const params = new URLSearchParams({
+      limit: limit.toString(),
+      ...(sessionId && { sessionId }),
+    });
+    
+    const endpoint = `${apiUrl}/chatbot/history?${params}`;
+
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch chat history');
+    }
+
+    const data = await response.json();
+    return data.messages || [];
+  } catch (error) {
+    console.error('❌ Failed to fetch chat history:', error);
+    return [];
+  }
 }
 
 export default callGemini;

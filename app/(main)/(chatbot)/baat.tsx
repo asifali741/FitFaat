@@ -1,7 +1,7 @@
-import { useTheme } from "@/contexts/ThemeContext";
 import AppHeader from "@/components/AppHeader";
 import Message from "@/components/Message";
 import { useChatbotStorage } from "@/contexts/ChatbotStorage";
+import { useTheme } from "@/contexts/ThemeContext";
 import Controls from "@/Control/controls";
 import { useRouter } from "expo-router";
 import React, { useEffect } from "react";
@@ -52,8 +52,13 @@ export default function Baat() {
       }))
     : [WelcomeText];
 
-  const handleAddMessage = (text: string, isUser: boolean) => {
+  const handleAddMessage = (text: string, isUser: boolean, source?: string) => {
     addMessage(text, isUser);
+    
+    // Log the source of the response for debugging
+    if (!isUser && source) {
+      console.log(`💡 Response source: ${source}`);
+    }
   };
 
   const styles = getStyles(colors, insets);
@@ -93,7 +98,10 @@ export default function Baat() {
           keyboardVerticalOffset={Platform.OS === 'ios' ? hp(10) : 0}
         >
           <View style={styles.inputContainer}>
-            <Controls onAddMessage={handleAddMessage} />
+            <Controls 
+              onAddMessage={handleAddMessage}
+              sessionId={currentSession?.id}
+            />
           </View>
         </KeyboardAvoidingView>
       </View>
