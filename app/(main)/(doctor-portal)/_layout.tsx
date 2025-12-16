@@ -1,3 +1,4 @@
+import { BottomTabBar } from "@/components/BottomTabBar";
 import { ScreenSceneWrapper } from "@/components/common/ScreenTiltAnimation";
 import { Slot } from "expo-router";
 import { View } from "react-native";
@@ -7,6 +8,7 @@ export default function DoctorPortalLayout() {
       <ScreenSceneWrapper>
         <View style={{ flex: 1 }}>
           <Slot />
+          <BottomTabBar />
         </View>
       </ScreenSceneWrapper>
     );

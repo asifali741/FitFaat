@@ -108,6 +108,8 @@ export default function MainLayout() {
       sceneStyle: { backgroundColor: "#FFFFFF" },
     }}
   >
+    <Drawer.Screen name="index" options={{ drawerItemStyle: { height: 0 } }} />
+    <Drawer.Screen name="(tabs)" options={{ drawerItemStyle: { height: 0 } }} />
     <Drawer.Screen name="(dashboard)" options={{ title: "Dashboard" }} />
     <Drawer.Screen name="(chatbot)" options={{ title: "Chatbot" }} />
     <Drawer.Screen 

@@ -1,6 +1,6 @@
-//import { Redirect } from "expo-router";
+import { Redirect } from "expo-router";
 
 export default function MainIndex() {
-    console.log("landed on /(main)/index")
-  //return <Redirect href="/(main)/(dashboard)" />;
+  console.log("landed on /(main)/index - redirecting to dashboard");
+  return <Redirect href="/(main)/(dashboard)" />;
 }
