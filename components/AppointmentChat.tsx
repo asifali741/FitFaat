@@ -24,6 +24,7 @@ interface ChatMessage {
   senderId: string;
   senderName: string;
   message: string;
+  status?: 'sent' | 'delivered' | 'read';
   isRead: boolean;
   createdAt: string;
 }
@@ -52,6 +53,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
   const [chatAccessGranted, setChatAccessGranted] = useState(false);
   const [isGrantingAccess, setIsGrantingAccess] = useState(false);
   const [otherUserName, setOtherUserName] = useState('');
+  const [patientName, setPatientName] = useState(''); // For doctor's view
   const [timeRemaining, setTimeRemaining] = useState('');
   const [chatEndTime, setChatEndTime] = useState<Date | null>(null);
   
@@ -191,6 +193,13 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
         console.log('Loaded messages:', messagesData.messages?.length || 0);
         if (messagesData.success) {
           setMessages(messagesData.messages || []);
+          
+          // Mark all messages as delivered/read after loading
+          setTimeout(() => {
+            if (socketRef.current && messagesData.messages?.length > 0) {
+              socketRef.current.emit('mark-all-read', { appointmentId });
+            }
+          }, 1000);
         }
       } else {
         console.error('Failed to load messages:', messagesResponse.status);
@@ -215,6 +224,11 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
         console.log('✅ Room details - appointmentId:', data.appointmentId, 'userRole:', data.userRole, 'canSend:', data.canSend);
         const otherName = data.otherUserName || (accessData.userRole === 'doctor' ? 'Patient' : 'Doctor');
         setOtherUserName(otherName);
+        
+        // Set patient name if user is doctor
+        if (accessData.userRole === 'doctor') {
+          setPatientName(otherName);
+        }
         
         // Update canSend from socket data (this reflects real-time access status)
         if (data.canSend !== undefined) {
@@ -248,12 +262,40 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
           
           const newMessages = [...prev, message];
           console.log('✅ Adding message to state. New count:', newMessages.length);
+          
+          // Mark message as delivered if it's from the other user
+          if (message.senderRole !== userRole && socketRef.current) {
+            socketRef.current.emit('message-delivered', { messageId: message._id });
+          }
+          
           return newMessages;
         });
         
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: true });
         }, 100);
+      });
+
+      socket.on('message-status-update', (data) => {
+        console.log('✅ Message status update:', data);
+        setMessages(prev => 
+          prev.map(msg => 
+            msg._id === data.messageId 
+              ? { ...msg, status: data.status }
+              : msg
+          )
+        );
+      });
+
+      socket.on('messages-read', (data) => {
+        console.log('👁️ All messages marked as read');
+        setMessages(prev => 
+          prev.map(msg => 
+            msg.senderRole === userRole 
+              ? { ...msg, status: 'read' }
+              : msg
+          )
+        );
       });
 
       socket.on('user-typing', (data) => {
@@ -434,6 +476,36 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
   const renderMessage = ({ item }: { item: ChatMessage }) => {
     const isOwnMessage = item.senderRole === userRole;
     
+    // Determine message status icon
+    const getMessageStatusIcon = () => {
+      if (!isOwnMessage) return null; // Only show status for sent messages
+      
+      const status = item.status || 'sent';
+      const isRead = status === 'read';
+      const iconColor = isRead ? '#4FC3F7' : '#B0BEC5'; // Blue when read, gray otherwise
+      
+      if (status === 'sent') {
+        // Single tick - sent but not delivered
+        return <Ionicons name="checkmark" size={14} color={iconColor} style={styles.statusIcon} />;
+      } else if (status === 'delivered') {
+        // Double tick - delivered but not read
+        return (
+          <View style={styles.doubleTickContainer}>
+            <Ionicons name="checkmark" size={14} color={iconColor} style={styles.doubleTick1} />
+            <Ionicons name="checkmark" size={14} color={iconColor} style={styles.doubleTick2} />
+          </View>
+        );
+      } else if (status === 'read') {
+        // Double tick blue - read
+        return (
+          <View style={styles.doubleTickContainer}>
+            <Ionicons name="checkmark" size={14} color={iconColor} style={styles.doubleTick1} />
+            <Ionicons name="checkmark" size={14} color={iconColor} style={styles.doubleTick2} />
+          </View>
+        );
+      }
+    };
+    
     return (
       <View style={[
         styles.messageContainer,
@@ -442,9 +514,9 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
         {!isOwnMessage && (
           <View style={styles.otherUserAvatar}>
             <Ionicons 
-              name={userRole === 'doctor' ? 'person-circle' : 'medical'} 
-              size={32} 
-              color="#007AFF" 
+              name={userRole === 'doctor' ? 'person' : 'medical'} 
+              size={24} 
+              color="#6C63FF" 
             />
           </View>
         )}
@@ -462,15 +534,18 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
             ]}>
               {item.message}
             </Text>
-            <Text style={[
-              styles.messageTime,
-              isOwnMessage ? styles.ownMessageTime : styles.otherMessageTime
-            ]}>
-              {new Date(item.createdAt).toLocaleTimeString([], { 
-                hour: '2-digit', 
-                minute: '2-digit' 
-              })}
-            </Text>
+            <View style={styles.messageFooter}>
+              <Text style={[
+                styles.messageTime,
+                isOwnMessage ? styles.ownMessageTime : styles.otherMessageTime
+              ]}>
+                {new Date(item.createdAt).toLocaleTimeString([], { 
+                  hour: '2-digit', 
+                  minute: '2-digit' 
+                })}
+              </Text>
+              {getMessageStatusIcon()}
+            </View>
           </View>
         </View>
       </View>
@@ -517,24 +592,24 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
         <View style={styles.headerCenter}>
           <View style={styles.profileImageContainer}>
             <Ionicons 
-              name={userRole === 'doctor' ? 'person-circle' : 'medical'} 
-              size={40} 
-              color="#FFF" 
+              name={userRole === 'doctor' ? 'person' : 'medical'} 
+              size={38} 
+              color="#6C63FF" 
             />
           </View>
           <View style={styles.headerInfo}>
-            <Text style={styles.headerName} numberOfLines={1}>
+            <Text style={styles.headerName}>
               {otherUserName || (userRole === 'doctor' ? 'Patient' : 'Doctor')}
             </Text>
             <View style={styles.timerContainer}>
-              <Ionicons name="time-outline" size={14} color="#E8F5E9" />
+              <Ionicons name="time-outline" size={14} color="#FFF" />
               <Text style={styles.timerText}>{timeRemaining || 'Loading...'}</Text>
             </View>
           </View>
         </View>
-
+        
         <TouchableOpacity style={styles.infoButton}>
-          <Ionicons name="information-circle-outline" size={24} color="#FFF" />
+          <Ionicons name="information-circle-outline" size={26} color="#FFF" />
         </TouchableOpacity>
       </View>
 
@@ -628,19 +703,19 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#E8EAF6'
+    backgroundColor: '#F5F7FA' // Clean professional background
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: '#007AFF',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#6C63FF', // Modern purple gradient
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 4
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 8
   },
   backButton: {
     padding: 8,
@@ -652,31 +727,39 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   profileImageContainer: {
-    marginRight: 12
+    marginRight: 14,
+    backgroundColor: '#FFF',
+    borderRadius: 25,
+    padding: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 4
   },
   headerInfo: {
     flex: 1
   },
   headerName: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 19,
+    fontWeight: '700',
     color: '#FFF',
-    marginBottom: 2
+    marginBottom: 4
   },
   timerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
     alignSelf: 'flex-start'
   },
   timerText: {
     fontSize: 12,
-    color: '#E8F5E9',
-    fontWeight: '600',
-    marginLeft: 4
+    color: '#FFF',
+    fontWeight: '700',
+    marginLeft: 5
   },
   infoButton: {
     padding: 8
@@ -686,87 +769,127 @@ const styles = StyleSheet.create({
     paddingBottom: 8
   },
   messageContainer: {
-    marginBottom: 12,
-    maxWidth: '80%',
+    marginBottom: 16,
+    maxWidth: '78%',
     flexDirection: 'row'
   },
   ownMessage: {
     alignSelf: 'flex-end',
-    marginLeft: '20%'
+    marginLeft: '22%'
   },
   otherMessage: {
     alignSelf: 'flex-start',
-    marginRight: '20%'
+    marginRight: '22%'
   },
   otherUserAvatar: {
-    marginRight: 8,
-    marginTop: 4
+    marginRight: 10,
+    marginTop: 4,
+    backgroundColor: '#E8EAED',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center'
   },
   senderName: {
-    fontSize: 11,
-    color: '#666',
-    marginBottom: 4,
-    marginLeft: 4,
-    fontWeight: '500'
+    fontSize: 13,
+    color: '#6C63FF',
+    marginBottom: 6,
+    marginLeft: 8,
+    fontWeight: '700'
   },
   messageBubble: {
-    borderRadius: 18,
+    borderRadius: 20,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 11,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+    minWidth: 80
   },
   ownBubble: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#6C63FF', // Modern purple
     borderBottomRightRadius: 4
   },
   otherBubble: {
     backgroundColor: '#FFF',
-    borderBottomLeftRadius: 4
+    borderBottomLeftRadius: 4,
+    borderWidth: 1,
+    borderColor: '#E8EAED'
   },
   messageText: {
     fontSize: 15,
-    lineHeight: 20,
+    lineHeight: 22,
     marginBottom: 4
   },
   ownMessageText: {
     color: '#FFF'
   },
   otherMessageText: {
-    color: '#000'
+    color: '#1F2937'
+  },
+  messageFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: 3
   },
   messageTime: {
-    fontSize: 10,
-    alignSelf: 'flex-end'
+    fontSize: 11,
+    marginRight: 4,
+    fontWeight: '500'
   },
   ownMessageTime: {
-    color: 'rgba(255, 255, 255, 0.7)'
+    color: 'rgba(255, 255, 255, 0.8)'
   },
   otherMessageTime: {
-    color: '#999'
+    color: '#9CA3AF'
+  },
+  statusIcon: {
+    marginLeft: 2
+  },
+  doubleTickContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 2,
+    height: 14,
+    width: 18,
+    position: 'relative'
+  },
+  doubleTick1: {
+    position: 'absolute',
+    left: 0,
+    top: 0
+  },
+  doubleTick2: {
+    position: 'absolute',
+    left: 5,
+    top: 0
   },
   typingContainer: {
     padding: 12,
-    backgroundColor: '#FFF'
+    paddingLeft: 20,
+    backgroundColor: 'transparent'
   },
   typingText: {
-    fontSize: 14,
-    color: '#666',
-    fontStyle: 'italic'
+    fontSize: 13,
+    color: '#6C63FF',
+    fontStyle: 'italic',
+    fontWeight: '600'
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    padding: 16,
+    padding: 14,
+    paddingHorizontal: 16,
     backgroundColor: '#FFF',
     borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
+    borderTopColor: '#E8EAED',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 8
   },
@@ -777,27 +900,28 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F7FA',
     borderRadius: 24,
     paddingHorizontal: 18,
-    paddingVertical: 12,
+    paddingVertical: 11,
     fontSize: 15,
     marginRight: 12,
-    borderWidth: 1,
-    borderColor: '#E0E0E0'
+    borderWidth: 1.5,
+    borderColor: '#E8EAED',
+    color: '#1F2937'
   },
   sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#007AFF',
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#6C63FF',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: '#6C63FF',
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4
+    shadowRadius: 5,
+    elevation: 5
   },
   sendButtonDisabled: {
-    backgroundColor: '#B0BEC5',
+    backgroundColor: '#D1D5DB',
     shadowOpacity: 0.1
   },
   grantAccessBanner: {
