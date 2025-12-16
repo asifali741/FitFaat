@@ -1,8 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useChatAccess } from '../hooks/useChatAccess';
+import { StyleSheet, Text, TouchableOpacity } from 'react-native';
 
 interface ChatButtonProps {
   appointmentId: string;
