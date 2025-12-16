@@ -184,10 +184,13 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
         }
       );
 
+      console.log('Messages response status:', messagesResponse.status);
+      
       if (messagesResponse.ok) {
         const messagesData = await messagesResponse.json();
+        console.log('Loaded messages:', messagesData.messages?.length || 0);
         if (messagesData.success) {
-          setMessages(messagesData.messages);
+          setMessages(messagesData.messages || []);
         }
       } else {
         console.error('Failed to load messages:', messagesResponse.status);
@@ -203,17 +206,42 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
 
       // Socket event listeners
       socket.on('connect', () => {
-        console.log('Socket connected');
+        console.log('✅ Socket connected successfully');
         socket.emit('join-appointment', { appointmentId });
       });
 
       socket.on('joined', (data) => {
-        console.log('Joined chat:', data);
+        console.log('✅ Joined chat room:', data);
+        const otherName = data.otherUserName || (accessData.userRole === 'doctor' ? 'Patient' : 'Doctor');
+        setOtherUserName(otherName);
+        
+        // Update canSend from socket data (this reflects real-time access status)
+        if (data.canSend !== undefined) {
+          console.log('📝 Updating canSend from socket:', data.canSend);
+          setCanSend(data.canSend);
+        }
+        
+        if (data.message) {
+          setAccessMessage(data.message);
+        }
         setLoading(false);
       });
 
       socket.on('new-message', (message) => {
-        setMessages(prev => [...prev, message]);
+        console.log('📨 New message received:', {
+          from: message.senderName,
+          role: message.senderRole,
+          text: message.message.substring(0, 50)
+        });
+        setMessages(prev => {
+          // Avoid duplicate messages
+          const exists = prev.some(m => m._id === message._id);
+          if (exists) {
+            console.log('⚠️ Duplicate message detected, skipping');
+            return prev;
+          }
+          return [...prev, message];
+        });
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: true });
         }, 100);
@@ -223,13 +251,38 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
         setOtherUserTyping(data.isTyping);
       });
 
+      socket.on('access-granted', (data) => {
+        console.log('🔓 Access granted event received:', data);
+        setCanSend(true);
+        setChatAccessGranted(true);
+        setAccessMessage('');
+        
+        // Only show alert to users (not doctors who granted it)
+        if (userRole === 'user') {
+          Alert.alert('Access Granted', 'Doctor has granted you chat access! You can now send messages.');
+        }
+      });
+
+      socket.on('access-status', (data) => {
+        console.log('📊 Access status update:', data);
+        setCanSend(data.canSend);
+        if (data.message) {
+          setAccessMessage(data.message);
+        }
+        if (data.chatAccessGrantedAt) {
+          setChatAccessGranted(true);
+        }
+      });
+
       socket.on('chat-closed', (data) => {
+        console.log('🚫 Chat closed:', data);
         setChatClosed(true);
         setClosedReason(data.reason || 'Chat has been closed');
         Alert.alert('Chat Closed', data.reason || 'Chat has been closed');
       });
 
       socket.on('error', (data) => {
+        console.error('❌ Socket error:', data);
         if (data.canSend === false) {
           setCanSend(false);
           setAccessMessage(data.message || 'You cannot send messages yet');
@@ -239,7 +292,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
       });
 
       socket.on('disconnect', () => {
-        console.log('Socket disconnected');
+        console.log('⚠️ Socket disconnected');
       });
 
     } catch (error) {
@@ -269,10 +322,19 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
       const data = await response.json();
       
       if (data.success) {
+        console.log('Access granted successfully:', data);
         setChatAccessGranted(true);
-        Alert.alert('Success', 'Chat access granted to user');
-        // Refresh access status
-        initializeChat();
+        setCanSend(true); // Doctor can now send
+        
+        // Emit socket event to notify user immediately
+        if (socketRef.current && socketRef.current.connected) {
+          console.log('Emitting access-granted event via socket');
+          socketRef.current.emit('access-granted', { appointmentId });
+        } else {
+          console.warn('Socket not connected, cannot emit access-granted event');
+        }
+        
+        Alert.alert('Success', 'Chat access granted! Both you and the patient can now send messages.');
       } else {
         Alert.alert('Error', data.message || 'Failed to grant access');
       }
@@ -285,17 +347,27 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
   };
 
   const sendMessage = () => {
-    if (!inputText.trim() || sending || chatClosed || !canSend) return;
+    if (!inputText.trim() || sending || chatClosed || !canSend) {
+      console.log('Cannot send message:', { 
+        hasText: !!inputText.trim(), 
+        sending, 
+        chatClosed, 
+        canSend 
+      });
+      return;
+    }
 
     setSending(true);
+    const messageText = inputText.trim();
+    setInputText('');
     
-    if (socketRef.current) {
+    if (socketRef.current && socketRef.current.connected) {
+      console.log('Sending message via socket:', messageText);
       socketRef.current.emit('send-message', {
         appointmentId,
-        message: inputText.trim()
+        message: messageText
       });
       
-      setInputText('');
       setSending(false);
       
       // Stop typing indicator
@@ -304,6 +376,11 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
       }
       socketRef.current.emit('typing', { appointmentId, isTyping: false });
       setIsTyping(false);
+    } else {
+      console.error('Socket not connected, cannot send message');
+      setInputText(messageText); // Restore message
+      setSending(false);
+      Alert.alert('Connection Error', 'Not connected to chat server. Please try again.');
     }
   };
 

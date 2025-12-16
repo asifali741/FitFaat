@@ -256,6 +256,13 @@ const userSchema = new mongoose.Schema({
       bookedAt: {
         type: Date,
         default: Date.now
+      },
+      chatAccessGrantedAt: {
+        type: Date,
+        default: null
+      },
+      doctorName: {
+        type: String
       }
     }
   ],

@@ -13,7 +13,7 @@ const isChatAllowed = (appointment, userRole) => {
   
   // Parse time (HH:MM AM/PM format)
   const timeParts = appointment.time.match(/(\d+):(\d+)\s*(AM|PM)/i);
-  if (!timeParts) return { allowed: false, reason: 'Invalid time format' };
+  if (!timeParts) return { allowed: false, canSend: false, reason: 'Invalid time format' };
   
   let hours = parseInt(timeParts[1]);
   const minutes = parseInt(timeParts[2]);
@@ -25,35 +25,53 @@ const isChatAllowed = (appointment, userRole) => {
   
   appointmentDate.setHours(hours, minutes, 0, 0);
   
-  // Appointment end time (assuming 1 hour duration)
-  const appointmentEndTime = new Date(appointmentDate);
-  appointmentEndTime.setHours(appointmentEndTime.getHours() + 1);
-  
-  // Check status
-  if (!['confirmed', 'pending'].includes(appointment.status)) {
-    return { allowed: false, reason: 'Appointment is not active' };
+  // Check status - only confirmed appointments allow chat
+  if (appointment.status !== 'confirmed') {
+    return { allowed: false, canSend: false, reason: 'Appointment must be confirmed first' };
   }
   
-  // Doctor can chat before and during appointment
+  // Determine chat start time (either when doctor granted access or appointment time)
+  let chatStartTime = appointment.chatAccessGrantedAt 
+    ? new Date(appointment.chatAccessGrantedAt) 
+    : appointmentDate;
+  
+  // Chat end time is 1 hour after chat starts
+  const chatEndTime = new Date(chatStartTime);
+  chatEndTime.setHours(chatEndTime.getHours() + 1);
+  
+  // If chat has ended
+  if (now > chatEndTime) {
+    return { 
+      allowed: true, 
+      canSend: false, 
+      reason: 'Chat session has ended (1 hour limit)'
+    };
+  }
+  
+  // Doctor can always send messages in confirmed appointments
   if (userRole === 'doctor') {
-    if (now > appointmentEndTime) {
-      return { allowed: false, reason: 'Appointment has ended' };
-    }
-    return { allowed: true };
+    return { allowed: true, canSend: true };
   }
   
-  // User can only chat during appointment time
+  // User can view chat but can only send if:
+  // 1. Doctor granted early access, OR
+  // 2. Appointment time has arrived
   if (userRole === 'user') {
-    if (now < appointmentDate) {
-      return { allowed: false, reason: 'Appointment has not started yet' };
+    const canUserSend = appointment.chatAccessGrantedAt || now >= appointmentDate;
+    
+    if (!canUserSend) {
+      const timeUntil = Math.ceil((appointmentDate - now) / (1000 * 60));
+      return { 
+        allowed: true, 
+        canSend: false, 
+        reason: `Chat will be available in ${timeUntil} minutes or when doctor grants access`
+      };
     }
-    if (now > appointmentEndTime) {
-      return { allowed: false, reason: 'Appointment has ended' };
-    }
-    return { allowed: true };
+    
+    return { allowed: true, canSend: true };
   }
   
-  return { allowed: false, reason: 'Invalid user role' };
+  return { allowed: false, canSend: false, reason: 'Invalid user role' };
 };
 
 /**
@@ -146,13 +164,29 @@ export const initializeSocketIO = (httpServer) => {
         socket.senderName = senderName;
         socket.senderModel = senderModel;
         
+        // Get other user's name for display
+        let otherUserName = '';
+        if (userRole === 'doctor') {
+          const patient = await User.findById(appointment.userId);
+          otherUserName = patient?.name || 'Patient';
+        } else {
+          const doctorDoc = await Doctor.findById(appointment.doctorId);
+          if (doctorDoc) {
+            otherUserName = `Dr. ${doctorDoc.personalInfo.firstName} ${doctorDoc.personalInfo.lastName}`;
+          } else {
+            otherUserName = 'Doctor';
+          }
+        }
+        
         socket.emit('joined', { 
           appointmentId,
           userRole,
-          message: 'Successfully joined chat'
+          otherUserName,
+          canSend: accessCheck.canSend,
+          message: accessCheck.reason || 'Successfully joined chat'
         });
         
-        console.log(`${senderName} (${userRole}) joined appointment ${appointmentId}`);
+        console.log(`${senderName} (${userRole}) joined appointment ${appointmentId}, canSend: ${accessCheck.canSend}`);
         
       } catch (error) {
         console.error('Error joining appointment:', error);
@@ -184,6 +218,7 @@ export const initializeSocketIO = (httpServer) => {
         const userId = socket.userId;
         const user = await User.findById(userId);
         let appointment = null;
+        let userRole = socket.userRole;
         
         if (user) {
           appointment = user.appointmentsBooked.id(appointmentId);
@@ -193,6 +228,7 @@ export const initializeSocketIO = (httpServer) => {
           const doctor = await Doctor.findOne({ userId });
           if (doctor) {
             appointment = doctor.bookedAppointments.id(appointmentId);
+            userRole = 'doctor';
           }
         }
         
@@ -201,7 +237,15 @@ export const initializeSocketIO = (httpServer) => {
           return;
         }
         
-        const accessCheck = isChatAllowed(appointment, socket.userRole);
+        // Get fresh access check with latest appointment data
+        const accessCheck = isChatAllowed(appointment, userRole);
+        
+        console.log(`Send message access check for ${socket.senderName} (${userRole}):`, {
+          allowed: accessCheck.allowed,
+          canSend: accessCheck.canSend,
+          chatAccessGrantedAt: appointment.chatAccessGrantedAt,
+          reason: accessCheck.reason
+        });
         
         if (!accessCheck.allowed) {
           socket.emit('chat-closed', { 
@@ -276,6 +320,93 @@ export const initializeSocketIO = (httpServer) => {
           senderName: socket.senderName,
           isTyping
         });
+      }
+    });
+
+    /**
+     * Access granted notification
+     */
+    socket.on('access-granted', async ({ appointmentId }) => {
+      if (socket.appointmentId === appointmentId) {
+        // Re-fetch appointment to get updated access status
+        try {
+          const userId = socket.userId;
+          const user = await User.findById(userId);
+          let appointment = null;
+          
+          if (user) {
+            appointment = user.appointmentsBooked.id(appointmentId);
+          }
+          
+          if (!appointment) {
+            const doctor = await Doctor.findOne({ userId });
+            if (doctor) {
+              appointment = doctor.bookedAppointments.id(appointmentId);
+            }
+          }
+          
+          if (appointment) {
+            // Check updated access
+            const accessCheck = isChatAllowed(appointment, socket.userRole);
+            
+            // Notify all users in the room with updated access status
+            io.to(appointmentId).emit('access-granted', {
+              message: 'Chat access has been granted',
+              canSend: accessCheck.canSend,
+              chatAccessGrantedAt: appointment.chatAccessGrantedAt
+            });
+            
+            console.log(`Access granted notification sent for appointment ${appointmentId}, canSend: ${accessCheck.canSend}`);
+          }
+        } catch (error) {
+          console.error('Error handling access-granted:', error);
+        }
+      }
+    });
+
+    /**
+     * Check current access status (allows users to refresh their access)
+     */
+    socket.on('check-access', async ({ appointmentId }) => {
+      try {
+        if (socket.appointmentId !== appointmentId) {
+          socket.emit('error', { message: 'Not joined to this appointment' });
+          return;
+        }
+        
+        const userId = socket.userId;
+        const user = await User.findById(userId);
+        let appointment = null;
+        
+        if (user) {
+          appointment = user.appointmentsBooked.id(appointmentId);
+        }
+        
+        if (!appointment) {
+          const doctor = await Doctor.findOne({ userId });
+          if (doctor) {
+            appointment = doctor.bookedAppointments.id(appointmentId);
+          }
+        }
+        
+        if (!appointment) {
+          socket.emit('error', { message: 'Appointment not found' });
+          return;
+        }
+        
+        const accessCheck = isChatAllowed(appointment, socket.userRole);
+        
+        socket.emit('access-status', {
+          canSend: accessCheck.canSend,
+          message: accessCheck.reason || '',
+          chatAccessGrantedAt: appointment.chatAccessGrantedAt
+        });
+        
+        console.log(`Access check for ${socket.senderName}: canSend=${accessCheck.canSend}`);
+        
+      } catch (error) {
+        console.error('Error checking access:', error);
+        socket.emit('error', { message: 'Failed to check access' });
       }
     });
 
