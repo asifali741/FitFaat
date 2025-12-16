@@ -364,19 +364,19 @@ function formatFoodResponse(foods, originalQuery = '') {
   // DETECT QUERY TYPE
   
   // A) Specific nutrient query (user asks for one thing only)
-  if (queryLower.includes('how much protein') || queryLower.includes('protein in') || queryLower.includes('protein does')) {
+  if (queryLower.includes('how much protein') || queryLower.includes('protein in') || queryLower.includes('protein does') || queryLower.includes('protein value') || queryLower.includes('protein of')) {
     return `${foodName} (${servingSize}) contains about ${protein} g of protein.`;
   }
   
-  if (queryLower.includes('how much calories') || queryLower.includes('how many calories') || queryLower.includes('calories in') || queryLower.includes('calories does')) {
+  if (queryLower.includes('how much calories') || queryLower.includes('how many calories') || queryLower.includes('calories in') || queryLower.includes('calories does') || queryLower.includes('calorie value') || queryLower.includes('calories of')) {
     return `${foodName} (${servingSize}) contains approximately ${calories} kcal.`;
   }
   
-  if (queryLower.includes('how much carbs') || queryLower.includes('how many carbs') || queryLower.includes('carbs in') || queryLower.includes('carbohydrates in')) {
+  if (queryLower.includes('how much carbs') || queryLower.includes('how many carbs') || queryLower.includes('carbs in') || queryLower.includes('carbohydrates in') || queryLower.includes('carb value') || queryLower.includes('carbs of')) {
     return `${foodName} (${servingSize}) contains about ${carbs} g of carbs.`;
   }
   
-  if (queryLower.includes('how much fat') || queryLower.includes('how many fat') || queryLower.includes('fat in')) {
+  if (queryLower.includes('how much fat') || queryLower.includes('how many fat') || queryLower.includes('fat in') || queryLower.includes('fat value') || queryLower.includes('fat of')) {
     return `${foodName} (${servingSize}) contains about ${fats} g of fat.`;
   }
   
@@ -395,11 +395,6 @@ function formatFoodResponse(foods, originalQuery = '') {
   if (firstFood.water_content || firstFood.water_content_g) {
     const water = firstFood.water_content || firstFood.water_content_g;
     response += `\n• Water: ${water} g`;
-  }
-  
-  // If multiple matches found, mention it
-  if (foods.length > 1) {
-    response += `\n\n(I found ${foods.length} variations of this food. Showing the first match.)`;
   }
   
   return response;
