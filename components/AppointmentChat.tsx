@@ -3,17 +3,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { io, Socket } from 'socket.io-client';
 
@@ -206,12 +206,13 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
 
       // Socket event listeners
       socket.on('connect', () => {
-        console.log('✅ Socket connected successfully');
+        console.log('✅ Socket connected successfully, joining appointment:', appointmentId);
         socket.emit('join-appointment', { appointmentId });
       });
 
       socket.on('joined', (data) => {
         console.log('✅ Joined chat room:', data);
+        console.log('✅ Room details - appointmentId:', data.appointmentId, 'userRole:', data.userRole, 'canSend:', data.canSend);
         const otherName = data.otherUserName || (accessData.userRole === 'doctor' ? 'Patient' : 'Doctor');
         setOtherUserName(otherName);
         
@@ -231,17 +232,25 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
         console.log('📨 New message received:', {
           from: message.senderName,
           role: message.senderRole,
-          text: message.message.substring(0, 50)
+          text: message.message.substring(0, 50),
+          messageId: message._id
         });
+        
         setMessages(prev => {
+          console.log('📋 Current messages count:', prev.length);
+          
           // Avoid duplicate messages
           const exists = prev.some(m => m._id === message._id);
           if (exists) {
             console.log('⚠️ Duplicate message detected, skipping');
             return prev;
           }
-          return [...prev, message];
+          
+          const newMessages = [...prev, message];
+          console.log('✅ Adding message to state. New count:', newMessages.length);
+          return newMessages;
         });
+        
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: true });
         }, 100);
@@ -253,14 +262,18 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
 
       socket.on('access-granted', (data) => {
         console.log('🔓 Access granted event received:', data);
-        setCanSend(true);
+        
+        // Update canSend from the data received (this is role-specific)
+        setCanSend(data.canSend);
         setChatAccessGranted(true);
         setAccessMessage('');
         
-        // Only show alert to users (not doctors who granted it)
-        if (userRole === 'user') {
+        // Use accessData.userRole instead of state userRole (avoid closure issue)
+        if (accessData.userRole === 'user' && data.canSend) {
           Alert.alert('Access Granted', 'Doctor has granted you chat access! You can now send messages.');
         }
+        
+        console.log('🔓 Updated canSend to:', data.canSend);
       });
 
       socket.on('access-status', (data) => {
@@ -293,6 +306,15 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
 
       socket.on('disconnect', () => {
         console.log('⚠️ Socket disconnected');
+      });
+
+      socket.on('connect_error', (error) => {
+        console.error('❌ Socket connection error:', error.message);
+      });
+
+      socket.on('reconnect', (attemptNumber) => {
+        console.log('🔄 Socket reconnected after', attemptNumber, 'attempts');
+        socket.emit('join-appointment', { appointmentId });
       });
 
     } catch (error) {

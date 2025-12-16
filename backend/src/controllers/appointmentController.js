@@ -102,9 +102,13 @@ export const bookAppointment = async (req, res) => {
     }
 
     // ============================================
-    // CREATE APPOINTMENT ENTRY
+    // CREATE APPOINTMENT ENTRY WITH SHARED ID
     // ============================================
+    // Generate a shared appointment ID that will be used by both user and doctor
+    const sharedAppointmentId = new mongoose.Types.ObjectId();
+    
     const appointmentData = {
+      _id: sharedAppointmentId, // Use the same ID for both
       doctorId,
       date: appointmentDate,
       time,
@@ -118,8 +122,9 @@ export const bookAppointment = async (req, res) => {
     user.appointmentsBooked.push(appointmentData);
     await user.save();
 
-    // Add appointment to doctor's bookedAppointments array
+    // Add appointment to doctor's bookedAppointments array with THE SAME ID
     const doctorAppointmentData = {
+      _id: sharedAppointmentId, // Same ID as user's appointment
       userId,
       date: appointmentDate,
       time,

@@ -164,6 +164,12 @@ export const initializeSocketIO = (httpServer) => {
         socket.senderName = senderName;
         socket.senderModel = senderModel;
         
+        console.log(`👤 ${senderName} (${userRole}, userId: ${userId}) joining room ${appointmentId}`);
+        
+        // Verify socket is in the room
+        const rooms = Array.from(socket.rooms);
+        console.log(`📍 Socket ${socket.id} is now in rooms:`, rooms);
+        
         // Get other user's name for display
         let otherUserName = '';
         if (userRole === 'doctor') {
@@ -291,6 +297,17 @@ export const initializeSocketIO = (httpServer) => {
         
         await chatMessage.save();
         
+        console.log(`💾 Message saved to database:`, {
+          id: chatMessage._id,
+          appointmentId: chatMessage.appointmentId,
+          from: chatMessage.senderName,
+          role: chatMessage.senderRole
+        });
+        
+        // Get all sockets in the room to verify broadcast
+        const socketsInRoom = await io.in(appointmentId).fetchSockets();
+        console.log(`📡 Broadcasting message to ${socketsInRoom.length} sockets in room ${appointmentId}`);
+        
         // Emit to room (including sender)
         io.to(appointmentId).emit('new-message', {
           _id: chatMessage._id,
@@ -302,7 +319,7 @@ export const initializeSocketIO = (httpServer) => {
           createdAt: chatMessage.createdAt
         });
         
-        console.log(`Message sent in appointment ${appointmentId} by ${socket.senderName}`);
+        console.log(`Message broadcasted in appointment ${appointmentId} by ${socket.senderName}`);
         
       } catch (error) {
         console.error('Error sending message:', error);
@@ -327,40 +344,47 @@ export const initializeSocketIO = (httpServer) => {
      * Access granted notification
      */
     socket.on('access-granted', async ({ appointmentId }) => {
-      if (socket.appointmentId === appointmentId) {
-        // Re-fetch appointment to get updated access status
-        try {
-          const userId = socket.userId;
-          const user = await User.findById(userId);
-          let appointment = null;
-          
-          if (user) {
-            appointment = user.appointmentsBooked.id(appointmentId);
-          }
-          
-          if (!appointment) {
-            const doctor = await Doctor.findOne({ userId });
-            if (doctor) {
-              appointment = doctor.bookedAppointments.id(appointmentId);
-            }
-          }
+      try {
+        console.log(`Access granted event received for appointment ${appointmentId}`);
+        
+        // Fetch both user and doctor appointments to get latest data
+        const users = await User.find({ 'appointmentsBooked._id': appointmentId });
+        const doctors = await Doctor.find({ 'bookedAppointments._id': appointmentId });
+        
+        let userAppointment = null;
+        let doctorAppointment = null;
+        
+        if (users.length > 0) {
+          userAppointment = users[0].appointmentsBooked.id(appointmentId);
+        }
+        
+        if (doctors.length > 0) {
+          doctorAppointment = doctors[0].bookedAppointments.id(appointmentId);
+        }
+        
+        // Get all sockets in the room
+        const socketsInRoom = await io.in(appointmentId).fetchSockets();
+        
+        // Send individual access status to each socket based on their role
+        for (const clientSocket of socketsInRoom) {
+          const clientRole = clientSocket.userRole;
+          const appointment = clientRole === 'doctor' ? doctorAppointment : userAppointment;
           
           if (appointment) {
-            // Check updated access
-            const accessCheck = isChatAllowed(appointment, socket.userRole);
+            const accessCheck = isChatAllowed(appointment, clientRole);
             
-            // Notify all users in the room with updated access status
-            io.to(appointmentId).emit('access-granted', {
+            clientSocket.emit('access-granted', {
               message: 'Chat access has been granted',
               canSend: accessCheck.canSend,
               chatAccessGrantedAt: appointment.chatAccessGrantedAt
             });
             
-            console.log(`Access granted notification sent for appointment ${appointmentId}, canSend: ${accessCheck.canSend}`);
+            console.log(`Sent access-granted to ${clientSocket.senderName} (${clientRole}), canSend: ${accessCheck.canSend}`);
           }
-        } catch (error) {
-          console.error('Error handling access-granted:', error);
         }
+        
+      } catch (error) {
+        console.error('Error handling access-granted:', error);
       }
     });
 
