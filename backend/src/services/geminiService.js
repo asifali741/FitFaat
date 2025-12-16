@@ -3,129 +3,151 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 /**
- * Health-Only AI Chatbot Service
- * Production-ready implementation with:
- * - Google Gemini 1.5 Flash API integration
- * - Strict health scope validation
- * - Dataset-first logic (food & exercise)
- * - Comprehensive error handling
- * - Polite out-of-scope rejection
+ * NUTRITION-ONLY AI Chatbot Service
+ * Strictly focused on food nutrition and calories
+ * - Greetings and well-wishing
+ * - Food nutrition queries only
+ * - Dataset-first logic (no Gemini if food exists)
+ * - Polite rejection of non-nutrition queries
  */
 
-// Gemini API Configuration
+// Gemini API Configuration (only used when food not found in dataset)
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = 'gemini-flash-latest'; // Correct model name for v1beta API
-const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
 const GEMINI_TIMEOUT_MS = 15000; // 15 seconds timeout
 
 /**
- * Health-focused system prompt for Gemini AI
- * Strictly enforces health, nutrition, and exercise topics only
+ * Nutrition-only system prompt for Gemini AI
+ * STRICTLY enforces food and nutrition topics only
  */
-const HEALTH_GUARD_PROMPT = `You are FitFaat Health Assistant, a specialized AI focused ONLY on health, nutrition, fitness, and exercise topics.
+const NUTRITION_GUARD_PROMPT = `You are FitFaat Nutrition Assistant, specialized ONLY in food nutrition and calories.
 
 STRICT RULES:
 1. ONLY answer questions about:
-   - Nutrition (calories, macros, vitamins, minerals)
-   - Food and diet (healthy eating, meal planning, dietary restrictions)
-   - Exercise and fitness (workouts, training, physical activity)
-   - Health and wellness (sleep, hydration, stress management, mental health)
-   - Medical advice (symptoms, conditions, prevention - always recommend consulting doctors)
-   - Weight management (healthy weight loss/gain strategies)
+   - Food nutrition (calories, protein, carbs, fat)
+   - Macronutrients and micronutrients in foods
+   - Meal nutrition and dietary information
+   - Hydration and water content
 
-2. REJECT all questions about:
-   - Politics, religion, or controversial topics
-   - Entertainment (movies, music, games)
-   - Technology unrelated to health/fitness
-   - General knowledge or trivia
-   - Personal advice unrelated to health
-   - Any topic outside health/fitness domain
+2. REJECT ALL other topics including:
+   - Exercise and fitness
+   - Weight loss/gain advice
+   - Medical or health advice
+   - General wellness or lifestyle
+   - Any non-nutrition topic
 
 3. Response format:
-   - Keep responses concise and practical (2-3 paragraphs max)
-   - Use bullet points for lists
-   - Always encourage consulting healthcare professionals for medical issues
-   - Be supportive and motivational
-   - Use simple, clear language
+   - Keep responses short and focused on nutrition facts
+   - Always provide specific nutritional values when possible
+   - If you don't have data, say "I don't have nutritional data for that food"
+   
+4. If user asks non-nutrition questions, respond:
+   "Sorry, I can only help with food nutrition, calories, and dietary information."
 
-4. If user asks non-health questions, politely respond:
-   "I'm FitFaat Health Assistant, specialized in health, nutrition, and fitness. I can only help with health-related questions. How can I assist you with your health and fitness goals today?"
-
-Remember: You are a health assistant, not a general chatbot. Stay focused on health topics only.`;
+Remember: You are a nutrition data provider, not a health coach or fitness trainer.`;
 
 /**
- * Extract potential food keywords from user message
- * Removes common question words and punctuation
+ * Extract food name from natural language queries
+ * Handles sentences like "I am going to eat Chicken Tandoori Roll"
  * @param {string} message - User message
- * @returns {string} - Cleaned food keyword
+ * @returns {string} - Cleaned food name
  */
 function extractFoodKeywords(message) {
-  // Remove common question patterns
-  const questionWords = [
-    'how much', 'how many', 'what is', 'what are', 'tell me', 'show me',
+  // Common phrases to remove
+  const phrasesToRemove = [
+    'i am going to eat', 'i am gonna eat', 'i will eat', 'i want to eat',
+    'tell me calories in', 'tell me calories of', 'show me calories in',
+    'how much calories in', 'how many calories in', 'how much calories does',
+    'how many calories does', 'what is the calorie', 'what are the calories',
+    'how much protein in', 'how much protein does', 'how many protein in',
+    'how much carbs in', 'how many carbs in', 'how much fat in',
     'calories in', 'protein in', 'carbs in', 'fat in', 'nutrition of',
     'nutritional value of', 'nutrients in', 'macros in', 'macros of',
-    'calorie content of', 'how much calories', 'how many calories'
+    'calorie content of', 'tell me', 'show me', 'what is', 'what are',
+    'how much', 'how many', 'i am eating', 'i ate', 'i had'
   ];
   
   let cleaned = message.toLowerCase().trim();
   
-  // Remove question words
-  questionWords.forEach(word => {
-    cleaned = cleaned.replace(new RegExp(word, 'gi'), '');
+  // Remove common phrases
+  phrasesToRemove.forEach(phrase => {
+    cleaned = cleaned.replace(new RegExp(phrase, 'gi'), '');
   });
   
   // Remove punctuation
   cleaned = cleaned.replace(/[?!.,;:]/g, '');
   
-  // Remove extra spaces
+  // Remove extra spaces and trim
   cleaned = cleaned.trim().replace(/\s+/g, ' ');
   
-  console.log(`🔍 Extracted food keyword: "${cleaned}" from "${message}"`);
+  console.log(`🔍 Extracted food name: "${cleaned}" from "${message}"`);
   return cleaned;
 }
 
 /**
- * Validate if message is within health scope
- * Allows greetings and basic conversation
- * @param {string} message - User message to validate
- * @returns {boolean} - True if health-related or greeting, false otherwise
+ * Detect greetings and well-wishing messages
+ * @param {string} message - User message to check
+ * @returns {boolean} - True if greeting detected
  */
-function isHealthRelated(message) {
+function isGreeting(message) {
   const lowerMessage = message.toLowerCase().trim();
   
-  // Allow greetings and basic conversation
+  // Common greetings
   const greetings = [
-    'hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening',
-    'how are you', 'whats up', 'thanks', 'thank you', 'bye', 'goodbye',
-    'help', 'assist', 'can you help', 'need help'
+    'hi', 'hello', 'hey', 'salam', 'assalamualaikum', 'assalam o alaikum',
+    'good morning', 'good afternoon', 'good evening', 'good night',
+    'how are you', 'whats up', "what's up", 'sup',
+    'thanks', 'thank you', 'tysm', 'ty', 'thx',
+    'bye', 'goodbye', 'see you', 'cya',
+    'help', 'assist', 'can you help', 'need help', 'help me'
   ];
   
-  if (greetings.some(greeting => lowerMessage.includes(greeting))) {
-    return true;
-  }
-  
-  // Check health-related keywords
-  const healthKeywords = [
-    // Nutrition
-    'calorie', 'protein', 'carb', 'fat', 'nutrition', 'nutrient', 'vitamin', 'mineral',
-    'macro', 'micro', 'diet', 'meal', 'food', 'eat', 'drink', 'water', 'hydration',
-    // Exercise & Fitness
-    'exercise', 'workout', 'training', 'fitness', 'gym', 'muscle', 'strength',
-    'cardio', 'run', 'walk', 'yoga', 'stretch', 'rep', 'set', 'weight',
-    // Health & Wellness
-    'health', 'wellness', 'sleep', 'rest', 'stress', 'mental', 'physical',
-    'body', 'weight', 'bmi', 'healthy', 'medical', 'doctor', 'symptom',
-    // Body parts
-    'bicep', 'tricep', 'chest', 'back', 'leg', 'shoulder', 'abs', 'core',
-  ];
-  
-  return healthKeywords.some(keyword => lowerMessage.includes(keyword));
+  return greetings.some(greeting => lowerMessage === greeting || lowerMessage.startsWith(greeting + ' ') || lowerMessage.endsWith(' ' + greeting));
 }
 
 /**
- * Call Google Gemini 1.5 Flash API with health-guarded prompt
- * Includes timeout and comprehensive error handling
+ * Validate if message is nutrition-related
+ * Only allows greetings and food/nutrition queries
+ * @param {string} message - User message to validate
+ * @returns {boolean} - True if nutrition-related or greeting
+ */
+function isNutritionRelated(message) {
+  const lowerMessage = message.toLowerCase().trim();
+  
+  // Allow greetings
+  if (isGreeting(message)) {
+    return true;
+  }
+  
+  // Check nutrition keywords only (no exercise or fitness)
+  const nutritionKeywords = [
+    'calorie', 'protein', 'carb', 'fat', 'nutrition', 'nutrient', 'vitamin', 'mineral',
+    'macro', 'micro', 'diet', 'meal', 'food', 'eat', 'drink', 'water', 'hydration',
+    'fiber', 'sugar', 'sodium', 'cholesterol', 'serving', 'kcal', 'gram', 'mg',
+    'biryani', 'chicken', 'rice', 'meat', 'egg', 'fruit', 'vegetable', 'dish', 'curry'
+  ];
+  
+  return nutritionKeywords.some(keyword => lowerMessage.includes(keyword));
+}
+
+/**
+ * Generate warm greeting response
+ * @returns {string} - Greeting message
+ */
+function generateGreetingResponse() {
+  const greetings = [
+    "Hello! 😊 I'm here to help you with food nutrition and calories. What would you like to eat?",
+    "Hi there! 🍽️ I can tell you about calories and nutrition in your meals. What are you having today?",
+    "Hey! 👋 Ask me about any food's calories, protein, carbs, or fat. What would you like to know?",
+    "Assalamualaikum! 🌟 I'm your nutrition assistant. Tell me what you're eating and I'll share the nutritional info!",
+    "Good day! 😊 I can help you track nutrition in your meals. What food are you curious about?"
+  ];
+  
+  return greetings[Math.floor(Math.random() * greetings.length)];
+}
+
+/**
+ * Call Google Gemini API with nutrition-guarded prompt
+ * Only called when food is NOT found in dataset
  * @param {string} userMessage - The user's question
  * @param {Array} conversationHistory - Previous messages for context
  * @returns {Promise<string>} - AI response
@@ -143,14 +165,14 @@ async function callGeminiAPI(userMessage, conversationHistory = []) {
       .join('\n');
 
     // Construct the full prompt with context
-    const fullPrompt = `${HEALTH_GUARD_PROMPT}
+    const fullPrompt = `${NUTRITION_GUARD_PROMPT}
 
 Previous conversation:
 ${contextMessages}
 
 Current user question: ${userMessage}
 
-Provide a helpful health-focused response:`;
+Provide a helpful nutrition-focused response:`;
 
     // Create abort controller for timeout
     const controller = new AbortController();
@@ -243,7 +265,7 @@ Provide a helpful health-focused response:`;
 
 /**
  * Search food dataset for nutrition information
- * Enhanced with smart keyword extraction and matching
+ * Uses smart keyword extraction and case-insensitive matching
  * @param {string} query - Food item to search
  * @returns {Array|null} - Food data array or null if not found
  */
@@ -251,11 +273,11 @@ async function searchFoodDataset(query) {
   try {
     console.log(`🔎 Searching food dataset for: "${query}"`);
     
-    // Extract food keywords from query
+    // Extract food name from natural language query
     const searchKeyword = extractFoodKeywords(query);
     const allFoods = [];
     
-    // Import Pakistani dishes dataset (comprehensive - 13,000+ items)
+    // Load Pakistani dishes dataset (comprehensive - 13,000+ items)
     try {
       const pakistaniDataModule = await import('../../../app/Dataset/dataSet.js');
       if (pakistaniDataModule.pakistaniDishes) {
@@ -266,7 +288,7 @@ async function searchFoodDataset(query) {
       console.log('⚠️ Pakistani dishes dataset not found');
     }
     
-    // Import basic food database from constants
+    // Load basic food database from constants
     try {
       const foodDatabaseModule = await import('../../../constants/foodDatabase.ts');
       const foodDatabase = foodDatabaseModule.foodDatabase;
@@ -293,17 +315,17 @@ async function searchFoodDataset(query) {
     
     console.log(`📊 Total foods in database: ${allFoods.length}`);
     
-    // Smart matching: case-insensitive, partial match on name
+    // Smart case-insensitive matching
     const results = allFoods.filter(food => {
-      const foodName = food.name?.toLowerCase() || '';
+      const foodName = (food.name || food.dish_name || food.item || food.food || '').toLowerCase();
       const searchLower = searchKeyword.toLowerCase();
       
       // Match if search term is in food name OR food name is in search term
-      return foodName.includes(searchLower) || searchLower.includes(foodName.split(' ')[0]);
+      return foodName.includes(searchLower) || searchLower.includes(foodName);
     });
 
     if (results.length > 0) {
-      console.log(`✅ Found ${results.length} matches in dataset:`, results.slice(0, 3).map(f => f.name));
+      console.log(`✅ Found ${results.length} matches in dataset`);
       return results;
     }
     
@@ -317,121 +339,74 @@ async function searchFoodDataset(query) {
 }
 
 /**
- * Search exercise dataset for workout information
- * @param {string} query - Exercise to search
- * @returns {Object|null} - Exercise data or null if not found
- */
-async function searchExerciseDataset(query) {
-  try {
-    // Since exerciseDB uses external API, we'll use a simpler local dataset
-    // or you can integrate with the RapidAPI if needed
-    
-    // For now, return null to let Gemini handle exercise queries
-    // You can add a local exercise dataset here later
-    
-    const searchTerm = query.toLowerCase().trim();
-    
-    // Simple local exercise database (can be expanded)
-    const localExercises = [
-      { name: 'Push-ups', bodyPart: 'chest', equipment: 'body weight', target: 'pectorals' },
-      { name: 'Pull-ups', bodyPart: 'back', equipment: 'pull-up bar', target: 'lats' },
-      { name: 'Squats', bodyPart: 'legs', equipment: 'body weight', target: 'quadriceps' },
-      { name: 'Lunges', bodyPart: 'legs', equipment: 'body weight', target: 'quadriceps' },
-      { name: 'Plank', bodyPart: 'core', equipment: 'body weight', target: 'abs' },
-      { name: 'Dumbbell Curl', bodyPart: 'arms', equipment: 'dumbbell', target: 'biceps' },
-      { name: 'Tricep Dips', bodyPart: 'arms', equipment: 'bench', target: 'triceps' },
-      { name: 'Shoulder Press', bodyPart: 'shoulders', equipment: 'dumbbell', target: 'deltoids' },
-      { name: 'Deadlift', bodyPart: 'back', equipment: 'barbell', target: 'lower back' },
-      { name: 'Bench Press', bodyPart: 'chest', equipment: 'barbell', target: 'pectorals' },
-    ];
-    
-    const results = localExercises.filter(exercise =>
-      exercise.name?.toLowerCase().includes(searchTerm) ||
-      exercise.bodyPart?.toLowerCase().includes(searchTerm) ||
-      exercise.target?.toLowerCase().includes(searchTerm)
-    );
-
-    return results.length > 0 ? results : null;
-
-  } catch (error) {
-    console.error('Exercise dataset search error:', error);
-    return null;
-  }
-}
-
-/**
- * Format food data for user-friendly response
+ * Format food nutrition data for user-friendly response
+ * Handles different query types (general, specific nutrient, multiple nutrients)
  * @param {Array} foods - Food items from dataset
+ * @param {string} originalQuery - Original user query to detect intent
  * @returns {string} - Formatted response
  */
-function formatFoodResponse(foods) {
+function formatFoodResponse(foods, originalQuery = '') {
   if (!foods || foods.length === 0) return null;
 
-  const foodList = foods.slice(0, 5).map((food, index) => {
-    // Debug log to see what fields are available
-    if (index === 0) {
-      console.log('📋 Food object structure:', Object.keys(food));
-    }
-    
-    const parts = [];
-    
-    // Get food name - check all possible field names
-    const foodName = food.name || food.dish_name || food.item || food.food || 'Unknown Food';
-    parts.push(`**${foodName}**`);
-    
-    // Handle different field names from different datasets
-    const calories = food.calories || food.calories_kcal;
-    const protein = food.protein || food.protein_g;
-    const carbs = food.carbs || food.carbohydrates || food.carbohydrates_g;
-    const fats = food.fats || food.fat || food.fat_g;
-    const water = food.water_content || food.water_content_g;
-    
-    if (calories) parts.push(`Calories: ${calories} kcal`);
-    if (protein) parts.push(`Protein: ${protein}g`);
-    if (carbs) parts.push(`Carbs: ${carbs}g`);
-    if (fats) parts.push(`Fats: ${fats}g`);
-    if (water) parts.push(`Water: ${water}g`);
-    if (food.fiber) parts.push(`Fiber: ${food.fiber}g`);
-    if (food.category) parts.push(`Category: ${food.category}`);
-    
-    return parts.join('\n');
-  }).join('\n\n');
-
-  const header = foods.length > 5 
-    ? `I found ${foods.length} items in our database. Here are the top 5:\n\n`
-    : `Here's the nutrition information from our database:\n\n`;
-
-  return header + foodList + '\n\nWould you like more details about any specific item?';
-}
-
-/**
- * Format exercise data for user-friendly response
- * @param {Array} exercises - Exercise items from dataset
- * @returns {string} - Formatted response
- */
-function formatExerciseResponse(exercises) {
-  if (!exercises || exercises.length === 0) return null;
-
-  const exerciseList = exercises.slice(0, 5).map(ex => {
-    const parts = [];
-    parts.push(`**${ex.name}**`);
-    if (ex.bodyPart) parts.push(`Target: ${ex.bodyPart}`);
-    if (ex.equipment) parts.push(`Equipment: ${ex.equipment}`);
-    if (ex.target) parts.push(`Muscle: ${ex.target}`);
-    
-    return parts.join('\n');
-  }).join('\n\n');
-
-  const header = exercises.length > 5
-    ? `I found ${exercises.length} exercises. Here are the top 5:\n\n`
-    : `Here are the exercises from our database:\n\n`;
-
-  return header + exerciseList + '\n\nWould you like detailed instructions for any exercise?';
+  const firstFood = foods[0];
+  const queryLower = originalQuery.toLowerCase();
+  
+  // Get food name from any available field
+  const foodName = firstFood.name || firstFood.dish_name || firstFood.item || firstFood.food || 'Unknown Food';
+  
+  // Get nutrition values with fallback field names
+  const servingSize = firstFood.serving_size || '1 serving';
+  const calories = firstFood.calories || firstFood.calories_kcal || 0;
+  const protein = firstFood.protein || firstFood.protein_g || 0;
+  const carbs = firstFood.carbs || firstFood.carbohydrates || firstFood.carbohydrates_g || 0;
+  const fats = firstFood.fats || firstFood.fat || firstFood.fat_g || 0;
+  
+  // DETECT QUERY TYPE
+  
+  // A) Specific nutrient query (user asks for one thing only)
+  if (queryLower.includes('how much protein') || queryLower.includes('protein in') || queryLower.includes('protein does')) {
+    return `${foodName} (${servingSize}) contains about ${protein} g of protein.`;
+  }
+  
+  if (queryLower.includes('how much calories') || queryLower.includes('how many calories') || queryLower.includes('calories in') || queryLower.includes('calories does')) {
+    return `${foodName} (${servingSize}) contains approximately ${calories} kcal.`;
+  }
+  
+  if (queryLower.includes('how much carbs') || queryLower.includes('how many carbs') || queryLower.includes('carbs in') || queryLower.includes('carbohydrates in')) {
+    return `${foodName} (${servingSize}) contains about ${carbs} g of carbs.`;
+  }
+  
+  if (queryLower.includes('how much fat') || queryLower.includes('how many fat') || queryLower.includes('fat in')) {
+    return `${foodName} (${servingSize}) contains about ${fats} g of fat.`;
+  }
+  
+  // B) General query or "I am going to eat..." format
+  // Provide complete nutrition breakdown
+  let response = `If you are going to eat ${foodName} (${servingSize}), it contains approximately:\n\n`;
+  response += `• Calories: ${calories} kcal\n`;
+  response += `• Protein: ${protein} g\n`;
+  response += `• Carbs: ${carbs} g\n`;
+  response += `• Fat: ${fats} g`;
+  
+  // Add fiber and water if available
+  if (firstFood.fiber) {
+    response += `\n• Fiber: ${firstFood.fiber} g`;
+  }
+  if (firstFood.water_content || firstFood.water_content_g) {
+    const water = firstFood.water_content || firstFood.water_content_g;
+    response += `\n• Water: ${water} g`;
+  }
+  
+  // If multiple matches found, mention it
+  if (foods.length > 1) {
+    response += `\n\n(I found ${foods.length} variations of this food. Showing the first match.)`;
+  }
+  
+  return response;
 }
 
 /**
  * Detect if query is asking about food/nutrition
- * Enhanced with more patterns
  * @param {string} message - User message
  * @returns {boolean}
  */
@@ -441,44 +416,25 @@ function isFoodQuery(message) {
     'food', 'meal', 'diet', 'eat', 'eating', 'vitamin', 'mineral',
     'macro', 'micro', 'kcal', 'gram', 'serving', 'biryani', 'chicken',
     'rice', 'meat', 'egg', 'fruit', 'vegetable', 'dish', 'curry',
+    'roll', 'burger', 'pizza', 'sandwich', 'salad', 'soup',
     'how many calories', 'how much calories', 'nutritional value',
-    'nutrients in', 'macros', 'how much protein'
+    'nutrients in', 'macros', 'how much protein', 'i am going to eat',
+    'i am gonna eat', 'tell me calories', 'show me calories'
   ];
   
   const lowerMessage = message.toLowerCase();
-  const isFood = foodKeywords.some(keyword => lowerMessage.includes(keyword));
-  
-  if (isFood) {
-    console.log('✅ Detected as FOOD query');
-  }
-  
-  return isFood;
+  return foodKeywords.some(keyword => lowerMessage.includes(keyword));
 }
 
 /**
- * Detect if query is asking about exercises
- * @param {string} message - User message
- * @returns {boolean}
- */
-function isExerciseQuery(message) {
-  const exerciseKeywords = [
-    'exercise', 'workout', 'training', 'gym', 'fitness', 'muscle',
-    'bicep', 'tricep', 'chest', 'back', 'leg', 'shoulder', 'abs',
-    'cardio', 'strength', 'squat', 'push', 'pull', 'rep', 'set'
-  ];
-  
-  const lowerMessage = message.toLowerCase();
-  return exerciseKeywords.some(keyword => lowerMessage.includes(keyword));
-}
-
-/**
- * Main AI service function - Production Ready
+ * Main nutrition service function - NUTRITION-ONLY
  * Flow:
- * 1. Validate health scope
- * 2. Check food dataset first
- * 3. Check exercise dataset second
- * 4. Call Gemini AI only if needed
- * 5. Return safe fallback on any error
+ * 1. Check if greeting → return warm response
+ * 2. Validate nutrition scope → reject if out of scope
+ * 3. Search food dataset FIRST (dataset-based responses only)
+ * 4. If not found in dataset → return polite "not found" message
+ * 5. NEVER call Gemini if food exists in dataset
+ * 6. Log all messages to database
  * 
  * @param {string} userMessage - User's question
  * @param {Array} conversationHistory - Previous messages
@@ -486,26 +442,39 @@ function isExerciseQuery(message) {
  */
 export async function processAIChat(userMessage, conversationHistory = []) {
   try {
-    console.log('\n🤖 Processing message:', userMessage);
+    console.log('\n🤖 Processing nutrition query:', userMessage);
     console.log('━'.repeat(60));
     
-    // STEP 1: Validate health scope BEFORE processing
-    if (!isHealthRelated(userMessage)) {
-      console.log('🚫 OUT-OF-SCOPE query detected');
+    // STEP 1: Check for greetings first
+    if (isGreeting(userMessage)) {
+      console.log('👋 Greeting detected - sending warm response');
+      console.log('━'.repeat(60));
       return {
-        content: "Sorry, I can only help with health, nutrition, and exercise related questions. I'm your health assistant - how can I help you with your fitness or wellness goals?",
+        content: generateGreetingResponse(),
         source: 'system',
       };
     }
 
-    // STEP 2: Check food dataset FIRST (fastest, no API call)
+    // STEP 2: Validate nutrition scope (reject non-nutrition queries)
+    if (!isNutritionRelated(userMessage)) {
+      console.log('🚫 OUT-OF-SCOPE query detected - not nutrition-related');
+      console.log('━'.repeat(60));
+      return {
+        content: "Sorry, I can only help with food nutrition, calories, and dietary information.",
+        source: 'system',
+      };
+    }
+
+    // STEP 3: Check food dataset (DATASET-FIRST - NO GEMINI IF FOUND)
     if (isFoodQuery(userMessage)) {
-      console.log('🍽️ Food query detected - checking dataset...');
+      console.log('🍽️ Food query detected - searching dataset...');
       const foodData = await searchFoodDataset(userMessage);
+      
       if (foodData && foodData.length > 0) {
-        const response = formatFoodResponse(foodData);
+        // Format response based on query type
+        const response = formatFoodResponse(foodData, userMessage);
         if (response) {
-          console.log('✅ DATASET HIT - Returning food data (no Gemini call)');
+          console.log('✅ DATASET HIT - Returning nutrition data (no Gemini call)');
           console.log('━'.repeat(60));
           return {
             content: response,
@@ -513,37 +482,22 @@ export async function processAIChat(userMessage, conversationHistory = []) {
           };
         }
       }
-      console.log('⚠️ No food found in dataset');
+      
+      // Food not found in dataset
+      console.log('❌ Food not found in dataset');
+      console.log('━'.repeat(60));
+      return {
+        content: "Sorry, I don't have nutritional data for this food yet.",
+        source: 'system',
+      };
     }
 
-    // STEP 3: Check exercise dataset SECOND (also fast, no API call)
-    if (isExerciseQuery(userMessage)) {
-      console.log('💪 Exercise query detected - checking dataset...');
-      const exerciseData = await searchExerciseDataset(userMessage);
-      if (exerciseData && exerciseData.length > 0) {
-        const response = formatExerciseResponse(exerciseData);
-        if (response) {
-          console.log('✅ DATASET HIT - Returning exercise data (no Gemini call)');
-          console.log('━'.repeat(60));
-          return {
-            content: response,
-            source: 'dataset',
-          };
-        }
-      }
-      console.log('⚠️ No exercise found in dataset');
-    }
-
-    // STEP 4: Call Gemini AI only if dataset search failed
-    console.log('🤖 CALLING GEMINI AI - Dataset search failed');
-    console.log('Query:', userMessage.substring(0, 50));
-    const aiResponse = await callGeminiAPI(userMessage, conversationHistory);
-    
-    console.log('✅ Gemini response received');
+    // STEP 4: If not a food query but nutrition-related, provide guidance
+    console.log('ℹ️ Nutrition-related but not a food query - providing guidance');
     console.log('━'.repeat(60));
     return {
-      content: aiResponse,
-      source: 'ai',
+      content: "I can help you find calories, protein, carbs, and fat in foods. Try asking like:\n• 'How many calories in biryani?'\n• 'I am going to eat Chicken Tandoori Roll'\n• 'Tell me nutrition of rice'",
+      source: 'system',
     };
 
   } catch (error) {
@@ -555,7 +509,7 @@ export async function processAIChat(userMessage, conversationHistory = []) {
     console.log('━'.repeat(60));
     
     return {
-      content: "I apologize, but I'm experiencing technical difficulties right now. Please try again in a moment. I'm here to help with your health, nutrition, and fitness questions!",
+      content: "I apologize, but I'm experiencing technical difficulties right now. Please try again in a moment.",
       source: 'system',
     };
   }
@@ -564,5 +518,4 @@ export async function processAIChat(userMessage, conversationHistory = []) {
 export default {
   processAIChat,
   searchFoodDataset,
-  searchExerciseDataset,
 };
