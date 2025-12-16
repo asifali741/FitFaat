@@ -1,15 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
 import { heightPercentageToDP as hp } from "react-native-responsive-screen";
-import { callGemini } from '../utils/api';
+import { sendChatbotMessage } from '../utils/api';
 
 type Message = {
   role: "user" | "assistant";
@@ -18,37 +18,48 @@ type Message = {
 };
 
 type ControlsProps = {
-  onAddMessage?: (text: string, isUser: boolean) => void;
+  onAddMessage?: (text: string, isUser: boolean, source?: string) => void;
+  sessionId?: string;
 };
 
-export default function Controls({ onAddMessage }: ControlsProps) {
+export default function Controls({ onAddMessage, sessionId }: ControlsProps) {
   const [content, setContent] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSend = async () => {
     if (content.trim()) {
+      const userMessage = content.trim();
+      
       try {
         setIsLoading(true);
         
-        // Add user message to storage
+        // Add user message to storage FIRST (before clearing input)
         if (onAddMessage) {
-          onAddMessage(content, true);
+          onAddMessage(userMessage, true, 'user');
         }
         
-        setContent(""); // Clear input immediately for better UX
+        setContent(""); // Clear input after adding message
 
-        // Get AI response
-        const response = await callGemini(content);
+        // Get AI response from backend chatbot
+        const response = await sendChatbotMessage(userMessage, sessionId);
         
-        // Add AI response to storage
-        if (onAddMessage) {
-          onAddMessage(response, false);
+        // Add AI response to storage with source information
+        if (onAddMessage && response.aiResponse) {
+          onAddMessage(
+            response.aiResponse.content, 
+            false, 
+            response.aiResponse.source
+          );
         }
       } catch (error) {
+        console.error('Chatbot error:', error);
         Alert.alert(
           "Error",
-          error instanceof Error ? error.message : "Failed to get response"
+          error instanceof Error ? error.message : "Failed to get response. Please try again."
         );
+        
+        // Keep the user message in chat even on error
+        // No need to restore to input field
       } finally {
         setIsLoading(false);
       }

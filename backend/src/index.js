@@ -12,6 +12,7 @@ import adminAuthRoutes from './routes/adminAuth.js';
 import appointmentRoutes from './routes/appointments.js';
 import authRoutes from './routes/auth.js';
 import chatRoutes from './routes/chat.js';
+import chatbotRoutes from './routes/chatbot.js';
 import dailyLogsRoutes from './routes/dailyLogs.js';
 import dietPlanRoutes from './routes/dietPlan.js';
 import doctorRoutes from './routes/doctors.js';
@@ -51,6 +52,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/admin/news', newsRoutes);
 app.use('/api/push-token', pushTokenRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/chatbot', chatbotRoutes); // AI Chatbot routes
 
 // Error handler
 app.use(errorHandler);
