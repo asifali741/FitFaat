@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# AI Chatbot Integration Test Script
-# Tests the health-only AI chatbot endpoints
+# NUTRITION-ONLY Chatbot Test Script
+# Tests the nutrition-focused chatbot with strict scope validation
 
-echo "🚀 FitFaat AI Chatbot Test Script"
-echo "=================================="
+echo "🚀 FitFaat Nutrition Chatbot Test Script"
+echo "========================================"
 echo ""
 
 # Configuration
@@ -18,22 +18,55 @@ if [ -z "$TOKEN" ]; then
     exit 1
 fi
 
-echo "📝 Testing AI Chatbot Endpoints..."
+echo "📝 Testing Nutrition Chatbot..."
 echo ""
 
-# Test 1: Send food-related message
-echo "1️⃣  Testing food query (should use food dataset)..."
+# Test 1: Greeting
+echo "1️⃣  Testing greeting..."
 curl -X POST "$BASE_URL/api/chatbot/message" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"message": "How many calories in chicken breast?"}' \
+  -d '{"message": "Hi"}' \
   | jq '.'
 echo ""
 echo "---"
 echo ""
 
-# Test 2: Send exercise-related message
-echo "2️⃣  Testing exercise query (should use exercise dataset)..."
+# Test 2: Natural language food query
+echo "2️⃣  Testing natural language: 'I am going to eat Chicken Tandoori Roll'..."
+curl -X POST "$BASE_URL/api/chatbot/message" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "I am going to eat Chicken Tandoori Roll"}' \
+  | jq '.'
+echo ""
+echo "---"
+echo ""
+
+# Test 3: Specific nutrient query
+echo "3️⃣  Testing specific nutrient: 'How much protein in chicken roll?'..."
+curl -X POST "$BASE_URL/api/chatbot/message" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "How much protein in chicken roll?"}' \
+  | jq '.'
+echo ""
+echo "---"
+echo ""
+
+# Test 4: Calorie query
+echo "4️⃣  Testing calorie query: 'Tell me calories in biryani'..."
+curl -X POST "$BASE_URL/api/chatbot/message" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Tell me calories in biryani"}' \
+  | jq '.'
+echo ""
+echo "---"
+echo ""
+
+# Test 5: Out-of-scope query (exercise)
+echo "5️⃣  Testing out-of-scope (exercise - should be rejected)..."
 curl -X POST "$BASE_URL/api/chatbot/message" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
@@ -43,19 +76,8 @@ echo ""
 echo "---"
 echo ""
 
-# Test 3: Send general health question (should use Gemini AI)
-echo "3️⃣  Testing general health query (should use Gemini AI)..."
-curl -X POST "$BASE_URL/api/chatbot/message" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"message": "How much water should I drink daily?"}' \
-  | jq '.'
-echo ""
-echo "---"
-echo ""
-
-# Test 4: Send non-health question (should be rejected)
-echo "4️⃣  Testing non-health query (should be rejected)..."
+# Test 6: Out-of-scope query (general)
+echo "6️⃣  Testing out-of-scope (general - should be rejected)..."
 curl -X POST "$BASE_URL/api/chatbot/message" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
@@ -65,27 +87,20 @@ echo ""
 echo "---"
 echo ""
 
-# Test 5: Get chat history
-echo "5️⃣  Getting chat history..."
-curl -X GET "$BASE_URL/api/chatbot/history?limit=10" \
+# Test 7: Food not in dataset
+echo "7️⃣  Testing food not in dataset..."
+curl -X POST "$BASE_URL/api/chatbot/message" \
   -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "How many calories in xyz123 food?"}' \
   | jq '.'
 echo ""
 echo "---"
 echo ""
 
-# Test 6: Get chat statistics
-echo "6️⃣  Getting chat statistics..."
-curl -X GET "$BASE_URL/api/chatbot/stats" \
-  -H "Authorization: Bearer $TOKEN" \
-  | jq '.'
-echo ""
-echo "---"
-echo ""
-
-# Test 7: Get chat sessions
-echo "7️⃣  Getting chat sessions..."
-curl -X GET "$BASE_URL/api/chatbot/sessions" \
+# Get chat history
+echo "8️⃣  Getting chat history..."
+curl -X GET "$BASE_URL/api/chatbot/history" \
   -H "Authorization: Bearer $TOKEN" \
   | jq '.'
 echo ""
@@ -94,9 +109,13 @@ echo ""
 
 echo "✅ All tests completed!"
 echo ""
-echo "📊 Check the responses above to verify:"
-echo "   - Food queries return dataset responses"
-echo "   - Exercise queries return dataset responses"
-echo "   - General health queries use Gemini AI"
-echo "   - Non-health queries are politely rejected"
+echo "Expected Results:"
+echo "1. Greeting → Warm nutrition assistant greeting"
+echo "2. Natural language → Full nutrition breakdown from dataset"
+echo "3. Specific nutrient → Single protein value"
+echo "4. Calorie query → Calorie information from dataset"
+echo "5. Exercise query → Polite rejection (nutrition-only)"
+echo "6. General query → Polite rejection (nutrition-only)"
+echo "7. Unknown food → 'I don't have nutritional data for this food yet'"
+echo "8. History → List of all messages"
 echo ""
