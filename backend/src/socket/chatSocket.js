@@ -316,6 +316,7 @@ export const initializeSocketIO = (httpServer) => {
           senderId: chatMessage.senderId,
           senderName: chatMessage.senderName,
           message: chatMessage.message,
+          status: chatMessage.status,
           createdAt: chatMessage.createdAt
         });
         
@@ -337,6 +338,90 @@ export const initializeSocketIO = (httpServer) => {
           senderName: socket.senderName,
           isTyping
         });
+      }
+    });
+
+    /**
+     * Mark message as delivered
+     */
+    socket.on('message-delivered', async ({ messageId }) => {
+      try {
+        const message = await ChatMessage.findById(messageId);
+        if (message && message.status === 'sent') {
+          message.status = 'delivered';
+          message.deliveredAt = new Date();
+          await message.save();
+          
+          // Notify sender that message was delivered
+          io.to(socket.appointmentId).emit('message-status-update', {
+            messageId,
+            status: 'delivered',
+            deliveredAt: message.deliveredAt
+          });
+          
+          console.log(`Message ${messageId} marked as delivered`);
+        }
+      } catch (error) {
+        console.error('Error marking message as delivered:', error);
+      }
+    });
+
+    /**
+     * Mark message as read
+     */
+    socket.on('message-read', async ({ messageId }) => {
+      try {
+        const message = await ChatMessage.findById(messageId);
+        if (message && message.status !== 'read') {
+          message.status = 'read';
+          message.readAt = new Date();
+          message.isRead = true;
+          await message.save();
+          
+          // Notify sender that message was read
+          io.to(socket.appointmentId).emit('message-status-update', {
+            messageId,
+            status: 'read',
+            readAt: message.readAt
+          });
+          
+          console.log(`Message ${messageId} marked as read`);
+        }
+      } catch (error) {
+        console.error('Error marking message as read:', error);
+      }
+    });
+
+    /**
+     * Mark all messages as read
+     */
+    socket.on('mark-all-read', async ({ appointmentId }) => {
+      try {
+        if (socket.appointmentId !== appointmentId) return;
+        
+        // Find all unread messages sent by the other user
+        const result = await ChatMessage.updateMany(
+          {
+            appointmentId,
+            senderId: { $ne: socket.userId },
+            status: { $ne: 'read' }
+          },
+          {
+            status: 'read',
+            readAt: new Date(),
+            isRead: true
+          }
+        );
+        
+        // Notify all users in the room
+        io.to(appointmentId).emit('messages-read', {
+          appointmentId,
+          readBy: socket.userRole
+        });
+        
+        console.log(`Marked ${result.modifiedCount} messages as read in appointment ${appointmentId}`);
+      } catch (error) {
+        console.error('Error marking all messages as read:', error);
       }
     });
 

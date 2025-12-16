@@ -41,9 +41,25 @@ const chatMessageSchema = new mongoose.Schema({
     maxlength: 1000
   },
   
+  status: {
+    type: String,
+    enum: ['sent', 'delivered', 'read'],
+    default: 'sent'
+  },
+  
   isRead: {
     type: Boolean,
     default: false
+  },
+  
+  deliveredAt: {
+    type: Date,
+    default: null
+  },
+  
+  readAt: {
+    type: Date,
+    default: null
   },
   
   createdAt: {
