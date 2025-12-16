@@ -121,7 +121,7 @@ export const initializeSocketIO = (httpServer) => {
         
         if (user) {
           appointment = user.appointmentsBooked.id(appointmentId);
-          senderName = user.name || 'User';
+          senderName = user.userInfo?.name || user.username || 'User';
         }
         
         // If not found, check if user is a doctor
@@ -173,15 +173,19 @@ export const initializeSocketIO = (httpServer) => {
         // Get other user's name for display
         let otherUserName = '';
         if (userRole === 'doctor') {
+          // Doctor is viewing chat - get patient name
           const patient = await User.findById(appointment.userId);
-          otherUserName = patient?.name || 'Patient';
+          otherUserName = patient?.userInfo?.name || patient?.username || 'Patient';
+          console.log(`👤 Doctor viewing chat with patient: ${otherUserName} (ID: ${appointment.userId})`);
         } else {
+          // User is viewing chat - get doctor name
           const doctorDoc = await Doctor.findById(appointment.doctorId);
           if (doctorDoc) {
             otherUserName = `Dr. ${doctorDoc.personalInfo.firstName} ${doctorDoc.personalInfo.lastName}`;
           } else {
             otherUserName = 'Doctor';
           }
+          console.log(`👤 User viewing chat with doctor: ${otherUserName} (ID: ${appointment.doctorId})`);
         }
         
         socket.emit('joined', { 
@@ -192,7 +196,7 @@ export const initializeSocketIO = (httpServer) => {
           message: accessCheck.reason || 'Successfully joined chat'
         });
         
-        console.log(`${senderName} (${userRole}) joined appointment ${appointmentId}, canSend: ${accessCheck.canSend}`);
+        console.log(`${senderName} (${userRole}) joined appointment ${appointmentId}, otherUser: ${otherUserName}, canSend: ${accessCheck.canSend}`);
         
       } catch (error) {
         console.error('Error joining appointment:', error);
