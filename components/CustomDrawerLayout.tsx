@@ -30,10 +30,43 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
   const [userName, setUserName] = useState('User');
   const [userEmail, setUserEmail] = useState('user@example.com');
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const [isDoctor, setIsDoctor] = useState(false);
+  const [doctorName, setDoctorName] = useState('');
   
   useEffect(() => {
     fetchUserData();
+    checkDoctorStatus();
   }, [user]);
+
+  const checkDoctorStatus = async () => {
+    try {
+      const token = await SecureStore.getItemAsync('fitfaat_auth_token');
+      if (!token) return;
+
+      const API_URL = getAPIURL();
+      const baseURL = Platform.OS === 'android' ? API_URL.replace('localhost', '10.0.2.2') : API_URL;
+
+      const response = await fetch(`${baseURL}/api/doctors/status`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Drawer - Doctor Status:', result);
+        if (result.success && result.doctor) {
+          setIsDoctor(true);
+          setDoctorName(result.doctor.name || 'Doctor');
+          console.log('Drawer - User is doctor:', result.doctor.name);
+        }
+      }
+    } catch (error) {
+      console.log('Drawer - Not a doctor or error:', error);
+    }
+  };
 
   const fetchUserData = async () => {
     try {
@@ -202,25 +235,27 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
             backgroundColor: isRouteActive('(chatbot)') ? colors.drawerActiveTabColor : 'transparent',
           }}
         />
-        <DrawerItem
-          label="Conference"
-          onPress={() => props.navigation.navigate('(conference)')}
-          labelStyle={{
-            marginLeft: 8,
-            fontSize: 18,
-            fontFamily: "PoppinsMedium500",
-            color: colors.textOnPrimary,
-          }}
-          style={{
-            marginHorizontal: 12,
-            marginVertical: 1,
-            borderRadius: 25,
-            paddingHorizontal: 20,
-            paddingVertical: 8,
-            minHeight: 45,
-            backgroundColor: isRouteActive('(conference)') ? colors.drawerActiveTabColor : 'transparent',
-          }}
-        />
+        {!isDoctor && (
+          <DrawerItem
+            label="Conference"
+            onPress={() => props.navigation.navigate('(conference)')}
+            labelStyle={{
+              marginLeft: 8,
+              fontSize: 18,
+              fontFamily: "PoppinsMedium500",
+              color: colors.textOnPrimary,
+            }}
+            style={{
+              marginHorizontal: 12,
+              marginVertical: 1,
+              borderRadius: 25,
+              paddingHorizontal: 20,
+              paddingVertical: 8,
+              minHeight: 45,
+              backgroundColor: isRouteActive('(conference)') ? colors.drawerActiveTabColor : 'transparent',
+            }}
+          />
+        )}
         <DrawerItem
           label="Workouts 👑"
           onPress={() => props.navigation.navigate('(exercises)/workout')}
@@ -241,7 +276,7 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
           }}
         />
         <DrawerItem
-          label="Join as Doctor 👨‍⚕️"
+          label={isDoctor && doctorName ? `Dr. ${doctorName} 👨‍⚕️` : "Join as Doctor 👨‍⚕️"}
           onPress={() => props.navigation.navigate('(doctor-portal)')}
           labelStyle={{
             marginLeft: 8,

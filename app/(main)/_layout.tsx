@@ -6,14 +6,17 @@ import { authApi } from "@/utils/auth/authApi";
 import { DrawerContentComponentProps } from "@react-navigation/drawer";
 import { useRouter } from "expo-router";
 import { Drawer } from "expo-router/drawer";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { colorsSheet as color } from "./(settings)/_ui_elements";
 type DrawerSceneWrapperProps = DrawerContentComponentProps;
 
 export default function MainLayout() {
     const router = useRouter();
-    console.log('Landed in (main)\_Layout');
+    const [isDoctor, setIsDoctor] = useState(false);
+    const [doctorName, setDoctorName] = useState("");
+    const [loading, setLoading] = useState(true);
+    console.log('Landed in (main)\_Layout', { isDoctor, doctorName });
     
     useEffect(() => {
       const checkAuth = async () => {
@@ -21,15 +24,51 @@ export default function MainLayout() {
           const isAuthenticated = await authApi.isAuthenticated();
           if (!isAuthenticated) {
             router.replace("/(auth)");
+            return;
+          }
+          
+          // Check if user is a doctor
+          try {
+            const doctorStatus = await authApi.getDoctorStatus();
+            console.log('Doctor Status Response:', doctorStatus);
+            if (doctorStatus.success && doctorStatus.doctor) {
+              setIsDoctor(true);
+              const name = doctorStatus.doctor.name || doctorStatus.doctor.fullName || "Doctor";
+              setDoctorName(name);
+              console.log('User is a doctor:', name);
+            } else {
+              setIsDoctor(false);
+              console.log('Not a doctor - response:', doctorStatus);
+            }
+          } catch (error: any) {
+            // User is not a doctor, keep isDoctor as false
+            setIsDoctor(false);
+            console.log('User is not a doctor - error:', error?.response?.data || error.message);
           }
         } catch (error) {
           console.error('Auth check error:', error);
           router.replace("/(auth)");
+        } finally {
+          setLoading(false);
         }
       };
       
       checkAuth();
     }, []);
+
+    // Memoize drawer options to ensure they update when state changes
+    const conferenceOptions = useMemo(() => ({
+      title: "Conference",
+      drawerItemStyle: isDoctor ? { height: 0, overflow: 'hidden' as const } : {},
+    }), [isDoctor]);
+
+    const doctorPortalOptions = useMemo(() => ({
+      title: isDoctor && doctorName ? `Dr. ${doctorName} 👨‍⚕️` : "Join as Doctor 👨‍⚕️"
+    }), [isDoctor, doctorName]);
+
+    if (loading) {
+      return null; // or a loading screen
+    }
     return <GestureHandlerRootView style={{ flex: 1 }}>
   <AppointmentProvider>
   <ChatbotStorageProvider>
@@ -71,11 +110,17 @@ export default function MainLayout() {
   >
     <Drawer.Screen name="(dashboard)" options={{ title: "Dashboard" }} />
     <Drawer.Screen name="(chatbot)" options={{ title: "Chatbot" }} />
-    <Drawer.Screen name="(conference)" options={{ title: "Conference" }} />
+    <Drawer.Screen 
+      name="(conference)" 
+      options={conferenceOptions}
+    />
     <Drawer.Screen name="(news)" options={{ title: "📰 News" }} />
     <Drawer.Screen name="(settings)" options={{ title: "Settings" }} />
     <Drawer.Screen name="(exercises)/workout" options={{ title: "Workouts 👑" }} />
-    <Drawer.Screen name="(doctor-portal)" options={{ title: "Join as Doctor 👨‍⚕️" }} />
+    <Drawer.Screen 
+      name="(doctor-portal)" 
+      options={doctorPortalOptions}
+    />
   </Drawer>
   </NewsProvider>
   </ChatbotStorageProvider>
