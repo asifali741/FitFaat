@@ -159,36 +159,48 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
   const addMessage = (text: string, isUser: boolean) => {
     // If no current session, create one first
     if (!currentSession) {
-      const sessionId = createNewSession();
-      // Use setTimeout to ensure state is updated before adding message
-      setTimeout(() => {
-        addMessage(text, isUser);
-      }, 100);
-      return;
+      createNewSession();
+      // Don't return here - we'll handle it below
     }
+
+    // Use the current session or create a temporary one
+    const sessionToUse = currentSession || {
+      id: Date.now().toString(),
+      title: 'New Chat',
+      createdAt: new Date(),
+      lastMessageAt: new Date(),
+      messageCount: 0,
+      messages: []
+    };
 
     const message: ChatMessage = {
       id: Date.now().toString() + Math.random().toString(), // Ensure unique ID
       text,
       isUser,
       timestamp: new Date(),
-      sessionId: currentSession.id
+      sessionId: sessionToUse.id
     };
 
     const updatedSession: ChatSession = {
-      ...currentSession,
-      messages: [...currentSession.messages, message],
+      ...sessionToUse,
+      messages: [...sessionToUse.messages, message],
       lastMessageAt: new Date(),
-      messageCount: currentSession.messageCount + 1,
-      title: currentSession.messageCount === 0 ? 
+      messageCount: sessionToUse.messageCount + 1,
+      title: sessionToUse.messageCount === 0 ? 
         (text.length > 30 ? text.substring(0, 30) + '...' : text) : 
-        currentSession.title
+        sessionToUse.title
     };
 
     // Update both sessions array and current session atomically
     setSessions(prev => {
-      const updated = prev.map(s => s.id === currentSession.id ? updatedSession : s);
-      return updated;
+      const existingIndex = prev.findIndex(s => s.id === sessionToUse.id);
+      if (existingIndex >= 0) {
+        const updated = prev.map(s => s.id === sessionToUse.id ? updatedSession : s);
+        return updated;
+      } else {
+        // Add new session if it doesn't exist
+        return [updatedSession, ...prev];
+      }
     });
     setCurrentSession(updatedSession);
   };
