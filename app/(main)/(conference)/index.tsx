@@ -84,6 +84,14 @@ export default function ConferenceScreen() {
             <Ionicons name="list" size={24} color={colors.primary} />
             <Text style={styles.viewAppointmentsButtonText}>View My Appointments</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.chatButton}
+            onPress={() => router.push('/(main)/(conference)/all-user-chats')}
+          >
+            <Ionicons name="chatbubbles" size={24} color={colors.primary} />
+            <Text style={styles.chatButtonText}>My Chats</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </SafeAreaView>
@@ -223,6 +231,32 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontSize: Math.min(hp(2.1), wp(5.2)),
     fontWeight: "600",
     letterSpacing: 0.3,
+    marginLeft: wp(2),
+  },
+  chatButton: {
+    backgroundColor: colors.white,
+    borderColor: colors.primary,
+    borderWidth: 2,
+    paddingVertical: Math.min(hp(2.2), wp(5.5)),
+    paddingHorizontal: wp(6),
+    borderRadius: 25,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    marginTop: hp(2),
+    shadowColor: colors.primary,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  chatButtonText: {
+    color: colors.primary,
+    fontSize: Math.min(hp(2.1), wp(5.2)),
+    fontWeight: "600",
     marginLeft: wp(2),
   },
   spacer: {

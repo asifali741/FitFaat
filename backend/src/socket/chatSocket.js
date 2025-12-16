@@ -1,0 +1,354 @@
+import jwt from 'jsonwebtoken';
+import { Server } from 'socket.io';
+import ChatMessage from '../models/ChatMessage.js';
+import Doctor from '../models/Doctor.js';
+import User from '../models/User.js';
+
+/**
+ * Helper function to check if chat is allowed based on appointment time
+ */
+const isChatAllowed = (appointment, userRole) => {
+  const now = new Date();
+  const appointmentDate = new Date(appointment.date);
+  
+  // Parse time (HH:MM AM/PM format)
+  const timeParts = appointment.time.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!timeParts) return { allowed: false, reason: 'Invalid time format' };
+  
+  let hours = parseInt(timeParts[1]);
+  const minutes = parseInt(timeParts[2]);
+  const period = timeParts[3].toUpperCase();
+  
+  // Convert to 24-hour format
+  if (period === 'PM' && hours !== 12) hours += 12;
+  if (period === 'AM' && hours === 12) hours = 0;
+  
+  appointmentDate.setHours(hours, minutes, 0, 0);
+  
+  // Appointment end time (assuming 1 hour duration)
+  const appointmentEndTime = new Date(appointmentDate);
+  appointmentEndTime.setHours(appointmentEndTime.getHours() + 1);
+  
+  // Check status
+  if (!['confirmed', 'pending'].includes(appointment.status)) {
+    return { allowed: false, reason: 'Appointment is not active' };
+  }
+  
+  // Doctor can chat before and during appointment
+  if (userRole === 'doctor') {
+    if (now > appointmentEndTime) {
+      return { allowed: false, reason: 'Appointment has ended' };
+    }
+    return { allowed: true };
+  }
+  
+  // User can only chat during appointment time
+  if (userRole === 'user') {
+    if (now < appointmentDate) {
+      return { allowed: false, reason: 'Appointment has not started yet' };
+    }
+    if (now > appointmentEndTime) {
+      return { allowed: false, reason: 'Appointment has ended' };
+    }
+    return { allowed: true };
+  }
+  
+  return { allowed: false, reason: 'Invalid user role' };
+};
+
+/**
+ * Initialize Socket.io server
+ */
+export const initializeSocketIO = (httpServer) => {
+  const io = new Server(httpServer, {
+    cors: {
+      origin: '*',
+      methods: ['GET', 'POST']
+    }
+  });
+
+  // Authentication middleware for Socket.io
+  io.use(async (socket, next) => {
+    try {
+      const token = socket.handshake.auth.token;
+      
+      if (!token) {
+        return next(new Error('Authentication error'));
+      }
+
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      socket.userId = decoded.id;
+      next();
+    } catch (error) {
+      next(new Error('Authentication error'));
+    }
+  });
+
+  io.on('connection', (socket) => {
+    console.log(`User connected: ${socket.userId}`);
+
+    /**
+     * Join appointment chat room
+     */
+    socket.on('join-appointment', async ({ appointmentId }) => {
+      try {
+        const userId = socket.userId;
+        
+        // Find appointment and verify access
+        const user = await User.findById(userId);
+        let appointment = null;
+        let userRole = 'user';
+        let senderName = '';
+        let senderModel = 'User';
+        
+        if (user) {
+          appointment = user.appointmentsBooked.id(appointmentId);
+          senderName = user.name || 'User';
+        }
+        
+        // If not found, check if user is a doctor
+        if (!appointment) {
+          const doctor = await Doctor.findOne({ userId });
+          if (doctor) {
+            appointment = doctor.bookedAppointments.id(appointmentId);
+            if (appointment) {
+              userRole = 'doctor';
+              senderName = `Dr. ${doctor.personalInfo.firstName} ${doctor.personalInfo.lastName}`;
+              senderModel = 'Doctor';
+            }
+          }
+        }
+        
+        if (!appointment) {
+          socket.emit('error', { message: 'Appointment not found' });
+          return;
+        }
+        
+        // Check if chat is allowed
+        const accessCheck = isChatAllowed(appointment, userRole);
+        
+        if (!accessCheck.allowed) {
+          socket.emit('chat-closed', { 
+            reason: accessCheck.reason,
+            appointment: {
+              date: appointment.date,
+              time: appointment.time,
+              status: appointment.status
+            }
+          });
+          return;
+        }
+        
+        // Join room
+        socket.join(appointmentId);
+        socket.appointmentId = appointmentId;
+        socket.userRole = userRole;
+        socket.senderName = senderName;
+        socket.senderModel = senderModel;
+        
+        socket.emit('joined', { 
+          appointmentId,
+          userRole,
+          message: 'Successfully joined chat'
+        });
+        
+        console.log(`${senderName} (${userRole}) joined appointment ${appointmentId}`);
+        
+      } catch (error) {
+        console.error('Error joining appointment:', error);
+        socket.emit('error', { message: 'Failed to join chat' });
+      }
+    });
+
+    /**
+     * Send message
+     */
+    socket.on('send-message', async ({ appointmentId, message }) => {
+      try {
+        if (!socket.appointmentId || socket.appointmentId !== appointmentId) {
+          socket.emit('error', { message: 'Not joined to this appointment' });
+          return;
+        }
+        
+        if (!message || message.trim().length === 0) {
+          socket.emit('error', { message: 'Message cannot be empty' });
+          return;
+        }
+        
+        if (message.length > 1000) {
+          socket.emit('error', { message: 'Message too long (max 1000 characters)' });
+          return;
+        }
+        
+        // Re-verify chat access before sending
+        const userId = socket.userId;
+        const user = await User.findById(userId);
+        let appointment = null;
+        
+        if (user) {
+          appointment = user.appointmentsBooked.id(appointmentId);
+        }
+        
+        if (!appointment) {
+          const doctor = await Doctor.findOne({ userId });
+          if (doctor) {
+            appointment = doctor.bookedAppointments.id(appointmentId);
+          }
+        }
+        
+        if (!appointment) {
+          socket.emit('error', { message: 'Appointment not found' });
+          return;
+        }
+        
+        const accessCheck = isChatAllowed(appointment, socket.userRole);
+        
+        if (!accessCheck.allowed) {
+          socket.emit('chat-closed', { 
+            reason: accessCheck.reason,
+            appointment: {
+              date: appointment.date,
+              time: appointment.time,
+              status: appointment.status
+            }
+          });
+          
+          // Notify other users in the room
+          socket.to(appointmentId).emit('chat-closed', {
+            reason: 'Appointment time has ended',
+            appointment: {
+              date: appointment.date,
+              time: appointment.time,
+              status: appointment.status
+            }
+          });
+          
+          return;
+        }
+        
+        // Check if user can send messages
+        if (!accessCheck.canSend) {
+          socket.emit('error', { 
+            message: accessCheck.reason || 'You cannot send messages at this time',
+            canSend: false
+          });
+          return;
+        }
+        
+        // Save message to database
+        const chatMessage = new ChatMessage({
+          appointmentId,
+          senderRole: socket.userRole,
+          senderId: socket.userId,
+          senderModel: socket.senderModel,
+          senderName: socket.senderName,
+          message: message.trim()
+        });
+        
+        await chatMessage.save();
+        
+        // Emit to room (including sender)
+        io.to(appointmentId).emit('new-message', {
+          _id: chatMessage._id,
+          appointmentId: chatMessage.appointmentId,
+          senderRole: chatMessage.senderRole,
+          senderId: chatMessage.senderId,
+          senderName: chatMessage.senderName,
+          message: chatMessage.message,
+          createdAt: chatMessage.createdAt
+        });
+        
+        console.log(`Message sent in appointment ${appointmentId} by ${socket.senderName}`);
+        
+      } catch (error) {
+        console.error('Error sending message:', error);
+        socket.emit('error', { message: 'Failed to send message' });
+      }
+    });
+
+    /**
+     * Typing indicator
+     */
+    socket.on('typing', ({ appointmentId, isTyping }) => {
+      if (socket.appointmentId === appointmentId) {
+        socket.to(appointmentId).emit('user-typing', {
+          userRole: socket.userRole,
+          senderName: socket.senderName,
+          isTyping
+        });
+      }
+    });
+
+    /**
+     * Leave appointment
+     */
+    socket.on('leave-appointment', ({ appointmentId }) => {
+      if (socket.appointmentId === appointmentId) {
+        socket.leave(appointmentId);
+        console.log(`${socket.senderName} left appointment ${appointmentId}`);
+      }
+    });
+
+    /**
+     * Disconnect
+     */
+    socket.on('disconnect', () => {
+      console.log(`User disconnected: ${socket.userId}`);
+      if (socket.appointmentId) {
+        socket.leave(socket.appointmentId);
+      }
+    });
+  });
+
+  // Periodic check for ended appointments (every minute)
+  setInterval(async () => {
+    try {
+      const rooms = io.sockets.adapter.rooms;
+      
+      for (const [appointmentId, sockets] of rooms) {
+        // Skip if it's a socket ID (not a room)
+        if (sockets.size === 1) continue;
+        
+        // Check if appointment has ended
+        const users = await User.find({ 'appointmentsBooked._id': appointmentId });
+        const doctors = await Doctor.find({ 'bookedAppointments._id': appointmentId });
+        
+        let appointment = null;
+        
+        if (users.length > 0) {
+          appointment = users[0].appointmentsBooked.id(appointmentId);
+        } else if (doctors.length > 0) {
+          appointment = doctors[0].bookedAppointments.id(appointmentId);
+        }
+        
+        if (appointment) {
+          const accessCheck = isChatAllowed(appointment, 'user');
+          
+          if (!accessCheck.allowed) {
+            // Notify all users and close chat
+            io.to(appointmentId).emit('chat-closed', {
+              reason: 'Appointment time has ended',
+              appointment: {
+                date: appointment.date,
+                time: appointment.time,
+                status: appointment.status
+              }
+            });
+            
+            // Disconnect all sockets from this room
+            const socketsInRoom = await io.in(appointmentId).fetchSockets();
+            socketsInRoom.forEach(socket => {
+              socket.leave(appointmentId);
+            });
+            
+            console.log(`Closed chat for appointment ${appointmentId} - time expired`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error in periodic check:', error);
+    }
+  }, 60000); // Check every minute
+
+  return io;
+};

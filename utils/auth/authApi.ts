@@ -286,4 +286,14 @@ export const authApi = {
       throw error.response?.data || error.message;
     }
   },
+
+  // Grant chat access to user (Doctor only)
+  grantChatAccess: async (appointmentId: string) => {
+    try {
+      const response = await api.post(`/chat/appointment/${appointmentId}/grant-access`);
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || error.message;
+    }
+  },
 };
