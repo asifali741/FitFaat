@@ -53,6 +53,10 @@ export default function Settings() {
         router.push("/payment-methods");
         break;
       
+      case "Premium":
+        router.push("/premium");
+        break;
+      
       case "Workout Preferences":
         router.push("/(exercises)/workout");
         break;
@@ -349,6 +353,12 @@ export default function Settings() {
               title="Payment Methods"
               subtitle="Manage your payment options"
               onPress={() => handleSettingPress("Payment Methods")}
+            />
+            <SettingItem
+              icon="star-outline"
+              title="Premium"
+              subtitle="Upgrade to unlock premium features"
+              onPress={() => handleSettingPress("Premium")}
             />
           </View>
 

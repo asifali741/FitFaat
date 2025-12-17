@@ -513,6 +513,8 @@ router.get('/profile', protect, async (req, res) => {
           isDocregister: user.isDocregister,
           profileImage: user.profileImage,
           profileImageUrl: user.profileImage ? `/uploads/profiles/${user.profileImage}` : null,
+          isPremium: user.isPremium,
+          premiumSubscription: user.premiumSubscription || null,
           userInfo: {
             ...user.userInfo,
             age: age

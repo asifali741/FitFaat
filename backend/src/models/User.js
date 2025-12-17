@@ -314,7 +314,28 @@ const userSchema = new mongoose.Schema({
         default: Date.now
       }
     }
-  ]
+  ],
+  // Premium Subscription
+  isPremium: {
+    type: Boolean,
+    default: false
+  },
+  premiumSubscription: {
+    stripeCustomerId: String,
+    stripePaymentMethodId: String,
+    purchaseDate: Date,
+    expiryDate: Date,
+    status: {
+      type: String,
+      enum: ['active', 'expired', 'cancelled'],
+      default: 'active'
+    },
+    amount: {
+      type: Number,
+      default: 10 // $10
+    },
+    transactionId: String
+  }
 });
 
 // Create indexes for faster appointment conflict checking

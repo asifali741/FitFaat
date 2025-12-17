@@ -3,6 +3,7 @@ import SafeScreen from "@/components/SafeScreen";
 import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
 import { ClerkProvider, useAuth, useUser } from "@clerk/clerk-expo";
 import { tokenCache } from "@clerk/clerk-expo/token-cache";
+import { StripeProvider } from "@stripe/stripe-react-native";
 import { Slot, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, StatusBar, View } from "react-native";
@@ -20,16 +21,24 @@ if (!publishableKey) {
 }
 
 export default function RootLayout() {
+  const stripePublishableKey = process.env.EXPO_PUBLIC_STRIPE_PK;
+  
+  if (!stripePublishableKey) {
+    throw new Error('Missing EXPO_PUBLIC_STRIPE_PK in .env');
+  }
+  
   return (
     // {/* NOTIFICATION FUNCTIONALITY DISABLED FOR NOW */}
     // <NotificationProvider>
-      <ClerkProvider tokenCache={tokenCache} publishableKey={publishableKey}> 
-        <ThemeProvider>
-          <SafeAreaProvider>
-            <ThemedApp />
-          </SafeAreaProvider>
-        </ThemeProvider>
-      </ClerkProvider>
+      <StripeProvider publishableKey={stripePublishableKey}>
+        <ClerkProvider tokenCache={tokenCache} publishableKey={publishableKey}> 
+          <ThemeProvider>
+            <SafeAreaProvider>
+              <ThemedApp />
+            </SafeAreaProvider>
+          </ThemeProvider>
+        </ClerkProvider>
+      </StripeProvider>
     // </NotificationProvider>
   );
 }
