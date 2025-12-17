@@ -1,12 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    StyleSheet,
+    TextInput,
+    TouchableOpacity,
+    View
 } from "react-native";
 import { heightPercentageToDP as hp } from "react-native-responsive-screen";
 import { sendChatbotMessage } from '../utils/api';
@@ -25,8 +25,6 @@ type ControlsProps = {
 export default function Controls({ onAddMessage, sessionId }: ControlsProps) {
   const [content, setContent] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  
-  console.log(`[Controls] Rendered with onAddMessage ref:`, onAddMessage?.name || 'anonymous');
 
   const handleSend = async () => {
     if (!content.trim()) {
@@ -35,7 +33,6 @@ export default function Controls({ onAddMessage, sessionId }: ControlsProps) {
     }
     
     const userMessage = content.trim();
-    console.log(`[Controls] handleSend - User message: "${userMessage}"`);
     setContent(""); // Clear immediately
     
     try {
@@ -44,16 +41,10 @@ export default function Controls({ onAddMessage, sessionId }: ControlsProps) {
       // Add user message directly
       if (onAddMessage) {
         try {
-          console.log(`[Controls] Calling onAddMessage for USER message: "${userMessage}"`);
-          console.log(`[Controls] onAddMessage ref:`, onAddMessage.name || 'anonymous');
-          console.log(`[Controls] onAddMessage is function:`, typeof onAddMessage === 'function');
           onAddMessage(userMessage, true, 'user');
-          console.log(`[Controls] onAddMessage returned for USER - no error`);
         } catch (err) {
-          console.error(`[Controls] ERROR caught in onAddMessage for USER:`, err);
+          console.error('Error adding user message:', err);
         }
-      } else {
-        console.log(`[Controls] onAddMessage is null/undefined!`);
       }
 
       // Get AI response
@@ -61,9 +52,7 @@ export default function Controls({ onAddMessage, sessionId }: ControlsProps) {
       
       // Add AI response
       if (onAddMessage && response.aiResponse) {
-        console.log(`[Controls] Calling onAddMessage for BOT message`);
         onAddMessage(response.aiResponse.content, false, response.aiResponse.source);
-        console.log(`[Controls] onAddMessage returned for BOT`);
       }
     } catch (error) {
       console.error('Chat error:', error);
