@@ -364,14 +364,19 @@ export default function PremiumScreen() {
                     cvc: "CVC",
                     postalCode: "12345",
                   }}
-                  onCardChange={(cardDetails) => {
+                  onCardChange={(details: any) => {
                     console.log("Card details updated:", {
-                      complete: cardDetails.complete,
-                      validCVC: cardDetails.validCVC,
-                      validExpiryDate: cardDetails.validExpiryDate,
-                      validNumber: cardDetails.validNumber,
+                      complete: details.complete,
+                      validCVC: details.validCVC,
+                      validExpiryDate: details.validExpiryDate,
+                      validNumber: details.validNumber,
                     });
-                    setCardDetails(cardDetails);
+                    setCardDetails({
+                      complete: details.complete,
+                      validCVC: details.validCVC,
+                      validExpiryDate: details.validExpiryDate,
+                      validNumber: details.validNumber,
+                    });
                   }}
                   style={styles.cardField}
                 />
