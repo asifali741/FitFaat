@@ -157,8 +157,12 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
   };
 
   const addMessage = (text: string, isUser: boolean) => {
+    console.log(`🔧 ChatbotStorage.addMessage called - isUser: ${isUser}, text: "${text.substring(0, 30)}..."`);
+    console.log(`🔧 Current session exists: ${!!currentSession}`);
+    
     // If no current session, create one first
     if (!currentSession) {
+      console.log(`🔧 No current session, creating new one...`);
       createNewSession();
       // Don't return here - we'll handle it below
     }
@@ -172,6 +176,8 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
       messageCount: 0,
       messages: []
     };
+
+    console.log(`🔧 Session to use ID: ${sessionToUse.id}, current messages: ${sessionToUse.messages.length}`);
 
     const message: ChatMessage = {
       id: Date.now().toString() + Math.random().toString(), // Ensure unique ID
@@ -191,6 +197,8 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
         sessionToUse.title
     };
 
+    console.log(`🔧 Updated session messages count: ${updatedSession.messages.length}`);
+
     // Update both sessions array and current session atomically
     setSessions(prev => {
       const existingIndex = prev.findIndex(s => s.id === sessionToUse.id);
@@ -203,6 +211,10 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
       }
     });
     setCurrentSession(updatedSession);
+    
+    // Immediately update messages state to ensure UI updates
+    setMessages(updatedSession.messages);
+    console.log(`🔧 Messages state updated directly with ${updatedSession.messages.length} messages`);
   };
 
   const clearCurrentSession = () => {

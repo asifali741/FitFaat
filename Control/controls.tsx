@@ -30,15 +30,14 @@ export default function Controls({ onAddMessage, sessionId }: ControlsProps) {
     if (content.trim()) {
       const userMessage = content.trim();
       
+      // IMMEDIATELY add user message first
+      onAddMessage?.(userMessage, true, 'user');
+      
+      // Clear input
+      setContent("");
+      
       try {
         setIsLoading(true);
-        
-        // Add user message to storage FIRST (before clearing input)
-        if (onAddMessage) {
-          onAddMessage(userMessage, true, 'user');
-        }
-        
-        setContent(""); // Clear input after adding message
 
         // Get AI response from backend chatbot
         const response = await sendChatbotMessage(userMessage, sessionId);
@@ -57,9 +56,6 @@ export default function Controls({ onAddMessage, sessionId }: ControlsProps) {
           "Error",
           error instanceof Error ? error.message : "Failed to get response. Please try again."
         );
-        
-        // Keep the user message in chat even on error
-        // No need to restore to input field
       } finally {
         setIsLoading(false);
       }

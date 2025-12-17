@@ -4,7 +4,7 @@ import { useChatbotStorage } from "@/contexts/ChatbotStorage";
 import { useTheme } from "@/contexts/ThemeContext";
 import Controls from "@/Control/controls";
 import { useRouter } from "expo-router";
-import React, { useEffect } from "react";
+import React, { useCallback, useEffect } from "react";
 import { FlatList, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -51,15 +51,27 @@ export default function Baat() {
         createdAt: msg.timestamp
       }))
     : [WelcomeText];
+  
+  console.log(`📱 Baat.tsx render - displayMessages count: ${displayMessages.length}, storedMessages: ${storedMessages.length}`);
 
-  const handleAddMessage = (text: string, isUser: boolean, source?: string) => {
-    addMessage(text, isUser);
-    
-    // Log the source of the response for debugging
-    if (!isUser && source) {
-      console.log(`💡 Response source: ${source}`);
+  const handleAddMessage = useCallback((text: string, isUser: boolean, source?: string) => {
+    console.log(`🚨🚨🚨 handleAddMessage ENTERED - isUser: ${isUser}`);
+    try {
+      console.log(`📨 Adding message - isUser: ${isUser}, text: "${text.substring(0, 30)}..."`);
+      console.log(`📊 Current storedMessages count: ${storedMessages.length}`);
+      
+      addMessage(text, isUser);
+      
+      // Log the source of the response for debugging
+      if (!isUser && source) {
+        console.log(`💡 Response source: ${source}`);
+      }
+      
+      console.log(`📊 After add - storedMessages count: ${storedMessages.length}`);
+    } catch (error) {
+      console.error(`❌ Error in handleAddMessage:`, error);
     }
-  };
+  }, [addMessage, storedMessages.length]);
 
   const styles = getStyles(colors, insets);
 
