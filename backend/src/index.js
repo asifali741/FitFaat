@@ -18,6 +18,7 @@ import dietPlanRoutes from './routes/dietPlan.js';
 import doctorRoutes from './routes/doctors.js';
 import foodRoutes from './routes/food.js';
 import newsRoutes from './routes/news.js';
+import paymentRoutes from './routes/payment.js';
 import pushTokenRoutes from './routes/pushToken.js';
 import userRoutes from './routes/user.js';
 import { initializeSocketIO } from './socket/chatSocket.js';
@@ -53,6 +54,7 @@ app.use('/api/admin/news', newsRoutes);
 app.use('/api/push-token', pushTokenRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/chatbot', chatbotRoutes); // AI Chatbot routes
+app.use('/api/payment', paymentRoutes); // Payment & Premium routes
 
 // Error handler
 app.use(errorHandler);
