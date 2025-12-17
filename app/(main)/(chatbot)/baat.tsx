@@ -5,7 +5,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import Controls from "@/Control/controls";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef } from "react";
-import { FlatList, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TouchableOpacity, View, Alert } from "react-native";
+import { Alert, FlatList, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 // type ChatMessage = {
@@ -25,7 +25,6 @@ const WelcomeText: ChatMessage = {
     "Hello, I am HeaLora, your AI-powered health companion. How can I assist you today?",
 }
 export default function Baat() {
-  console.log(`[baat.tsx] Baat component rendering...`);
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { 
@@ -43,8 +42,6 @@ export default function Baat() {
   useEffect(() => {
     addMessageRef.current = addMessage;
   }, [addMessage]);
-  
-  console.log(`[baat.tsx] currentSession:`, currentSession?.id, `messages:`, storedMessages.length);
 
   // Initialize session and load messages
   useEffect(() => {
@@ -83,17 +80,11 @@ export default function Baat() {
 
   const handleAddMessage = useCallback((text: string, isUser: boolean, source?: string) => {
     try {
-      const callId = `${isUser ? 'USER' : 'BOT'}-${Date.now()}`;
-      console.log(`[baat.tsx] handleAddMessage CALLED (ID: ${callId})`);
-      console.log(`[baat.tsx] About to call addMessage...`);
       addMessageRef.current(text, isUser);
-      console.log(`[baat.tsx] addMessage returned (ID: ${callId})`);
     } catch (err) {
-      console.error(`[baat.tsx] ERROR in handleAddMessage:`, err);
+      console.error('Error adding message:', err);
     }
   }, []); // Empty dependency array since we use ref
-  
-  console.log(`[baat.tsx] handleAddMessage recreated, passing to Controls`);
 
   const styles = getStyles(colors, insets);
 

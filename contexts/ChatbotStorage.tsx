@@ -149,13 +149,9 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
   };
 
   const addMessage = (text: string, isUser: boolean) => {
-    console.log(`[ChatbotStorage] addMessage START - isUser: ${isUser}, text: "${text.substring(0, 20)}..."`);
-    console.log(`[ChatbotStorage] currentSession exists: ${!!currentSession}`);
-    
     // If no session exists, we still need to add the message to a new session
     let sessionToUse = currentSession;
     if (!sessionToUse) {
-      console.log(`[ChatbotStorage] No currentSession, but continuing to create message`);
       // We'll handle this by creating message and letting sessions/currentSession updates handle it
     }
 
@@ -178,11 +174,9 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
         messageCount: 1,
         messages: [message]
       };
-      console.log(`[ChatbotStorage] Created new session: ${newSessionId}`);
       setSessions(prev => [sessionToUse, ...prev]);
       setCurrentSession(sessionToUse);
       setMessages([message]);
-      console.log(`[ChatbotStorage] addMessage DONE - new session`);
       return;
     }
 
@@ -196,8 +190,6 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
         sessionToUse.title
     };
 
-    console.log(`[ChatbotStorage] Updated session messages: ${updatedSession.messages.length}`);
-
     setSessions(prev => {
       const existingIndex = prev.findIndex(s => s.id === sessionToUse.id);
       if (existingIndex >= 0) {
@@ -207,13 +199,8 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
       }
     });
     
-    console.log(`[ChatbotStorage] Calling setCurrentSession...`);
     setCurrentSession(updatedSession);
-    
-    console.log(`[ChatbotStorage] Calling setMessages with ${updatedSession.messages.length} messages`);
     setMessages(updatedSession.messages);
-    
-    console.log(`[ChatbotStorage] addMessage DONE`);
   };
 
   const clearCurrentSession = () => {
