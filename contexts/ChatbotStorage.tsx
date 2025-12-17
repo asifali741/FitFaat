@@ -66,15 +66,6 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
     loadSessions();
   }, []);
 
-  // Update messages when current session changes
-  useEffect(() => {
-    if (currentSession) {
-      setMessages(currentSession.messages);
-    } else {
-      setMessages([]);
-    }
-  }, [currentSession]);
-
   // Save sessions to AsyncStorage whenever sessions change
   useEffect(() => {
     if (!isLoading) {
@@ -104,6 +95,7 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
             b.lastMessageAt.getTime() - a.lastMessageAt.getTime()
           )[0];
           setCurrentSession(mostRecent);
+          setMessages(mostRecent.messages);
         }
       }
     } catch (error) {
@@ -157,35 +149,42 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
   };
 
   const addMessage = (text: string, isUser: boolean) => {
-    console.log(`🔧 ChatbotStorage.addMessage called - isUser: ${isUser}, text: "${text.substring(0, 30)}..."`);
-    console.log(`🔧 Current session exists: ${!!currentSession}`);
+    console.log(`[ChatbotStorage] addMessage START - isUser: ${isUser}, text: "${text.substring(0, 20)}..."`);
+    console.log(`[ChatbotStorage] currentSession exists: ${!!currentSession}`);
     
-    // If no current session, create one first
-    if (!currentSession) {
-      console.log(`🔧 No current session, creating new one...`);
-      createNewSession();
-      // Don't return here - we'll handle it below
+    // If no session exists, we still need to add the message to a new session
+    let sessionToUse = currentSession;
+    if (!sessionToUse) {
+      console.log(`[ChatbotStorage] No currentSession, but continuing to create message`);
+      // We'll handle this by creating message and letting sessions/currentSession updates handle it
     }
 
-    // Use the current session or create a temporary one
-    const sessionToUse = currentSession || {
-      id: Date.now().toString(),
-      title: 'New Chat',
-      createdAt: new Date(),
-      lastMessageAt: new Date(),
-      messageCount: 0,
-      messages: []
-    };
-
-    console.log(`🔧 Session to use ID: ${sessionToUse.id}, current messages: ${sessionToUse.messages.length}`);
-
     const message: ChatMessage = {
-      id: Date.now().toString() + Math.random().toString(), // Ensure unique ID
+      id: Date.now().toString() + Math.random().toString(),
       text,
       isUser,
       timestamp: new Date(),
-      sessionId: sessionToUse.id
+      sessionId: sessionToUse?.id || Date.now().toString()
     };
+
+    // Create or update session
+    if (!sessionToUse) {
+      const newSessionId = Date.now().toString();
+      sessionToUse = {
+        id: newSessionId,
+        title: text.length > 30 ? text.substring(0, 30) + '...' : text,
+        createdAt: new Date(),
+        lastMessageAt: new Date(),
+        messageCount: 1,
+        messages: [message]
+      };
+      console.log(`[ChatbotStorage] Created new session: ${newSessionId}`);
+      setSessions(prev => [sessionToUse, ...prev]);
+      setCurrentSession(sessionToUse);
+      setMessages([message]);
+      console.log(`[ChatbotStorage] addMessage DONE - new session`);
+      return;
+    }
 
     const updatedSession: ChatSession = {
       ...sessionToUse,
@@ -197,24 +196,24 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
         sessionToUse.title
     };
 
-    console.log(`🔧 Updated session messages count: ${updatedSession.messages.length}`);
+    console.log(`[ChatbotStorage] Updated session messages: ${updatedSession.messages.length}`);
 
-    // Update both sessions array and current session atomically
     setSessions(prev => {
       const existingIndex = prev.findIndex(s => s.id === sessionToUse.id);
       if (existingIndex >= 0) {
-        const updated = prev.map(s => s.id === sessionToUse.id ? updatedSession : s);
-        return updated;
+        return prev.map(s => s.id === sessionToUse.id ? updatedSession : s);
       } else {
-        // Add new session if it doesn't exist
         return [updatedSession, ...prev];
       }
     });
+    
+    console.log(`[ChatbotStorage] Calling setCurrentSession...`);
     setCurrentSession(updatedSession);
     
-    // Immediately update messages state to ensure UI updates
+    console.log(`[ChatbotStorage] Calling setMessages with ${updatedSession.messages.length} messages`);
     setMessages(updatedSession.messages);
-    console.log(`🔧 Messages state updated directly with ${updatedSession.messages.length} messages`);
+    
+    console.log(`[ChatbotStorage] addMessage DONE`);
   };
 
   const clearCurrentSession = () => {

@@ -25,42 +25,51 @@ type ControlsProps = {
 export default function Controls({ onAddMessage, sessionId }: ControlsProps) {
   const [content, setContent] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  
+  console.log(`[Controls] Rendered with onAddMessage ref:`, onAddMessage?.name || 'anonymous');
 
   const handleSend = async () => {
-    if (content.trim()) {
-      const userMessage = content.trim();
-      
-      // IMMEDIATELY add user message first
-      onAddMessage?.(userMessage, true, 'user');
-      
-      // Clear input
-      setContent("");
-      
-      try {
-        setIsLoading(true);
-
-        // Get AI response from backend chatbot
-        const response = await sendChatbotMessage(userMessage, sessionId);
-        
-        // Add AI response to storage with source information
-        if (onAddMessage && response.aiResponse) {
-          onAddMessage(
-            response.aiResponse.content, 
-            false, 
-            response.aiResponse.source
-          );
-        }
-      } catch (error) {
-        console.error('Chatbot error:', error);
-        Alert.alert(
-          "Error",
-          error instanceof Error ? error.message : "Failed to get response. Please try again."
-        );
-      } finally {
-        setIsLoading(false);
-      }
-    } else {
+    if (!content.trim()) {
       Alert.alert("Empty message", "Please type something before sending.");
+      return;
+    }
+    
+    const userMessage = content.trim();
+    console.log(`[Controls] handleSend - User message: "${userMessage}"`);
+    setContent(""); // Clear immediately
+    
+    try {
+      setIsLoading(true);
+      
+      // Add user message directly
+      if (onAddMessage) {
+        try {
+          console.log(`[Controls] Calling onAddMessage for USER message: "${userMessage}"`);
+          console.log(`[Controls] onAddMessage ref:`, onAddMessage.name || 'anonymous');
+          console.log(`[Controls] onAddMessage is function:`, typeof onAddMessage === 'function');
+          onAddMessage(userMessage, true, 'user');
+          console.log(`[Controls] onAddMessage returned for USER - no error`);
+        } catch (err) {
+          console.error(`[Controls] ERROR caught in onAddMessage for USER:`, err);
+        }
+      } else {
+        console.log(`[Controls] onAddMessage is null/undefined!`);
+      }
+
+      // Get AI response
+      const response = await sendChatbotMessage(userMessage, sessionId);
+      
+      // Add AI response
+      if (onAddMessage && response.aiResponse) {
+        console.log(`[Controls] Calling onAddMessage for BOT message`);
+        onAddMessage(response.aiResponse.content, false, response.aiResponse.source);
+        console.log(`[Controls] onAddMessage returned for BOT`);
+      }
+    } catch (error) {
+      console.error('Chat error:', error);
+      Alert.alert("Error", "Failed to get response. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 

@@ -4,8 +4,8 @@ import { useChatbotStorage } from "@/contexts/ChatbotStorage";
 import { useTheme } from "@/contexts/ThemeContext";
 import Controls from "@/Control/controls";
 import { useRouter } from "expo-router";
-import React, { useCallback, useEffect } from "react";
-import { FlatList, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useEffect, useRef } from "react";
+import { FlatList, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TouchableOpacity, View, Alert } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 // type ChatMessage = {
@@ -25,6 +25,7 @@ const WelcomeText: ChatMessage = {
     "Hello, I am HeaLora, your AI-powered health companion. How can I assist you today?",
 }
 export default function Baat() {
+  console.log(`[baat.tsx] Baat component rendering...`);
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { 
@@ -32,9 +33,18 @@ export default function Baat() {
     addMessage, 
     createNewSession, 
     currentSession,
-    isLoading 
+    isLoading,
+    clearAllChats
   } = useChatbotStorage();
   const router = useRouter();
+  
+  // Keep a stable ref to addMessage even if it changes
+  const addMessageRef = useRef(addMessage);
+  useEffect(() => {
+    addMessageRef.current = addMessage;
+  }, [addMessage]);
+  
+  console.log(`[baat.tsx] currentSession:`, currentSession?.id, `messages:`, storedMessages.length);
 
   // Initialize session and load messages
   useEffect(() => {
@@ -42,6 +52,25 @@ export default function Baat() {
       createNewSession();
     }
   }, [currentSession, isLoading, createNewSession]);
+
+  // Clear chat handler
+  const handleClearChat = async () => {
+    Alert.alert(
+      "Clear Chat",
+      "Are you sure you want to delete all messages?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear",
+          style: "destructive",
+          onPress: async () => {
+            await clearAllChats();
+            createNewSession();
+          }
+        }
+      ]
+    );
+  };
 
   // Convert stored messages to display format
   const displayMessages: ChatMessage[] = storedMessages.length > 0 
@@ -51,36 +80,37 @@ export default function Baat() {
         createdAt: msg.timestamp
       }))
     : [WelcomeText];
-  
-  console.log(`📱 Baat.tsx render - displayMessages count: ${displayMessages.length}, storedMessages: ${storedMessages.length}`);
 
   const handleAddMessage = useCallback((text: string, isUser: boolean, source?: string) => {
-    console.log(`🚨🚨🚨 handleAddMessage ENTERED - isUser: ${isUser}`);
     try {
-      console.log(`📨 Adding message - isUser: ${isUser}, text: "${text.substring(0, 30)}..."`);
-      console.log(`📊 Current storedMessages count: ${storedMessages.length}`);
-      
-      addMessage(text, isUser);
-      
-      // Log the source of the response for debugging
-      if (!isUser && source) {
-        console.log(`💡 Response source: ${source}`);
-      }
-      
-      console.log(`📊 After add - storedMessages count: ${storedMessages.length}`);
-    } catch (error) {
-      console.error(`❌ Error in handleAddMessage:`, error);
+      const callId = `${isUser ? 'USER' : 'BOT'}-${Date.now()}`;
+      console.log(`[baat.tsx] handleAddMessage CALLED (ID: ${callId})`);
+      console.log(`[baat.tsx] About to call addMessage...`);
+      addMessageRef.current(text, isUser);
+      console.log(`[baat.tsx] addMessage returned (ID: ${callId})`);
+    } catch (err) {
+      console.error(`[baat.tsx] ERROR in handleAddMessage:`, err);
     }
-  }, [addMessage, storedMessages.length]);
+  }, []); // Empty dependency array since we use ref
+  
+  console.log(`[baat.tsx] handleAddMessage recreated, passing to Controls`);
 
   const styles = getStyles(colors, insets);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <AppHeader 
-        title="HeaLora Chat"
-        showStepIndicator={false}
-      />
+      <View style={styles.headerContainer}>
+        <AppHeader 
+          title="HeaLora Chat"
+          showStepIndicator={false}
+        />
+        <TouchableOpacity 
+          style={styles.clearButton}
+          onPress={handleClearChat}
+        >
+          <Text style={styles.clearButtonText}>Clear Chat</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Chat Content */}
       <View style={styles.content}>
@@ -125,6 +155,24 @@ const getStyles = (colors: any, insets: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.primary,
+  },
+  headerContainer: {
+    position: 'relative',
+  },
+  clearButton: {
+    position: 'absolute',
+    right: wp(4),
+    top: hp(1.5),
+    backgroundColor: '#FF6B6B',
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(0.8),
+    borderRadius: 8,
+    zIndex: 10,
+  },
+  clearButtonText: {
+    color: '#fff',
+    fontSize: hp(1.6),
+    fontWeight: '600',
   },
   content: {
     flex: 1,
