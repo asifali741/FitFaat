@@ -383,7 +383,22 @@ const userSchema = new mongoose.Schema({
         default: null
       }
     }
-  ]
+  ],
+  // Chat Usage Tracking (for free vs premium limits)
+  chatUsage: {
+    dailyMessageCount: {
+      type: Number,
+      default: 0
+    },
+    lastResetDate: {
+      type: Date,
+      default: Date.now
+    },
+    totalChatsSent: {
+      type: Number,
+      default: 0
+    }
+  }
 });
 
 // Create indexes for faster appointment conflict checking
