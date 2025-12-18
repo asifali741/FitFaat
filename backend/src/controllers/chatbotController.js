@@ -1,11 +1,160 @@
 import { validationResult } from 'express-validator';
 import ChatBotChat from '../models/ChatBotChat.js';
+import User from '../models/User.js';
 import { processAIChat } from '../services/geminiService.js';
 
 /**
  * AI Chatbot Controller
  * Handles all chatbot-related requests with health-focused AI
  */
+
+/**
+ * @route   GET /api/chatbot/check-limit
+ * @desc    Check if user can send a message based on premium status
+ * @access  Private
+ */
+export const checkChatLimit = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Premium users have unlimited chats
+    if (user.isPremium && user.premiumSubscription?.status === 'active') {
+      return res.status(200).json({
+        success: true,
+        canChat: true,
+        isPremium: true,
+        remainingChats: null,
+        message: 'Premium user - unlimited chats'
+      });
+    }
+
+    // Reset daily count if it's a new day
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const lastReset = new Date(user.chatUsage?.lastResetDate || new Date());
+    lastReset.setHours(0, 0, 0, 0);
+
+    if (today > lastReset) {
+      // Reset the daily counter
+      user.chatUsage = {
+        dailyMessageCount: 0,
+        lastResetDate: new Date(),
+        totalChatsSent: user.chatUsage?.totalChatsSent || 0
+      };
+      await user.save();
+    }
+
+    const dailyLimit = 5;
+    const currentCount = user.chatUsage?.dailyMessageCount || 0;
+    const canChat = currentCount < dailyLimit;
+    const remainingChats = Math.max(0, dailyLimit - currentCount);
+
+    return res.status(200).json({
+      success: true,
+      canChat,
+      isPremium: false,
+      currentCount,
+      remainingChats,
+      dailyLimit,
+      message: canChat 
+        ? `You have ${remainingChats} free message${remainingChats !== 1 ? 's' : ''} left today`
+        : 'Daily free chat limit reached. Upgrade to Premium for unlimited chats!'
+    });
+  } catch (error) {
+    console.error('Check chat limit error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to check chat limit',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * @route   POST /api/chatbot/increment-count
+ * @desc    Increment user's daily chat count
+ * @access  Private
+ */
+export const incrementChatCount = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Premium users don't have limits
+    if (user.isPremium && user.premiumSubscription?.status === 'active') {
+      return res.status(200).json({
+        success: true,
+        message: 'Premium user - no limit',
+        isPremium: true
+      });
+    }
+
+    // Reset daily count if it's a new day
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const lastReset = new Date(user.chatUsage?.lastResetDate || new Date());
+    lastReset.setHours(0, 0, 0, 0);
+
+    if (today > lastReset) {
+      user.chatUsage = {
+        dailyMessageCount: 0,
+        lastResetDate: new Date(),
+        totalChatsSent: user.chatUsage?.totalChatsSent || 0
+      };
+    }
+
+    const dailyLimit = 5;
+    const currentCount = user.chatUsage?.dailyMessageCount || 0;
+
+    // Check if user can send another message
+    if (currentCount >= dailyLimit) {
+      return res.status(429).json({
+        success: false,
+        message: 'Daily chat limit reached',
+        currentCount,
+        dailyLimit,
+        canChat: false
+      });
+    }
+
+    // Increment the counters
+    user.chatUsage.dailyMessageCount = currentCount + 1;
+    user.chatUsage.totalChatsSent = (user.chatUsage?.totalChatsSent || 0) + 1;
+    await user.save();
+
+    const remainingChats = dailyLimit - user.chatUsage.dailyMessageCount;
+
+    return res.status(200).json({
+      success: true,
+      message: 'Chat count incremented',
+      currentCount: user.chatUsage.dailyMessageCount,
+      remainingChats,
+      dailyLimit
+    });
+  } catch (error) {
+    console.error('Increment chat count error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to increment chat count',
+      error: error.message
+    });
+  }
+};
 
 /**
  * @route   POST /api/chatbot/message
@@ -25,6 +174,53 @@ export const sendMessage = async (req, res) => {
 
     const { message, sessionId } = req.body;
     const userId = req.user.id; // From auth middleware
+
+    // Check chat limit first
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Reset daily count if it's a new day
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const lastReset = new Date(user.chatUsage?.lastResetDate || new Date());
+    lastReset.setHours(0, 0, 0, 0);
+
+    if (today > lastReset) {
+      user.chatUsage = {
+        dailyMessageCount: 0,
+        lastResetDate: new Date(),
+        totalChatsSent: user.chatUsage?.totalChatsSent || 0
+      };
+    }
+
+    // Check if user is premium
+    const isPremium = user.isPremium && user.premiumSubscription?.status === 'active';
+    const dailyLimit = 5;
+    const currentCount = user.chatUsage?.dailyMessageCount || 0;
+
+    // If not premium and limit reached, deny request
+    if (!isPremium && currentCount >= dailyLimit) {
+      return res.status(429).json({
+        success: false,
+        message: 'Daily free chat limit reached (5 per day). Upgrade to Premium for unlimited chats!',
+        currentCount,
+        dailyLimit,
+        canChat: false,
+        isPremium: false
+      });
+    }
+
+    // Increment chat count for non-premium users
+    if (!isPremium) {
+      user.chatUsage.dailyMessageCount = currentCount + 1;
+      user.chatUsage.totalChatsSent = (user.chatUsage?.totalChatsSent || 0) + 1;
+      await user.save();
+    }
 
     // Generate session ID if not provided
     const chatSessionId = sessionId || `session_${userId}_${Date.now()}`;
@@ -378,4 +574,6 @@ export default {
   deleteSession,
   clearHistory,
   getChatStats,
+  checkChatLimit,
+  incrementChatCount,
 };
