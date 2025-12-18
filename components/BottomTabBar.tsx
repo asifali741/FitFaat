@@ -4,7 +4,7 @@ import Constants from "expo-constants";
 import { usePathname, useRouter } from "expo-router";
 import * as SecureStore from 'expo-secure-store';
 import { useEffect, useState } from 'react';
-import { Image, Platform, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Image, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { colorsSheet } from '../app/(main)/(settings)/_ui_elements';
 
 type TabType = 'dashboard' | 'chatbot' | 'conference' | 'doctor-portal' | 'profile';
@@ -14,6 +14,7 @@ export function BottomTabBar() {
   const pathname = usePathname();
   const [isDoctor, setIsDoctor] = useState(false);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const API_URL = (() => {
     const defaultHost = Constants.expoConfig?.hostUri?.split(':')[0] || 'localhost';
@@ -55,8 +56,37 @@ export function BottomTabBar() {
       } 
     };
 
+    const fetchUnreadCount = async () => {
+      try {
+        const token = await SecureStore.getItemAsync('authToken');
+        if (token) {
+          const response = await fetch(`${API_URL}/api/chats/unread-count`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && typeof data.unreadCount === 'number') {
+              setUnreadCount(data.unreadCount);
+            }
+          }
+        }
+      } catch (error) {
+        console.log('Error fetching unread count:', error);
+      }
+    };
+
     checkDoctorStatus();
     fetchProfilePicture();
+    fetchUnreadCount();
+
+    // Refresh unread count every 30 seconds
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   // Determine which tab is active based on pathname
@@ -149,6 +179,13 @@ export function BottomTabBar() {
             size={24} 
             color={(activeTab === 'conference' || activeTab === 'doctor-portal') ? colorsSheet.primary : colorsSheet.darkGray}
           />
+          {unreadCount > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </Text>
+            </View>
+          )}
         </View>
       </TouchableOpacity>
       
@@ -218,5 +255,25 @@ const styles = StyleSheet.create({
   activeProfileImage: {
     borderWidth: 3,
     borderColor: colorsSheet.primary,
+  },
+  badge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: '#FF4444',
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colorsSheet.white,
+  },
+  badgeText: {
+    color: colorsSheet.white,
+    fontSize: 12,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    paddingHorizontal: 4,
   },
 });

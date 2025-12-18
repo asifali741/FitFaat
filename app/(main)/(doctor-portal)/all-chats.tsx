@@ -2,6 +2,7 @@ import AppHeader from '@/components/AppHeader';
 import { authApi } from '@/utils/auth/authApi';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -20,9 +21,11 @@ export default function AllChatsScreen() {
   const [appointments, setAppointments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [doctorId, setDoctorId] = useState<string | null>(null);
+  const [unreadMessages, setUnreadMessages] = useState<{ [key: string]: number }>({});
 
   useEffect(() => {
     fetchAppointments();
+    fetchUnreadMessages();
   }, []);
 
   const fetchAppointments = async () => {
@@ -55,6 +58,70 @@ export default function AllChatsScreen() {
     }
   };
 
+  const fetchUnreadMessages = async () => {
+    try {
+      const token = await SecureStore.getItemAsync('authToken');
+      if (!token) return;
+
+      const API_URL = 'http://localhost:5001';
+      const response = await fetch(`${API_URL}/api/chats/unread-by-appointment`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.unreadByAppointment) {
+          setUnreadMessages(data.unreadByAppointment);
+        }
+      }
+    } catch (error) {
+      console.log('Error fetching unread messages:', error);
+    }
+  };
+
+  const deleteChat = async (appointmentId: string) => {
+    Alert.alert(
+      'Delete Chat',
+      'Are you sure you want to delete this chat? This action cannot be undone.',
+      [
+        { text: 'Cancel', onPress: () => {}, style: 'cancel' },
+        {
+          text: 'Delete',
+          onPress: async () => {
+            try {
+              const token = await SecureStore.getItemAsync('authToken');
+              if (!token) return;
+
+              const API_URL = 'http://localhost:5001';
+              const response = await fetch(`${API_URL}/api/chats/delete/${appointmentId}`, {
+                method: 'DELETE',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+              });
+
+              if (response.ok) {
+                setAppointments(appointments.filter(apt => apt._id !== appointmentId));
+                Alert.alert('Success', 'Chat deleted successfully');
+              } else {
+                Alert.alert('Error', 'Failed to delete chat');
+              }
+            } catch (error) {
+              console.error('Error deleting chat:', error);
+              Alert.alert('Error', 'Failed to delete chat');
+            }
+          },
+          style: 'destructive',
+        },
+      ]
+    );
+  };
+
   const openChat = (appointmentId: string) => {
     router.push({
       pathname: '/(main)/(conference)/appointment-chat',
@@ -69,41 +136,60 @@ export default function AllChatsScreen() {
       day: 'numeric',
       year: 'numeric'
     });
+    const unreadCount = unreadMessages[item._id] || 0;
 
     return (
-      <TouchableOpacity
-        style={styles.appointmentCard}
-        onPress={() => openChat(item._id)}
-        activeOpacity={0.7}
+      <View
+        style={[styles.appointmentCard, unreadCount > 0 && styles.unreadCard]}
       >
-        <View style={styles.appointmentHeader}>
-          <View style={styles.patientInfo}>
-            <Ionicons name="person-circle" size={40} color="#007AFF" />
-            <View style={styles.patientDetails}>
-              <Text style={styles.patientName}>{item.userName || 'Patient'}</Text>
-              <Text style={styles.appointmentDate}>{formattedDate} at {item.time}</Text>
-            </View>
-          </View>
-          <View style={styles.chatIconContainer}>
-            <Ionicons name="chatbubbles" size={24} color="#007AFF" />
-            {item.chatAccessGrantedAt && (
-              <View style={styles.accessBadge}>
-                <Text style={styles.accessBadgeText}>✓</Text>
+        <View style={styles.cardContent}>
+          <TouchableOpacity 
+            style={styles.chatTouchable}
+            onPress={() => openChat(item._id)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.appointmentHeader}>
+              <View style={styles.patientInfo}>
+                <Ionicons name="person-circle" size={40} color="#007AFF" />
+                <View style={styles.patientDetails}>
+                  <Text style={styles.patientName}>{item.userName || 'Patient'}</Text>
+                  <Text style={styles.appointmentDate}>{formattedDate} at {item.time}</Text>
+                </View>
               </View>
-            )}
-          </View>
-        </View>
+              <View style={styles.chatIconContainer}>
+                <Ionicons name="chatbubbles" size={24} color="#007AFF" />
+                {unreadCount > 0 && (
+                  <View style={styles.unreadBadge}>
+                    <Text style={styles.unreadBadgeText}>
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
 
-        <View style={styles.appointmentFooter}>
-          <View style={styles.statusContainer}>
-            <View style={[styles.statusDot, { backgroundColor: '#4CAF50' }]} />
-            <Text style={styles.statusText}>Confirmed</Text>
-          </View>
-          {item.chatAccessGrantedAt && (
-            <Text style={styles.accessGrantedText}>Chat Access Granted</Text>
-          )}
+            <View style={styles.appointmentFooter}>
+              <View style={styles.statusContainer}>
+                <View style={[styles.statusDot, { backgroundColor: '#4CAF50' }]} />
+                <Text style={styles.statusText}>Confirmed</Text>
+              </View>
+              {item.chatAccessGrantedAt && (
+                <View style={styles.accessBadge}>
+                  <Text style={styles.accessBadgeText}>✓</Text>
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.deleteButtonTop}
+            onPress={() => deleteChat(item._id)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="trash-outline" size={26} color="#FF6B6B" />
+          </TouchableOpacity>
         </View>
-      </TouchableOpacity>
+      </View>
     );
   };
 
@@ -183,7 +269,6 @@ const styles = StyleSheet.create({
   appointmentCard: {
     backgroundColor: '#FFF',
     borderRadius: 16,
-    padding: wp(4),
     marginBottom: hp(2),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
@@ -191,7 +276,20 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 5,
     borderLeftWidth: 4,
-    borderLeftColor: '#007AFF'
+    borderLeftColor: '#4CAF50'
+  },
+  unreadCard: {
+    backgroundColor: '#F8F9FF',
+    borderLeftColor: '#FF6B6B',
+  },
+  cardContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    padding: wp(4),
+  },
+  chatTouchable: {
+    flex: 1,
   },
   appointmentHeader: {
     flexDirection: 'row',
@@ -263,5 +361,29 @@ const styles = StyleSheet.create({
     fontSize: wp(3),
     color: '#4CAF50',
     fontWeight: '500'
-  }
-});
+  },
+  unreadBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#FF6B6B',
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFF',
+  },
+  unreadBadgeText: {
+    color: '#FFF',
+    fontSize: 11,
+    fontWeight: 'bold',
+    paddingHorizontal: 4,
+  },
+  deleteButtonTop: {
+    padding: wp(2),
+    marginLeft: wp(1),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },});

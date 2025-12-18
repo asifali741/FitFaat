@@ -331,3 +331,108 @@ export const markMessagesAsRead = async (req, res) => {
     });
   }
 };
+
+/**
+ * Get total unread message count for user
+ */
+export const getUnreadCount = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Count unread messages for this user
+    const unreadCount = await ChatMessage.countDocuments({
+      recipientId: userId,
+      isRead: false
+    });
+    
+    res.json({
+      success: true,
+      unreadCount
+    });
+  } catch (error) {
+    console.error('Error getting unread count:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Get unread message count grouped by appointment
+ */
+export const getUnreadByAppointment = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Get all messages grouped by appointmentId
+    const unreadByAppointment = {};
+    
+    const appointments = await ChatMessage.aggregate([
+      {
+        $match: {
+          recipientId: userId,
+          isRead: false
+        }
+      },
+      {
+        $group: {
+          _id: '$appointmentId',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+    
+    // Convert to object format
+    appointments.forEach(apt => {
+      if (apt._id) {
+        unreadByAppointment[apt._id] = apt.count;
+      }
+    });
+    
+    res.json({
+      success: true,
+      unreadByAppointment
+    });
+  } catch (error) {
+    console.error('Error getting unread by appointment:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Delete all messages in a chat (appointment)
+ */
+export const deleteChat = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { appointmentId } = req.params;
+    
+    // Delete all messages for this appointment where user is involved
+    const result = await ChatMessage.deleteMany({
+      appointmentId,
+      $or: [
+        { senderId: userId },
+        { recipientId: userId }
+      ]
+    });
+    
+    res.json({
+      success: true,
+      message: 'Chat deleted successfully',
+      deletedCount: result.deletedCount
+    });
+  } catch (error) {
+    console.error('Error deleting chat:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
+  }
+};
