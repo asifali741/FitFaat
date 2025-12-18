@@ -1,13 +1,13 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import {
-  approveAppointment,
-  bookAppointment,
-  cancelAppointment,
-  checkAppointmentLimit,
-  getDoctorAppointments,
-  getUserAppointments,
-  incrementAppointmentCount
+    approveAppointment,
+    bookAppointment,
+    cancelAppointment,
+    checkAppointmentLimit,
+    getDoctorAppointments,
+    getUserAppointments,
+    incrementAppointmentCount
 } from '../controllers/appointmentController.js';
 import { protect } from '../middleware/auth.js';
 
