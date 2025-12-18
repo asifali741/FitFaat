@@ -96,8 +96,13 @@ export function BottomTabBar() {
       return 'profile' as const;
     }
     
-    // Doctor portal / all-chats check (must come before chatbot to avoid conflict)
-    if (pathname.includes('doctor-portal') || pathname.includes('all-chats')) {
+    // All-chats check (must come before doctor-portal/conference to avoid conflict)
+    if (pathname.includes('all-chats')) {
+      return 'doctor-portal' as const; // Use doctor-portal type for consistency
+    }
+    
+    // Doctor portal check
+    if (pathname.includes('doctor-portal')) {
       return 'doctor-portal' as const;
     }
     
@@ -117,6 +122,10 @@ export function BottomTabBar() {
     }
     
     return 'dashboard' as const;
+  };
+
+  const isOnChatTab = (): boolean => {
+    return pathname.includes('all-chats');
   };
 
   const activeTab: TabType = getActiveTab();
@@ -158,12 +167,12 @@ export function BottomTabBar() {
         </View>
       </TouchableOpacity>
       
-      {/* Appointments/Chats Tab */}
+      {/* Appointments/Calendar Tab */}
       <TouchableOpacity 
         style={styles.tabItem}
         onPress={() => {
           if (isDoctor) {
-            router.push('/(main)/(doctor-portal)/all-chats');
+            router.push('/(main)/(doctor-portal)');
           } else {
             router.push('/(main)/(conference)');
           }
@@ -172,12 +181,30 @@ export function BottomTabBar() {
       >
         <View style={styles.iconContainer}>
           <Ionicons 
-            name={isDoctor 
-              ? (activeTab === 'doctor-portal' ? "chatbubbles" : "chatbubbles-outline")
-              : (activeTab === 'conference' ? "calendar" : "calendar-outline")
-            }
+            name={activeTab === 'conference' || (activeTab === 'doctor-portal' && !isOnChatTab()) ? "calendar" : "calendar-outline"}
             size={24} 
-            color={(activeTab === 'conference' || activeTab === 'doctor-portal') ? colorsSheet.primary : colorsSheet.darkGray}
+            color={activeTab === 'conference' || (activeTab === 'doctor-portal' && !isOnChatTab()) ? colorsSheet.primary : colorsSheet.darkGray}
+          />
+        </View>
+      </TouchableOpacity>
+      
+      {/* Chat Tab - Shows unread count badge */}
+      <TouchableOpacity 
+        style={styles.tabItem}
+        onPress={() => {
+          if (isDoctor) {
+            router.push('/(main)/(doctor-portal)/all-chats');
+          } else {
+            router.push('/(main)/(conference)/all-chats');
+          }
+        }}
+        activeOpacity={0.6}
+      >
+        <View style={styles.iconContainer}>
+          <Ionicons 
+            name={isOnChatTab() ? "chatbubbles" : "chatbubbles-outline"}
+            size={24} 
+            color={isOnChatTab() ? colorsSheet.primary : colorsSheet.darkGray}
           />
           {unreadCount > 0 && (
             <View style={styles.badge}>

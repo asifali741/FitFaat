@@ -193,13 +193,6 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
         console.log('Loaded messages:', messagesData.messages?.length || 0);
         if (messagesData.success) {
           setMessages(messagesData.messages || []);
-          
-          // Mark all messages as delivered/read after loading
-          setTimeout(() => {
-            if (socketRef.current && messagesData.messages?.length > 0) {
-              socketRef.current.emit('mark-all-read', { appointmentId });
-            }
-          }, 1000);
         }
       } else {
         console.error('Failed to load messages:', messagesResponse.status);
@@ -239,6 +232,10 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
         if (data.message) {
           setAccessMessage(data.message);
         }
+        
+        // Mark all messages as read after joining the chat
+        socket.emit('mark-all-read', { appointmentId });
+        
         setLoading(false);
       });
 
