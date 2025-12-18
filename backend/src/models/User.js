@@ -335,7 +335,55 @@ const userSchema = new mongoose.Schema({
       default: 10 // $10
     },
     transactionId: String
-  }
+  },
+  // Saved Payment Methods
+  paymentMethods: [
+    {
+      id: {
+        type: String,
+        unique: true,
+        sparse: true
+      },
+      type: {
+        type: String,
+        enum: ['card', 'bank'],
+        default: 'card'
+      },
+      // Card Details
+      cardBrand: {
+        type: String,
+        enum: ['visa', 'mastercard', 'amex', 'discover', 'diners', 'jcb'],
+      },
+      last4: {
+        type: String,
+        required: true
+      },
+      expiryMonth: {
+        type: String,
+      },
+      expiryYear: {
+        type: String,
+      },
+      // Bank Account Details (if applicable)
+      bankName: String,
+      // Stripe Reference
+      stripePaymentMethodId: String,
+      // Default Payment Method
+      isDefault: {
+        type: Boolean,
+        default: false
+      },
+      // Metadata
+      addedAt: {
+        type: Date,
+        default: Date.now
+      },
+      lastUsed: {
+        type: Date,
+        default: null
+      }
+    }
+  ]
 });
 
 // Create indexes for faster appointment conflict checking

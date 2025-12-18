@@ -98,7 +98,7 @@ router.post(
         });
       }
 
-      const { paymentIntentId } = req.body;
+      const { paymentIntentId, cardDetails } = req.body;
 
       // Retrieve payment intent from Stripe (Frontend already confirmed it)
       // Backend just verifies the status and updates user
@@ -145,6 +145,28 @@ router.post(
         amount: PREMIUM_PRICE / 100,
         transactionId: paymentIntentId
       };
+
+      // Save the card used for payment if card details are provided
+      if (cardDetails && cardDetails.last4 && cardDetails.expiryMonth && cardDetails.expiryYear) {
+        const newPaymentMethod = {
+          id: `${user._id}-${Date.now()}`,
+          type: 'card',
+          cardBrand: cardDetails.cardBrand || 'visa',
+          last4: cardDetails.last4,
+          expiryMonth: cardDetails.expiryMonth,
+          expiryYear: cardDetails.expiryYear,
+          stripePaymentMethodId: paymentIntent.payment_method || null,
+          isDefault: user.paymentMethods && user.paymentMethods.length === 0,
+          addedAt: new Date(),
+          lastUsed: new Date()
+        };
+        
+        if (!user.paymentMethods) {
+          user.paymentMethods = [];
+        }
+        user.paymentMethods.push(newPaymentMethod);
+        console.log(`[Payment] Card saved for user ${user._id}`);
+      }
 
       await user.save();
 
@@ -243,6 +265,198 @@ router.post('/cancel-premium', protect, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error cancelling premium',
+      error: error.message
+    });
+  }
+});
+
+// @route   GET /api/payment/methods
+// @desc    Get all saved payment methods for user
+// @access  Private
+router.get('/methods', protect, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('paymentMethods');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      paymentMethods: user.paymentMethods || []
+    });
+  } catch (error) {
+    console.error('[Payment Methods] Error fetching:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch payment methods',
+      error: error.message
+    });
+  }
+});
+
+// @route   POST /api/payment/methods/add
+// @desc    Add a new payment method
+// @access  Private
+router.post('/methods/add', protect, async (req, res) => {
+  try {
+    const { cardBrand, last4, expiryMonth, expiryYear, stripePaymentMethodId } = req.body;
+
+    if (!cardBrand || !last4 || !expiryMonth || !expiryYear) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required card details'
+      });
+    }
+
+    const user = await User.findById(req.user.id);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Create payment method object
+    const newPaymentMethod = {
+      id: `${user._id}-${Date.now()}`,
+      type: 'card',
+      cardBrand: cardBrand.toLowerCase(),
+      last4,
+      expiryMonth,
+      expiryYear,
+      stripePaymentMethodId,
+      isDefault: user.paymentMethods.length === 0, // First card is default
+      addedAt: new Date(),
+      lastUsed: null
+    };
+
+    // Add to user's payment methods
+    user.paymentMethods.push(newPaymentMethod);
+    await user.save();
+
+    console.log('[Payment] New payment method added for user:', user._id);
+
+    res.json({
+      success: true,
+      message: 'Payment method added successfully',
+      paymentMethod: newPaymentMethod
+    });
+  } catch (error) {
+    console.error('[Payment Methods] Error adding:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to add payment method',
+      error: error.message
+    });
+  }
+});
+
+// @route   DELETE /api/payment/methods/:methodId
+// @desc    Delete a payment method
+// @access  Private
+router.delete('/methods/:methodId', protect, async (req, res) => {
+  try {
+    const { methodId } = req.params;
+
+    const user = await User.findById(req.user.id);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Find the payment method
+    const paymentMethodIndex = user.paymentMethods.findIndex(m => m.id === methodId);
+    
+    if (paymentMethodIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: 'Payment method not found'
+      });
+    }
+
+    const deletedMethod = user.paymentMethods[paymentMethodIndex];
+
+    // Remove the payment method
+    user.paymentMethods.splice(paymentMethodIndex, 1);
+
+    // If deleted method was default and there are other methods, set first as default
+    if (deletedMethod.isDefault && user.paymentMethods.length > 0) {
+      user.paymentMethods[0].isDefault = true;
+    }
+
+    await user.save();
+
+    console.log('[Payment] Payment method deleted for user:', user._id);
+
+    res.json({
+      success: true,
+      message: 'Payment method deleted successfully'
+    });
+  } catch (error) {
+    console.error('[Payment Methods] Error deleting:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete payment method',
+      error: error.message
+    });
+  }
+});
+
+// @route   PUT /api/payment/methods/:methodId/set-default
+// @desc    Set a payment method as default
+// @access  Private
+router.put('/methods/:methodId/set-default', protect, async (req, res) => {
+  try {
+    const { methodId } = req.params;
+
+    const user = await User.findById(req.user.id);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Check if payment method exists
+    const paymentMethodIndex = user.paymentMethods.findIndex(m => m.id === methodId);
+    
+    if (paymentMethodIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: 'Payment method not found'
+      });
+    }
+
+    // Remove default from all methods
+    user.paymentMethods.forEach(method => {
+      method.isDefault = false;
+    });
+
+    // Set the selected method as default
+    user.paymentMethods[paymentMethodIndex].isDefault = true;
+
+    await user.save();
+
+    console.log('[Payment] Default method set for user:', user._id);
+
+    res.json({
+      success: true,
+      message: 'Default payment method updated'
+    });
+  } catch (error) {
+    console.error('[Payment Methods] Error setting default:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to set default payment method',
       error: error.message
     });
   }

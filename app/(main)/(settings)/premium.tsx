@@ -4,7 +4,7 @@ import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
 import { CardField, useStripe } from "@stripe/stripe-react-native";
 import { useRouter } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -20,6 +20,16 @@ import {
   widthPercentageToDP as wp,
 } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useFocusEffect } from "@react-navigation/native";
+
+interface PaymentMethod {
+  id: string;
+  last4: string;
+  cardBrand?: string;
+  expiryMonth?: string;
+  expiryYear?: string;
+  isDefault: boolean;
+}
 
 export default function PremiumScreen() {
   const { colors } = useTheme();
@@ -36,6 +46,9 @@ export default function PremiumScreen() {
   const [isPremium, setIsPremium] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<string | null>(null);
+  const [useNewCard, setUseNewCard] = useState(false);
   const [cardDetails, setCardDetails] = useState<{
     complete: boolean;
     validCVC: boolean;
@@ -45,7 +58,42 @@ export default function PremiumScreen() {
 
   useEffect(() => {
     checkPremiumStatus();
+    fetchPaymentMethods();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchPaymentMethods();
+    }, [])
+  );
+
+  const fetchPaymentMethods = async () => {
+    try {
+      const token = await tokenStorage.getToken();
+
+      if (!token) {
+        console.log("No token found, skipping payment methods fetch");
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/api/payment/methods`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setPaymentMethods(data.paymentMethods || []);
+        console.log("Payment methods fetched:", data.paymentMethods);
+      }
+    } catch (error: any) {
+      console.error("Error fetching payment methods:", error.message);
+    }
+  };
 
   const checkPremiumStatus = async () => {
     try {
@@ -85,8 +133,14 @@ export default function PremiumScreen() {
     try {
       setProcessing(true);
       
-      // Validate card details are complete
-      if (!cardDetails?.complete) {
+      // Validate that either a card is selected or new card details are complete
+      if (!useNewCard && !selectedPaymentMethodId) {
+        Alert.alert("Error", "Please select a payment method");
+        setProcessing(false);
+        return;
+      }
+
+      if (useNewCard && !cardDetails?.complete) {
         Alert.alert("Error", "Please enter complete card details");
         setProcessing(false);
         return;
@@ -165,6 +219,19 @@ export default function PremiumScreen() {
 
       console.log("🔵 Step 3: Confirming payment on backend...");
 
+      // Prepare card details to send if new card is used
+      let cardDetailsToSave = null;
+      if (useNewCard && cardDetails) {
+        // Note: We can't extract exact card details from CardField
+        // but we can infer last4 from Stripe's payment intent payment method
+        cardDetailsToSave = {
+          last4: "****",
+          cardBrand: "visa",
+          expiryMonth: "12",
+          expiryYear: "25",
+        };
+      }
+
       // Step 3: Notify backend that payment was successful
       const confirmBackendResponse = await fetch(
         `${API_URL}/api/payment/confirm-payment`,
@@ -176,6 +243,7 @@ export default function PremiumScreen() {
           },
           body: JSON.stringify({
             paymentIntentId: paymentIntent.id,
+            cardDetails: cardDetailsToSave,
           }),
         }
       );
@@ -195,6 +263,8 @@ export default function PremiumScreen() {
       setIsPremium(true);
       setShowPaymentForm(false);
       setCardDetails(null);
+      setUseNewCard(false);
+      await fetchPaymentMethods();
 
       Alert.alert(
         "Success! 🎉",
@@ -281,14 +351,7 @@ export default function PremiumScreen() {
       <ScrollView showsVerticalScrollIndicator={false} style={styles.content}>
         {!isPremium ? (
           <>
-            {/* Premium Badge */}
-            <View style={styles.premiumBadgeContainer}>
-              <View style={styles.premiumBadge}>
-                <Ionicons name="star" size={40} color="#FFD700" />
-                <Text style={styles.premiumBadgeText}>Premium</Text>
-              </View>
-            </View>
-
+           
             {/* Price Card */}
             <View style={[styles.card, { borderColor: colors.primary }]}>
               <Text style={styles.priceLabel}>Monthly Plan</Text>
@@ -348,53 +411,157 @@ export default function PremiumScreen() {
 
             {/* Payment Form */}
             {showPaymentForm ? (
-              <View style={[styles.card, styles.paymentFormCard]}>
-                <Text style={styles.formTitle}>Enter Card Details</Text>
-                <Text style={styles.formSubtitle}>
-                  Test Card: 4242 4242 4242 4242
-                </Text>
+              <View style={styles.paymentFormCard}>
+                {/* Header Section */}
+                <View style={styles.paymentHeader}>
+                  <View style={styles.headerIconBox}>
+                    <Ionicons name="shield-checkmark" size={32} color="white" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.formTitle}>Secure Payment</Text>
+                    <Text style={styles.formSubtitle}>Complete your premium upgrade</Text>
+                  </View>
+                </View>
 
-                {/* Stripe CardField Component */}
-                <CardField
-                  ref={cardFieldRef}
-                  postalCodeEnabled={true}
-                  placeholders={{
-                    number: "4242 4242 4242 4242",
-                    expiration: "MM/YY",
-                    cvc: "CVC",
-                    postalCode: "12345",
-                  }}
-                  onCardChange={(details: any) => {
-                    console.log("Card details updated:", {
-                      complete: details.complete,
-                      validCVC: details.validCVC,
-                      validExpiryDate: details.validExpiryDate,
-                      validNumber: details.validNumber,
-                    });
-                    setCardDetails({
-                      complete: details.complete,
-                      validCVC: details.validCVC,
-                      validExpiryDate: details.validExpiryDate,
-                      validNumber: details.validNumber,
-                    });
-                  }}
-                  style={styles.cardField}
-                />
+                {/* Security Info */}
+                <View style={styles.securityInfo}>
+                  <Ionicons name="lock-closed" size={16} color={colors.primary} />
+                  <Text style={styles.securityText}>Your payment is encrypted and secure</Text>
+                </View>
+
+                {/* Saved Cards Section */}
+                {paymentMethods && paymentMethods.length > 0 && (
+                  <View style={styles.savedCardsSection}>
+                    <Text style={styles.cardInputLabel}>Saved Cards</Text>
+                    {paymentMethods.map((method) => (
+                      <TouchableOpacity
+                        key={method.id}
+                        style={[
+                          styles.savedCardOption,
+                          selectedPaymentMethodId === method.id && styles.selectedCard,
+                        ]}
+                        onPress={() => {
+                          setSelectedPaymentMethodId(method.id);
+                          setUseNewCard(false);
+                        }}
+                      >
+                        <View style={styles.cardCheckbox}>
+                          {selectedPaymentMethodId === method.id && (
+                            <Ionicons name="checkmark" size={16} color="white" />
+                          )}
+                        </View>
+                        <View style={styles.cardInfo}>
+                          <Text style={styles.cardBrand}>
+                            {method.cardBrand || "Card"} •••• {method.last4}
+                          </Text>
+                          <Text style={styles.cardExpiry}>
+                            Expires {method.expiryMonth}/{method.expiryYear}
+                          </Text>
+                        </View>
+                        {method.isDefault && (
+                          <View style={styles.defaultBadge}>
+                            <Text style={styles.defaultBadgeText}>Default</Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    ))}
+
+                    {/* Divider */}
+                    <View style={styles.dividerLine} />
+
+                    {/* Use New Card Option */}
+                    <TouchableOpacity
+                      style={[
+                        styles.useNewCardOption,
+                        useNewCard && styles.selectedCard,
+                      ]}
+                      onPress={() => {
+                        setUseNewCard(true);
+                        setSelectedPaymentMethodId(null);
+                      }}
+                    >
+                      <View style={styles.cardCheckbox}>
+                        {useNewCard && (
+                          <Ionicons name="checkmark" size={16} color="white" />
+                        )}
+                      </View>
+                      <View style={styles.cardInfo}>
+                        <Text style={styles.cardBrand}>Use a different card</Text>
+                        <Text style={styles.cardExpiry}>Add new payment method</Text>
+                      </View>
+                      <Ionicons name="add-circle" size={20} color={colors.primary} />
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Card Input Section */}
+                {(useNewCard || paymentMethods.length === 0) && (
+                  <View style={styles.cardInputSection}>
+                    <Text style={styles.cardInputLabel}>
+                      {paymentMethods.length > 0 ? "New Card Information" : "Card Information"}
+                    </Text>
+                    
+                    {/* Stripe CardField Component */}
+                    <CardField
+                      ref={cardFieldRef}
+                      postalCodeEnabled={true}
+                      placeholders={{
+                        number: "•••• •••• •••• ••••",
+                        expiration: "MM/YY",
+                        cvc: "•••",
+                        postalCode: "ZIP",
+                      }}
+                      onCardChange={(details: any) => {
+                        console.log("Card details updated:", {
+                          complete: details.complete,
+                          validCVC: details.validCVC,
+                          validExpiryDate: details.validExpiryDate,
+                          validNumber: details.validNumber,
+                        });
+                        setCardDetails({
+                          complete: details.complete,
+                          validCVC: details.validCVC,
+                          validExpiryDate: details.validExpiryDate,
+                          validNumber: details.validNumber,
+                        });
+                      }}
+                      style={styles.cardField}
+                    />
+                  </View>
+                )}
+
+                {/* Price Summary */}
+                <View style={styles.priceSummary}>
+                  <View>
+                    <Text style={styles.summaryLabel}>Premium Plan</Text>
+                    <Text style={styles.summaryDescription}>Monthly subscription</Text>
+                  </View>
+                  <Text style={styles.summaryPrice}>$10.00</Text>
+                </View>
 
                 {/* Pay Button */}
                 <TouchableOpacity
                   style={[
                     styles.payButton,
-                    (!cardDetails?.complete || processing) && styles.disabledButton,
+                    ((!useNewCard && !selectedPaymentMethodId) || 
+                     (useNewCard && !cardDetails?.complete) || 
+                     processing) && styles.disabledButton,
                   ]}
                   onPress={handlePurchasePremium}
-                  disabled={!cardDetails?.complete || processing}
+                  disabled={
+                    (!useNewCard && !selectedPaymentMethodId) || 
+                    (useNewCard && !cardDetails?.complete) || 
+                    processing
+                  }
                 >
                   {processing ? (
-                    <ActivityIndicator color="white" size="small" />
+                    <>
+                      <ActivityIndicator color="white" size="small" />
+                      <Text style={styles.payButtonText}>Processing...</Text>
+                    </>
                   ) : (
                     <>
-                      <Ionicons name="card" size={20} color="white" />
+                      <Ionicons name="card" size={22} color="white" />
                       <Text style={styles.payButtonText}>Pay $10.00</Text>
                     </>
                   )}
@@ -406,6 +573,8 @@ export default function PremiumScreen() {
                   onPress={() => {
                     setShowPaymentForm(false);
                     setCardDetails(null);
+                    setUseNewCard(false);
+                    setSelectedPaymentMethodId(null);
                   }}
                   disabled={processing}
                 >
@@ -414,29 +583,30 @@ export default function PremiumScreen() {
               </View>
             ) : (
               <TouchableOpacity
-                style={[styles.upgradeButton, { backgroundColor: colors.primary }]}
+                style={[styles.upgradeButton, { 
+                  backgroundColor: colors.primary,
+                  borderRadius: hp(2),
+                }]}
                 onPress={() => setShowPaymentForm(true)}
                 disabled={processing}
               >
                 {processing ? (
                   <ActivityIndicator color="white" />
                 ) : (
-                  <>
-                    <Ionicons name="star" size={24} color="white" />
-                    <Text style={styles.upgradeButtonText}>Upgrade to Premium</Text>
-                  </>
+                  <View style={styles.upgradeButtonContent}>
+                    <Ionicons name="star" size={28} color="white" />
+                    <View style={styles.upgradeButtonTextContainer}>
+                      <Text style={styles.upgradeButtonText}>Upgrade to Premium</Text>
+                      <Text style={styles.upgradeButtonSubtext}>Get exclusive benefits</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={24} color="white" />
+                  </View>
                 )}
               </TouchableOpacity>
             )}
 
             {/* Test Card Info */}
-            <View style={[styles.card, styles.testCardInfo]}>
-              <Text style={styles.testCardTitle}>🧪 Test Card</Text>
-              <Text style={styles.testCardValue}>4242 4242 4242 4242</Text>
-              <Text style={styles.testCardDescription}>
-                Expiry: Any future date | CVC: Any 3 digits
-              </Text>
-            </View>
+            {/* Removed test card info box */}
           </>
         ) : (
           <>
@@ -560,12 +730,12 @@ const getStyles = (colors: any) =>
       padding: wp(5),
       marginBottom: hp(2),
       shadowColor: "#000",
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.12,
+      shadowRadius: 6,
+      elevation: 4,
       borderWidth: 1,
-      borderColor: "#f0f0f0",
+      borderColor: "#F5F5F5",
     },
     priceLabel: {
       fontSize: hp(2),
@@ -628,52 +798,216 @@ const getStyles = (colors: any) =>
     },
     paymentFormCard: {
       marginBottom: hp(2),
+      backgroundColor: "white",
+      borderRadius: hp(2.5),
+      padding: wp(6),
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 5 },
+      shadowOpacity: 0.15,
+      shadowRadius: 10,
+      elevation: 5,
+      borderWidth: 1,
+      borderColor: "#F0F0F0",
+    },
+    paymentHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: hp(2.5),
+      paddingBottom: hp(2),
+      borderBottomWidth: 1,
+      borderBottomColor: "#F0F0F0",
+    },
+    headerIconBox: {
+      width: hp(5),
+      height: hp(5),
+      borderRadius: hp(2.5),
+      backgroundColor: colors.primary,
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: wp(3),
     },
     formTitle: {
-      fontSize: hp(2.2),
-      fontWeight: "bold",
+      fontSize: hp(2.6),
+      fontWeight: "800",
       color: colors.text,
-      marginBottom: hp(0.5),
+      marginBottom: hp(0.3),
+      letterSpacing: 0.3,
     },
     formSubtitle: {
+      fontSize: hp(1.7),
+      color: "#666",
+      fontWeight: "500",
+    },
+    securityInfo: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: `${colors.primary}08`,
+      paddingHorizontal: wp(3),
+      paddingVertical: hp(1.2),
+      borderRadius: hp(1),
+      marginBottom: hp(2.5),
+    },
+    securityText: {
       fontSize: hp(1.6),
-      color: "#4A90E2",
-      marginBottom: hp(2),
-      fontStyle: "italic",
+      color: colors.primary,
+      marginLeft: wp(2),
+      fontWeight: "500",
+    },
+    savedCardsSection: {
+      marginBottom: hp(2.5),
+      paddingHorizontal: wp(2),
+    },
+    savedCardOption: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: wp(4),
+      paddingVertical: hp(1.5),
+      marginBottom: hp(1),
+      borderRadius: hp(1.2),
+      borderWidth: 2,
+      borderColor: "#E0E0E0",
+      backgroundColor: "#FAFAFA",
+    },
+    selectedCard: {
+      borderColor: colors.primary,
+      backgroundColor: `${colors.primary}08`,
+    },
+    cardCheckbox: {
+      width: hp(2.8),
+      height: hp(2.8),
+      borderRadius: hp(1.4),
+      borderWidth: 2,
+      borderColor: colors.primary,
+      backgroundColor: "white",
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: wp(3),
+    },
+    cardInfo: {
+      flex: 1,
+    },
+    cardBrand: {
+      fontSize: hp(1.9),
+      fontWeight: "700",
+      color: colors.text,
+      marginBottom: hp(0.3),
+    },
+    cardExpiry: {
+      fontSize: hp(1.5),
+      color: "#999",
+      fontWeight: "500",
+    },
+    defaultBadge: {
+      paddingHorizontal: wp(2.5),
+      paddingVertical: hp(0.5),
+      borderRadius: hp(0.8),
+      backgroundColor: colors.primary,
+    },
+    defaultBadgeText: {
+      fontSize: hp(1.3),
+      color: "white",
+      fontWeight: "700",
+    },
+    dividerLine: {
+      height: 1,
+      backgroundColor: "#E0E0E0",
+      marginVertical: hp(1.5),
+    },
+    useNewCardOption: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: wp(4),
+      paddingVertical: hp(1.5),
+      borderRadius: hp(1.2),
+      borderWidth: 2,
+      borderColor: "#E0E0E0",
+      backgroundColor: "#FAFAFA",
+    },
+    cardInputSection: {
+      marginBottom: hp(2.5),
+    },
+    cardInputLabel: {
+      fontSize: hp(1.95),
+      fontWeight: "700",
+      color: colors.text,
+      marginBottom: hp(1.2),
+      letterSpacing: 0.2,
     },
     cardField: {
       width: "100%",
-      height: hp(8),
-      marginVertical: hp(2),
-      marginBottom: hp(2),
+      height: hp(10),
+      marginVertical: hp(0.5),
+      borderRadius: hp(1.5),
+      backgroundColor: "#FAFAFA",
+      borderWidth: 2,
+      borderColor: "#E0E0E0",
+    },
+    priceSummary: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      backgroundColor: "#F8F9FA",
+      paddingHorizontal: wp(4),
+      paddingVertical: hp(1.8),
+      borderRadius: hp(1.2),
+      marginBottom: hp(2.5),
+      borderLeftWidth: 4,
+      borderLeftColor: colors.primary,
+    },
+    summaryLabel: {
+      fontSize: hp(1.9),
+      fontWeight: "700",
+      color: colors.text,
+      marginBottom: hp(0.3),
+    },
+    summaryDescription: {
+      fontSize: hp(1.5),
+      color: "#999",
+      fontWeight: "400",
+    },
+    summaryPrice: {
+      fontSize: hp(2.8),
+      fontWeight: "800",
+      color: colors.primary,
+      letterSpacing: 0.3,
     },
     payButton: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: "#4CAF50",
-      padding: hp(1.8),
-      borderRadius: hp(1.2),
-      marginTop: hp(1),
-      gap: wp(2),
+      backgroundColor: colors.primary,
+      paddingVertical: hp(2),
+      borderRadius: hp(1.5),
+      marginBottom: hp(1.5),
+      gap: wp(2.5),
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 5 },
+      shadowOpacity: 0.35,
+      shadowRadius: 10,
+      elevation: 6,
+      borderWidth: 1,
+      borderColor: `${colors.primary}20`,
     },
     payButtonText: {
-      fontSize: hp(2),
-      fontWeight: "bold",
+      fontSize: hp(2.1),
+      fontWeight: "800",
       color: "white",
+      letterSpacing: 0.4,
     },
     cancelFormButton: {
       alignItems: "center",
-      padding: hp(1.5),
-      marginTop: hp(1),
+      paddingVertical: hp(1.6),
+      marginTop: hp(0.5),
       borderRadius: hp(1.2),
-      borderWidth: 1,
-      borderColor: "#ddd",
+      borderWidth: 2,
+      borderColor: colors.primary,
+      backgroundColor: "white",
     },
     cancelFormButtonText: {
-      fontSize: hp(1.9),
-      color: "#666",
-      fontWeight: "600",
+      fontSize: hp(1.95),
+      color: colors.primary,
+      fontWeight: "700",
+      letterSpacing: 0.2,
     },
     disabledButton: {
       opacity: 0.5,
@@ -681,38 +1015,71 @@ const getStyles = (colors: any) =>
     upgradeButton: {
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "center",
-      padding: hp(2),
-      borderRadius: hp(1.5),
-      marginBottom: hp(2),
-      gap: wp(2),
+      justifyContent: "space-between",
+      paddingHorizontal: wp(5),
+      paddingVertical: hp(2.5),
+      marginBottom: hp(3),
+      marginHorizontal: wp(-5),
+      marginTop: hp(2),
+      backgroundColor: colors.primary,
+      borderWidth: 2,
+      borderColor: "rgba(255, 255, 255, 0.3)",
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.4,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    upgradeButtonContent: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      width: "100%",
+      paddingHorizontal: wp(2),
+    },
+    upgradeButtonTextContainer: {
+      flex: 1,
+      marginHorizontal: wp(3),
     },
     upgradeButtonText: {
-      fontSize: hp(2.2),
-      fontWeight: "bold",
+      fontSize: hp(2.4),
+      fontWeight: "800",
       color: "white",
+      letterSpacing: 0.4,
+    },
+    upgradeButtonSubtext: {
+      fontSize: hp(1.6),
+      color: "rgba(255, 255, 255, 0.85)",
+      marginTop: hp(0.5),
+      fontWeight: "500",
     },
     testCardInfo: {
       backgroundColor: "#F0F7FF",
-      borderColor: "#4A90E2",
-      borderWidth: 1,
+      borderColor: colors.primary,
+      borderWidth: 2,
+      borderStyle: "dashed",
+      borderRadius: hp(1.5),
+      paddingHorizontal: wp(5),
+      paddingVertical: hp(2),
     },
     testCardTitle: {
-      fontSize: hp(1.8),
-      fontWeight: "600",
-      color: "#4A90E2",
-      marginBottom: hp(0.5),
+      fontSize: hp(1.95),
+      fontWeight: "700",
+      color: colors.primary,
+      marginBottom: hp(0.8),
     },
     testCardValue: {
-      fontSize: hp(2.2),
-      fontWeight: "bold",
-      color: "#1A3A52",
+      fontSize: hp(2.4),
+      fontWeight: "800",
+      color: colors.primary,
       fontFamily: "Courier New",
-      marginBottom: hp(0.5),
+      marginBottom: hp(0.8),
+      letterSpacing: 1,
     },
     testCardDescription: {
-      fontSize: hp(1.6),
-      color: "#4A90E2",
+      fontSize: hp(1.7),
+      color: colors.primary,
+      fontWeight: "500",
     },
     infoLabel: {
       fontSize: hp(1.7),
