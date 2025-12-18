@@ -3,10 +3,12 @@ import { AppointmentProvider } from "@/contexts/AppointmentContext";
 import { ChatbotStorageProvider } from "@/contexts/ChatbotStorage";
 import { NewsProvider } from "@/contexts/NewsContext";
 import { authApi } from "@/utils/auth/authApi";
+import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { DrawerContentComponentProps } from "@react-navigation/drawer";
 import { useRouter } from "expo-router";
 import { Drawer } from "expo-router/drawer";
 import { useEffect, useMemo, useState } from "react";
+import { Platform, StyleSheet } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { colorsSheet as color } from "./(settings)/_ui_elements";
 type DrawerSceneWrapperProps = DrawerContentComponentProps;
@@ -15,8 +17,9 @@ export default function MainLayout() {
     const router = useRouter();
     const [isDoctor, setIsDoctor] = useState(false);
     const [doctorName, setDoctorName] = useState("");
+    const [isPremium, setIsPremium] = useState(false);
     const [loading, setLoading] = useState(true);
-    console.log('Landed in (main)\_Layout', { isDoctor, doctorName });
+    console.log('Landed in (main)\_Layout', { isDoctor, doctorName, isPremium });
     
     useEffect(() => {
       const checkAuth = async () => {
@@ -45,6 +48,34 @@ export default function MainLayout() {
             setIsDoctor(false);
             console.log('User is not a doctor - error:', error?.response?.data || error.message);
           }
+
+          // Check if user is premium
+          try {
+            const token = await tokenStorage.getToken();
+            if (token) {
+              const API_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001';
+              const response = await fetch(`${API_URL}/api/payment/premium-status`, {
+                method: 'GET',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+              });
+              const premiumStatus = await response.json();
+              console.log('Premium Status Response:', premiumStatus);
+              if (premiumStatus.success && premiumStatus.isPremium && premiumStatus.premiumSubscription?.status === 'active') {
+                setIsPremium(true);
+                console.log('User is premium');
+              } else {
+                setIsPremium(false);
+                console.log('User is not premium');
+              }
+            }
+          } catch (error: any) {
+            // User is not premium
+            setIsPremium(false);
+            console.log('Premium check error:', error?.message);
+          }
         } catch (error) {
           console.error('Auth check error:', error);
           router.replace("/(auth)");
@@ -65,6 +96,10 @@ export default function MainLayout() {
     const doctorPortalOptions = useMemo(() => ({
       title: isDoctor && doctorName ? `Dr. ${doctorName} 👨‍⚕️` : "Join as Doctor 👨‍⚕️"
     }), [isDoctor, doctorName]);
+
+    const workoutOptions = useMemo(() => ({
+      title: "Workouts 👑",
+    }), []);
 
     if (loading) {
       return null; // or a loading screen
@@ -118,15 +153,21 @@ export default function MainLayout() {
     />
     <Drawer.Screen name="(news)" options={{ title: "📰 News" }} />
     <Drawer.Screen name="(settings)" options={{ title: "Settings" }} />
-    <Drawer.Screen name="(exercises)/workout" options={{ title: "Workouts 👑" }} />
+    <Drawer.Screen 
+      name="(exercises)/workout" 
+      options={workoutOptions}
+    />
     <Drawer.Screen 
       name="(doctor-portal)" 
       options={doctorPortalOptions}
     />
   </Drawer>
+
   </NewsProvider>
   </ChatbotStorageProvider>
   </AppointmentProvider>
 </GestureHandlerRootView>
 
 }
+
+const styles = StyleSheet.create({});
