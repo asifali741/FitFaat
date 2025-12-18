@@ -1,19 +1,18 @@
 import AppHeader from "@/components/AppHeader";
 import { ScreenSceneWrapper } from "@/components/common/ScreenTiltAnimation";
+import { useTheme } from "@/contexts/ThemeContext";
+import { tokenStorage } from "@/utils/auth/tokenStorage";
+import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Modal, Alert } from "react-native";
+import { Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import {
     heightPercentageToDP as hp,
     widthPercentageToDP as wp,
 } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useTheme } from "@/contexts/ThemeContext";
 import { MainImages } from "../../../constants/list";
-import { tokenStorage } from "@/utils/auth/tokenStorage";
-import { Ionicons } from "@expo/vector-icons";
-import { Platform } from "react-native";
 
 export default function WorkoutScreen() {
   const { colors } = useTheme();
