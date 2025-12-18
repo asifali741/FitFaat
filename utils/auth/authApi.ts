@@ -296,4 +296,14 @@ export const authApi = {
       throw error.response?.data || error.message;
     }
   },
+
+  // Get premium status
+  getPremiumStatus: async () => {
+    try {
+      const response = await api.get('/payment/premium-status');
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || error.message;
+    }
+  },
 };
