@@ -1,21 +1,20 @@
+import { tokenStorage } from '@/utils/auth/tokenStorage';
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState, useEffect } from "react";
+import { useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Modal,
+    Platform,
     StyleSheet,
+    Text,
     TextInput,
     TouchableOpacity,
-    View,
-    Text,
-    Platform,
-    Modal,
-    ScrollView
+    View
 } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { sendChatbotMessage } from '../utils/api';
-import { tokenStorage } from '@/utils/auth/tokenStorage';
-import { useRouter } from "expo-router";
 
 type Message = {
   role: "user" | "assistant";
