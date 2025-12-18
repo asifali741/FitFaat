@@ -288,6 +288,26 @@ export const initializeSocketIO = (httpServer) => {
           });
           return;
         }
+
+        // Determine recipientId (the other person in the chat)
+        let recipientId = null;
+        try {
+          if (socket.userRole === 'doctor') {
+            // Recipient is the user/patient
+            const user = await User.findById(socket.userId);
+            if (user) {
+              const appointment = user.appointmentsBooked.id(appointmentId);
+              recipientId = appointment?.userId;
+            }
+          } else {
+            // Recipient is the doctor
+            const user = await User.findById(socket.userId);
+            const appointment = user.appointmentsBooked.id(appointmentId);
+            recipientId = appointment?.doctorId;
+          }
+        } catch (error) {
+          console.error('Error determining recipientId:', error);
+        }
         
         // Save message to database
         const chatMessage = new ChatMessage({
@@ -296,6 +316,7 @@ export const initializeSocketIO = (httpServer) => {
           senderId: socket.userId,
           senderModel: socket.senderModel,
           senderName: socket.senderName,
+          recipientId: recipientId,
           message: message.trim()
         });
         
@@ -305,7 +326,8 @@ export const initializeSocketIO = (httpServer) => {
           id: chatMessage._id,
           appointmentId: chatMessage.appointmentId,
           from: chatMessage.senderName,
-          role: chatMessage.senderRole
+          role: chatMessage.senderRole,
+          recipientId: chatMessage.recipientId
         });
         
         // Get all sockets in the room to verify broadcast
@@ -319,6 +341,7 @@ export const initializeSocketIO = (httpServer) => {
           senderRole: chatMessage.senderRole,
           senderId: chatMessage.senderId,
           senderName: chatMessage.senderName,
+          recipientId: chatMessage.recipientId,
           message: chatMessage.message,
           status: chatMessage.status,
           createdAt: chatMessage.createdAt
