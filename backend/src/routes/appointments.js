@@ -4,8 +4,10 @@ import {
   approveAppointment,
   bookAppointment,
   cancelAppointment,
+  checkAppointmentLimit,
   getDoctorAppointments,
-  getUserAppointments
+  getUserAppointments,
+  incrementAppointmentCount
 } from '../controllers/appointmentController.js';
 import { protect } from '../middleware/auth.js';
 
@@ -50,6 +52,20 @@ router.post(
     await bookAppointment(req, res);
   }
 );
+
+/**
+ * @route   GET /api/appointments/check-limit
+ * @desc    Check appointment booking limit for user
+ * @access  Private
+ */
+router.get('/check-limit', protect, checkAppointmentLimit);
+
+/**
+ * @route   POST /api/appointments/increment-count
+ * @desc    Increment appointment count
+ * @access  Private
+ */
+router.post('/increment-count', protect, incrementAppointmentCount);
 
 /**
  * @route   GET /api/appointments/my-appointments

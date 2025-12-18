@@ -48,6 +48,28 @@ export const bookAppointment = async (req, res) => {
       });
     }
 
+    // ============================================
+    // CHECK APPOINTMENT LIMIT FOR FREE USERS
+    // ============================================
+    // Premium users (with active subscription) can book unlimited appointments
+    // Free users can only book 1 active appointment
+    if (!user.isPremium || user.premiumSubscription?.status !== 'active') {
+      // Count active appointments (pending + confirmed)
+      const activeAppointments = user.appointmentsBooked?.filter(
+        apt => ['pending', 'confirmed'].includes(apt.status)
+      ).length || 0;
+
+      if (activeAppointments >= 1) {
+        return res.status(429).json({
+          success: false,
+          message: 'Free users can only have 1 active appointment. Upgrade to premium for unlimited appointments.',
+          appointmentLimitReached: true,
+          activeAppointments,
+          limit: 1
+        });
+      }
+    }
+
     // Check if doctor exists and is approved
     const doctor = await Doctor.findById(doctorId);
     if (!doctor) {
@@ -120,6 +142,18 @@ export const bookAppointment = async (req, res) => {
 
     // Add appointment to user's appointmentsBooked array
     user.appointmentsBooked.push(appointmentData);
+
+    // Update appointment usage tracking
+    if (!user.appointmentUsage) {
+      user.appointmentUsage = {
+        totalAppointments: 0,
+        activeAppointments: 0,
+        lastBookedDate: null
+      };
+    }
+    user.appointmentUsage.totalAppointments = (user.appointmentUsage.totalAppointments || 0) + 1;
+    user.appointmentUsage.lastBookedDate = new Date();
+
     await user.save();
 
     // Add appointment to doctor's bookedAppointments array with THE SAME ID
@@ -457,6 +491,112 @@ export const approveAppointment = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to approve appointment'
+    });
+  }
+};
+/**
+ * @desc    Check appointment limit for free vs premium users
+ * @route   GET /api/appointments/check-limit
+ * @access  Private
+ */
+export const checkAppointmentLimit = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Get user with appointment info
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Premium users have unlimited appointments
+    if (user.isPremium && user.premiumSubscription?.status === 'active') {
+      return res.json({
+        success: true,
+        canBook: true,
+        isPremium: true,
+        activeAppointments: user.appointmentUsage?.activeAppointments || 0,
+        totalAppointments: user.appointmentUsage?.totalAppointments || 0,
+        appointmentLimit: 'unlimited'
+      });
+    }
+
+    // Free users have 1 appointment limit
+    const activeAppointments = user.appointmentsBooked?.filter(
+      apt => ['pending', 'confirmed'].includes(apt.status)
+    ).length || 0;
+
+    const canBook = activeAppointments < 1;
+    const remainingAppointments = Math.max(0, 1 - activeAppointments);
+
+    return res.json({
+      success: true,
+      canBook,
+      isPremium: false,
+      activeAppointments,
+      remainingAppointments,
+      appointmentLimit: 1
+    });
+  } catch (error) {
+    console.error('Check appointment limit error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to check appointment limit'
+    });
+  }
+};
+
+/**
+ * @desc    Increment appointment count
+ * @route   POST /api/appointments/increment-count
+ * @access  Private
+ */
+export const incrementAppointmentCount = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Initialize appointmentUsage if not exists
+    if (!user.appointmentUsage) {
+      user.appointmentUsage = {
+        totalAppointments: 0,
+        activeAppointments: 0,
+        lastBookedDate: null
+      };
+    }
+
+    // Count active appointments (pending + confirmed)
+    const activeAppointments = user.appointmentsBooked?.filter(
+      apt => ['pending', 'confirmed'].includes(apt.status)
+    ).length || 0;
+
+    // Update appointment tracking
+    user.appointmentUsage.totalAppointments = (user.appointmentUsage.totalAppointments || 0) + 1;
+    user.appointmentUsage.activeAppointments = activeAppointments;
+    user.appointmentUsage.lastBookedDate = new Date();
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Appointment count updated',
+      appointmentUsage: user.appointmentUsage
+    });
+  } catch (error) {
+    console.error('Increment appointment count error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update appointment count'
     });
   }
 };

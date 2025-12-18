@@ -398,6 +398,21 @@ const userSchema = new mongoose.Schema({
       type: Number,
       default: 0
     }
+  },
+  // Appointment Usage Tracking (for free vs premium limits)
+  appointmentUsage: {
+    totalAppointments: {
+      type: Number,
+      default: 0
+    },
+    activeAppointments: {
+      type: Number,
+      default: 0
+    },
+    lastBookedDate: {
+      type: Date,
+      default: null
+    }
   }
 });
 

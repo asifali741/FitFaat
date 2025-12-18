@@ -1,8 +1,9 @@
 import { useAppointmentBooking } from "@/hooks/useAppointmentBooking";
+import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useState } from "react";
-import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colorsSheet } from "../(settings)/_ui_elements";
@@ -13,10 +14,17 @@ export default function AppointmentSummaryScreen() {
   const { bookAppointment, isLoading, error } = useAppointmentBooking();
   const [isConfirming, setIsConfirming] = useState(false);
   const [showResultModal, setShowResultModal] = useState(false);
+  const [showLimitModal, setShowLimitModal] = useState(false);
+  const [appointmentLimit, setAppointmentLimit] = useState<any>(null);
+  const [activeAppointmentCount, setActiveAppointmentCount] = useState(0);
   const [bookingResult, setBookingResult] = useState<{
     success: boolean;
     message: string;
   }>({ success: false, message: '' });
+  
+  const API_URL = Platform.OS === "android"
+    ? "http://10.0.2.2:5001"
+    : "http://localhost:5001";
   
   // Extract parameters from route
   const doctorId = Array.isArray(params.doctorId) ? params.doctorId[0] : params.doctorId;
@@ -29,6 +37,34 @@ export default function AppointmentSummaryScreen() {
 
   const [isCallReady, setIsCallReady] = useState(false);
 
+  // Check appointment limit on mount
+  useEffect(() => {
+    checkAppointmentLimit();
+  }, []);
+
+  const checkAppointmentLimit = async () => {
+    try {
+      const token = await tokenStorage.getToken();
+      if (!token) return;
+
+      const response = await fetch(`${API_URL}/api/appointments/check-limit`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      setAppointmentLimit(data);
+      if (data.activeAppointments !== undefined) {
+        setActiveAppointmentCount(data.activeAppointments);
+      }
+    } catch (error) {
+      console.error('Error checking appointment limit:', error);
+    }
+  };
+
   const handleConfirmAppointment = async () => {
     if (!doctorId || !date || !time || fee === undefined) {
       setBookingResult({
@@ -36,6 +72,12 @@ export default function AppointmentSummaryScreen() {
         message: 'Missing appointment details'
       });
       setShowResultModal(true);
+      return;
+    }
+
+    // Check appointment limit first
+    if (appointmentLimit && !appointmentLimit.canBook) {
+      setShowLimitModal(true);
       return;
     }
 
@@ -62,18 +104,29 @@ export default function AppointmentSummaryScreen() {
           router.replace('/(main)/(conference)');
         }, 10000);
       } else {
+        // Check if it's an appointment limit error
+        if (response.appointmentLimitReached) {
+          setShowLimitModal(true);
+        } else {
+          setBookingResult({
+            success: false,
+            message: response.message || 'Failed to book appointment'
+          });
+          setShowResultModal(true);
+        }
+      }
+    } catch (err: any) {
+      // Check if error response indicates limit reached
+      if (err.message && (err.message.includes('already have') || err.message.includes('limit') || err.message.includes('appointment'))) {
+        await checkAppointmentLimit(); // Refresh limit status
+        setShowLimitModal(true);
+      } else {
         setBookingResult({
           success: false,
-          message: response.message || 'Failed to book appointment'
+          message: err.message || 'Failed to book appointment'
         });
         setShowResultModal(true);
       }
-    } catch (err: any) {
-      setBookingResult({
-        success: false,
-        message: err.message || 'Failed to book appointment'
-      });
-      setShowResultModal(true);
     } finally {
       setIsConfirming(false);
     }
@@ -291,6 +344,87 @@ export default function AppointmentSummaryScreen() {
               <Text style={styles.resultButtonText}>
                 {bookingResult.success ? "Continue" : "Try Again"}
               </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Appointment Limit Modal */}
+      <Modal
+        visible={showLimitModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowLimitModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.appointmentModalContent}>
+            {/* Close button */}
+            <TouchableOpacity
+              style={styles.appointmentCloseButton}
+              onPress={() => setShowLimitModal(false)}
+            >
+              <Ionicons name="close-circle" size={30} color="#999" />
+            </TouchableOpacity>
+
+            {/* Icon */}
+            <View style={styles.appointmentIconContainer}>
+              <Ionicons name="alert-circle" size={60} color="#FF6B6B" />
+            </View>
+
+            {/* Title */}
+            <Text style={styles.appointmentModalTitle}>You Already Have an Appointment</Text>
+
+            {/* Subtitle */}
+            <Text style={styles.appointmentModalSubtitle}>
+              {activeAppointmentCount === 1 
+                ? "You have 1 active appointment scheduled" 
+                : `You have ${activeAppointmentCount} appointments scheduled`}
+            </Text>
+
+            {/* Description */}
+            <Text style={styles.appointmentModalDescription}>
+              Free users can book only 1 active appointment at a time. Upgrade to Premium for unlimited appointments!
+            </Text>
+
+            {/* Features List */}
+            <View style={styles.appointmentFeaturesList}>
+              <View style={styles.appointmentFeatureItem}>
+                <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                <Text style={styles.appointmentFeatureText}>Book unlimited appointments</Text>
+              </View>
+              <View style={styles.appointmentFeatureItem}>
+                <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                <Text style={styles.appointmentFeatureText}>Priority doctor access</Text>
+              </View>
+              <View style={styles.appointmentFeatureItem}>
+                <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                <Text style={styles.appointmentFeatureText}>Unlimited chat support</Text>
+              </View>
+            </View>
+
+            {/* Price Tag */}
+            <View style={styles.appointmentPriceTag}>
+              <Text style={styles.appointmentPriceAmount}>$10</Text>
+              <Text style={styles.appointmentPriceFrequency}>/month</Text>
+            </View>
+
+            {/* Action Buttons */}
+            <TouchableOpacity
+              style={styles.appointmentUpgradButton}
+              onPress={() => {
+                setShowLimitModal(false);
+                router.push("/(main)/(settings)/premium");
+              }}
+            >
+              <Ionicons name="star" size={20} color="#fff" />
+              <Text style={styles.appointmentUpgradButtonText}>Upgrade to Premium</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.appointmentLaterButton}
+              onPress={() => setShowLimitModal(false)}
+            >
+              <Text style={styles.appointmentLaterButtonText}>Maybe Later</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -606,4 +740,125 @@ const styles = StyleSheet.create({
     fontSize: hp(1.8),
     fontWeight: '600',
   },
-});
+  // Appointment Limit Modal Styles
+  appointmentModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: hp(3),
+    paddingHorizontal: wp(6),
+    paddingVertical: hp(3),
+    width: '100%',
+    maxWidth: wp(90),
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  appointmentCloseButton: {
+    position: 'absolute',
+    top: hp(1.5),
+    right: wp(3),
+    zIndex: 10,
+  },
+  appointmentIconContainer: {
+    marginTop: hp(1),
+    marginBottom: hp(2),
+  },
+  appointmentModalTitle: {
+    fontSize: hp(2.8),
+    fontWeight: '800',
+    color: '#1a1a1a',
+    marginBottom: hp(0.8),
+    textAlign: 'center',
+  },
+  appointmentModalSubtitle: {
+    fontSize: hp(2),
+    fontWeight: '600',
+    color: '#FF6B6B',
+    marginBottom: hp(1.5),
+    textAlign: 'center',
+  },
+  appointmentModalDescription: {
+    fontSize: hp(1.8),
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: hp(2.5),
+    lineHeight: hp(2.8),
+  },
+  appointmentFeaturesList: {
+    width: '100%',
+    marginBottom: hp(2.5),
+    paddingHorizontal: wp(2),
+  },
+  appointmentFeatureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: hp(1.2),
+  },
+  appointmentFeatureText: {
+    fontSize: hp(1.7),
+    color: '#333',
+    marginLeft: wp(2.5),
+    fontWeight: '500',
+  },
+  appointmentPriceTag: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'baseline',
+    marginBottom: hp(2.5),
+    paddingVertical: hp(1.5),
+    paddingHorizontal: wp(5),
+    backgroundColor: '#F0F7FF',
+    borderRadius: hp(1.5),
+    borderWidth: 1.5,
+    borderColor: '#4CAF50',
+  },
+  appointmentPriceAmount: {
+    fontSize: hp(3.5),
+    fontWeight: '800',
+    color: '#4CAF50',
+  },
+  appointmentPriceFrequency: {
+    fontSize: hp(1.9),
+    color: '#666',
+    marginLeft: wp(1),
+    fontWeight: '600',
+  },
+  appointmentUpgradButton: {
+    width: '100%',
+    flexDirection: 'row',
+    backgroundColor: '#4CAF50',
+    paddingVertical: hp(2),
+    borderRadius: hp(1.2),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: hp(1),
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  appointmentUpgradButtonText: {
+    fontSize: hp(2),
+    fontWeight: '700',
+    color: '#fff',
+    marginLeft: wp(2),
+    letterSpacing: 0.5,
+  },
+  appointmentLaterButton: {
+    width: '100%',
+    paddingVertical: hp(1.5),
+    borderRadius: hp(1),
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#ddd',
+    backgroundColor: '#fafafa',
+  },
+  appointmentLaterButtonText: {
+    fontSize: hp(1.9),
+    fontWeight: '600',
+    color: '#666',
+  },});
