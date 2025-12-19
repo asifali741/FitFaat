@@ -4,13 +4,11 @@ import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { Platform } from 'react-native';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
-    FlatList,
-    StyleSheet,
+    FlatList, Platform, StyleSheet,
     Text,
     TouchableOpacity,
     View
