@@ -65,7 +65,6 @@ export function BottomTabBar() {
     const fetchUnreadCount = async () => {
       try {
         const token = await tokenStorage.getToken();
-        console.log('BottomTabBar: fetchUnreadCount called, API_URL=', API_URL, 'token exists=', !!token);
         if (token) {
           const response = await fetch(`${API_URL}/api/chat/unread-count`, {
             method: 'GET',
@@ -75,22 +74,15 @@ export function BottomTabBar() {
             },
           });
 
-          console.log('BottomTabBar: unread-count response status', response.status);
-
           if (response.ok) {
             const data = await response.json();
-            console.log('BottomTabBar: unread-count data', data);
             if (data.success && typeof data.unreadCount === 'number') {
               setUnreadCount(data.unreadCount);
-              console.log('BottomTabBar: setUnreadCount ->', data.unreadCount);
             }
-          } else {
-            const text = await response.text();
-            console.log('BottomTabBar: unread-count non-ok response', text);
           }
         }
       } catch (error) {
-        console.log('Error fetching unread count:', error);
+        console.error('Error fetching unread count:', error);
       }
     };
 
@@ -119,32 +111,28 @@ export function BottomTabBar() {
         socketRef.current = socket;
 
         socket.on('connect', () => {
-          console.log('✅ BottomTabBar: Socket connected successfully');
           // Ensure we have the latest count on connect
           fetchUnreadCount();
         });
 
         socket.on('disconnect', (reason) => {
-          console.log('⚠️ BottomTabBar: Socket disconnected. Reason:', reason);
+          // Socket disconnected, will reconnect automatically
         });
 
         socket.on('connect_error', (error) => {
-          console.log('❌ BottomTabBar: Socket connection error:', error.message);
+          console.error('Socket connection error:', error.message);
         });
 
         // When a new message is broadcasted in an appointment room (server emits 'new-message')
         socket.on('new-message', (payload) => {
-          console.log('BottomTabBar: socket new-message payload', payload);
           fetchUnreadCount();
         });
 
         // When the server notifies this specific user about a new message
         socket.on('user-new-message', (payload) => {
-          console.log('BottomTabBar: socket user-new-message payload', payload);
           // If server provided unreadCount, update immediately; otherwise, fallback to fetching
           if (payload && typeof payload.unreadCount === 'number') {
             setUnreadCount(payload.unreadCount);
-            console.log('BottomTabBar: setUnreadCount from payload ->', payload.unreadCount);
           } else {
             fetchUnreadCount();
           }

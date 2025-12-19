@@ -644,7 +644,6 @@ export const initializeSocketIO = (httpServer) => {
     socket.on('leave-appointment', ({ appointmentId }) => {
       if (socket.appointmentId === appointmentId) {
         socket.leave(appointmentId);
-        console.log(`${socket.senderName} left appointment ${appointmentId}`);
       }
     });
 
@@ -652,7 +651,6 @@ export const initializeSocketIO = (httpServer) => {
      * Disconnect
      */
     socket.on('disconnect', () => {
-      console.log(`User disconnected: ${socket.userId}`);
       if (socket.appointmentId) {
         socket.leave(socket.appointmentId);
       }
@@ -700,7 +698,6 @@ export const initializeSocketIO = (httpServer) => {
               socket.leave(appointmentId);
             });
             
-            console.log(`Closed chat for appointment ${appointmentId} - time expired`);
           }
         }
       }
