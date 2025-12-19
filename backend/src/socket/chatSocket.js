@@ -102,13 +102,23 @@ export const initializeSocketIO = (httpServer) => {
     }
   });
 
-  io.on('connection', (socket) => {
+  io.on('connection', async (socket) => {
     console.log(`User connected: ${socket.userId}`);
 
     // Add socket to a per-user room so we can notify users globally about new messages
     try {
-      socket.join(`user:${socket.userId}`);
-      console.log(`Socket ${socket.id} joined personal room: user:${socket.userId}`);
+      let actualUserId = socket.userId;
+      
+      // Check if this is a doctor account - if so, use Doctor._id instead of User account id
+      const doctor = await Doctor.findOne({ userId: socket.userId });
+      if (doctor) {
+        actualUserId = doctor._id.toString();
+        console.log(`  👨‍⚕️ Doctor detected. Using Doctor._id for room: ${actualUserId}`);
+        socket.doctorId = doctor._id;
+      }
+      
+      socket.join(`user:${actualUserId}`);
+      console.log(`Socket ${socket.id} joined personal room: user:${actualUserId}`);
     } catch (err) {
       console.warn('Failed to join user room for socket:', err);
     }
@@ -173,6 +183,7 @@ export const initializeSocketIO = (httpServer) => {
         socket.senderModel = senderModel;
         
         console.log(`👤 ${senderName} (${userRole}, userId: ${userId}) joining room ${appointmentId}`);
+        console.log(`  🔐 socket.userId=${socket.userId}, socket.userRole=${socket.userRole}, socket.senderModel=${socket.senderModel}`);
         
         // Verify socket is in the room
         const rooms = Array.from(socket.rooms);
@@ -300,36 +311,67 @@ export const initializeSocketIO = (httpServer) => {
         // Determine recipientId (the other person in the chat)
         let recipientId = null;
         try {
+          console.log(`🔍 Determining recipientId for ${socket.userRole}. socket.userId=${socket.userId}, appointmentId=${appointmentId}`);
+          
           if (socket.userRole === 'doctor') {
             // Recipient is the user/patient -> find in Doctor collection
+            console.log(`  → Doctor sending, looking for Doctor with userId=${socket.userId}`);
             const doctor = await Doctor.findOne({ userId: socket.userId });
             if (doctor) {
+              console.log(`  ✅ Found doctor, checking appointment ${appointmentId}`);
               const appointment = doctor.bookedAppointments.id(appointmentId);
               recipientId = appointment?.userId || null;
+              console.log(`  → recipientId from doctor appointment: ${recipientId}`);
+            } else {
+              console.log(`  ❌ No doctor found with userId=${socket.userId}`);
             }
           } else {
             // Sender is a user/patient -> recipient is the doctor
+            console.log(`  → User sending, looking for User with _id=${socket.userId}`);
             const user = await User.findById(socket.userId);
             if (user) {
+              console.log(`  ✅ Found user, checking appointment ${appointmentId}`);
               const appointment = user.appointmentsBooked.id(appointmentId);
               recipientId = appointment?.doctorId || null;
+              console.log(`  → recipientId from user appointment: ${recipientId}`);
+            } else {
+              console.log(`  ❌ No user found with _id=${socket.userId}`);
             }
           }
 
           // Fallback: try to locate appointment in both collections if still null
           if (!recipientId) {
+            console.log(`  🔄 recipientId is null, trying fallback search...`);
             // Try user side
             const user = await User.findOne({ 'appointmentsBooked._id': appointmentId });
             if (user) {
+              console.log(`  ✅ Found user in fallback, looking for recipient`);
               const apt = user.appointmentsBooked.id(appointmentId);
-              if (apt) recipientId = (socket.userRole === 'doctor') ? apt.userId : apt.doctorId;
+              if (apt) {
+                if (socket.userRole === 'doctor') {
+                  recipientId = apt.userId;
+                } else {
+                  recipientId = apt.doctorId;
+                }
+              }
+              console.log(`  → recipientId from fallback (user side): ${recipientId}`);
             }
             // Try doctor side
             if (!recipientId) {
               const doctor = await Doctor.findOne({ 'bookedAppointments._id': appointmentId });
               if (doctor) {
+                console.log(`  ✅ Found doctor in fallback, looking for recipient`);
                 const apt = doctor.bookedAppointments.id(appointmentId);
-                if (apt) recipientId = (socket.userRole === 'doctor') ? apt.userId : apt.doctorId;
+                if (apt) {
+                  if (socket.userRole === 'doctor') {
+                    // Doctor sending - recipient is the user
+                    recipientId = apt.userId;
+                  } else {
+                    // User sending - recipient is the doctor (use doctor's _id, not a field)
+                    recipientId = doctor._id;
+                  }
+                }
+                console.log(`  → recipientId from fallback (doctor side): ${recipientId}`);
               }
             }
           }
@@ -623,8 +665,8 @@ export const initializeSocketIO = (httpServer) => {
       const rooms = io.sockets.adapter.rooms;
       
       for (const [appointmentId, sockets] of rooms) {
-        // Skip if it's a socket ID (not a room)
-        if (sockets.size === 1) continue;
+        // Skip if it's a socket ID (not a room) or a user notification room
+        if (sockets.size === 1 || appointmentId.startsWith('user:')) continue;
         
         // Check if appointment has ended
         const users = await User.find({ 'appointmentsBooked._id': appointmentId });
