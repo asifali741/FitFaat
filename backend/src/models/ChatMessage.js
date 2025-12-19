@@ -34,6 +34,11 @@ const chatMessageSchema = new mongoose.Schema({
     required: true
   },
   
+  recipientId: {
+    type: mongoose.Schema.Types.ObjectId,
+    index: true
+  },
+  
   message: {
     type: String,
     required: true,

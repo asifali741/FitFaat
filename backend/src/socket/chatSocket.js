@@ -105,6 +105,14 @@ export const initializeSocketIO = (httpServer) => {
   io.on('connection', (socket) => {
     console.log(`User connected: ${socket.userId}`);
 
+    // Add socket to a per-user room so we can notify users globally about new messages
+    try {
+      socket.join(`user:${socket.userId}`);
+      console.log(`Socket ${socket.id} joined personal room: user:${socket.userId}`);
+    } catch (err) {
+      console.warn('Failed to join user room for socket:', err);
+    }
+
     /**
      * Join appointment chat room
      */
@@ -293,21 +301,43 @@ export const initializeSocketIO = (httpServer) => {
         let recipientId = null;
         try {
           if (socket.userRole === 'doctor') {
-            // Recipient is the user/patient
+            // Recipient is the user/patient -> find in Doctor collection
+            const doctor = await Doctor.findOne({ userId: socket.userId });
+            if (doctor) {
+              const appointment = doctor.bookedAppointments.id(appointmentId);
+              recipientId = appointment?.userId || null;
+            }
+          } else {
+            // Sender is a user/patient -> recipient is the doctor
             const user = await User.findById(socket.userId);
             if (user) {
               const appointment = user.appointmentsBooked.id(appointmentId);
-              recipientId = appointment?.userId;
+              recipientId = appointment?.doctorId || null;
             }
-          } else {
-            // Recipient is the doctor
-            const user = await User.findById(socket.userId);
-            const appointment = user.appointmentsBooked.id(appointmentId);
-            recipientId = appointment?.doctorId;
+          }
+
+          // Fallback: try to locate appointment in both collections if still null
+          if (!recipientId) {
+            // Try user side
+            const user = await User.findOne({ 'appointmentsBooked._id': appointmentId });
+            if (user) {
+              const apt = user.appointmentsBooked.id(appointmentId);
+              if (apt) recipientId = (socket.userRole === 'doctor') ? apt.userId : apt.doctorId;
+            }
+            // Try doctor side
+            if (!recipientId) {
+              const doctor = await Doctor.findOne({ 'bookedAppointments._id': appointmentId });
+              if (doctor) {
+                const apt = doctor.bookedAppointments.id(appointmentId);
+                if (apt) recipientId = (socket.userRole === 'doctor') ? apt.userId : apt.doctorId;
+              }
+            }
           }
         } catch (error) {
           console.error('Error determining recipientId:', error);
         }
+        
+        console.log(`📍 [CRITICAL] recipientId determined: ${recipientId} for ${socket.userRole} sender. appointmentId: ${appointmentId}`);
         
         // Save message to database
         const chatMessage = new ChatMessage({
@@ -327,14 +357,15 @@ export const initializeSocketIO = (httpServer) => {
           appointmentId: chatMessage.appointmentId,
           from: chatMessage.senderName,
           role: chatMessage.senderRole,
-          recipientId: chatMessage.recipientId
+          recipientId: chatMessage.recipientId,
+          isRead: chatMessage.isRead
         });
         
         // Get all sockets in the room to verify broadcast
         const socketsInRoom = await io.in(appointmentId).fetchSockets();
         console.log(`📡 Broadcasting message to ${socketsInRoom.length} sockets in room ${appointmentId}`);
         
-        // Emit to room (including sender)
+        // Emit to appointment room (including sender)
         io.to(appointmentId).emit('new-message', {
           _id: chatMessage._id,
           appointmentId: chatMessage.appointmentId,
@@ -346,7 +377,26 @@ export const initializeSocketIO = (httpServer) => {
           status: chatMessage.status,
           createdAt: chatMessage.createdAt
         });
-        
+
+        // Also notify the recipient at a per-user level so UI elements outside the chat room
+        // (like the bottom tab bar) can react to incoming messages in real-time.
+        if (chatMessage.recipientId) {
+          // Compute unread count for recipient to include in payload and avoid extra fetch on client
+          const unreadCount = await ChatMessage.countDocuments({ recipientId: chatMessage.recipientId, isRead: false });
+
+          console.log(`📢 [EMIT TO RECIPIENT] Sending user-new-message to room: user:${chatMessage.recipientId}. unreadCount=${unreadCount}`);
+          
+          io.to(`user:${chatMessage.recipientId}`).emit('user-new-message', {
+            appointmentId: chatMessage.appointmentId,
+            messageId: chatMessage._id,
+            senderName: chatMessage.senderName,
+            senderId: chatMessage.senderId,
+            createdAt: chatMessage.createdAt,
+            unreadCount
+          });
+          console.log(`✅ Notified user:${chatMessage.recipientId} about new message. unreadCount=${unreadCount}`);
+        }
+
         console.log(`Message broadcasted in appointment ${appointmentId} by ${socket.senderName}`);
         
       } catch (error) {

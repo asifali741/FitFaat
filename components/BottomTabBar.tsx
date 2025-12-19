@@ -1,10 +1,11 @@
 import { authApi } from '@/utils/auth/authApi';
+import { tokenStorage } from '@/utils/auth/tokenStorage';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from "expo-constants";
 import { usePathname, useRouter } from "expo-router";
-import * as SecureStore from 'expo-secure-store';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Image, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { io, Socket } from 'socket.io-client';
 import { colorsSheet } from '../app/(main)/(settings)/_ui_elements';
 
 type TabType = 'dashboard' | 'chatbot' | 'conference' | 'doctor-portal' | 'profile';
@@ -15,6 +16,7 @@ export function BottomTabBar() {
   const [isDoctor, setIsDoctor] = useState(false);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const socketRef = useRef<Socket | null>(null);
 
   const API_URL = (() => {
     const ENV = Constants.expoConfig?.extra;
@@ -39,7 +41,7 @@ export function BottomTabBar() {
 
     const fetchProfilePicture = async () => {
       try {
-        const token = await SecureStore.getItemAsync('authToken');
+        const token = await tokenStorage.getToken();
         if (token) {
           const response = await fetch(`${API_URL}/api/user/profile-picture`, {
             method: 'GET',
@@ -62,9 +64,10 @@ export function BottomTabBar() {
 
     const fetchUnreadCount = async () => {
       try {
-        const token = await SecureStore.getItemAsync('authToken');
+        const token = await tokenStorage.getToken();
+        console.log('BottomTabBar: fetchUnreadCount called, API_URL=', API_URL, 'token exists=', !!token);
         if (token) {
-          const response = await fetch(`${API_URL}/api/chats/unread-count`, {
+          const response = await fetch(`${API_URL}/api/chat/unread-count`, {
             method: 'GET',
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -72,11 +75,18 @@ export function BottomTabBar() {
             },
           });
 
+          console.log('BottomTabBar: unread-count response status', response.status);
+
           if (response.ok) {
             const data = await response.json();
+            console.log('BottomTabBar: unread-count data', data);
             if (data.success && typeof data.unreadCount === 'number') {
               setUnreadCount(data.unreadCount);
+              console.log('BottomTabBar: setUnreadCount ->', data.unreadCount);
             }
+          } else {
+            const text = await response.text();
+            console.log('BottomTabBar: unread-count non-ok response', text);
           }
         }
       } catch (error) {
@@ -90,7 +100,77 @@ export function BottomTabBar() {
 
     // Refresh unread count every 30 seconds
     const interval = setInterval(fetchUnreadCount, 30000);
-    return () => clearInterval(interval);
+
+    // Setup socket to get real-time updates for incoming messages
+    (async () => {
+      try {
+        const token = await tokenStorage.getToken();
+        if (!token) return;
+
+        const socket = io(API_URL, {
+          transports: ['websocket'],
+          auth: { token },
+          reconnection: true,
+          reconnectionDelay: 1000,
+          reconnectionDelayMax: 5000,
+          reconnectionAttempts: Infinity,
+        });
+
+        socketRef.current = socket;
+
+        socket.on('connect', () => {
+          console.log('✅ BottomTabBar: Socket connected successfully');
+          // Ensure we have the latest count on connect
+          fetchUnreadCount();
+        });
+
+        socket.on('disconnect', (reason) => {
+          console.log('⚠️ BottomTabBar: Socket disconnected. Reason:', reason);
+        });
+
+        socket.on('connect_error', (error) => {
+          console.log('❌ BottomTabBar: Socket connection error:', error.message);
+        });
+
+        // When a new message is broadcasted in an appointment room (server emits 'new-message')
+        socket.on('new-message', (payload) => {
+          console.log('BottomTabBar: socket new-message payload', payload);
+          fetchUnreadCount();
+        });
+
+        // When the server notifies this specific user about a new message
+        socket.on('user-new-message', (payload) => {
+          console.log('BottomTabBar: socket user-new-message payload', payload);
+          // If server provided unreadCount, update immediately; otherwise, fallback to fetching
+          if (payload && typeof payload.unreadCount === 'number') {
+            setUnreadCount(payload.unreadCount);
+            console.log('BottomTabBar: setUnreadCount from payload ->', payload.unreadCount);
+          } else {
+            fetchUnreadCount();
+          }
+        });
+
+        // Other events that may affect unread counts
+        socket.on('message-status-update', () => {
+          fetchUnreadCount();
+        });
+
+        socket.on('messages-read', () => {
+          fetchUnreadCount();
+        });
+
+      } catch (error) {
+        console.log('Error setting up chat socket in BottomTabBar:', error);
+      }
+    })();
+
+    return () => {
+      clearInterval(interval);
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+    };
   }, []);
 
   // Determine which tab is active based on pathname
