@@ -133,14 +133,8 @@ export default function PremiumScreen() {
     try {
       setProcessing(true);
       
-      // Validate that either a card is selected or new card details are complete
-      if (!useNewCard && !selectedPaymentMethodId) {
-        Alert.alert("Error", "Please select a payment method");
-        setProcessing(false);
-        return;
-      }
-
-      if (useNewCard && !cardDetails?.complete) {
+      // Validate card details are complete (we always use the card field)
+      if (!cardDetails?.complete) {
         Alert.alert("Error", "Please enter complete card details");
         setProcessing(false);
         return;
@@ -429,74 +423,10 @@ export default function PremiumScreen() {
                   <Text style={styles.securityText}>Your payment is encrypted and secure</Text>
                 </View>
 
-                {/* Saved Cards Section */}
-                {paymentMethods && paymentMethods.length > 0 && (
-                  <View style={styles.savedCardsSection}>
-                    <Text style={styles.cardInputLabel}>Saved Cards</Text>
-                    {paymentMethods.map((method) => (
-                      <TouchableOpacity
-                        key={method.id}
-                        style={[
-                          styles.savedCardOption,
-                          selectedPaymentMethodId === method.id && styles.selectedCard,
-                        ]}
-                        onPress={() => {
-                          setSelectedPaymentMethodId(method.id);
-                          setUseNewCard(false);
-                        }}
-                      >
-                        <View style={styles.cardCheckbox}>
-                          {selectedPaymentMethodId === method.id && (
-                            <Ionicons name="checkmark" size={16} color="white" />
-                          )}
-                        </View>
-                        <View style={styles.cardInfo}>
-                          <Text style={styles.cardBrand}>
-                            {method.cardBrand || "Card"} •••• {method.last4}
-                          </Text>
-                          <Text style={styles.cardExpiry}>
-                            Expires {method.expiryMonth}/{method.expiryYear}
-                          </Text>
-                        </View>
-                        {method.isDefault && (
-                          <View style={styles.defaultBadge}>
-                            <Text style={styles.defaultBadgeText}>Default</Text>
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    ))}
-
-                    {/* Divider */}
-                    <View style={styles.dividerLine} />
-
-                    {/* Use New Card Option */}
-                    <TouchableOpacity
-                      style={[
-                        styles.useNewCardOption,
-                        useNewCard && styles.selectedCard,
-                      ]}
-                      onPress={() => {
-                        setUseNewCard(true);
-                        setSelectedPaymentMethodId(null);
-                      }}
-                    >
-                      <View style={styles.cardCheckbox}>
-                        {useNewCard && (
-                          <Ionicons name="checkmark" size={16} color="white" />
-                        )}
-                      </View>
-                      <View style={styles.cardInfo}>
-                        <Text style={styles.cardBrand}>Use a different card</Text>
-                        <Text style={styles.cardExpiry}>Add new payment method</Text>
-                      </View>
-                      <Ionicons name="add-circle" size={20} color={colors.primary} />
-                    </TouchableOpacity>
-                  </View>
-                )}
+                {/* Saved Cards Section - REMOVED for simplicity */}
 
                 {/* Card Input Section */}
-                {(useNewCard || paymentMethods.length === 0) && (
-                  <View style={styles.cardInputSection}>
+                <View style={styles.cardInputSection}>
                     <Text style={styles.cardInputLabel}>
                       {paymentMethods.length > 0 ? "New Card Information" : "Card Information"}
                     </Text>
@@ -504,15 +434,14 @@ export default function PremiumScreen() {
                     {/* Stripe CardField Component */}
                     <CardField
                       ref={cardFieldRef}
-                      postalCodeEnabled={true}
+                      postalCodeEnabled={false}
                       placeholders={{
                         number: "•••• •••• •••• ••••",
                         expiration: "MM/YY",
                         cvc: "•••",
-                        postalCode: "ZIP",
                       }}
                       onCardChange={(details: any) => {
-                        console.log("Card details updated:", {
+                        console.log("🔍 Card details updated:", {
                           complete: details.complete,
                           validCVC: details.validCVC,
                           validExpiryDate: details.validExpiryDate,
@@ -528,7 +457,6 @@ export default function PremiumScreen() {
                       style={styles.cardField}
                     />
                   </View>
-                )}
 
                 {/* Price Summary */}
                 <View style={styles.priceSummary}>
@@ -539,20 +467,21 @@ export default function PremiumScreen() {
                   <Text style={styles.summaryPrice}>$10.00</Text>
                 </View>
 
+                {/* Debug: Show card validation status */}
+                <View style={{paddingHorizontal: 16, marginBottom: 8}}>
+                  <Text style={{fontSize: 12, color: cardDetails?.complete ? '#4CAF50' : '#FF6B6B'}}>
+                    {cardDetails?.complete ? '✅ Card complete - ready to pay' : '❌ Card incomplete - fill all fields'}
+                  </Text>
+                </View>
+
                 {/* Pay Button */}
                 <TouchableOpacity
                   style={[
                     styles.payButton,
-                    ((!useNewCard && !selectedPaymentMethodId) || 
-                     (useNewCard && !cardDetails?.complete) || 
-                     processing) && styles.disabledButton,
+                    (!cardDetails?.complete || processing) && styles.disabledButton,
                   ]}
                   onPress={handlePurchasePremium}
-                  disabled={
-                    (!useNewCard && !selectedPaymentMethodId) || 
-                    (useNewCard && !cardDetails?.complete) || 
-                    processing
-                  }
+                  disabled={!cardDetails?.complete || processing}
                 >
                   {processing ? (
                     <>
@@ -573,8 +502,6 @@ export default function PremiumScreen() {
                   onPress={() => {
                     setShowPaymentForm(false);
                     setCardDetails(null);
-                    setUseNewCard(false);
-                    setSelectedPaymentMethodId(null);
                   }}
                   disabled={processing}
                 >
