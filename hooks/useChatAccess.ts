@@ -1,7 +1,7 @@
 import { tokenStorage } from '@/utils/auth/tokenStorage';
 import Constants from 'expo-constants';
-import { Platform } from 'react-native';
 import { useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 
 // Remove /api from BACKEND_URL since routes already include it
 const ENV = Constants.expoConfig?.extra;
