@@ -32,10 +32,20 @@ export default function AllUserChatsScreen() {
     try {
       const response = await authApi.getUserAppointments();
       if (response.success) {
-        // Filter only confirmed appointments
+        // Filter only confirmed appointments and sort by most recent message
         const confirmedAppointments = (response.appointments || [])
           .filter((apt: any) => apt.status === 'confirmed')
-          .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          .sort((a: any, b: any) => {
+            // If both have messages, sort by most recent message
+            if (a.lastMessageAt && b.lastMessageAt) {
+              return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
+            }
+            // Chats with messages come first
+            if (a.lastMessageAt) return -1;
+            if (b.lastMessageAt) return 1;
+            // If no messages, sort by appointment date
+            return new Date(b.date).getTime() - new Date(a.date).getTime();
+          });
         setAppointments(confirmedAppointments);
       } else {
         Alert.alert('Error', 'Failed to load appointments');

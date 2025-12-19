@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import ChatMessage from '../models/ChatMessage.js';
 import Doctor from '../models/Doctor.js';
 import User from '../models/User.js';
 
@@ -218,9 +219,24 @@ export const getUserAppointments = async (req, res) => {
       });
     }
 
+    // Add lastMessageAt to each appointment
+    const appointmentsWithLastMessage = await Promise.all(
+      (user.appointmentsBooked || []).map(async (apt) => {
+        const lastMessage = await ChatMessage.findOne({ appointmentId: apt._id.toString() })
+          .sort({ createdAt: -1 })
+          .select('createdAt')
+          .lean();
+        
+        return {
+          ...apt.toObject(),
+          lastMessageAt: lastMessage?.createdAt || null
+        };
+      })
+    );
+
     res.json({
       success: true,
-      appointments: user.appointmentsBooked || []
+      appointments: appointmentsWithLastMessage
     });
   } catch (error) {
     console.error('Get appointments error:', error);
@@ -250,10 +266,17 @@ export const getDoctorAppointments = async (req, res) => {
       });
     }
 
-    // Populate user details for each appointment
+    // Populate user details and last message time for each appointment
     const appointmentsWithUserDetails = await Promise.all(
       (doctor.bookedAppointments || []).map(async (apt) => {
         const user = await User.findById(apt.userId).select('userInfo.name email');
+        
+        // Get the most recent message for this appointment
+        const lastMessage = await ChatMessage.findOne({ appointmentId: apt._id.toString() })
+          .sort({ createdAt: -1 })
+          .select('createdAt')
+          .lean();
+        
         return {
           _id: apt._id,
           userId: apt.userId,
@@ -264,7 +287,8 @@ export const getDoctorAppointments = async (req, res) => {
           description: apt.description,
           bookedAt: apt.bookedAt,
           userName: user?.userInfo?.name || 'Unknown',
-          userEmail: user?.email || 'N/A'
+          userEmail: user?.email || 'N/A',
+          lastMessageAt: lastMessage?.createdAt || null
         };
       })
     );
