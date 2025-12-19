@@ -3,6 +3,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
+import Constants from "expo-constants";
 import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
@@ -47,9 +48,8 @@ export default function PaymentMethods() {
     zipCode: "",
   });
 
-  const API_URL = Platform.OS === "android"
-    ? "http://10.0.2.2:5001"
-    : "http://localhost:5001";
+  const ENV = Constants.expoConfig?.extra;
+  const API_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === "android" ? "http://10.0.2.2:5001" : "http://localhost:5001")).replace(/\/api\/?$/, '');
 
   useFocusEffect(
     useCallback(() => {

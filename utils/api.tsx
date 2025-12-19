@@ -6,12 +6,10 @@ import { Platform } from 'react-native';
 // Get API key from .env via Expo's Constants
 const ENV = Constants.expoConfig?.extra;
 
-// Get backend API URL
+// Get backend API URL from environment variable
 const getBackendApiUrl = (): string => {
-  if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:5001/api';
-  }
-  return 'http://localhost:5001/api';
+  const baseUrl = ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001');
+  return baseUrl.replace(/\/api\/?$/, '') + '/api';
 };
 
 // Helper function to check if query is a greeting or thanks/help

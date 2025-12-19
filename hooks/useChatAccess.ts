@@ -1,8 +1,11 @@
 import { tokenStorage } from '@/utils/auth/tokenStorage';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import { useEffect, useState } from 'react';
 
 // Remove /api from BACKEND_URL since routes already include it
-const BACKEND_URL = (process.env.EXPO_PUBLIC_BACKEND_API_URL || 'http://localhost:5001').replace('/api', '');
+const ENV = Constants.expoConfig?.extra;
+const BACKEND_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')).replace(/\/api\/?$/, '');
 
 /**
  * Hook to check if chat is available for an appointment

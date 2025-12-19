@@ -17,6 +17,10 @@ export function BottomTabBar() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   const API_URL = (() => {
+    const ENV = Constants.expoConfig?.extra;
+    if (ENV?.EXPO_PUBLIC_BACKEND_API_URL) {
+      return ENV.EXPO_PUBLIC_BACKEND_API_URL.replace(/\/api\/?$/, '');
+    }
     const defaultHost = Constants.expoConfig?.hostUri?.split(':')[0] || 'localhost';
     return `http://${defaultHost}:5001`;
   })();

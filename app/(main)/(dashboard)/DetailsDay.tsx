@@ -220,8 +220,8 @@ export default function DetailsDay () {
 
         // Get backend URL
         const ENV = Constants.expoConfig?.extra;
-        const baseUrl = ENV?.EXPO_PUBLIC_BACKEND_API_URL || 'http://localhost:5001/api';
-        const apiUrl = baseUrl.replace('/api', '') + '/api/food-detect/upload';
+        const baseUrl = ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001');
+        const apiUrl = baseUrl.replace(/\/api\/?$/, '') + '/api/food-detect/upload';
 
         // Upload to backend (Clarifai food detection)
         const response = await fetch(apiUrl, {

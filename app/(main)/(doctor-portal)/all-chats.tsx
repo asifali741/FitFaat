@@ -1,8 +1,10 @@
 import AppHeader from '@/components/AppHeader';
 import { authApi } from '@/utils/auth/authApi';
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -63,7 +65,8 @@ export default function AllChatsScreen() {
       const token = await SecureStore.getItemAsync('authToken');
       if (!token) return;
 
-      const API_URL = 'http://localhost:5001';
+      const ENV = Constants.expoConfig?.extra;
+      const API_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')).replace(/\/api\/?$/, '');
       const response = await fetch(`${API_URL}/api/chats/unread-by-appointment`, {
         method: 'GET',
         headers: {
@@ -96,7 +99,8 @@ export default function AllChatsScreen() {
               const token = await SecureStore.getItemAsync('authToken');
               if (!token) return;
 
-              const API_URL = 'http://localhost:5001';
+              const ENV = Constants.expoConfig?.extra;
+              const API_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')).replace(/\/api\/?$/, '');
               const response = await fetch(`${API_URL}/api/chats/delete/${appointmentId}`, {
                 method: 'DELETE',
                 headers: {

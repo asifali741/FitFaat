@@ -4,6 +4,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -37,7 +38,8 @@ export default function WorkoutScreen() {
           return;
         }
 
-        const API_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001';
+        const ENV = Constants.expoConfig?.extra;
+        const API_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')).replace(/\/api\/?$/, '');
         console.log('🌐 Checking premium status at:', API_URL + '/api/payment/premium-status');
         
         // Add timeout to fetch

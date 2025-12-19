@@ -5,6 +5,7 @@ import { NewsProvider } from "@/contexts/NewsContext";
 import { authApi } from "@/utils/auth/authApi";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { DrawerContentComponentProps } from "@react-navigation/drawer";
+import Constants from "expo-constants";
 import { useRouter } from "expo-router";
 import { Drawer } from "expo-router/drawer";
 import { useEffect, useMemo, useState } from "react";
@@ -53,7 +54,8 @@ export default function MainLayout() {
           try {
             const token = await tokenStorage.getToken();
             if (token) {
-              const API_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001';
+              const ENV = Constants.expoConfig?.extra;
+              const API_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')).replace(/\/api\/?$/, '');
               const response = await fetch(`${API_URL}/api/payment/premium-status`, {
                 method: 'GET',
                 headers: {
