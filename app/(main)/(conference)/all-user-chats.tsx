@@ -172,13 +172,15 @@ export default function AllUserChatsScreen() {
             </View>
           </TouchableOpacity>
           
-          <TouchableOpacity
-            style={styles.deleteButtonTop}
-            onPress={() => deleteChat(item._id)}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Ionicons name="trash-outline" size={26} color="#FF6B6B" />
-          </TouchableOpacity>
+          <View style={{ display: 'none' }}>
+            <TouchableOpacity
+              style={styles.deleteButtonTop}
+              onPress={() => deleteChat(item._id)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="trash-outline" size={26} color="#FF6B6B" />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     );
