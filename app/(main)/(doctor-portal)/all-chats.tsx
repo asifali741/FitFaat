@@ -65,7 +65,7 @@ export default function AllChatsScreen() {
 
       const ENV = Constants.expoConfig?.extra;
       const API_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')).replace(/\/api\/?$/, '');
-      const response = await fetch(`${API_URL}/api/chats/unread-by-appointment`, {
+      const response = await fetch(`${API_URL}/api/chat/unread-by-appointment`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -99,7 +99,7 @@ export default function AllChatsScreen() {
 
               const ENV = Constants.expoConfig?.extra;
               const API_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')).replace(/\/api\/?$/, '');
-              const response = await fetch(`${API_URL}/api/chats/delete/${appointmentId}`, {
+              const response = await fetch(`${API_URL}/api/chat/delete/${appointmentId}`, {
                 method: 'DELETE',
                 headers: {
                   'Authorization': `Bearer ${token}`,

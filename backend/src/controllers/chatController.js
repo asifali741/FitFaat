@@ -338,12 +338,15 @@ export const markMessagesAsRead = async (req, res) => {
 export const getUnreadCount = async (req, res) => {
   try {
     const userId = req.user.id;
+    console.log(`GET /api/chats/unread-count called for user: ${userId}`);
     
     // Count unread messages for this user
     const unreadCount = await ChatMessage.countDocuments({
       recipientId: userId,
       isRead: false
     });
+
+    console.log(`GET /api/chats/unread-count -> user: ${userId}, unreadCount: ${unreadCount}`);
     
     res.json({
       success: true,
