@@ -1,5 +1,6 @@
 import { tokenStorage } from '@/utils/auth/tokenStorage';
 import { Ionicons } from "@expo/vector-icons";
+import Constants from 'expo-constants';
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -35,9 +36,11 @@ export default function Controls({ onAddMessage, sessionId }: ControlsProps) {
   const [showLimitModal, setShowLimitModal] = useState(false);
   const router = useRouter();
 
-  const API_URL = Platform.OS === "android"
-    ? "http://10.0.2.2:5001"
-    : "http://localhost:5001";
+  const API_URL = (() => {
+    const baseUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_API_URL ||
+      (Platform.OS === "android" ? "http://10.0.2.2:5001" : "http://localhost:5001");
+    return baseUrl.replace(/\/api\/?$/, '');
+  })();
 
   // Check chat limit on component mount and periodically
   useEffect(() => {

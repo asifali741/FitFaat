@@ -5,7 +5,8 @@ import NotificationToast from './components/NotificationToast';
 import DashboardPage from './pages/DashboardPage';
 import LoginPage from './pages/LoginPage';
 
-const API_BASE_URL = 'http://localhost:5001/api';
+// Get API base URL from environment variable or use default
+const API_BASE_URL = process.env.REACT_APP_BACKEND_API_URL || 'http://localhost:5001/api';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);

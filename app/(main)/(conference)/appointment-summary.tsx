@@ -1,6 +1,7 @@
 import { useAppointmentBooking } from "@/hooks/useAppointmentBooking";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
+import Constants from "expo-constants";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -22,9 +23,8 @@ export default function AppointmentSummaryScreen() {
     message: string;
   }>({ success: false, message: '' });
   
-  const API_URL = Platform.OS === "android"
-    ? "http://10.0.2.2:5001"
-    : "http://localhost:5001";
+  const ENV = Constants.expoConfig?.extra;
+  const API_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === "android" ? "http://10.0.2.2:5001" : "http://localhost:5001")).replace(/\/api\/?$/, '');
   
   // Extract parameters from route
   const doctorId = Array.isArray(params.doctorId) ? params.doctorId[0] : params.doctorId;

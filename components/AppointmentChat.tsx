@@ -1,5 +1,6 @@
 import { tokenStorage } from '@/utils/auth/tokenStorage';
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -30,7 +31,8 @@ interface ChatMessage {
 }
 
 // Remove /api from BACKEND_URL since routes already include it
-const BACKEND_URL = (process.env.EXPO_PUBLIC_BACKEND_API_URL || 'http://localhost:5001').replace('/api', '');
+const ENV = Constants.expoConfig?.extra;
+const BACKEND_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')).replace(/\/api\/?$/, '');
 
 interface AppointmentChatProps {
   appointmentId: string;

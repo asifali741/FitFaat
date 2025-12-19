@@ -1,4 +1,5 @@
 import axios from 'axios';
+import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import React, { createContext, useContext, useRef } from 'react';
 import { Platform } from 'react-native';
@@ -81,7 +82,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const registerTokenWithBackend = async (pushToken: string) => {
     try {
-      const API_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001';
+      const ENV = Constants.expoConfig?.extra;
+      const API_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')).replace(/\/api\/?$/, '');
 
       // Generate a consistent device ID using timestamp
       const userId = `device_${Platform.OS}_${Math.round(Date.now() / 1000)}`;

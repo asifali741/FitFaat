@@ -20,7 +20,8 @@ type DrawerSceneWrapperProps = DrawerContentComponentProps;
 
 // Helper function to get API URL
 const getAPIURL = () => {
-  const apiUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_API_URL || 'http://localhost:5001';
+  const ENV = Constants.expoConfig?.extra;
+  const apiUrl = ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001');
   return apiUrl.replace(/\/api\/?$/, '');
 };
 
