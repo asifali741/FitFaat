@@ -1,4 +1,5 @@
 import { DrawerSceneWrapper } from "@/components/CustomDrawerLayout";
+import { theme } from "@/constants/theme";
 import { AppointmentProvider } from "@/contexts/AppointmentContext";
 import { ChatbotStorageProvider } from "@/contexts/ChatbotStorage";
 import { NewsProvider } from "@/contexts/NewsContext";
@@ -11,7 +12,6 @@ import { Drawer } from "expo-router/drawer";
 import { useEffect, useMemo, useState } from "react";
 import { Platform, StyleSheet } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { colorsSheet as color } from "./(settings)/_ui_elements";
 type DrawerSceneWrapperProps = DrawerContentComponentProps;
 
 export default function MainLayout() {
@@ -116,13 +116,13 @@ export default function MainLayout() {
     screenOptions={{
       lazy: true,
       headerShown: false,
-      drawerActiveBackgroundColor: color.drawerActiveTabColor,
+      drawerActiveBackgroundColor: theme.colors.primary,
       drawerInactiveBackgroundColor: "transparent",
       drawerActiveTintColor: "#FFFFFF",
       drawerInactiveTintColor: "#FFFFFF",
       overlayColor: "transparent",
       drawerStyle: {
-        backgroundColor: color.drawerBackground,
+        backgroundColor: theme.colors.background,
         width: "75%",
         paddingTop: 40,
       },

@@ -1,4 +1,4 @@
-import { colorsSheet } from '@/app/(main)/(settings)/_ui_elements';
+import { theme } from '@/constants/theme';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
   timerText: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: colorsSheet.primary,
+    color: theme.colors.primary,
     fontFamily: 'monospace',
   },
 });
