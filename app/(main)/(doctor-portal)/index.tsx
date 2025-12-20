@@ -7,7 +7,7 @@ import React, { useCallback, useState } from "react";
 import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { colorsSheet } from "../(settings)/_ui_elements";
+import { theme } from "@/constants/theme";
 
 export default function DoctorPortal() {
   const router = useRouter();
@@ -88,13 +88,13 @@ export default function DoctorPortal() {
             <Ionicons 
               name="videocam" 
               size={30} 
-              color={doctorStatus === 'approved' ? colorsSheet.primary : colorsSheet.textSecondary} 
+              color={doctorStatus === 'approved' ? theme.colors.primary : theme.colors.textSecondary} 
             />
             <Text style={[styles.featureText, doctorStatus !== 'approved' && styles.featureTextDisabled]}>
               Video Consultations
             </Text>
             {doctorStatus !== 'approved' && (
-              <Ionicons name="lock-closed" size={20} color={colorsSheet.textSecondary} style={styles.lockIcon} />
+              <Ionicons name="lock-closed" size={20} color={theme.colors.textSecondary} style={styles.lockIcon} />
             )}
           </TouchableOpacity>
 
@@ -107,13 +107,13 @@ export default function DoctorPortal() {
             <Ionicons 
               name="chatbubbles" 
               size={30} 
-              color={doctorStatus === 'approved' ? colorsSheet.primary : colorsSheet.textSecondary} 
+              color={doctorStatus === 'approved' ? theme.colors.primary : theme.colors.textSecondary} 
             />
             <Text style={[styles.featureText, doctorStatus !== 'approved' && styles.featureTextDisabled]}>
               All Chats
             </Text>
             {doctorStatus !== 'approved' && (
-              <Ionicons name="lock-closed" size={20} color={colorsSheet.textSecondary} style={styles.lockIcon} />
+              <Ionicons name="lock-closed" size={20} color={theme.colors.textSecondary} style={styles.lockIcon} />
             )}
           </TouchableOpacity>
           
@@ -126,7 +126,7 @@ export default function DoctorPortal() {
             <Ionicons 
               name="people" 
               size={30} 
-              color={doctorStatus === 'approved' ? colorsSheet.primaryLight : colorsSheet.textSecondary} 
+              color={doctorStatus === 'approved' ? theme.colors.primaryLight : theme.colors.textSecondary} 
             />
             <Text style={[styles.featureText, doctorStatus !== 'approved' && styles.featureTextDisabled]}>
               Appointments Management
@@ -136,7 +136,7 @@ export default function DoctorPortal() {
                 <Text style={styles.featureBadgeText}>New</Text>
               </View>
             ) : (
-              <Ionicons name="lock-closed" size={20} color={colorsSheet.textSecondary} style={styles.lockIcon} />
+              <Ionicons name="lock-closed" size={20} color={theme.colors.textSecondary} style={styles.lockIcon} />
             )}
           </TouchableOpacity>
           
@@ -148,13 +148,13 @@ export default function DoctorPortal() {
             <Ionicons 
               name="nutrition" 
               size={30} 
-              color={doctorStatus === 'approved' ? colorsSheet.secondary : colorsSheet.textSecondary} 
+              color={doctorStatus === 'approved' ? theme.colors.secondary : theme.colors.textSecondary} 
             />
             <Text style={[styles.featureText, doctorStatus !== 'approved' && styles.featureTextDisabled]}>
               Diet Plan Creation
             </Text>
             {doctorStatus !== 'approved' && (
-              <Ionicons name="lock-closed" size={20} color={colorsSheet.textSecondary} style={styles.lockIcon} />
+              <Ionicons name="lock-closed" size={20} color={theme.colors.textSecondary} style={styles.lockIcon} />
             )}
           </TouchableOpacity>
         </View>
@@ -187,7 +187,7 @@ export default function DoctorPortal() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: theme.colors.primary,
   },
   header: {
     flexDirection: "row",
@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: wp(5),
     paddingVertical: hp(2),
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: theme.colors.primary,
   },
   menuButton: {
     padding: 8,
@@ -203,13 +203,13 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: Math.min(hp(2.5), wp(6)),
     fontWeight: "bold",
-    color: colorsSheet.textOnPrimary,
+    color: theme.colors.surface,
     textAlign: "center",
     flex: 1,
   },
   content: {
     flex: 1,
-    backgroundColor: colorsSheet.screenColor,
+    backgroundColor: theme.colors.background,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     paddingTop: hp(4),
@@ -227,14 +227,14 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     fontSize: Math.min(hp(2.8), wp(7)),
     fontWeight: "bold",
-    color: colorsSheet.textPrimary,
+    color: theme.colors.textPrimary,
     textAlign: "center",
     marginBottom: hp(1),
     paddingHorizontal: wp(2),
   },
   welcomeSubtitle: {
     fontSize: Math.min(hp(1.8), wp(4.5)),
-    color: colorsSheet.textSecondary,
+    color: theme.colors.textSecondary,
     textAlign: "center",
     lineHeight: Math.min(hp(2.5), wp(6)),
     paddingHorizontal: wp(6),
@@ -247,36 +247,36 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: hp(2),
     paddingHorizontal: wp(4),
-    backgroundColor: colorsSheet.primarySoft,
+    backgroundColor: theme.colors.primary + "20",
     borderRadius: 15,
     marginBottom: hp(1.5),
   },
   featureItemDisabled: {
     opacity: 0.5,
-    backgroundColor: colorsSheet.cardBackground,
+    backgroundColor: theme.colors.surface,
   },
   featureText: {
     fontSize: hp(2),
-    color: colorsSheet.textOnCard,
+    color: theme.colors.textPrimary,
     marginLeft: wp(4),
     fontWeight: "500",
     flex: 1,
   },
   featureTextDisabled: {
-    color: colorsSheet.textSecondary,
+    color: theme.colors.textSecondary,
   },
   lockIcon: {
     marginLeft: 'auto',
   },
   featureBadge: {
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: theme.colors.primary,
     paddingVertical: hp(0.4),
     paddingHorizontal: wp(2),
     borderRadius: 12,
     marginLeft: 'auto',
   },
   featureBadgeText: {
-    color: colorsSheet.white,
+    color: theme.colors.surface,
     fontSize: hp(1.3),
     fontWeight: '600',
   },
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     overflow: "hidden",
     marginBottom: hp(2),
-    shadowColor: colorsSheet.primary,
+    shadowColor: theme.colors.primary,
     shadowOffset: {
       width: 0,
       height: 4,
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   gradientButtonText: {
-    color: colorsSheet.white,
+    color: theme.colors.surface,
     fontSize: hp(2.4),
     fontWeight: "700",
     letterSpacing: 0.5,

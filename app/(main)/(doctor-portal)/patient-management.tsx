@@ -1,5 +1,6 @@
 import AppHeader from '@/components/AppHeader';
 import ChatButton from '@/components/ChatButton';
+import { theme } from '@/constants/theme';
 import { authApi } from '@/utils/auth/authApi';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -18,7 +19,6 @@ import {
 } from 'react-native';
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colorsSheet } from '../(settings)/_ui_elements';
 
 const { width } = Dimensions.get('window');
 
@@ -255,10 +255,10 @@ export default function PatientManagementScreen() {
 
         <View style={styles.cardFooter}>
           <View style={styles.feeContainer}>
-            <Ionicons name="cash" size={16} color={colorsSheet.success} />
+            <Ionicons name="cash" size={16} color={theme.colors.success} />
             <Text style={styles.feeText}>Rs {item.price}</Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color={colorsSheet.textSecondary} />
+          <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
         </View>
       </TouchableOpacity>
     );
@@ -274,7 +274,7 @@ export default function PatientManagementScreen() {
           showStepIndicator={false}
         />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colorsSheet.primary} />
+          <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
       </SafeAreaView>
     );
@@ -301,7 +301,7 @@ export default function PatientManagementScreen() {
             <Ionicons
               name="list-outline"
               size={64}
-              color={colorsSheet.textSecondary}
+              color={theme.colors.textSecondary}
             />
             <Text style={styles.emptyTitle}>No Requests</Text>
             <Text style={styles.emptySubtitle}>
@@ -337,7 +337,7 @@ export default function PatientManagementScreen() {
               onPress={() => setShowModal(false)}
               style={styles.closeButton}
             >
-              <Ionicons name="close" size={28} color={colorsSheet.textPrimary} />
+              <Ionicons name="close" size={28} color={theme.colors.textPrimary} />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>Patient Request</Text>
             <View style={styles.headerSpacer} />
@@ -357,7 +357,7 @@ export default function PatientManagementScreen() {
                       <Ionicons
                         name="person"
                         size={40}
-                        color={colorsSheet.primary}
+                        color={theme.colors.primary}
                       />
                     </View>
                     <View style={styles.patientDetails}>
@@ -374,7 +374,7 @@ export default function PatientManagementScreen() {
                   <Text style={styles.sectionTitle}>Appointment Details</Text>
 
                   <View style={styles.detailRow}>
-                    <Ionicons name="calendar" size={20} color={colorsSheet.info} />
+                    <Ionicons name="calendar" size={20} color={theme.colors.info} />
                     <View style={styles.detailContent}>
                       <Text style={styles.detailLabel}>Date</Text>
                       <Text style={styles.detailValue}>
@@ -391,7 +391,7 @@ export default function PatientManagementScreen() {
                   </View>
 
                   <View style={styles.detailRow}>
-                    <Ionicons name="time" size={20} color={colorsSheet.warning} />
+                    <Ionicons name="time" size={20} color={theme.colors.warning} />
                     <View style={styles.detailContent}>
                       <Text style={styles.detailLabel}>Time</Text>
                       <Text style={styles.detailValue}>
@@ -401,7 +401,7 @@ export default function PatientManagementScreen() {
                   </View>
 
                   <View style={styles.detailRow}>
-                    <Ionicons name="cash" size={20} color={colorsSheet.success} />
+                    <Ionicons name="cash" size={20} color={theme.colors.success} />
                     <View style={styles.detailContent}>
                       <Text style={styles.detailLabel}>Consultation Fee</Text>
                       <Text style={styles.detailValue}>
@@ -414,7 +414,7 @@ export default function PatientManagementScreen() {
                     <Ionicons
                       name="document-text"
                       size={20}
-                      color={colorsSheet.secondary}
+                      color={theme.colors.secondary}
                     />
                     <View style={styles.detailContent}>
                       <Text style={styles.detailLabel}>Patient Concern</Text>
@@ -521,7 +521,7 @@ export default function PatientManagementScreen() {
                     >
                       {isProcessing ? (
                         <ActivityIndicator
-                          color={colorsSheet.white}
+                          color={theme.colors.surface}
                           size="small"
                         />
                       ) : (
@@ -529,7 +529,7 @@ export default function PatientManagementScreen() {
                           <Ionicons
                             name="checkmark-circle"
                             size={20}
-                            color={colorsSheet.white}
+                            color={theme.colors.surface}
                           />
                           <Text style={styles.actionButtonText}>
                             Approve Request
@@ -552,7 +552,7 @@ export default function PatientManagementScreen() {
                     >
                       {isProcessing ? (
                         <ActivityIndicator
-                          color={colorsSheet.white}
+                          color={theme.colors.surface}
                           size="small"
                         />
                       ) : (
@@ -560,7 +560,7 @@ export default function PatientManagementScreen() {
                           <Ionicons
                             name="close-circle"
                             size={20}
-                            color={colorsSheet.white}
+                            color={theme.colors.surface}
                           />
                           <Text style={styles.actionButtonText}>
                             Reject Request
@@ -573,7 +573,7 @@ export default function PatientManagementScreen() {
 
                 {selectedAppointment.status === 'confirmed' && (
                   <View style={styles.approvedSection}>
-                    <Ionicons name="checkmark-done" size={40} color={colorsSheet.success} />
+                    <Ionicons name="checkmark-done" size={40} color={theme.colors.success} />
                     <Text style={styles.approvedTitle}>Request Approved</Text>
                     <Text style={styles.approvedSubtitle}>
                       Patient has been notified about the appointment confirmation
@@ -607,7 +607,7 @@ export default function PatientManagementScreen() {
               <Ionicons
                 name={confirmationType === 'approve' ? 'checkmark-circle' : 'alert-circle'}
                 size={48}
-                color={colorsSheet.white}
+                color={theme.colors.surface}
               />
               <Text style={styles.confirmationTitle}>
                 {confirmationType === 'approve' ? 'Approve Appointment?' : 'Reject Appointment?'}
@@ -618,12 +618,12 @@ export default function PatientManagementScreen() {
             <View style={styles.confirmationContent}>
               <View style={styles.appointmentSummary}>
                 <View style={styles.summaryRow}>
-                  <Ionicons name="person" size={18} color={colorsSheet.textSecondary} />
+                  <Ionicons name="person" size={18} color={theme.colors.textSecondary} />
                   <Text style={styles.summaryLabel}>Patient:</Text>
                   <Text style={styles.summaryValue}>{selectedAppointment?.userName || 'Unknown'}</Text>
                 </View>
                 <View style={styles.summaryRow}>
-                  <Ionicons name="calendar" size={18} color={colorsSheet.textSecondary} />
+                  <Ionicons name="calendar" size={18} color={theme.colors.textSecondary} />
                   <Text style={styles.summaryLabel}>Date:</Text>
                   <Text style={styles.summaryValue}>
                     {selectedAppointment?.date
@@ -636,7 +636,7 @@ export default function PatientManagementScreen() {
                   </Text>
                 </View>
                 <View style={styles.summaryRow}>
-                  <Ionicons name="time" size={18} color={colorsSheet.textSecondary} />
+                  <Ionicons name="time" size={18} color={theme.colors.textSecondary} />
                   <Text style={styles.summaryLabel}>Time:</Text>
                   <Text style={styles.summaryValue}>{selectedAppointment?.time || 'N/A'}</Text>
                 </View>
@@ -670,13 +670,13 @@ export default function PatientManagementScreen() {
                 disabled={isProcessing}
               >
                 {isProcessing ? (
-                  <ActivityIndicator color={colorsSheet.white} size="small" />
+                  <ActivityIndicator color={theme.colors.surface} size="small" />
                 ) : (
                   <>
                     <Ionicons
                       name={confirmationType === 'approve' ? 'checkmark' : 'close'}
                       size={18}
-                      color={colorsSheet.white}
+                      color={theme.colors.surface}
                     />
                     <Text style={styles.confirmationActionText}>
                       {confirmationType === 'approve' ? 'Approve' : 'Reject'}
@@ -696,7 +696,7 @@ const getStyles = () =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colorsSheet.primary,
+      backgroundColor: theme.colors.primary,
     },
     content: {
       flex: 1,
@@ -716,20 +716,20 @@ const getStyles = () =>
       paddingHorizontal: wp(3.5),
       borderRadius: 12,
       borderWidth: 2,
-      borderColor: colorsSheet.lightGray,
-      backgroundColor: colorsSheet.white,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
     },
     filterButtonActive: {
-      backgroundColor: colorsSheet.primary,
-      borderColor: colorsSheet.primary,
+      backgroundColor: theme.colors.primary,
+      borderColor: theme.colors.primary,
     },
     filterButtonText: {
       fontSize: hp(1.4),
       fontWeight: '600',
-      color: colorsSheet.textSecondary,
+      color: theme.colors.textSecondary,
     },
     filterButtonTextActive: {
-      color: colorsSheet.white,
+      color: theme.colors.surface,
     },
     loadingContainer: {
       flex: 1,
@@ -745,13 +745,13 @@ const getStyles = () =>
     emptyTitle: {
       fontSize: hp(2.5),
       fontWeight: 'bold',
-      color: colorsSheet.textPrimary,
+      color: theme.colors.textPrimary,
       marginTop: hp(2),
       marginBottom: hp(0.5),
     },
     emptySubtitle: {
       fontSize: hp(1.6),
-      color: colorsSheet.textSecondary,
+      color: theme.colors.textSecondary,
       textAlign: 'center',
     },
     listContainer: {
@@ -761,7 +761,7 @@ const getStyles = () =>
     },
     // Card Styles
     requestCard: {
-      backgroundColor: colorsSheet.white,
+      backgroundColor: theme.colors.surface,
       borderRadius: 16,
       marginBottom: hp(2),
       shadowColor: '#000',
@@ -789,12 +789,12 @@ const getStyles = () =>
     patientName: {
       fontSize: hp(1.8),
       fontWeight: '700',
-      color: colorsSheet.textPrimary,
+      color: theme.colors.textPrimary,
       marginBottom: hp(0.3),
     },
     appointmentDateTime: {
       fontSize: hp(1.4),
-      color: colorsSheet.textSecondary,
+      color: theme.colors.textSecondary,
     },
     statusBadge: {
       paddingVertical: hp(0.6),
@@ -826,7 +826,7 @@ const getStyles = () =>
     feeText: {
       fontSize: hp(1.5),
       fontWeight: '600',
-      color: colorsSheet.success,
+      color: theme.colors.success,
     },
     requestContent: {
       flexDirection: 'row',
@@ -836,7 +836,7 @@ const getStyles = () =>
       width: wp(12),
       height: wp(12),
       borderRadius: wp(6),
-      backgroundColor: colorsSheet.primarySoft,
+      backgroundColor: theme.colors.primary + "20",
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: wp(3),
@@ -847,7 +847,7 @@ const getStyles = () =>
     consultationFee: {
       fontSize: hp(1.4),
       fontWeight: '500',
-      color: colorsSheet.success,
+      color: theme.colors.success,
     },
     statusContainer: {
       marginLeft: wp(2),
@@ -863,7 +863,7 @@ const getStyles = () =>
       justifyContent: 'space-between',
       paddingHorizontal: wp(4),
       paddingVertical: hp(2),
-      backgroundColor: colorsSheet.white,
+      backgroundColor: theme.colors.surface,
       borderBottomWidth: 1,
       borderBottomColor: '#EFEFEF',
     },
@@ -873,7 +873,7 @@ const getStyles = () =>
     modalTitle: {
       fontSize: hp(2.2),
       fontWeight: '700',
-      color: colorsSheet.textPrimary,
+      color: theme.colors.textPrimary,
     },
     headerSpacer: {
       width: hp(3),
@@ -889,24 +889,24 @@ const getStyles = () =>
     sectionTitle: {
       fontSize: hp(2),
       fontWeight: 'bold',
-      color: colorsSheet.textPrimary,
+      color: theme.colors.textPrimary,
       marginBottom: hp(1),
     },
     infoCard: {
       flexDirection: 'row',
-      backgroundColor: colorsSheet.white,
+      backgroundColor: theme.colors.surface,
       borderRadius: 16,
       padding: wp(4),
       alignItems: 'center',
       borderLeftWidth: 4,
-      borderLeftColor: colorsSheet.primary,
+      borderLeftColor: theme.colors.primary,
       marginBottom: hp(1),
     },
     avatarLarge: {
       width: wp(14),
       height: wp(14),
       borderRadius: wp(7),
-      backgroundColor: colorsSheet.primary,
+      backgroundColor: theme.colors.primary,
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: wp(3),
@@ -917,22 +917,22 @@ const getStyles = () =>
     patientNameLarge: {
       fontSize: hp(1.8),
       fontWeight: '700',
-      color: colorsSheet.textPrimary,
+      color: theme.colors.textPrimary,
       marginBottom: hp(0.3),
     },
     patientEmail: {
       fontSize: hp(1.4),
-      color: colorsSheet.textSecondary,
+      color: theme.colors.textSecondary,
     },
     detailRow: {
       flexDirection: 'row',
-      backgroundColor: colorsSheet.white,
+      backgroundColor: theme.colors.surface,
       borderRadius: 14,
       padding: wp(4),
       marginBottom: hp(1.2),
       alignItems: 'flex-start',
       borderLeftWidth: 3,
-      borderLeftColor: colorsSheet.info,
+      borderLeftColor: theme.colors.info,
     },
     detailContent: {
       flex: 1,
@@ -940,17 +940,17 @@ const getStyles = () =>
     },
     detailLabel: {
       fontSize: hp(1.2),
-      color: colorsSheet.textSecondary,
+      color: theme.colors.textSecondary,
       marginBottom: hp(0.3),
     },
     detailValue: {
       fontSize: hp(1.7),
       fontWeight: '700',
-      color: colorsSheet.textPrimary,
+      color: theme.colors.textPrimary,
     },
     statusDisplay: {
       flexDirection: 'row',
-      backgroundColor: colorsSheet.white,
+      backgroundColor: theme.colors.surface,
       borderRadius: 14,
       padding: wp(4),
       borderLeftWidth: 4,
@@ -970,7 +970,7 @@ const getStyles = () =>
     },
     statusLabel: {
       fontSize: hp(1.3),
-      color: colorsSheet.textSecondary,
+      color: theme.colors.textSecondary,
       marginBottom: hp(0.3),
     },
     statusValue: {
@@ -1020,43 +1020,43 @@ const getStyles = () =>
       justifyContent: 'center',
     },
     approveButton: {
-      backgroundColor: colorsSheet.success,
+      backgroundColor: theme.colors.success,
     },
     rejectButton: {
-      backgroundColor: colorsSheet.error,
+      backgroundColor: theme.colors.error,
     },
     buttonDisabled: {
       opacity: 0.6,
     },
     actionButtonText: {
-      color: colorsSheet.white,
+      color: theme.colors.surface,
       fontSize: hp(1.7),
       fontWeight: '600',
       marginLeft: wp(2),
     },
     approvedSection: {
-      backgroundColor: colorsSheet.white,
+      backgroundColor: theme.colors.surface,
       borderRadius: 15,
       padding: wp(6),
       alignItems: 'center',
       marginBottom: hp(2),
       borderTopWidth: 3,
-      borderTopColor: colorsSheet.success,
+      borderTopColor: theme.colors.success,
     },
     approvedTitle: {
       fontSize: hp(2.2),
       fontWeight: 'bold',
-      color: colorsSheet.textPrimary,
+      color: theme.colors.textPrimary,
       marginTop: hp(1),
       marginBottom: hp(0.5),
     },
     approvedSubtitle: {
       fontSize: hp(1.5),
-      color: colorsSheet.textSecondary,
+      color: theme.colors.textSecondary,
       textAlign: 'center',
     },
     closeModalButton: {
-      backgroundColor: colorsSheet.gray,
+      backgroundColor: theme.colors.disabled,
       paddingVertical: hp(1.8),
       paddingHorizontal: wp(6),
       borderRadius: 15,
@@ -1065,7 +1065,7 @@ const getStyles = () =>
       marginBottom: hp(3),
     },
     closeModalButtonText: {
-      color: colorsSheet.textPrimary,
+      color: theme.colors.textPrimary,
       fontSize: hp(1.7),
       fontWeight: '600',
     },
@@ -1077,7 +1077,7 @@ const getStyles = () =>
       alignItems: 'center',
     },
     confirmationContainer: {
-      backgroundColor: colorsSheet.white,
+      backgroundColor: theme.colors.surface,
       borderRadius: 20,
       overflow: 'hidden',
       width: '85%',
@@ -1095,15 +1095,15 @@ const getStyles = () =>
       gap: wp(2),
     },
     confirmApproveHeader: {
-      backgroundColor: colorsSheet.success,
+      backgroundColor: theme.colors.success,
     },
     confirmRejectHeader: {
-      backgroundColor: colorsSheet.error,
+      backgroundColor: theme.colors.error,
     },
     confirmationTitle: {
       fontSize: hp(2.2),
       fontWeight: '700',
-      color: colorsSheet.white,
+      color: theme.colors.surface,
       textAlign: 'center',
     },
     confirmationContent: {
@@ -1126,19 +1126,19 @@ const getStyles = () =>
     summaryLabel: {
       fontSize: hp(1.4),
       fontWeight: '600',
-      color: colorsSheet.textSecondary,
+      color: theme.colors.textSecondary,
       flex: 1,
     },
     summaryValue: {
       fontSize: hp(1.6),
       fontWeight: '700',
-      color: colorsSheet.textPrimary,
+      color: theme.colors.textPrimary,
       flex: 1.5,
       textAlign: 'right',
     },
     confirmationMessage: {
       fontSize: hp(1.5),
-      color: colorsSheet.textSecondary,
+      color: theme.colors.textSecondary,
       textAlign: 'center',
       marginVertical: hp(1.5),
       lineHeight: hp(2.2),
@@ -1163,7 +1163,7 @@ const getStyles = () =>
     confirmationCancelText: {
       fontSize: hp(1.6),
       fontWeight: '600',
-      color: colorsSheet.textPrimary,
+      color: theme.colors.textPrimary,
     },
     confirmationActionButton: {
       flex: 1,
@@ -1175,14 +1175,14 @@ const getStyles = () =>
       gap: wp(1.5),
     },
     confirmationApproveButton: {
-      backgroundColor: colorsSheet.success,
+      backgroundColor: theme.colors.success,
     },
     confirmationRejectButton: {
-      backgroundColor: colorsSheet.error,
+      backgroundColor: theme.colors.error,
     },
     confirmationActionText: {
       fontSize: hp(1.6),
       fontWeight: '700',
-      color: colorsSheet.white,
+      color: theme.colors.surface,
     },
   });
