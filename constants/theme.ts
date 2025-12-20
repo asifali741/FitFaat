@@ -13,11 +13,17 @@ export const theme = {
     // Backgrounds
     background: '#F8FAFC',     // Soft Off-White
     surface: '#FFFFFF',        // Card backgrounds
+    screenColor: '#F8FAFC',    // Screen background
+    cardBackground: '#FFFFFF', // Card/Item backgrounds
+    offWhite: '#F5F7FA',       // Subtle backgrounds
     
     // Text
     textPrimary: '#1F2933',    // Dark Gray
     textSecondary: '#6B7280',  // Medium Gray
     textTertiary: '#9CA3AF',   // Light Gray
+    textOnPrimary: '#FFFFFF',  // White text on primary
+    textLight: '#9CA3AF',      // Light text
+    buttonText: '#FFFFFF',     // Button text
     
     // Semantic Colors
     success: '#22C55E',
@@ -35,12 +41,17 @@ export const theme = {
     border: '#E5E7EB',
     divider: '#E5E7EB',
     disabled: '#D1D5DB',
+    lightGray: '#E5E7EB',
+    gray: '#9CA3AF',
+    primarySoft: '#E0F2FE',    // Soft primary background
     
     // Status Colors
     statusActive: '#22C55E',
     statusPending: '#F59E0B',
     statusCancelled: '#EF4444',
     statusConfirmed: '#4CAF50',
+    finishedStatus: '#4CAF50',  // Finished/completed
+    lockedStatus: '#95A5A6',    // Locked state
     
     // Chat Backgrounds
     chatDoctor: '#E0F2FE',     // Light Blue

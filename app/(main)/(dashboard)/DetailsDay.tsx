@@ -405,7 +405,7 @@ export default function DetailsDay () {
     const styles = useMemo(() => getStyles(colors), [colors]);
     //output
     return (
-  <View style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom, backgroundColor: colors.screenColor }}>
+  <View style={{ flex: 1, paddingTop: insets.top, backgroundColor: colors.screenColor }}>
     {!showMenu ? (
       <Animated.View
         style={{ flex: 1, opacity: fade, backgroundColor: colors.screenColor, paddingHorizontal: 10 }}
@@ -1384,7 +1384,7 @@ export default function DetailsDay () {
 const getStyles = (colors: any) => StyleSheet.create({
     heading: {
         paddingHorizontal: HEADER_PADDING_HORIZONTAL,
-        paddingVertical: HEADER_PADDING_VERTICAL,
+        paddingVertical: hp(1.2),
         marginBottom: 8,
         backgroundColor: colors.screenColor,
     },
@@ -1438,7 +1438,7 @@ const getStyles = (colors: any) => StyleSheet.create({
         width: 44,
         height: 44,
         borderRadius: 22,
-        backgroundColor: colors.cardBackground,
+        backgroundColor: colors.surface,
         justifyContent: 'center',
         alignItems: 'center',
         shadowColor: "#000",
@@ -1451,7 +1451,7 @@ const getStyles = (colors: any) => StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
-        paddingBottom: hp(3),
+        paddingBottom: hp(12),
     },
     centerBody:{
         flex: 1,
@@ -1726,7 +1726,7 @@ const getStyles = (colors: any) => StyleSheet.create({
         flexGrow: 1,
         paddingHorizontal: wp(5),
         paddingTop: hp(3),
-        paddingBottom: hp(2),
+        paddingBottom: hp(15),
         justifyContent: 'space-between',
     },
     menuContent: {

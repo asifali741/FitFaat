@@ -162,13 +162,13 @@ export default function DayPlan () {
   if(!JsonResponse)
   {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.primary }]}>
-        {/* Header */}
-        <View style={[styles.header, { backgroundColor: colors.primary }]}>
-        <View style={styles.spacer} />
-          <Text style={[styles.headerTitle, { color: colors.textOnPrimary }]}>FitFaat Dashboard</Text>
-          <View style={styles.spacer} />
-        </View>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.screenColor }]} edges={['top']}>
+        <AppHeader 
+          title="FitFaat Dashboard"
+          showStepIndicator={false}
+          showBackButton={false}
+          showMenuButton={true}
+        />
 
         {/* Loading Content */}
         <View style={[styles.content, { backgroundColor: colors.screenColor }]}>
@@ -195,7 +195,7 @@ export default function DayPlan () {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.screenColor }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.screenColor }]} edges={['top']}>
       <AppHeader 
         title="FitFaat Dashboard"
         showStepIndicator={false}
@@ -217,7 +217,7 @@ export default function DayPlan () {
       <View style={[styles.content, { backgroundColor: colors.screenColor }]}>
         <ScrollView 
           style={styles.list}
-          contentContainerStyle={{ paddingBottom: 50 }}
+          contentContainerStyle={{ paddingBottom: 100, paddingTop: 12 }}
           showsVerticalScrollIndicator={false} 
           showsHorizontalScrollIndicator={false}
           scrollEventThrottle={16}
@@ -239,35 +239,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: Math.min(wp(5), 20),
-    paddingVertical: Math.min(hp(2), 16),
-    minHeight: hp(8),
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  headerTitle: {
-    fontSize: Math.min(hp(2.8), wp(7)),
-    fontWeight: "800",
-    textAlign: "center",
-    flex: 1,
-    marginHorizontal: wp(2),
-    letterSpacing: 0.5,
-  },
   content: {
     flex: 1,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    overflow: 'hidden',
-  },
-  spacer: {
-    width: wp(18),
   },
   list: {
     flex: 1,
