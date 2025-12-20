@@ -4,7 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { colorsSheet } from "../(settings)/_ui_elements";
+import { theme } from "@/constants/theme";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
 export default function SelectDateScreen() {
@@ -37,7 +37,7 @@ export default function SelectDateScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={colorsSheet.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={theme.colors.textOnPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Pick a Date to Schedule a Session</Text>
         <View style={styles.spacer} />
@@ -60,7 +60,7 @@ export default function SelectDateScreen() {
                   year: "numeric"
                 }).replace(/ /g, "/")}
               </Text>
-              <Ionicons name="calendar" size={24} color={colorsSheet.primary} />
+              <Ionicons name="calendar" size={24} color={theme.colors.primary} />
             </TouchableOpacity>
           </View>
 
@@ -92,7 +92,7 @@ export default function SelectDateScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: theme.colors.primary,
   },
   header: {
     flexDirection: "row",
@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: hp(2.2),
     fontWeight: "bold",
-    color: colorsSheet.textOnPrimary,
+    color: theme.colors.textOnPrimary,
     flex: 1,
     textAlign: "center",
   },
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: colorsSheet.screenColor,
+    backgroundColor: theme.colors.screenColor,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     paddingTop: hp(4),
@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   card: {
-    backgroundColor: colorsSheet.primarySoft,
+    backgroundColor: theme.colors.primarySoft,
     borderRadius: 20,
     padding: wp(6),
     width: "100%",
@@ -134,7 +134,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: hp(2),
     fontWeight: "600",
-    color: colorsSheet.textPrimary,
+    color: theme.colors.textPrimary,
     marginBottom: hp(2),
   },
   dateInputContainer: {
@@ -142,27 +142,27 @@ const styles = StyleSheet.create({
   },
   dateLabel: {
     fontSize: hp(1.6),
-    color: colorsSheet.textSecondary,
+    color: theme.colors.textSecondary,
     marginBottom: hp(1),
   },
   dateInput: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: colorsSheet.white,
+    backgroundColor: theme.colors.white,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: colorsSheet.primary,
+    borderColor: theme.colors.primary,
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.8),
   },
   dateText: {
     fontSize: hp(2),
-    color: colorsSheet.textPrimary,
+    color: theme.colors.textPrimary,
     fontWeight: "500",
   },
   datePicker: {
-    backgroundColor: colorsSheet.white,
+    backgroundColor: theme.colors.white,
     borderRadius: 12,
     marginBottom: hp(2),
   },
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     fontSize: hp(1.8),
-    color: colorsSheet.primary,
+    color: theme.colors.primary,
     fontWeight: "600",
   },
   okButton: {
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
   },
   okButtonText: {
     fontSize: hp(1.8),
-    color: colorsSheet.primary,
+    color: theme.colors.primary,
     fontWeight: "600",
   },
 });

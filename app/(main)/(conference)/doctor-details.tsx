@@ -4,7 +4,7 @@ import React from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { colorsSheet } from "../(settings)/_ui_elements";
+import { theme } from "@/constants/theme";
 import { getDoctorById } from "./_doctorsData";
 
 export default function DoctorDetailsScreen() {
@@ -31,7 +31,7 @@ export default function DoctorDetailsScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={colorsSheet.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color={theme.colors.textOnPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Doctor Details</Text>
         <View style={styles.spacer} />
@@ -41,7 +41,7 @@ export default function DoctorDetailsScreen() {
         {/* Doctor Profile Card */}
         <View style={styles.profileCard}>
           <View style={styles.avatarLarge}>
-            <Ionicons name="person" size={80} color={colorsSheet.primary} />
+            <Ionicons name="person" size={80} color={theme.colors.primary} />
           </View>
           <Text style={styles.doctorName}>{doctor.name}</Text>
           <View style={styles.specialtyContainer}>
@@ -69,7 +69,7 @@ export default function DoctorDetailsScreen() {
           
           <View style={styles.detailRow}>
             <View style={styles.detailIconContainer}>
-              <Ionicons name="briefcase" size={22} color={colorsSheet.primary} />
+              <Ionicons name="briefcase" size={22} color={theme.colors.primary} />
             </View>
             <View style={styles.detailTextContainer}>
               <Text style={styles.detailLabel}>Experience</Text>
@@ -79,7 +79,7 @@ export default function DoctorDetailsScreen() {
 
           <View style={styles.detailRow}>
             <View style={styles.detailIconContainer}>
-              <Ionicons name="star" size={22} color={colorsSheet.warning} />
+              <Ionicons name="star" size={22} color={theme.colors.warning} />
             </View>
             <View style={styles.detailTextContainer}>
               <Text style={styles.detailLabel}>Rating</Text>
@@ -89,7 +89,7 @@ export default function DoctorDetailsScreen() {
 
           <View style={styles.detailRow}>
             <View style={styles.detailIconContainer}>
-              <Ionicons name="cash" size={22} color={colorsSheet.success} />
+              <Ionicons name="cash" size={22} color={theme.colors.success} />
             </View>
             <View style={styles.detailTextContainer}>
               <Text style={styles.detailLabel}>Consultation Fee</Text>
@@ -99,7 +99,7 @@ export default function DoctorDetailsScreen() {
 
           <View style={styles.detailRow}>
             <View style={styles.detailIconContainer}>
-              <Ionicons name="mail" size={22} color={colorsSheet.info} />
+              <Ionicons name="mail" size={22} color={theme.colors.info} />
             </View>
             <View style={styles.detailTextContainer}>
               <Text style={styles.detailLabel}>Email</Text>
@@ -114,7 +114,7 @@ export default function DoctorDetailsScreen() {
           onPress={handleBookAppointment}
         >
           <Text style={styles.bookButtonText}>Continue to Book Appointment</Text>
-          <Ionicons name="arrow-forward" size={20} color={colorsSheet.white} />
+          <Ionicons name="arrow-forward" size={20} color={theme.colors.white} />
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -124,7 +124,7 @@ export default function DoctorDetailsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: theme.colors.primary,
   },
   header: {
     flexDirection: "row",
@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: hp(2.2),
     fontWeight: "bold",
-    color: colorsSheet.textOnPrimary,
+    color: theme.colors.textOnPrimary,
     flex: 1,
     textAlign: "center",
   },
@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: colorsSheet.screenColor,
+    backgroundColor: theme.colors.screenColor,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     paddingTop: hp(3),
@@ -156,11 +156,11 @@ const styles = StyleSheet.create({
   },
   profileCard: {
     alignItems: "center",
-    backgroundColor: colorsSheet.white,
+    backgroundColor: theme.colors.white,
     borderRadius: 20,
     padding: wp(6),
     marginBottom: hp(2),
-    shadowColor: colorsSheet.primary,
+    shadowColor: theme.colors.primary,
     shadowOffset: {
       width: 0,
       height: 3,
@@ -173,17 +173,17 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: colorsSheet.primarySoft,
+    backgroundColor: theme.colors.primarySoft,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: hp(2),
     borderWidth: 3,
-    borderColor: colorsSheet.primary,
+    borderColor: theme.colors.primary,
   },
   doctorName: {
     fontSize: hp(2.5),
     fontWeight: "bold",
-    color: colorsSheet.textPrimary,
+    color: theme.colors.textPrimary,
     marginBottom: hp(1),
   },
   specialtyContainer: {
@@ -192,13 +192,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   specialtyBadge: {
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: theme.colors.primary,
     paddingHorizontal: wp(4),
     paddingVertical: hp(0.8),
     borderRadius: 20,
   },
   specialtyText: {
-    color: colorsSheet.white,
+    color: theme.colors.white,
     fontSize: hp(1.6),
     fontWeight: "600",
   },
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: hp(2),
     fontWeight: "600",
-    color: colorsSheet.textPrimary,
+    color: theme.colors.textPrimary,
     marginBottom: hp(1.5),
   },
   tagsContainer: {
@@ -217,24 +217,24 @@ const styles = StyleSheet.create({
     gap: wp(2),
   },
   tag: {
-    backgroundColor: colorsSheet.success,
+    backgroundColor: theme.colors.success,
     paddingHorizontal: wp(3),
     paddingVertical: hp(1),
     borderRadius: 15,
   },
   tagText: {
-    color: colorsSheet.white,
+    color: theme.colors.white,
     fontSize: hp(1.5),
     fontWeight: "500",
   },
   detailRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colorsSheet.white,
+    backgroundColor: theme.colors.white,
     borderRadius: 12,
     padding: wp(4),
     marginBottom: hp(1),
-    shadowColor: colorsSheet.primary,
+    shadowColor: theme.colors.primary,
     shadowOffset: {
       width: 0,
       height: 1,
@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colorsSheet.primarySoft,
+    backgroundColor: theme.colors.primarySoft,
     alignItems: "center",
     justifyContent: "center",
     marginRight: wp(3),
@@ -257,24 +257,24 @@ const styles = StyleSheet.create({
   },
   detailLabel: {
     fontSize: hp(1.5),
-    color: colorsSheet.textSecondary,
+    color: theme.colors.textSecondary,
     marginBottom: hp(0.3),
   },
   detailValue: {
     fontSize: hp(1.8),
     fontWeight: "600",
-    color: colorsSheet.textPrimary,
+    color: theme.colors.textPrimary,
   },
   bookButton: {
     flexDirection: "row",
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: theme.colors.primary,
     paddingVertical: hp(2),
     paddingHorizontal: wp(6),
     borderRadius: 25,
     alignItems: "center",
     justifyContent: "center",
     marginVertical: hp(3),
-    shadowColor: colorsSheet.primary,
+    shadowColor: theme.colors.primary,
     shadowOffset: {
       width: 0,
       height: 3,
@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   bookButtonText: {
-    color: colorsSheet.white,
+    color: theme.colors.white,
     fontSize: hp(2),
     fontWeight: "600",
     marginRight: wp(2),

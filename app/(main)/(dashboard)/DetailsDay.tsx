@@ -16,7 +16,6 @@ import Animated, { Easing, runOnJS, useAnimatedProps, useSharedValue, withTiming
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
-import { colorsSheet } from "../(settings)/_ui_elements";
 import { Day as typeDay } from "./types";
 interface ProgressCircleProps {
   achievedCalories: number;
@@ -3238,6 +3237,7 @@ const getStyles = (colors: any) => StyleSheet.create({
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 
 const ProgressCircle = (CircleProps: ProgressCircleProps) =>{
+    const { colors } = useTheme();
     const outerRadius = 55;
     const innerRadius = 40;
     const outerCircumference = 2 * Math.PI * outerRadius;
@@ -3282,7 +3282,7 @@ const ProgressCircle = (CircleProps: ProgressCircleProps) =>{
                 stroke="#E5E7EB"  strokeWidth="10"  fill="transparent"/>
         {/* Calories progress */}
         <AnimatedCircle  cx="60" cy="60" r={outerRadius}
-            stroke={colorsSheet.progressBarColor}  strokeWidth="10"  fill="transparent"
+            stroke={colors.primary}  strokeWidth="10"  fill="transparent"
             strokeDasharray={outerCircumference} //total
             animatedProps={animatedCalProps}
             strokeLinecap="round"transform= "rotate(-90 60 60)" />

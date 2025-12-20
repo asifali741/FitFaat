@@ -1,3 +1,4 @@
+import { theme } from '@/constants/theme';
 import { authApi } from '@/utils/auth/authApi';
 import { tokenStorage } from '@/utils/auth/tokenStorage';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,7 +7,6 @@ import { usePathname, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from 'react';
 import { Image, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { io, Socket } from 'socket.io-client';
-import { colorsSheet } from '../app/(main)/(settings)/_ui_elements';
 
 type TabType = 'dashboard' | 'chatbot' | 'conference' | 'doctor-portal' | 'profile';
 
@@ -219,7 +219,7 @@ export function BottomTabBar() {
           <Ionicons 
             name={activeTab === 'dashboard' ? "home" : "home-outline"} 
             size={24} 
-            color={activeTab === 'dashboard' ? colorsSheet.primary : colorsSheet.darkGray}
+            color={activeTab === 'dashboard' ? theme.colors.primary : theme.colors.textSecondary}
           />
         </View>
       </TouchableOpacity>
@@ -234,7 +234,7 @@ export function BottomTabBar() {
           <Ionicons 
             name="sparkles-outline"
             size={26} 
-            color={colorsSheet.darkGray}
+            color={theme.colors.textSecondary}
           />
         </View>
       </TouchableOpacity>
@@ -255,7 +255,7 @@ export function BottomTabBar() {
           <Ionicons 
             name={activeTab === 'conference' || (activeTab === 'doctor-portal' && !isOnChatTab()) ? "calendar" : "calendar-outline"}
             size={24} 
-            color={activeTab === 'conference' || (activeTab === 'doctor-portal' && !isOnChatTab()) ? colorsSheet.primary : colorsSheet.darkGray}
+            color={activeTab === 'conference' || (activeTab === 'doctor-portal' && !isOnChatTab()) ? theme.colors.primary : theme.colors.textSecondary}
           />
         </View>
       </TouchableOpacity>
@@ -276,7 +276,7 @@ export function BottomTabBar() {
           <Ionicons 
             name={isOnChatTab() ? "chatbubbles" : "chatbubbles-outline"}
             size={24} 
-            color={isOnChatTab() ? colorsSheet.primary : colorsSheet.darkGray}
+            color={isOnChatTab() ? theme.colors.primary : theme.colors.textSecondary}
           />
           {unreadCount > 0 && (
             <View style={styles.badge}>
@@ -304,7 +304,7 @@ export function BottomTabBar() {
             <Ionicons 
               name={activeTab === 'profile' ? "person" : "person-outline"} 
               size={24} 
-              color={activeTab === 'profile' ? colorsSheet.primary : colorsSheet.darkGray}
+              color={activeTab === 'profile' ? theme.colors.primary : theme.colors.textSecondary}
             />
           )}
         </View>
@@ -316,14 +316,14 @@ export function BottomTabBar() {
 const styles = StyleSheet.create({
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: colorsSheet.white,
+    backgroundColor: theme.colors.surface,
     borderTopWidth: 1,
-    borderTopColor: colorsSheet.lightGray,
+    borderTopColor: theme.colors.border,
     height: Platform.OS === 'ios' ? 85 : 70,
     paddingBottom: Platform.OS === 'ios' ? 25 : 10,
     paddingTop: 10,
     elevation: 8,
-    shadowColor: colorsSheet.black,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
   },
   activeProfileImage: {
     borderWidth: 3,
-    borderColor: colorsSheet.primary,
+    borderColor: theme.colors.primary,
   },
   badge: {
     position: 'absolute',
@@ -366,10 +366,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: colorsSheet.white,
+    borderColor: '#FFF',
   },
   badgeText: {
-    color: colorsSheet.white,
+    color: '#FFF',
     fontSize: 12,
     fontWeight: 'bold',
     textAlign: 'center',
