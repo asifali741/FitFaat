@@ -1,5 +1,5 @@
-import Login from '../../components/authentication/Login';
+import LoginThemed from '../../components/authentication/LoginThemed';
 
 export default function EmailLoginScreen() {
-  return <Login />;
+  return <LoginThemed />;
 }

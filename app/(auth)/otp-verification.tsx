@@ -1,3 +1,3 @@
-import OTPVerification from '@/components/authentication/OTPVerification';
+import OTPVerificationThemed from '@/components/authentication/OTPVerificationThemed';
 
-export default OTPVerification;
+export default OTPVerificationThemed;
