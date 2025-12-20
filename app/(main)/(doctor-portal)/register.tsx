@@ -1,25 +1,25 @@
 import { dataScreenStyles } from "@/components/dataScreenStyles";
+import { theme } from "@/constants/theme";
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts } from "expo-font";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import { ActivityIndicator, Alert, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp } from "react-native-responsive-screen";
-import { colorsSheet } from "../(settings)/_ui_elements";
 
 const specializations = [
-  { id: 1, name: "Cardiologist", icon: "heart", color: colorsSheet.error },
-  { id: 2, name: "Dermatologist", icon: "person", color: colorsSheet.warning },
-  { id: 3, name: "Neurologist", icon: "medical", color: colorsSheet.info },
-  { id: 4, name: "Pediatrician", icon: "happy", color: colorsSheet.primaryLight },
-  { id: 5, name: "Orthopedic", icon: "body", color: colorsSheet.primary },
-  { id: 6, name: "Gynecologist", icon: "female", color: colorsSheet.secondary },
+  { id: 1, name: "Cardiologist", icon: "heart", color: theme.colors.error },
+  { id: 2, name: "Dermatologist", icon: "person", color: theme.colors.warning },
+  { id: 3, name: "Neurologist", icon: "medical", color: theme.colors.info },
+  { id: 4, name: "Pediatrician", icon: "happy", color: theme.colors.primary + '40' },
+  { id: 5, name: "Orthopedic", icon: "body", color: theme.colors.primary },
+  { id: 6, name: "Gynecologist", icon: "female", color: theme.colors.secondary },
 ];
 
 const consultationModes = [
-  { id: 1, name: "In-person", icon: "location", color: colorsSheet.success },
-  { id: 2, name: "Online", icon: "videocam", color: colorsSheet.info },
-  { id: 3, name: "Both", icon: "options", color: colorsSheet.primary },
+  { id: 1, name: "In-person", icon: "location", color: theme.colors.success },
+  { id: 2, name: "Online", icon: "videocam", color: theme.colors.info },
+  { id: 3, name: "Both", icon: "options", color: theme.colors.primary },
 ];
 
 // Dropdown options
@@ -502,7 +502,7 @@ export default function DoctorRegistration() {
         <TouchableOpacity
           style={[
             dataScreenStyles.generateButton,
-            { backgroundColor: colorsSheet.buttonPrimary },
+            { backgroundColor: theme.colors.primary },
             isLoading && { opacity: 0.7 }
           ]}
           onPress={handleSubmit}
