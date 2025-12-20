@@ -1,3 +1,4 @@
+import { theme } from '@/constants/theme';
 import { tokenStorage } from '@/utils/auth/tokenStorage';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
@@ -481,7 +482,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
       
       const status = item.status || 'sent';
       const isRead = status === 'read';
-      const iconColor = isRead ? '#4FC3F7' : '#B0BEC5'; // Blue when read, gray otherwise
+      const iconColor = isRead ? theme.colors.info : theme.colors.textTertiary;
       
       if (status === 'sent') {
         // Single tick - sent but not delivered
@@ -515,7 +516,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
             <Ionicons 
               name={userRole === 'doctor' ? 'person' : 'medical'} 
               size={24} 
-              color="#6C63FF" 
+              color={theme.colors.primary} 
             />
           </View>
         )}
@@ -555,7 +556,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color={theme.colors.primary} />
           <Text style={styles.loadingText}>Loading chat...</Text>
         </View>
       </SafeAreaView>
@@ -566,7 +567,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.closedContainer}>
-          <Ionicons name="chatbubbles-outline" size={64} color="#999" />
+          <Ionicons name="chatbubbles-outline" size={64} color={theme.colors.textTertiary} />
           <Text style={styles.closedTitle}>Chat Unavailable</Text>
           <Text style={styles.closedReason}>{closedReason}</Text>
           <TouchableOpacity 
@@ -585,7 +586,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
       {/* Custom Header with Profile and Timer */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#FFF" />
+          <Ionicons name="arrow-back" size={24} color={theme.colors.surface} />
         </TouchableOpacity>
         
         <View style={styles.headerCenter}>
@@ -593,7 +594,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
             <Ionicons 
               name={userRole === 'doctor' ? 'person' : 'medical'} 
               size={38} 
-              color="#6C63FF" 
+              color={theme.colors.primary} 
             />
           </View>
           <View style={styles.headerInfo}>
@@ -601,14 +602,14 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
               {otherUserName || (userRole === 'doctor' ? 'Patient' : 'Doctor')}
             </Text>
             <View style={styles.timerContainer}>
-              <Ionicons name="time-outline" size={14} color="#FFF" />
+              <Ionicons name="time-outline" size={14} color={theme.colors.surface} />
               <Text style={styles.timerText}>{timeRemaining || 'Loading...'}</Text>
             </View>
           </View>
         </View>
         
         <TouchableOpacity style={styles.infoButton}>
-          <Ionicons name="information-circle-outline" size={26} color="#FFF" />
+          <Ionicons name="information-circle-outline" size={26} color={theme.colors.surface} />
         </TouchableOpacity>
       </View>
 
@@ -631,10 +632,10 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
             activeOpacity={0.8}
           >
             {isGrantingAccess ? (
-              <ActivityIndicator size="small" color="#FFF" />
+              <ActivityIndicator size="small" color={theme.colors.surface} />
             ) : (
               <>
-                <Ionicons name="key" size={18} color="#FFF" />
+                <Ionicons name="key" size={18} color={theme.colors.surface} />
                 <Text style={styles.grantAccessButtonText}>Grant Access</Text>
               </>
             )}
@@ -673,7 +674,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
             value={inputText}
             onChangeText={handleTextChange}
             placeholder={canSend ? "Type a message..." : (accessMessage || "Waiting for chat access...")}
-            placeholderTextColor="#999"
+            placeholderTextColor={theme.colors.textTertiary}
             multiline
             maxLength={1000}
             editable={!chatClosed && canSend}
@@ -688,9 +689,9 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
             activeOpacity={0.8}
           >
             {sending ? (
-              <ActivityIndicator size="small" color="#FFF" />
+              <ActivityIndicator size="small" color={theme.colors.surface} />
             ) : (
-              <Ionicons name="send" size={24} color="#FFF" />
+              <Ionicons name="send" size={24} color={theme.colors.surface} />
             )}
           </TouchableOpacity>
         </View>
@@ -702,23 +703,19 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F7FA' // Clean professional background
+    backgroundColor: theme.colors.background
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: theme.spacing.lg,
     paddingVertical: 14,
-    backgroundColor: '#6C63FF', // Modern purple gradient
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 5,
-    elevation: 8
+    backgroundColor: theme.colors.primary,
+    ...theme.shadows.large
   },
   backButton: {
-    padding: 8,
-    marginRight: 8
+    padding: theme.spacing.sm,
+    marginRight: theme.spacing.sm
   },
   headerCenter: {
     flex: 1,
@@ -727,22 +724,18 @@ const styles = StyleSheet.create({
   },
   profileImageContainer: {
     marginRight: 14,
-    backgroundColor: '#FFF',
+    backgroundColor: theme.colors.surface,
     borderRadius: 25,
     padding: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 4
+    ...theme.shadows.small
   },
   headerInfo: {
     flex: 1
   },
   headerName: {
     fontSize: 19,
-    fontWeight: '700',
-    color: '#FFF',
+    fontWeight: theme.typography.fontWeight.bold as any,
+    color: theme.colors.surface,
     marginBottom: 4
   },
   timerContainer: {
@@ -751,24 +744,24 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 16,
+    borderRadius: theme.borderRadius.large,
     alignSelf: 'flex-start'
   },
   timerText: {
-    fontSize: 12,
-    color: '#FFF',
-    fontWeight: '700',
+    fontSize: theme.typography.fontSize.xs,
+    color: theme.colors.surface,
+    fontWeight: theme.typography.fontWeight.bold as any,
     marginLeft: 5
   },
   infoButton: {
-    padding: 8
+    padding: theme.spacing.sm
   },
   messagesList: {
-    padding: 16,
-    paddingBottom: 8
+    padding: theme.spacing.lg,
+    paddingBottom: theme.spacing.sm
   },
   messageContainer: {
-    marginBottom: 16,
+    marginBottom: theme.spacing.lg,
     maxWidth: '78%',
     flexDirection: 'row'
   },
@@ -783,7 +776,7 @@ const styles = StyleSheet.create({
   otherUserAvatar: {
     marginRight: 10,
     marginTop: 4,
-    backgroundColor: '#E8EAED',
+    backgroundColor: theme.colors.border,
     borderRadius: 20,
     width: 40,
     height: 40,
@@ -791,43 +784,39 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   senderName: {
-    fontSize: 13,
-    color: '#6C63FF',
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.primary,
     marginBottom: 6,
-    marginLeft: 8,
-    fontWeight: '700'
+    marginLeft: theme.spacing.sm,
+    fontWeight: theme.typography.fontWeight.bold as any
   },
   messageBubble: {
-    borderRadius: 20,
-    paddingHorizontal: 16,
+    borderRadius: theme.borderRadius.xl,
+    paddingHorizontal: theme.spacing.lg,
     paddingVertical: 11,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
+    ...theme.shadows.small,
     minWidth: 80
   },
   ownBubble: {
-    backgroundColor: '#6C63FF', // Modern purple
+    backgroundColor: theme.colors.primary,
     borderBottomRightRadius: 4
   },
   otherBubble: {
-    backgroundColor: '#FFF',
+    backgroundColor: theme.colors.surface,
     borderBottomLeftRadius: 4,
     borderWidth: 1,
-    borderColor: '#E8EAED'
+    borderColor: theme.colors.border
   },
   messageText: {
-    fontSize: 15,
+    fontSize: theme.typography.fontSize.base,
     lineHeight: 22,
     marginBottom: 4
   },
   ownMessageText: {
-    color: '#FFF'
+    color: theme.colors.surface
   },
   otherMessageText: {
-    color: '#1F2937'
+    color: theme.colors.textPrimary
   },
   messageFooter: {
     flexDirection: 'row',
@@ -838,13 +827,13 @@ const styles = StyleSheet.create({
   messageTime: {
     fontSize: 11,
     marginRight: 4,
-    fontWeight: '500'
+    fontWeight: theme.typography.fontWeight.medium as any
   },
   ownMessageTime: {
     color: 'rgba(255, 255, 255, 0.8)'
   },
   otherMessageTime: {
-    color: '#9CA3AF'
+    color: theme.colors.textTertiary
   },
   statusIcon: {
     marginLeft: 2
@@ -868,77 +857,69 @@ const styles = StyleSheet.create({
     top: 0
   },
   typingContainer: {
-    padding: 12,
-    paddingLeft: 20,
+    padding: theme.spacing.md,
+    paddingLeft: theme.spacing.xl,
     backgroundColor: 'transparent'
   },
   typingText: {
-    fontSize: 13,
-    color: '#6C63FF',
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.primary,
     fontStyle: 'italic',
-    fontWeight: '600'
+    fontWeight: theme.typography.fontWeight.semiBold as any
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     padding: 14,
-    paddingHorizontal: 16,
-    backgroundColor: '#FFF',
+    paddingHorizontal: theme.spacing.lg,
+    backgroundColor: theme.colors.surface,
     borderTopWidth: 1,
-    borderTopColor: '#E8EAED',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 8
+    borderTopColor: theme.colors.border,
+    ...theme.shadows.medium
   },
   input: {
     flex: 1,
     minHeight: 44,
     maxHeight: 100,
-    backgroundColor: '#F5F7FA',
+    backgroundColor: theme.colors.background,
     borderRadius: 24,
     paddingHorizontal: 18,
     paddingVertical: 11,
-    fontSize: 15,
-    marginRight: 12,
+    fontSize: theme.typography.fontSize.base,
+    marginRight: theme.spacing.md,
     borderWidth: 1.5,
-    borderColor: '#E8EAED',
-    color: '#1F2937'
+    borderColor: theme.colors.border,
+    color: theme.colors.textPrimary
   },
   sendButton: {
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: '#6C63FF',
+    backgroundColor: theme.colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#6C63FF',
+    shadowColor: theme.colors.accent,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
     shadowRadius: 5,
     elevation: 5
   },
   sendButtonDisabled: {
-    backgroundColor: '#D1D5DB',
+    backgroundColor: theme.colors.disabled,
     shadowOpacity: 0.1
   },
   grantAccessBanner: {
     backgroundColor: '#FFF9E6',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: '#FFE0B2',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2
+    ...theme.shadows.small
   },
   grantAccessContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12
+    marginBottom: theme.spacing.md
   },
   grantAccessIcon: {
     width: 40,
@@ -947,40 +928,40 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFE0B2',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12
+    marginRight: theme.spacing.md
   },
   grantAccessTextContainer: {
     flex: 1
   },
   grantAccessTitle: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: theme.typography.fontSize.base,
+    fontWeight: theme.typography.fontWeight.semiBold as any,
     color: '#E65100',
     marginBottom: 2
   },
   grantAccessSubtitle: {
-    fontSize: 13,
+    fontSize: theme.typography.fontSize.sm,
     color: '#F57C00'
   },
   grantAccessButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#4CAF50',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    backgroundColor: theme.colors.secondary,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.xl,
     borderRadius: 24,
-    gap: 8,
-    shadowColor: '#4CAF50',
+    gap: theme.spacing.sm,
+    shadowColor: theme.colors.secondary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 3
   },
   grantAccessButtonText: {
-    color: '#FFF',
-    fontSize: 15,
-    fontWeight: '600',
+    color: theme.colors.surface,
+    fontSize: theme.typography.fontSize.base,
+    fontWeight: theme.typography.fontWeight.semiBold as any,
     letterSpacing: 0.5
   },
   loadingContainer: {
@@ -989,38 +970,38 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#666'
+    marginTop: theme.spacing.md,
+    fontSize: theme.typography.fontSize.base,
+    color: theme.colors.textSecondary
   },
   closedContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32
+    padding: theme.spacing.xxxl
   },
   closedTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#333',
-    marginTop: 16
+    fontSize: theme.typography.fontSize.xl,
+    fontWeight: theme.typography.fontWeight.semiBold as any,
+    color: theme.colors.textPrimary,
+    marginTop: theme.spacing.lg
   },
   closedReason: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.textSecondary,
     textAlign: 'center',
-    marginTop: 8
+    marginTop: theme.spacing.sm
   },
   goBackButton: {
-    marginTop: 24,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    backgroundColor: '#007AFF',
-    borderRadius: 8
+    marginTop: theme.spacing.xl,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.xl,
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.borderRadius.medium
   },
   backButtonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '600'
+    color: theme.colors.surface,
+    fontSize: theme.typography.fontSize.base,
+    fontWeight: theme.typography.fontWeight.semiBold as any
   }
 });

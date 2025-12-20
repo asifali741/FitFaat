@@ -3,8 +3,8 @@
  * OTP Verification screen using themed components
  */
 
-import { theme } from '@/constants/theme';
 import { KeyboardAwareContainer, ThemedButton } from '@/components/themed';
+import { theme } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
@@ -155,7 +155,7 @@ export default function OTPVerificationThemed() {
           {otp.map((digit, index) => (
             <TextInput
               key={index}
-              ref={(ref) => (inputRefs.current[index] = ref)}
+              ref={(el) => { inputRefs.current[index] = el; }}
               style={[
                 styles.otpInput,
                 digit && styles.otpInputFilled
