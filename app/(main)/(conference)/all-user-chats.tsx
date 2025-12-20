@@ -1,4 +1,5 @@
 import AppHeader from '@/components/AppHeader';
+import { theme } from '@/constants/theme';
 import { authApi } from '@/utils/auth/authApi';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
@@ -8,18 +9,19 @@ import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
-    FlatList, Platform, StyleSheet,
+    FlatList, Platform, RefreshControl, StyleSheet,
     Text,
     TouchableOpacity,
     View
 } from 'react-native';
-import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
+import { widthPercentageToDP as wp } from 'react-native-responsive-screen';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function AllUserChatsScreen() {
   const router = useRouter();
   const [appointments, setAppointments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState<{ [key: string]: number }>({});
 
   useEffect(() => {
@@ -125,6 +127,13 @@ export default function AllUserChatsScreen() {
     );
   };
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchAppointments();
+    await fetchUnreadMessages();
+    setRefreshing(false);
+  };
+
   const openChat = (appointmentId: string) => {
     router.push({
       pathname: '/(main)/(conference)/appointment-chat',
@@ -201,7 +210,7 @@ export default function AllUserChatsScreen() {
       <SafeAreaView style={styles.container}>
         <AppHeader title="My Chats" showBackButton />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color={theme.colors.primary} />
           <Text style={styles.loadingText}>Loading chats...</Text>
         </View>
       </SafeAreaView>
@@ -214,7 +223,7 @@ export default function AllUserChatsScreen() {
       
       {appointments.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="chatbubbles-outline" size={80} color="#CCC" />
+          <Ionicons name="chatbubbles-outline" size={80} color={theme.colors.border} />
           <Text style={styles.emptyTitle}>No Chats Available</Text>
           <Text style={styles.emptySubtitle}>
             Your confirmed appointments will appear here
@@ -227,6 +236,14 @@ export default function AllUserChatsScreen() {
           keyExtractor={(item) => item._id}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={onRefresh}
+              tintColor={theme.colors.primary}
+              colors={[theme.colors.primary]}
+            />
+          }
         />
       )}
     </SafeAreaView>
@@ -236,7 +253,7 @@ export default function AllUserChatsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#E8EAF6'
+    backgroundColor: theme.colors.background
   },
   loadingContainer: {
     flex: 1,
@@ -244,52 +261,48 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#666'
+    marginTop: theme.spacing.md,
+    fontSize: theme.typography.fontSize.base,
+    color: theme.colors.textSecondary
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20
+    padding: theme.spacing.xl
   },
   emptyTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 16
+    fontSize: theme.typography.fontSize.xl,
+    fontWeight: theme.typography.fontWeight.bold as any,
+    color: theme.colors.textPrimary,
+    marginTop: theme.spacing.lg
   },
   emptySubtitle: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: theme.typography.fontSize.base,
+    color: theme.colors.textSecondary,
     textAlign: 'center',
-    marginTop: 8
+    marginTop: theme.spacing.sm
   },
   listContainer: {
-    padding: wp(4)
+    padding: theme.spacing.lg
   },
   appointmentCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 16,
-    marginBottom: hp(2),
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 5,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.large,
+    marginBottom: theme.spacing.lg,
+    ...theme.shadows.medium,
     borderLeftWidth: 4,
-    borderLeftColor: '#4CAF50'
+    borderLeftColor: theme.colors.statusConfirmed
   },
   unreadCard: {
-    backgroundColor: '#F8F9FF',
-    borderLeftColor: '#FF6B6B',
+    backgroundColor: theme.colors.chatDoctor,
+    borderLeftColor: theme.colors.error,
   },
   cardContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    padding: wp(4),
+    padding: theme.spacing.lg,
   },
   chatTouchable: {
     flex: 1,
@@ -297,11 +310,11 @@ const styles = StyleSheet.create({
   appointmentHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: hp(1.5),
+    marginBottom: theme.spacing.md,
   },
   deleteButtonTop: {
-    padding: wp(2),
-    marginLeft: wp(1),
+    padding: theme.spacing.sm,
+    marginLeft: theme.spacing.xs,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -314,19 +327,19 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -8,
     right: -8,
-    backgroundColor: '#FF6B6B',
+    backgroundColor: theme.colors.error,
     borderRadius: 12,
     minWidth: 24,
     height: 24,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#FFF',
+    borderColor: theme.colors.surface,
   },
   unreadBadgeText: {
-    color: '#FFF',
+    color: theme.colors.surface,
     fontSize: 11,
-    fontWeight: 'bold',
+    fontWeight: theme.typography.fontWeight.bold as any,
     paddingHorizontal: 4,
   },
   doctorInfo: {
@@ -335,26 +348,26 @@ const styles = StyleSheet.create({
     flex: 1
   },
   doctorDetails: {
-    marginLeft: wp(3),
+    marginLeft: theme.spacing.md,
     flex: 1
   },
   doctorName: {
     fontSize: wp(4.5),
-    fontWeight: '600',
-    color: '#333'
+    fontWeight: theme.typography.fontWeight.semiBold as any,
+    color: theme.colors.textPrimary
   },
   appointmentDate: {
     fontSize: wp(3.5),
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginTop: 2
   },
   appointmentFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: hp(1.5),
+    paddingTop: theme.spacing.md,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0'
+    borderTopColor: theme.colors.border
   },
   statusContainer: {
     flexDirection: 'row',
@@ -368,11 +381,11 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: wp(3.5),
-    color: '#666'
+    color: theme.colors.textSecondary
   },
   accessGrantedText: {
     fontSize: wp(3),
-    color: '#4CAF50',
-    fontWeight: '500'
+    color: theme.colors.statusConfirmed,
+    fontWeight: theme.typography.fontWeight.medium as any
   },
 });

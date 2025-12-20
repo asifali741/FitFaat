@@ -3,8 +3,8 @@
  * Signup screen using themed components
  */
 
-import { theme } from '@/constants/theme';
 import { KeyboardAwareContainer, ThemedButton, ThemedInput } from '@/components/themed';
+import { theme } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
