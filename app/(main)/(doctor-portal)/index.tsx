@@ -1,13 +1,13 @@
 import AppHeader from "@/components/AppHeader";
+import { theme } from "@/constants/theme";
 import { useDoctorRegistration } from "@/hooks/useDoctorRegistration";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
-import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { theme } from "@/constants/theme";
 
 export default function DoctorPortal() {
   const router = useRouter();
@@ -66,7 +66,11 @@ export default function DoctorPortal() {
       />
 
       {/* Main Content */}
-      <View style={styles.content}>
+      <ScrollView 
+        style={styles.content}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.welcomeSection}>
           <Image 
             source={require("../../../assets/images/logo.png")} 
@@ -126,7 +130,7 @@ export default function DoctorPortal() {
             <Ionicons 
               name="people" 
               size={30} 
-              color={doctorStatus === 'approved' ? theme.colors.primaryLight : theme.colors.textSecondary} 
+              color={doctorStatus === 'approved' ? theme.colors.primary : theme.colors.textSecondary} 
             />
             <Text style={[styles.featureText, doctorStatus !== 'approved' && styles.featureTextDisabled]}>
               Appointments Management
@@ -168,7 +172,7 @@ export default function DoctorPortal() {
             disabled={isLoadingStatus}
           >
             <LinearGradient
-              colors={['#26867C', '#4CAF50', '#66BB6A']}
+              colors={[theme.colors.primary, theme.colors.secondary, theme.colors.accent]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.gradientButton}
@@ -179,7 +183,7 @@ export default function DoctorPortal() {
             </LinearGradient>
           </TouchableOpacity>
         </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -212,8 +216,11 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
+  },
+  scrollContent: {
     paddingTop: hp(4),
     paddingHorizontal: wp(6),
+    paddingBottom: hp(12),
   },
   welcomeSection: {
     alignItems: "center",
@@ -247,13 +254,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: hp(2),
     paddingHorizontal: wp(4),
-    backgroundColor: theme.colors.primary + "20",
-    borderRadius: 15,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 16,
     marginBottom: hp(1.5),
+    borderWidth: 2,
+    borderColor: '#000000',
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
   },
   featureItemDisabled: {
-    opacity: 0.5,
-    backgroundColor: theme.colors.surface,
+    opacity: 0.6,
+    backgroundColor: theme.colors.offWhite,
+    borderColor: theme.colors.border,
   },
   featureText: {
     fontSize: hp(2),
@@ -281,8 +296,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   buttonContainer: {
-    flex: 1,
-    justifyContent: "center",
+    marginTop: hp(4),
+    marginBottom: hp(2),
   },
   gradientButtonContainer: {
     borderRadius: 30,
