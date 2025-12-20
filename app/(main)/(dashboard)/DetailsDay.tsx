@@ -481,7 +481,7 @@ export default function DetailsDay () {
 
                   <View style={styles.statCard}>
                     <View style={styles.statCardContent}>
-                      <Ionicons name="flame" size={Math.min(hp(2.2), wp(5.5))} color="#FF6B6B" />
+                      <Ionicons name="flame" size={Math.min(hp(2.2), wp(5.5))} color="#F97316" />
                       <Text style={styles.statLabel}>Calories</Text>
                     </View>
                     <Text style={styles.statValue}>{dayData.achievedCalories}</Text>
@@ -490,7 +490,7 @@ export default function DetailsDay () {
 
                   <View style={styles.statCard}>
                     <View style={styles.statCardContent}>
-                      <Ionicons name="water" size={Math.min(hp(2.2), wp(5.5))} color="#4ECDC4" />
+                      <Ionicons name="water" size={Math.min(hp(2.2), wp(5.5))} color="#2E86AB" />
                       <Text style={styles.statLabel}>Hydration</Text>
                     </View>
                     <Text style={styles.statValue}>{dayData.achieviedHydration}</Text>
@@ -499,7 +499,7 @@ export default function DetailsDay () {
 
                   <View style={styles.statCard}>
                     <View style={styles.statCardContent}>
-                      <Ionicons name="timer" size={Math.min(hp(2.2), wp(5.5))} color="#FFB347" />
+                      <Ionicons name="timer" size={Math.min(hp(2.2), wp(5.5))} color="#FFA500" />
                       <Text style={styles.statLabel}>Timer</Text>
                     </View>
                     <Text style={styles.statValueLarge}>{timer}</Text>
@@ -510,7 +510,7 @@ export default function DetailsDay () {
                 <View style={styles.progressSection}>
                   <View style={styles.progressItem}>
                     <View style={styles.progressHeader}>
-                      <Ionicons name="flame-outline" size={16} color="#FF6B6B" />
+                      <Ionicons name="flame-outline" size={16} color="#F97316" />
                       <Text style={styles.progressLabel}>Calories Progress</Text>
                     </View>
                     <View style={styles.progressBarContainer}>
@@ -520,7 +520,7 @@ export default function DetailsDay () {
                           styles.progressBar, 
                           { 
                             width: `${Math.min((dayData.achievedCalories / dayData.targetCalories) * 100, 100)}%`,
-                            backgroundColor: '#FF6B6B'
+                            backgroundColor: '#F97316'
                           }
                         ]} 
                       />
@@ -532,7 +532,7 @@ export default function DetailsDay () {
                   
                   <View style={styles.progressItem}>
                     <View style={styles.progressHeader}>
-                      <Ionicons name="water-outline" size={16} color="#4ECDC4" />
+                      <Ionicons name="water-outline" size={16} color="#2E86AB" />
                       <Text style={styles.progressLabel}>Hydration Progress</Text>
                     </View>
                     <View style={styles.progressBarContainer}>
@@ -542,7 +542,7 @@ export default function DetailsDay () {
                           styles.progressBar, 
                           { 
                             width: `${Math.min((dayData.achieviedHydration / dayData.targetHydration) * 100, 100)}%`,
-                            backgroundColor: '#4ECDC4'
+                            backgroundColor: '#2E86AB'
                           }
                         ]} 
                       />
@@ -586,7 +586,7 @@ export default function DetailsDay () {
 
                   <View style={styles.statCard}>
                     <View style={styles.statCardContent}>
-                      <Ionicons name="flame" size={Math.min(hp(2.2), wp(5.5))} color="#FF6B6B" />
+                      <Ionicons name="flame" size={Math.min(hp(2.2), wp(5.5))} color="#F97316" />
                       <Text style={styles.statLabel}>Calories</Text>
                     </View>
                     <Text style={styles.statValue}>{dayData.achievedCalories}</Text>
@@ -595,7 +595,7 @@ export default function DetailsDay () {
 
                   <View style={styles.statCard}>
                     <View style={styles.statCardContent}>
-                      <Ionicons name="water" size={Math.min(hp(2.2), wp(5.5))} color="#4ECDC4" />
+                      <Ionicons name="water" size={Math.min(hp(2.2), wp(5.5))} color="#2E86AB" />
                       <Text style={styles.statLabel}>Hydration</Text>
                     </View>
                     <Text style={styles.statValue}>{dayData.achieviedHydration}</Text>
@@ -604,7 +604,7 @@ export default function DetailsDay () {
 
                   <View style={styles.statCard}>
                     <View style={styles.statCardContent}>
-                      <Ionicons name="timer" size={Math.min(hp(2.2), wp(5.5))} color="#FFB347" />
+                      <Ionicons name="timer" size={Math.min(hp(2.2), wp(5.5))} color="#FFA500" />
                       <Text style={styles.statLabel}>Timer</Text>
                     </View>
                     <Text style={styles.statValueLarge}>{timer}</Text>
@@ -615,7 +615,7 @@ export default function DetailsDay () {
                 <View style={styles.progressSection}>
                   <View style={styles.progressItem}>
                     <View style={styles.progressHeader}>
-                      <Ionicons name="flame-outline" size={16} color="#FF6B6B" />
+                      <Ionicons name="flame-outline" size={16} color="#F97316" />
                       <Text style={styles.progressLabel}>Calories Progress</Text>
                     </View>
                     <View style={styles.progressBarContainer}>
@@ -625,7 +625,7 @@ export default function DetailsDay () {
                           styles.progressBar, 
                           { 
                             width: `${Math.min((dayData.achievedCalories / dayData.targetCalories) * 100, 100)}%`,
-                            backgroundColor: '#FF6B6B'
+                            backgroundColor: '#F97316'
                           }
                         ]} 
                       />
@@ -637,7 +637,7 @@ export default function DetailsDay () {
                   
                   <View style={styles.progressItem}>
                     <View style={styles.progressHeader}>
-                      <Ionicons name="water-outline" size={16} color="#4ECDC4" />
+                      <Ionicons name="water-outline" size={16} color="#2E86AB" />
                       <Text style={styles.progressLabel}>Hydration Progress</Text>
                     </View>
                     <View style={styles.progressBarContainer}>
@@ -647,7 +647,7 @@ export default function DetailsDay () {
                           styles.progressBar, 
                           { 
                             width: `${Math.min((dayData.achieviedHydration / dayData.targetHydration) * 100, 100)}%`,
-                            backgroundColor: '#4ECDC4'
+                            backgroundColor: '#2E86AB'
                           }
                         ]} 
                       />
@@ -663,7 +663,7 @@ export default function DetailsDay () {
               {dayData.achievedCalories >= dayData.targetCalories && 
                dayData.achieviedHydration >= dayData.targetHydration && (
                 <View style={styles.congratsContainer}>
-                  <Ionicons name="trophy" size={Math.min(hp(4), wp(10))} color="#FFD700" />
+                  <Ionicons name="trophy" size={Math.min(hp(4), wp(10))} color="#FFA500" />
                   <Text style={styles.congratsTitle}>Congratulations! 🎉</Text>
                   <Text style={styles.congratsText}>
                     You've achieved your daily goals! Keep up the great work!
@@ -741,7 +741,7 @@ export default function DetailsDay () {
                       </View>
                       <Text style={styles.quickPickName} numberOfLines={2}>{food.food_name || food.name}</Text>
                       <View style={styles.quickPickCalories}>
-                        <Ionicons name="flame" size={12} color="#FF6B6B" />
+                        <Ionicons name="flame" size={12} color="#F97316" />
                         <Text style={styles.quickPickCalText}>{food.calories_kcal || food.calories}</Text>
                       </View>
                     </TouchableOpacity>
@@ -847,7 +847,7 @@ export default function DetailsDay () {
               {/* Search Drinks */}
               <View style={styles.fieldContainer}>
                 <Text style={styles.fieldLabel}>
-                  <Ionicons name="search" size={16} color="#4ECDC4" /> Search Drinks
+                  <Ionicons name="search" size={16} color="#2E86AB" /> Search Drinks
                 </Text>
                 <View style={styles.searchInputContainer}>
                   <Ionicons name="search-outline" size={20} color={colors.textSecondary} style={styles.searchIconLeft} />
@@ -888,14 +888,14 @@ export default function DetailsDay () {
                       >
                         <View style={styles.searchResultLeft}>
                           <View style={styles.drinkResultIconBg}>
-                            <Ionicons name="cafe" size={18} color="#4ECDC4" />
+                            <Ionicons name="cafe" size={18} color="#2E86AB" />
                           </View>
                           <View style={styles.searchResultInfo}>
                             <Text style={styles.searchResultTitle}>{drink.drink_name || drink.food_name}</Text>
                             <View style={styles.drinkMetaRow}>
                               <Text style={styles.searchResultMeta}>{drink.serving_size}</Text>
                               <View style={styles.hydrationBadge}>
-                                <Ionicons name="water" size={12} color="#4ECDC4" />
+                                <Ionicons name="water" size={12} color="#2E86AB" />
                                 <Text style={styles.hydrationText}>{drink.hydration_percent}%</Text>
                               </View>
                             </View>
@@ -916,7 +916,7 @@ export default function DetailsDay () {
                 <View style={styles.selectedDrinkCard}>
                   <View style={styles.selectedDrinkHeader}>
                     <View style={styles.drinkIconLarge}>
-                      <Ionicons name="checkmark-circle" size={24} color="#4ECDC4" />
+                      <Ionicons name="checkmark-circle" size={24} color="#2E86AB" />
                     </View>
                     <View style={styles.selectedDrinkInfo}>
                       <Text style={styles.selectedDrinkName}>{selectedDrink.drink_name || selectedDrink.food_name}</Text>
@@ -930,25 +930,25 @@ export default function DetailsDay () {
                   {/* Drink Nutrition Grid */}
                   <View style={styles.drinkNutritionGrid}>
                     <View style={styles.drinkNutritionItem}>
-                      <Ionicons name="water" size={16} color="#4ECDC4" />
+                      <Ionicons name="water" size={16} color="#2E86AB" />
                       <Text style={styles.drinkNutritionValue}>{selectedDrink.hydration_percent}%</Text>
                       <Text style={styles.drinkNutritionLabel}>hydration</Text>
                     </View>
                     <View style={styles.drinkNutritionItem}>
-                      <Ionicons name="flame" size={16} color="#FF6B6B" />
+                      <Ionicons name="flame" size={16} color="#F97316" />
                       <Text style={styles.drinkNutritionValue}>{Math.round(selectedDrink.calories_kcal * parseFloat(drinkQuantity || '1'))}</Text>
                       <Text style={styles.drinkNutritionLabel}>cal</Text>
                     </View>
                     {selectedDrink.protein_g > 0 && (
                       <View style={styles.drinkNutritionItem}>
-                        <Ionicons name="fitness" size={16} color="#4ECDC4" />
+                        <Ionicons name="fitness" size={16} color="#2E86AB" />
                         <Text style={styles.drinkNutritionValue}>{Math.round(selectedDrink.protein_g * parseFloat(drinkQuantity || '1'))}</Text>
                         <Text style={styles.drinkNutritionLabel}>protein</Text>
                       </View>
                     )}
                     {selectedDrink.carbs_g > 0 && (
                       <View style={styles.drinkNutritionItem}>
-                        <Ionicons name="leaf" size={16} color="#FFB347" />
+                        <Ionicons name="leaf" size={16} color="#FFA500" />
                         <Text style={styles.drinkNutritionValue}>{Math.round(selectedDrink.carbs_g * parseFloat(drinkQuantity || '1'))}</Text>
                         <Text style={styles.drinkNutritionLabel}>carbs</Text>
                       </View>
@@ -968,7 +968,7 @@ export default function DetailsDay () {
                           setWaterInput(hydrationValue.toFixed(2));
                         }}
                       >
-                        <Ionicons name="remove" size={18} color="#4ECDC4" />
+                        <Ionicons name="remove" size={18} color="#2E86AB" />
                       </TouchableOpacity>
                       <View style={styles.quantityDisplay}>
                         <TextInput
@@ -994,7 +994,7 @@ export default function DetailsDay () {
                           setWaterInput(hydrationValue.toFixed(2));
                         }}
                       >
-                        <Ionicons name="add" size={18} color="#4ECDC4" />
+                        <Ionicons name="add" size={18} color="#2E86AB" />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -1004,7 +1004,7 @@ export default function DetailsDay () {
               {/* Quick Water Amounts */}
               <View style={styles.sectionContainer}>
                 <Text style={styles.sectionLabel}>
-                  <Ionicons name="water-outline" size={18} color="#4ECDC4" /> Quick Add Plain Water
+                  <Ionicons name="water-outline" size={18} color="#2E86AB" /> Quick Add Plain Water
                 </Text>
                 <View style={styles.waterQuickGrid}>
                   {waterIntakeDatabase.options.map((option) => (
@@ -1018,7 +1018,7 @@ export default function DetailsDay () {
                       activeOpacity={0.7}
                     >
                       <View style={styles.waterQuickIconBg}>
-                        <Ionicons name="water" size={24} color="#4ECDC4" />
+                        <Ionicons name="water" size={24} color="#2E86AB" />
                       </View>
                       <Text style={styles.waterQuickLabel}>{option.name}</Text>
                       <Text style={styles.waterQuickAmount}>{option.amount}L</Text>
@@ -1030,7 +1030,7 @@ export default function DetailsDay () {
               {/* Water Amount Input */}
               <View style={styles.fieldContainer}>
                 <Text style={styles.fieldLabel}>
-                  <Ionicons name="water" size={16} color="#4ECDC4" /> Hydration Amount
+                  <Ionicons name="water" size={16} color="#2E86AB" /> Hydration Amount
                 </Text>
                 <View style={styles.waterAmountSelector}>
                   <TouchableOpacity 
@@ -1040,7 +1040,7 @@ export default function DetailsDay () {
                       setWaterInput(Math.max(0, current - 0.25).toFixed(2));
                     }}
                   >
-                    <Ionicons name="remove-circle" size={36} color="#4ECDC4" />
+                    <Ionicons name="remove-circle" size={36} color="#2E86AB" />
                   </TouchableOpacity>
                   
                   <View style={styles.waterDisplayBox}>
@@ -1065,7 +1065,7 @@ export default function DetailsDay () {
                       setWaterInput((current + 0.25).toFixed(2));
                     }}
                   >
-                    <Ionicons name="add-circle" size={36} color="#4ECDC4" />
+                    <Ionicons name="add-circle" size={36} color="#2E86AB" />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1084,7 +1084,7 @@ export default function DetailsDay () {
                       styles.progressBarFg,
                       {
                         width: `${Math.min(((dayData.achieviedHydration + parseFloat(waterInput || '0')) / dayData.targetHydration) * 100, 100)}%`,
-                        backgroundColor: '#4ECDC4'
+                        backgroundColor: '#2E86AB'
                       }
                     ]}
                   />
@@ -1190,7 +1190,7 @@ export default function DetailsDay () {
           {trackingMode === 'meal' && (
           <View style={styles.fieldContainer}>
             <Text style={styles.fieldLabel}>
-              <Ionicons name="flame-outline" size={16} color="#FF6B6B" /> Calories
+              <Ionicons name="flame-outline" size={16} color="#F97316" /> Calories
             </Text>
             <View style={styles.calorieInputContainer}>
               <TextInput 
@@ -1212,7 +1212,7 @@ export default function DetailsDay () {
                         styles.calorieBarFill,
                         {
                           width: `${Math.min((parseInt(calorieInput) / dayData.targetCalories) * 100, 100)}%`,
-                          backgroundColor: parseInt(calorieInput) > dayData.targetCalories ? '#FF6B6B' : '#4ECDC4'
+                          backgroundColor: parseInt(calorieInput) > dayData.targetCalories ? '#F97316' : '#2E86AB'
                         }
                       ]}
                     />
@@ -1513,17 +1513,17 @@ const getStyles = (colors: any) => StyleSheet.create({
         minHeight: Math.min(hp(14), wp(30)),
         maxHeight: Math.min(hp(14), wp(30)),
         backgroundColor: colors.cardBackground,
-        borderRadius: 14,
+        borderRadius: 16,
         padding: Math.min(hp(1.4), wp(3)),
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: "#000",
-        shadowOpacity: 0.08,
-        shadowRadius: 6,
-        shadowOffset: { width: 0, height: 2 },
-        elevation: 3,
-        borderWidth: 1,
-        borderColor: colors.gray + '15',
+        shadowColor: colors.primary,
+        shadowOpacity: 0.12,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 4,
+        borderWidth: 2,
+        borderColor: '#000000',
         overflow: 'hidden',
     },
     statCardHeader: {
@@ -1596,20 +1596,22 @@ const getStyles = (colors: any) => StyleSheet.create({
     trayButton: {
         flexDirection: 'row',
         backgroundColor: colors.primary,
-        paddingVertical: hp(1.6),
+        paddingVertical: hp(1.8),
         paddingHorizontal: wp(6),
         marginHorizontal: wp(4),
         marginTop: hp(1.5),
         marginBottom: hp(1),
-        borderRadius: 14,
+        borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
         gap: 10,
         shadowColor: colors.primary,
-        shadowOpacity: 0.35,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 4 },
-        elevation: 5,
+        shadowOpacity: 0.4,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 5 },
+        elevation: 6,
+        borderWidth: 1,
+        borderColor: colors.primary,
     },
     trayButtonText: {
         color: '#fff',
@@ -1626,12 +1628,12 @@ const getStyles = (colors: any) => StyleSheet.create({
         marginBottom: hp(1),
         alignItems: 'center',
         borderWidth: 2,
-        borderColor: colors.success + '40',
+        borderColor: '#000000',
         shadowColor: colors.success,
-        shadowOpacity: 0.15,
-        shadowRadius: 6,
-        shadowOffset: { width: 0, height: 2 },
-        elevation: 3,
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 4,
     },
     congratsTitle: {
         fontSize: Math.min(hp(2.2), wp(5.5)),
@@ -1653,15 +1655,15 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     progressItem: {
         backgroundColor: colors.cardBackground,
-        borderRadius: 14,
+        borderRadius: 16,
         padding: Math.min(hp(1.6), wp(3.8)),
-        shadowColor: "#000",
-        shadowOpacity: 0.08,
-        shadowRadius: 6,
-        shadowOffset: { width: 0, height: 2 },
-        elevation: 3,
-        borderWidth: 1,
-        borderColor: colors.gray + '15',
+        shadowColor: colors.primary,
+        shadowOpacity: 0.12,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 4,
+        borderWidth: 2,
+        borderColor: '#000000',
         overflow: 'hidden',
     },
     progressHeader: {
@@ -2314,7 +2316,7 @@ const getStyles = (colors: any) => StyleSheet.create({
         padding: wp(3),
         borderRadius: 10,
         borderLeftWidth: 4,
-        borderLeftColor: '#4ECDC4',
+        borderLeftColor: '#2E86AB',
     },
     inputLabel: {
         fontSize: Math.min(hp(1.4), wp(3.2)),
@@ -2483,7 +2485,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     quickPickCalText: {
         fontSize: Math.min(hp(1.3), wp(3)),
         fontWeight: '700',
-        color: '#FF6B6B',
+        color: '#F97316',
     },
     // Search Input Styles
     searchInputContainer: {
@@ -2580,7 +2582,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     searchResultCalValue: {
         fontSize: Math.min(hp(2), wp(4.8)),
         fontWeight: '700',
-        color: '#FF6B6B',
+        color: '#F97316',
     },
     searchResultCalLabel: {
         fontSize: Math.min(hp(1.2), wp(2.8)),
@@ -2615,7 +2617,7 @@ const getStyles = (colors: any) => StyleSheet.create({
         width: wp(10),
         height: wp(10),
         borderRadius: wp(5),
-        backgroundColor: '#4ECDC4' + '20',
+        backgroundColor: '#2E86AB' + '20',
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: wp(3),
@@ -2630,7 +2632,7 @@ const getStyles = (colors: any) => StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: wp(1),
-        backgroundColor: '#4ECDC4' + '20',
+        backgroundColor: '#2E86AB' + '20',
         paddingHorizontal: wp(2),
         paddingVertical: hp(0.3),
         borderRadius: wp(2),
@@ -2638,12 +2640,12 @@ const getStyles = (colors: any) => StyleSheet.create({
     hydrationText: {
         fontSize: Math.min(hp(1.1), wp(2.6)),
         fontWeight: '600',
-        color: '#4ECDC4',
+        color: '#2E86AB',
     },
     drinkCalValue: {
         fontSize: Math.min(hp(2), wp(4.8)),
         fontWeight: '700',
-        color: '#4ECDC4',
+        color: '#2E86AB',
     },
     selectedDrinkCard: {
         marginBottom: hp(2),
@@ -2651,8 +2653,8 @@ const getStyles = (colors: any) => StyleSheet.create({
         borderRadius: wp(4),
         padding: wp(4),
         borderWidth: 2,
-        borderColor: '#4ECDC4' + '40',
-        shadowColor: '#4ECDC4',
+        borderColor: '#2E86AB' + '40',
+        shadowColor: '#2E86AB',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.2,
         shadowRadius: 8,
@@ -2699,7 +2701,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     drinkNutritionValue: {
         fontSize: Math.min(hp(1.8), wp(4.2)),
         fontWeight: '700',
-        color: '#4ECDC4',
+        color: '#2E86AB',
     },
     drinkNutritionLabel: {
         fontSize: Math.min(hp(1.2), wp(2.8)),
@@ -2761,8 +2763,8 @@ const getStyles = (colors: any) => StyleSheet.create({
         borderRadius: wp(3),
         alignItems: 'center',
         borderWidth: 2,
-        borderColor: '#4ECDC4' + '20',
-        shadowColor: '#4ECDC4',
+        borderColor: '#2E86AB' + '20',
+        shadowColor: '#2E86AB',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
@@ -2780,7 +2782,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     waterQuickAmount: {
         fontSize: Math.min(hp(1.8), wp(4.2)),
         fontWeight: '700',
-        color: '#4ECDC4',
+        color: '#2E86AB',
     },
     waterAmountSelector: {
         flexDirection: 'row',
@@ -2799,8 +2801,8 @@ const getStyles = (colors: any) => StyleSheet.create({
         alignItems: 'center',
         marginHorizontal: wp(2),
         borderWidth: 2,
-        borderColor: '#4ECDC4',
-        shadowColor: '#4ECDC4',
+        borderColor: '#2E86AB',
+        shadowColor: '#2E86AB',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.15,
         shadowRadius: 8,
@@ -2809,7 +2811,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     waterValueInput: {
         fontSize: Math.min(hp(4), wp(10)),
         fontWeight: '700',
-        color: '#4ECDC4',
+        color: '#2E86AB',
         textAlign: 'center',
         padding: 0,
         minWidth: wp(20),
@@ -2851,7 +2853,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     progressPercent: {
         fontSize: Math.min(hp(1.8), wp(4.2)),
         fontWeight: '700',
-        color: '#4ECDC4',
+        color: '#2E86AB',
     },
     progressBarBg: {
         height: hp(1.2),
@@ -2972,7 +2974,7 @@ const getStyles = (colors: any) => StyleSheet.create({
         fontWeight: '600',
     },
     miniWaterCard: {
-        backgroundColor: '#4ECDC4' + '20',
+        backgroundColor: '#2E86AB' + '20',
         paddingHorizontal: wp(2),
         paddingVertical: hp(0.6),
         borderRadius: wp(2),
@@ -2985,7 +2987,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     miniWaterText: {
         fontSize: Math.min(hp(1), wp(2.5)),
-        color: '#4ECDC4',
+        color: '#2E86AB',
         fontWeight: '500',
         textAlign: 'center',
     },
@@ -3000,20 +3002,20 @@ const getStyles = (colors: any) => StyleSheet.create({
         width: wp(9),
         height: wp(9),
         borderRadius: wp(2),
-        backgroundColor: '#4ECDC4' + '20',
+        backgroundColor: '#2E86AB' + '20',
         alignItems: 'center',
         justifyContent: 'center',
     },
     waterControlText: {
         fontSize: Math.min(hp(1.8), wp(4.5)),
-        color: '#4ECDC4',
+        color: '#2E86AB',
         fontWeight: 'bold',
     },
     waterInputField: {
         flex: 1,
         backgroundColor: colors.inputBackground || '#F9FAFB',
         borderWidth: 1,
-        borderColor: '#4ECDC4',
+        borderColor: '#2E86AB',
         borderRadius: wp(2),
         paddingHorizontal: wp(3),
         paddingVertical: hp(0.8),
@@ -3030,7 +3032,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     // Glass Counter Styles
     glassCounterSection: {
-        backgroundColor: '#4ECDC4' + '10',
+        backgroundColor: '#2E86AB' + '10',
         borderRadius: wp(3),
         padding: wp(2.5),
         marginTop: hp(1),
@@ -3045,7 +3047,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     glassCounterTitle: {
         fontSize: Math.min(hp(1.2), wp(3)),
         fontWeight: '600',
-        color: '#4ECDC4',
+        color: '#2E86AB',
     },
     glassCounterDisplay: {
         alignItems: 'center',
@@ -3054,7 +3056,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     glassCount: {
         fontSize: Math.min(hp(2), wp(5)),
         fontWeight: 'bold',
-        color: '#4ECDC4',
+        color: '#2E86AB',
     },
     glassLabel: {
         fontSize: Math.min(hp(1), wp(2.5)),
@@ -3071,7 +3073,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     waterUnitLabel: {
         fontSize: Math.min(hp(1.5), wp(4)),
         fontWeight: '600',
-        color: '#4ECDC4',
+        color: '#2E86AB',
     },
     // Hydration Progress in Input Modal
     hydrationProgressSection: {
@@ -3080,7 +3082,7 @@ const getStyles = (colors: any) => StyleSheet.create({
         padding: wp(3),
         marginTop: hp(1.5),
         borderWidth: 1,
-        borderColor: '#4ECDC4' + '30',
+        borderColor: '#2E86AB' + '30',
     },
     hydrationProgressHeader: {
         flexDirection: 'row',
@@ -3096,7 +3098,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     hydrationProgressPercent: {
         fontSize: Math.min(hp(1.5), wp(4)),
         fontWeight: 'bold',
-        color: '#4ECDC4',
+        color: '#2E86AB',
     },
     hydrationProgressBar: {
         height: hp(1.2),
@@ -3107,7 +3109,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     hydrationProgressFill: {
         height: '100%',
-        backgroundColor: '#4ECDC4',
+        backgroundColor: '#2E86AB',
         borderRadius: wp(2),
     },
     hydrationProgressText: {
@@ -3117,7 +3119,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     hydrationProgressCurrent: {
         fontSize: Math.min(hp(1), wp(2.5)),
-        color: '#4ECDC4',
+        color: '#2E86AB',
         fontWeight: '500',
     },
     hydrationProgressTarget: {
