@@ -81,7 +81,7 @@ const ActiveDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}) 
             <Text style={styles.statusValue}>{info.achievedCalories} kcal</Text>
           </View>
         </View>
-        <View style={[styles.modernStatusItem, { borderLeftWidth: 1, borderLeftColor: '#E0E0E0', paddingLeft: rs(12) }]}>
+        <View style={[styles.modernStatusItem, { borderLeftWidth: 1, borderLeftColor: '#E5E7EB', paddingLeft: rs(12) }]}>
           <View style={styles.hydrationIconBox}>
             <Ionicons name="water" size={18} color="#FFFFFF" />
           </View>
@@ -95,7 +95,7 @@ const ActiveDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}) 
       {/* Remarks */}
       {info.remarks && (
         <View style={styles.modernRemarksSection}>
-          <Ionicons name="chatbubble-ellipses" size={14} color="#666" />
+          <Ionicons name="chatbubble-ellipses" size={14} color={colors.primary} />
           <Text style={styles.modernRemarksText}>{info.remarks}</Text>
         </View>
       )}
@@ -109,7 +109,7 @@ const ActiveDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}) 
           style={styles.modernViewButton}
         >
           <Text style={styles.modernViewButtonText}>View Details</Text>
-          <Ionicons name="arrow-forward" size={16} color="#fff" />
+          <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
         </Pressable>
       </View>
     </Animated.View>
@@ -134,7 +134,7 @@ const FinishedDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}
     <Animated.View style={[styles.modernFinishedItem, animatedStyle]}>
       <View style={styles.modernFinishedHeader}>
         <View style={styles.modernSuccessIcon}>
-          <Ionicons name="checkmark-circle" size={50} color="#4CAF50" />
+          <Ionicons name="checkmark-circle" size={50} color={colors.success} />
         </View>
         
         <View style={styles.modernFinishedInfo}>
@@ -154,7 +154,7 @@ const FinishedDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}
         style={styles.modernFinishedButton}
       >
         <Text style={styles.modernFinishedButtonText}>View Results</Text>
-        <Ionicons name="trophy" size={16} color="#fff" />
+        <Ionicons name="trophy" size={16} color="#FFFFFF" />
       </Pressable>
     </Animated.View>
   );
@@ -167,7 +167,7 @@ const LockedDay = ({info} : {info: Day}) => {
     <View style={styles.modernLockedItem}>
       <View style={styles.modernLockedHeader}>
         <View style={styles.modernLockedIcon}>
-          <Ionicons name="lock-closed" size={40} color="#95A5A6" />
+          <Ionicons name="lock-closed" size={40} color={colors.gray || '#D1D5DB'} />
         </View>
         
         <View style={styles.modernLockedInfo}>
@@ -212,7 +212,7 @@ const ProgressCircle = React.memo(({finalProgress}: {finalProgress: number})=>{
                 <Stop offset="100%" stopColor={getProgressColor()} stopOpacity="0.7" />
               </LinearGradient>
             </Defs>
-            <Circle cx="35" cy="35" r="30" stroke="#E0E0E0" strokeWidth="6" fill="none" />
+            <Circle cx="35" cy="35" r="30" stroke="#E5E7EB" strokeWidth="6" fill="none" />
             <AnimatedCircle
               cx="35" cy="35" r="30"
               stroke="url(#progressGrad)"
@@ -279,7 +279,7 @@ const InfoTray = React.memo(({ duration }: { duration: number }) => {
 
   return (
     <View style={styles.modernNextMeal}>
-          <Ionicons name="time" size={16} color="#9C27B0" />
+          <Ionicons name="time" size={16} color={colors.primary} />
           <Text style={styles.modernNextMealText}>Time left: {timeRemaining}</Text>
     </View>
     
@@ -438,17 +438,18 @@ const getStyles = (colors: any) => StyleSheet.create({
     margin: rs(8),
     marginHorizontal: wp(3),
     backgroundColor: colors.cardBackground,
-    borderRadius: rs(24),
-    padding: rs(20),
-    marginBottom: rs(18),
+    borderRadius: rs(20),
+    padding: rs(18),
+    marginBottom: rs(16),
     shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: rs(16),
-    elevation: 12,
-    borderLeftWidth: 6,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: rs(12),
+    elevation: 8,
+    borderLeftWidth: 5,
     borderLeftColor: colors.primary,
-    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#000000',
   },
   
   modernTopHeader: {
@@ -458,7 +459,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     marginBottom: rs(16),
     paddingBottom: rs(14),
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: '#E5E7EB',
   },
   
   modernDayInfo: {
@@ -530,31 +531,31 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   
   calorieIconBox: {
-    width: rs(40),
-    height: rs(40),
-    borderRadius: rs(10),
-    backgroundColor: '#FF6B35',
+    width: rs(42),
+    height: rs(42),
+    borderRadius: rs(11),
+    backgroundColor: '#F97316',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#FF6B35',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: rs(4),
-    elevation: 3,
+    shadowColor: '#F97316',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.28,
+    shadowRadius: rs(5),
+    elevation: 4,
   },
   
   hydrationIconBox: {
-    width: rs(40),
-    height: rs(40),
-    borderRadius: rs(10),
-    backgroundColor: '#4A90E2',
+    width: rs(42),
+    height: rs(42),
+    borderRadius: rs(11),
+    backgroundColor: '#2E86AB',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#4A90E2',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: rs(4),
-    elevation: 3,
+    shadowColor: '#2E86AB',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.28,
+    shadowRadius: rs(5),
+    elevation: 4,
   },
   
   statusContent: {
@@ -619,26 +620,26 @@ const getStyles = (colors: any) => StyleSheet.create({
   modernNextMeal: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F4FF',
+    backgroundColor: colors.primarySoft,
     borderRadius: rs(12),
     paddingHorizontal: rs(14),
     paddingVertical: rs(10),
     flex: 1,
     borderWidth: 1.5,
-    borderColor: '#E8D5F2',
-    shadowColor: '#7B1FA2',
+    borderColor: colors.primary + '30',
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: rs(4),
-    elevation: 2,
+    shadowOpacity: 0.15,
+    shadowRadius: rs(5),
+    elevation: 3,
   },
   
   modernNextMealText: {
     fontSize: rs(13),
-    color: '#7B1FA2',
-    fontWeight: '600',
+    color: colors.primary,
+    fontWeight: '700',
     marginLeft: rs(8),
-    letterSpacing: 0.2,
+    letterSpacing: 0.3,
   },
   
   modernViewButton: {
@@ -657,7 +658,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   
   modernViewButtonText: {
-    color: colors.buttonText,
+    color: '#FFFFFF',
     fontSize: rs(14),
     fontWeight: '700',
     letterSpacing: 0.4,
@@ -668,17 +669,18 @@ const getStyles = (colors: any) => StyleSheet.create({
     margin: rs(8),
     marginHorizontal: wp(3),
     backgroundColor: colors.cardBackground,
-    borderRadius: rs(24),
-    padding: rs(20),
-    marginBottom: rs(18),
-    shadowColor: colors.finishedStatus,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: rs(12),
-    elevation: 10,
-    borderLeftWidth: 6,
-    borderLeftColor: colors.finishedStatus,
-    overflow: 'hidden',
+    borderRadius: rs(20),
+    padding: rs(18),
+    marginBottom: rs(16),
+    shadowColor: colors.success,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.16,
+    shadowRadius: rs(10),
+    elevation: 8,
+    borderLeftWidth: 5,
+    borderLeftColor: colors.success,
+    borderWidth: 1,
+    borderColor: '#000000',
   },
   
   modernFinishedHeader: {
@@ -699,7 +701,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   modernFinishedDayNumber: {
     fontSize: rs(30),
     fontWeight: '800',
-    color: colors.finishedStatus,
+    color: colors.success,
     backgroundColor: colors.primarySoft,
     borderRadius: rs(10),
     paddingHorizontal: rs(12),
@@ -707,11 +709,11 @@ const getStyles = (colors: any) => StyleSheet.create({
     textAlign: 'center',
     alignSelf: 'flex-start',
     marginBottom: rs(8),
-    shadowColor: colors.finishedStatus,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.18,
+    shadowColor: colors.success,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
     shadowRadius: rs(4),
-    elevation: 3,
+    elevation: 2,
   },
   
   modernFinishedDayText: {
@@ -740,14 +742,14 @@ const getStyles = (colors: any) => StyleSheet.create({
   modernFinishedPercentage: {
     fontSize: rs(28),
     fontWeight: '800',
-    color: colors.finishedStatus,
+    color: colors.success,
     marginBottom: rs(4),
     letterSpacing: 0.3,
   },
   
   modernFinishedLabel: {
     fontSize: rs(12),
-    color: colors.finishedStatus,
+    color: colors.success,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 1.2,
@@ -757,15 +759,15 @@ const getStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.finishedStatus,
+    backgroundColor: colors.success,
     borderRadius: rs(12),
     paddingHorizontal: rs(20),
     paddingVertical: rs(12),
-    shadowColor: colors.finishedStatus,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: rs(8),
-    elevation: 6,
+    shadowColor: colors.success,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: rs(6),
+    elevation: 5,
     marginTop: rs(12),
   },
   
@@ -781,18 +783,17 @@ const getStyles = (colors: any) => StyleSheet.create({
     margin: rs(8),
     marginHorizontal: wp(3),
     backgroundColor: colors.cardBackground,
-    borderRadius: rs(24),
-    padding: rs(20),
-    marginBottom: rs(18),
-    shadowColor: colors.textLight,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: rs(6),
-    elevation: 4,
-    borderWidth: 2,
-    borderColor: colors.gray,
-    opacity: 0.9,
-    overflow: 'hidden',
+    borderRadius: rs(20),
+    padding: rs(18),
+    marginBottom: rs(16),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: rs(4),
+    elevation: 2,
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    opacity: 0.75,
   },
   
   modernLockedHeader: {
