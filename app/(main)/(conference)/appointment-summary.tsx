@@ -1,3 +1,4 @@
+import { theme } from "@/constants/theme";
 import { useAppointmentBooking } from "@/hooks/useAppointmentBooking";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,7 +8,6 @@ import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { colorsSheet } from "../(settings)/_ui_elements";
 
 export default function AppointmentSummaryScreen() {
   const router = useRouter();
@@ -146,7 +146,7 @@ export default function AppointmentSummaryScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.replace("/(main)/(conference)")} style={styles.backButton}>
-          <Ionicons name="home" size={24} color={colorsSheet.textOnPrimary} />
+          <Ionicons name="home" size={24} color={theme.colors.surface} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Appointment Confirmed</Text>
         <View style={styles.spacer} />
@@ -156,7 +156,7 @@ export default function AppointmentSummaryScreen() {
         {/* Success Icon */}
         <View style={styles.successContainer}>
           <View style={styles.successIconCircle}>
-            <Ionicons name="checkmark-circle" size={80} color={colorsSheet.success} />
+            <Ionicons name="checkmark-circle" size={80} color={theme.colors.success} />
           </View>
           <Text style={styles.successTitle}>Please Confirm Your Appointment!</Text>
           <Text style={styles.successSubtitle}>Get a best Consultation Experience</Text>
@@ -168,7 +168,7 @@ export default function AppointmentSummaryScreen() {
 
           <View style={styles.summaryRow}>
             <View style={styles.summaryIconContainer}>
-              <Ionicons name="person" size={20} color={colorsSheet.primary} />
+              <Ionicons name="person" size={20} color={theme.colors.primary} />
             </View>
             <View style={styles.summaryTextContainer}>
               <Text style={styles.summaryLabel}>Doctor</Text>
@@ -181,7 +181,7 @@ export default function AppointmentSummaryScreen() {
 
           <View style={styles.summaryRow}>
             <View style={styles.summaryIconContainer}>
-              <Ionicons name="calendar" size={20} color={colorsSheet.info} />
+              <Ionicons name="calendar" size={20} color={theme.colors.info} />
             </View>
             <View style={styles.summaryTextContainer}>
               <Text style={styles.summaryLabel}>Date</Text>
@@ -210,7 +210,7 @@ export default function AppointmentSummaryScreen() {
 
           <View style={styles.summaryRow}>
             <View style={styles.summaryIconContainer}>
-              <Ionicons name="time" size={20} color={colorsSheet.warning} />
+              <Ionicons name="time" size={20} color={theme.colors.warning} />
             </View>
             <View style={styles.summaryTextContainer}>
               <Text style={styles.summaryLabel}>Time</Text>
@@ -222,7 +222,7 @@ export default function AppointmentSummaryScreen() {
 
           <View style={styles.summaryRow}>
             <View style={styles.summaryIconContainer}>
-              <Ionicons name="document-text" size={20} color={colorsSheet.secondary} />
+              <Ionicons name="document-text" size={20} color={theme.colors.secondary} />
             </View>
             <View style={styles.summaryTextContainer}>
               <Text style={styles.summaryLabel}>Your Concern</Text>
@@ -253,7 +253,7 @@ export default function AppointmentSummaryScreen() {
           <Ionicons 
             name="videocam" 
             size={24} 
-            color={isCallReady ? colorsSheet.white : colorsSheet.textLight} 
+            color={isCallReady ? theme.colors.surface : theme.colors.textTertiary} 
           />
           <Text style={[styles.callButtonText, !isCallReady && styles.callButtonTextDisabled]}>
             {isCallReady ? "Start Call" : "Start Call (Not Ready)"}
@@ -268,12 +268,12 @@ export default function AppointmentSummaryScreen() {
         >
           {isConfirming || isLoading ? (
             <>
-              <ActivityIndicator color={colorsSheet.white} />
+              <ActivityIndicator color={theme.colors.surface} />
               <Text style={styles.confirmButtonText}>Booking...</Text>
             </>
           ) : (
             <>
-              <Ionicons name="checkmark-circle" size={20} color={colorsSheet.white} />
+              <Ionicons name="checkmark-circle" size={20} color={theme.colors.surface} />
               <Text style={styles.confirmButtonText}>Confirm Appointment</Text>
             </>
           )}
@@ -281,7 +281,7 @@ export default function AppointmentSummaryScreen() {
 
         {error && (
           <View style={styles.errorAlert}>
-            <Ionicons name="alert-circle" size={20} color={colorsSheet.error} />
+            <Ionicons name="alert-circle" size={20} color={theme.colors.error} />
             <Text style={styles.errorAlertText}>{error}</Text>
           </View>
         )}
@@ -314,7 +314,7 @@ export default function AppointmentSummaryScreen() {
               <Ionicons 
                 name={bookingResult.success ? "checkmark-circle" : "close-circle"} 
                 size={80} 
-                color={colorsSheet.white} 
+                color={theme.colors.surface} 
               />
             </View>
 
@@ -436,7 +436,7 @@ export default function AppointmentSummaryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: theme.colors.primary,
   },
   header: {
     flexDirection: "row",
@@ -446,12 +446,12 @@ const styles = StyleSheet.create({
     paddingVertical: hp(2),
   },
   backButton: {
-    padding: 8,
+    padding: theme.spacing.sm,
   },
   headerTitle: {
     fontSize: hp(2.2),
-    fontWeight: "bold",
-    color: colorsSheet.textOnPrimary,
+    fontWeight: theme.typography.fontWeight.bold as any,
+    color: theme.colors.surface,
     flex: 1,
     textAlign: "center",
   },
@@ -460,9 +460,9 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: colorsSheet.screenColor,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
+    backgroundColor: theme.colors.background,
+    borderTopLeftRadius: theme.borderRadius.xl,
+    borderTopRightRadius: theme.borderRadius.xl,
     paddingTop: hp(3),
     paddingHorizontal: wp(6),
   },
@@ -475,59 +475,45 @@ const styles = StyleSheet.create({
   },
   successTitle: {
     fontSize: hp(2.4),
-    fontWeight: "bold",
-    color: colorsSheet.textPrimary,
+    fontWeight: theme.typography.fontWeight.bold as any,
+    color: theme.colors.textPrimary,
     marginBottom: hp(0.5),
     textAlign: "center",
   },
   successSubtitle: {
     fontSize: hp(1.6),
-    color: colorsSheet.textSecondary,
+    color: theme.colors.textSecondary,
     textAlign: "center",
   },
   timerCard: {
-    backgroundColor: colorsSheet.primary,
-    borderRadius: 20,
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.borderRadius.xl,
     padding: wp(6),
     alignItems: "center",
     marginBottom: hp(2),
-    shadowColor: colorsSheet.primary,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    ...theme.shadows.large,
   },
   timerLabel: {
     fontSize: hp(1.6),
-    color: colorsSheet.white,
+    color: theme.colors.surface,
     marginBottom: hp(1),
   },
   timerValue: {
     fontSize: hp(3.5),
-    fontWeight: "bold",
-    color: colorsSheet.white,
+    fontWeight: theme.typography.fontWeight.bold as any,
+    color: theme.colors.surface,
   },
   summaryCard: {
-    backgroundColor: colorsSheet.white,
-    borderRadius: 20,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.xl,
     padding: wp(5),
     marginBottom: hp(2),
-    shadowColor: colorsSheet.primary,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...theme.shadows.medium,
   },
   summaryTitle: {
     fontSize: hp(2.2),
-    fontWeight: "bold",
-    color: colorsSheet.textPrimary,
+    fontWeight: theme.typography.fontWeight.bold as any,
+    color: theme.colors.textPrimary,
     marginBottom: hp(2),
   },
   summaryRow: {
@@ -538,7 +524,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colorsSheet.primarySoft,
+    backgroundColor: theme.colors.primary + '20',
     alignItems: "center",
     justifyContent: "center",
     marginRight: wp(3),
@@ -548,96 +534,80 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: hp(1.4),
-    color: colorsSheet.textSecondary,
+    color: theme.colors.textSecondary,
     marginBottom: hp(0.3),
   },
   summaryValue: {
     fontSize: hp(1.8),
-    fontWeight: "600",
-    color: colorsSheet.textPrimary,
+    fontWeight: theme.typography.fontWeight.semiBold as any,
+    color: theme.colors.textPrimary,
   },
   summarySubValue: {
     fontSize: hp(1.5),
-    color: colorsSheet.textSecondary,
+    color: theme.colors.textSecondary,
     marginTop: hp(0.2),
   },
   divider: {
     height: 1,
-    backgroundColor: colorsSheet.gray,
+    backgroundColor: theme.colors.border,
     marginVertical: hp(1.5),
   },
   callButton: {
     flexDirection: "row",
-    backgroundColor: colorsSheet.success,
+    backgroundColor: theme.colors.success,
     paddingVertical: hp(2),
     paddingHorizontal: wp(6),
-    borderRadius: 25,
+    borderRadius: theme.borderRadius.xl,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: hp(1.5),
-    shadowColor: colorsSheet.success,
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 6,
+    ...theme.shadows.large,
   },
   callButtonDisabled: {
-    backgroundColor: colorsSheet.gray,
-    shadowColor: colorsSheet.gray,
+    backgroundColor: theme.colors.disabled,
   },
   callButtonText: {
-    color: colorsSheet.white,
+    color: theme.colors.surface,
     fontSize: hp(2),
-    fontWeight: "600",
+    fontWeight: theme.typography.fontWeight.semiBold as any,
     marginLeft: wp(2),
   },
   callButtonTextDisabled: {
-    color: colorsSheet.textLight,
+    color: theme.colors.textTertiary,
   },
   homeButton: {
-    backgroundColor: colorsSheet.primarySoft,
+    backgroundColor: theme.colors.primary + '20',
     paddingVertical: hp(2),
     paddingHorizontal: wp(6),
-    borderRadius: 25,
+    borderRadius: theme.borderRadius.xl,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: hp(3),
   },
   homeButtonText: {
-    color: colorsSheet.primary,
+    color: theme.colors.primary,
     fontSize: hp(1.8),
-    fontWeight: "600",
+    fontWeight: theme.typography.fontWeight.semiBold as any,
   },
   confirmButton: {
     flexDirection: "row",
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: theme.colors.primary,
     paddingVertical: hp(2),
     paddingHorizontal: wp(6),
-    borderRadius: 25,
+    borderRadius: theme.borderRadius.xl,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: hp(1.5),
-    shadowColor: colorsSheet.primary,
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 6,
+    ...theme.shadows.large,
   },
   confirmButtonDisabled: {
-    backgroundColor: colorsSheet.gray,
-    shadowColor: colorsSheet.gray,
+    backgroundColor: theme.colors.disabled,
     opacity: 0.6,
   },
   confirmButtonText: {
-    color: colorsSheet.white,
+    color: theme.colors.surface,
     fontSize: hp(1.8),
-    fontWeight: "600",
+    fontWeight: theme.typography.fontWeight.semiBold as any,
     marginLeft: wp(2),
   },
   errorContainer: {
@@ -647,20 +617,20 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: hp(1.8),
-    color: colorsSheet.error || "#FF3B30",
+    color: theme.colors.error,
   },
   errorAlert: {
     flexDirection: "row",
-    backgroundColor: "#FFE5E5",
-    borderRadius: 12,
+    backgroundColor: theme.colors.error + '20',
+    borderRadius: theme.borderRadius.medium,
     padding: wp(4),
     marginTop: hp(2),
     alignItems: "center",
     borderLeftWidth: 4,
-    borderLeftColor: colorsSheet.error || "#FF3B30",
+    borderLeftColor: theme.colors.error,
   },
   errorAlertText: {
-    color: colorsSheet.error || "#FF3B30",
+    color: theme.colors.error,
     fontSize: hp(1.5),
     marginLeft: wp(3),
     flex: 1,
@@ -673,25 +643,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: colorsSheet.white,
-    borderRadius: 30,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.xl,
     padding: wp(8),
     width: wp(85),
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 10,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
+    ...theme.shadows.large,
   },
   modalSuccess: {
-    backgroundColor: colorsSheet.white,
+    backgroundColor: theme.colors.surface,
   },
   modalError: {
-    backgroundColor: colorsSheet.white,
+    backgroundColor: theme.colors.surface,
   },
   resultIconContainer: {
     width: hp(12),
@@ -702,21 +665,21 @@ const styles = StyleSheet.create({
     marginBottom: hp(2),
   },
   resultIconSuccess: {
-    backgroundColor: colorsSheet.success || '#4CAF50',
+    backgroundColor: theme.colors.success,
   },
   resultIconError: {
-    backgroundColor: colorsSheet.error || '#FF3B30',
+    backgroundColor: theme.colors.error,
   },
   resultTitle: {
     fontSize: hp(2.5),
-    fontWeight: 'bold',
-    color: colorsSheet.textPrimary,
+    fontWeight: theme.typography.fontWeight.bold as any,
+    color: theme.colors.textPrimary,
     textAlign: 'center',
     marginBottom: hp(1),
   },
   resultMessage: {
     fontSize: hp(1.6),
-    color: colorsSheet.textSecondary,
+    color: theme.colors.textSecondary,
     textAlign: 'center',
     marginBottom: hp(2.5),
     lineHeight: hp(2.4),
@@ -724,36 +687,32 @@ const styles = StyleSheet.create({
   resultButton: {
     paddingVertical: hp(1.8),
     paddingHorizontal: wp(8),
-    borderRadius: 20,
+    borderRadius: theme.borderRadius.xl,
     width: '100%',
     alignItems: 'center',
     marginTop: hp(1),
   },
   resultButtonSuccess: {
-    backgroundColor: colorsSheet.success || '#4CAF50',
+    backgroundColor: theme.colors.success,
   },
   resultButtonError: {
-    backgroundColor: colorsSheet.error || '#FF3B30',
+    backgroundColor: theme.colors.error,
   },
   resultButtonText: {
-    color: colorsSheet.white,
+    color: theme.colors.surface,
     fontSize: hp(1.8),
-    fontWeight: '600',
+    fontWeight: theme.typography.fontWeight.semiBold as any,
   },
   // Appointment Limit Modal Styles
   appointmentModalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
     borderRadius: hp(3),
     paddingHorizontal: wp(6),
     paddingVertical: hp(3),
     width: '100%',
     maxWidth: wp(90),
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
+    ...theme.shadows.large,
   },
   appointmentCloseButton: {
     position: 'absolute',
@@ -767,21 +726,21 @@ const styles = StyleSheet.create({
   },
   appointmentModalTitle: {
     fontSize: hp(2.8),
-    fontWeight: '800',
-    color: '#1a1a1a',
+    fontWeight: theme.typography.fontWeight.bold as any,
+    color: theme.colors.textPrimary,
     marginBottom: hp(0.8),
     textAlign: 'center',
   },
   appointmentModalSubtitle: {
     fontSize: hp(2),
-    fontWeight: '600',
-    color: '#FF6B6B',
+    fontWeight: theme.typography.fontWeight.semiBold as any,
+    color: theme.colors.error,
     marginBottom: hp(1.5),
     textAlign: 'center',
   },
   appointmentModalDescription: {
     fontSize: hp(1.8),
-    color: '#666',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
     marginBottom: hp(2.5),
     lineHeight: hp(2.8),
@@ -798,9 +757,9 @@ const styles = StyleSheet.create({
   },
   appointmentFeatureText: {
     fontSize: hp(1.7),
-    color: '#333',
+    color: theme.colors.textPrimary,
     marginLeft: wp(2.5),
-    fontWeight: '500',
+    fontWeight: theme.typography.fontWeight.medium as any,
   },
   appointmentPriceTag: {
     flexDirection: 'row',
@@ -809,41 +768,37 @@ const styles = StyleSheet.create({
     marginBottom: hp(2.5),
     paddingVertical: hp(1.5),
     paddingHorizontal: wp(5),
-    backgroundColor: '#F0F7FF',
+    backgroundColor: theme.colors.success + '15',
     borderRadius: hp(1.5),
     borderWidth: 1.5,
-    borderColor: '#4CAF50',
+    borderColor: theme.colors.success,
   },
   appointmentPriceAmount: {
     fontSize: hp(3.5),
-    fontWeight: '800',
-    color: '#4CAF50',
+    fontWeight: theme.typography.fontWeight.bold as any,
+    color: theme.colors.success,
   },
   appointmentPriceFrequency: {
     fontSize: hp(1.9),
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginLeft: wp(1),
-    fontWeight: '600',
+    fontWeight: theme.typography.fontWeight.semiBold as any,
   },
   appointmentUpgradButton: {
     width: '100%',
     flexDirection: 'row',
-    backgroundColor: '#4CAF50',
+    backgroundColor: theme.colors.success,
     paddingVertical: hp(2),
     borderRadius: hp(1.2),
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: hp(1),
-    shadowColor: '#4CAF50',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 5,
+    ...theme.shadows.large,
   },
   appointmentUpgradButtonText: {
     fontSize: hp(2),
-    fontWeight: '700',
-    color: '#fff',
+    fontWeight: theme.typography.fontWeight.bold as any,
+    color: theme.colors.surface,
     marginLeft: wp(2),
     letterSpacing: 0.5,
   },
@@ -854,11 +809,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#ddd',
-    backgroundColor: '#fafafa',
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.background,
   },
   appointmentLaterButtonText: {
     fontSize: hp(1.9),
-    fontWeight: '600',
-    color: '#666',
-  },});
+    fontWeight: theme.typography.fontWeight.semiBold as any,
+    color: theme.colors.textSecondary,
+  },
+});
