@@ -1,9 +1,9 @@
 import AppHeader from '@/components/AppHeader';
-import { useTheme } from '@/contexts/ThemeContext';
+import { theme } from '@/constants/theme';
 import { authApi } from '@/utils/auth/authApi';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -18,7 +18,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function DoctorSelectionScreen() {
   const router = useRouter();
-  const { colors } = useTheme();
   const [doctors, setDoctors] = useState<any[]>([]);
   const [isLoadingDoctors, setIsLoadingDoctors] = useState(true);
   const [selectedDoctor, setSelectedDoctor] = useState<any>(null);
@@ -27,8 +26,6 @@ export default function DoctorSelectionScreen() {
   const [step, setStep] = useState<'doctors' | 'date' | 'time'>('doctors');
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
-
-  const styles = useMemo(() => getStyles(colors), [colors]);
 
   // Fetch doctors on mount
   useEffect(() => {
@@ -191,7 +188,7 @@ export default function DoctorSelectionScreen() {
         showStepIndicator={false}
       />
 
-      <View style={[styles.content, { backgroundColor: colors.screenColor }]}>
+      <View style={styles.content}>
         {/* Step 1: Doctor Selection */}
         {step === 'doctors' && (
           <View style={styles.stepContainer}>
@@ -200,11 +197,11 @@ export default function DoctorSelectionScreen() {
 
             {isLoadingDoctors ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={colors.primary} />
+                <ActivityIndicator size="large" color={theme.colors.primary} />
               </View>
             ) : doctors.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <Ionicons name="person-remove" size={48} color={colors.textSecondary} />
+                <Ionicons name="person-remove" size={48} color={theme.colors.textSecondary} />
                 <Text style={styles.emptyText}>No doctors available</Text>
               </View>
             ) : (
@@ -220,14 +217,14 @@ export default function DoctorSelectionScreen() {
                   >
                     <View style={styles.doctorContent}>
                       <View style={styles.doctorAvatar}>
-                        <Ionicons name="person" size={32} color={colors.primary} />
+                        <Ionicons name="person" size={32} color={theme.colors.primary} />
                       </View>
                       <View style={styles.doctorInfo}>
                         <Text style={styles.doctorName}>{doctor.name}</Text>
                         <Text style={styles.doctorSpecialty}>{doctor.specialty}</Text>
                         <Text style={styles.doctorExperience}>{doctor.experience}</Text>
                         <View style={styles.ratingContainer}>
-                          <Ionicons name="star" size={14} color={colors.warning} />
+                          <Ionicons name="star" size={14} color={theme.colors.warning} />
                           <Text style={styles.ratingText}>{doctor.rating}</Text>
                         </View>
                       </View>
@@ -238,7 +235,7 @@ export default function DoctorSelectionScreen() {
                     </View>
                     {selectedDoctor?.id === doctor.id && (
                       <View style={styles.checkmark}>
-                        <Ionicons name="checkmark-circle" size={24} color={colors.success} />
+                        <Ionicons name="checkmark-circle" size={24} color={theme.colors.statusConfirmed} />
                       </View>
                     )}
                   </TouchableOpacity>
@@ -272,7 +269,7 @@ export default function DoctorSelectionScreen() {
                       <Text style={styles.dateDisplay}>{dateObj.display}</Text>
                     </View>
                     {selectedDate === dateObj.date && (
-                      <Ionicons name="checkmark-circle" size={24} color={colors.success} />
+                      <Ionicons name="checkmark-circle" size={24} color={theme.colors.statusConfirmed} />
                     )}
                   </View>
                 </TouchableOpacity>
@@ -291,7 +288,7 @@ export default function DoctorSelectionScreen() {
 
             {isLoadingSlots ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={colors.primary} />
+                <ActivityIndicator size="large" color={theme.colors.primary} />
                 <Text style={styles.loadingText}>Loading available slots...</Text>
               </View>
             ) : (
@@ -324,7 +321,7 @@ export default function DoctorSelectionScreen() {
                         <Ionicons 
                           name="close-circle" 
                           size={16} 
-                          color={colors.error} 
+                          color={theme.colors.error} 
                           style={styles.bookedIcon}
                         />
                       )}
@@ -359,232 +356,232 @@ export default function DoctorSelectionScreen() {
   );
 }
 
-const getStyles = (colors: any) =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.primary,
-    },
-    content: {
-      flex: 1,
-      borderTopLeftRadius: 30,
-      borderTopRightRadius: 30,
-      paddingTop: hp(3),
-      paddingHorizontal: wp(5),
-    },
-    stepContainer: {
-      flex: 1,
-    },
-    stepTitle: {
-      fontSize: hp(2.5),
-      fontWeight: 'bold',
-      color: colors.textPrimary,
-      marginBottom: hp(0.5),
-    },
-    stepSubtitle: {
-      fontSize: hp(1.6),
-      color: colors.textSecondary,
-      marginBottom: hp(2),
-    },
-    loadingContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    emptyContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    emptyText: {
-      fontSize: hp(1.8),
-      color: colors.textSecondary,
-      marginTop: hp(1),
-    },
-    loadingText: {
-      fontSize: hp(1.6),
-      color: colors.textSecondary,
-      marginTop: hp(2),
-    },
-    doctorCard: {
-      backgroundColor: colors.cardBackground || colors.white,
-      borderRadius: 15,
-      padding: wp(4),
-      marginBottom: hp(1.5),
-      borderWidth: 2,
-      borderColor: colors.lightGray || '#f0f0f0',
-    },
-    doctorCardSelected: {
-      borderColor: colors.success || '#4CAF50',
-      backgroundColor: colors.primary + '10',
-    },
-    doctorContent: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    doctorAvatar: {
-      width: 60,
-      height: 60,
-      borderRadius: 30,
-      backgroundColor: colors.gray || '#f0f0f0',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: wp(3),
-    },
-    doctorInfo: {
-      flex: 1,
-    },
-    doctorName: {
-      fontSize: hp(1.8),
-      fontWeight: '600',
-      color: colors.textPrimary,
-      marginBottom: hp(0.3),
-    },
-    doctorSpecialty: {
-      fontSize: hp(1.5),
-      color: colors.textSecondary,
-      marginBottom: hp(0.2),
-    },
-    doctorExperience: {
-      fontSize: hp(1.4),
-      color: colors.textSecondary,
-      marginBottom: hp(0.3),
-    },
-    ratingContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    ratingText: {
-      fontSize: hp(1.4),
-      color: colors.textSecondary,
-      marginLeft: wp(1),
-    },
-    feeContainer: {
-      alignItems: 'flex-end',
-    },
-    feeLabel: {
-      fontSize: hp(1.2),
-      color: colors.textSecondary,
-    },
-    feeAmount: {
-      fontSize: hp(1.8),
-      fontWeight: 'bold',
-      color: colors.primary,
-    },
-    checkmark: {
-      position: 'absolute',
-      right: wp(4),
-      top: hp(1),
-    },
-    timeGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent: 'space-between',
-      paddingBottom: hp(10),
-    },
-    timeSlot: {
-      width: '30%',
-      aspectRatio: 1,
-      backgroundColor: colors.gray || '#f0f0f0',
-      borderRadius: 12,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginBottom: hp(2),
-      borderWidth: 2,
-      borderColor: colors.lightGray || '#f0f0f0',
-    },
-    timeSlotSelected: {
-      backgroundColor: colors.success || '#4CAF50',
-      borderColor: colors.success || '#4CAF50',
-    },
-    timeSlotText: {
-      fontSize: hp(1.5),
-      fontWeight: '600',
-      color: colors.textPrimary,
-    },
-    timeSlotTextSelected: {
-      color: colors.white,
-    },
-    timeSlotBooked: {
-      backgroundColor: colors.lightGray || '#e0e0e0',
-      borderColor: colors.error || '#FF6B6B',
-      opacity: 0.6,
-    },
-    timeSlotTextBooked: {
-      color: colors.error || '#FF6B6B',
-      textDecorationLine: 'line-through',
-    },
-    bookedIcon: {
-      position: 'absolute',
-      top: -8,
-      right: -8,
-    },
-    dateCard: {
-      backgroundColor: colors.cardBackground || colors.white,
-      borderRadius: 12,
-      padding: wp(4),
-      marginBottom: hp(1.5),
-      borderWidth: 2,
-      borderColor: colors.lightGray || '#f0f0f0',
-    },
-    dateCardSelected: {
-      borderColor: colors.success || '#4CAF50',
-      backgroundColor: colors.primary + '10',
-    },
-    dateContent: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    },
-    dateInfo: {
-      flex: 1,
-    },
-    dateDay: {
-      fontSize: hp(1.5),
-      fontWeight: '600',
-      color: colors.textPrimary,
-    },
-    dateDisplay: {
-      fontSize: hp(1.8),
-      fontWeight: 'bold',
-      color: colors.primary,
-      marginTop: hp(0.3),
-    },
-    buttonContainer: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      paddingBottom: hp(2),
-      paddingTop: hp(2),
-    },
-    backBtn: {
-      flex: 0.45,
-      backgroundColor: colors.lightGray || '#f0f0f0',
-      paddingVertical: hp(2),
-      borderRadius: 12,
-      alignItems: 'center',
-    },
-    backBtnText: {
-      fontSize: hp(1.8),
-      fontWeight: '600',
-      color: colors.textPrimary,
-    },
-    nextBtn: {
-      flex: 0.45,
-      backgroundColor: colors.primary,
-      paddingVertical: hp(2),
-      borderRadius: 12,
-      alignItems: 'center',
-    },
-    nextBtnDisabled: {
-      backgroundColor: colors.lightGray || '#f0f0f0',
-      opacity: 0.6,
-    },
-    nextBtnText: {
-      fontSize: hp(1.8),
-      fontWeight: '600',
-      color: colors.white,
-    },
-    nextBtnTextDisabled: {
-      color: colors.textSecondary,
-    },
-  });
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.primary,
+  },
+  content: {
+    flex: 1,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    backgroundColor: theme.colors.background,
+    paddingTop: hp(3),
+    paddingHorizontal: wp(5),
+  },
+  stepContainer: {
+    flex: 1,
+  },
+  stepTitle: {
+    fontSize: hp(2.5),
+    fontWeight: theme.typography.fontWeight.bold as any,
+    color: theme.colors.textPrimary,
+    marginBottom: hp(0.5),
+  },
+  stepSubtitle: {
+    fontSize: hp(1.6),
+    color: theme.colors.textSecondary,
+    marginBottom: hp(2),
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: hp(1.8),
+    color: theme.colors.textSecondary,
+    marginTop: hp(1),
+  },
+  loadingText: {
+    fontSize: hp(1.6),
+    color: theme.colors.textSecondary,
+    marginTop: hp(2),
+  },
+  doctorCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.large,
+    padding: wp(4),
+    marginBottom: hp(1.5),
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+  },
+  doctorCardSelected: {
+    borderColor: theme.colors.statusConfirmed,
+    backgroundColor: theme.colors.primary + '10',
+  },
+  doctorContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  doctorAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: theme.colors.primary + '20',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: wp(3),
+  },
+  doctorInfo: {
+    flex: 1,
+  },
+  doctorName: {
+    fontSize: hp(1.8),
+    fontWeight: theme.typography.fontWeight.semiBold as any,
+    color: theme.colors.textPrimary,
+    marginBottom: hp(0.3),
+  },
+  doctorSpecialty: {
+    fontSize: hp(1.5),
+    color: theme.colors.textSecondary,
+    marginBottom: hp(0.2),
+  },
+  doctorExperience: {
+    fontSize: hp(1.4),
+    color: theme.colors.textSecondary,
+    marginBottom: hp(0.3),
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  ratingText: {
+    fontSize: hp(1.4),
+    color: theme.colors.textSecondary,
+    marginLeft: wp(1),
+  },
+  feeContainer: {
+    alignItems: 'flex-end',
+  },
+  feeLabel: {
+    fontSize: hp(1.2),
+    color: theme.colors.textSecondary,
+  },
+  feeAmount: {
+    fontSize: hp(1.8),
+    fontWeight: theme.typography.fontWeight.bold as any,
+    color: theme.colors.primary,
+  },
+  checkmark: {
+    position: 'absolute',
+    right: wp(4),
+    top: hp(1),
+  },
+  timeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingBottom: hp(10),
+  },
+  timeSlot: {
+    width: '30%',
+    aspectRatio: 1,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.medium,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: hp(2),
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+  },
+  timeSlotSelected: {
+    backgroundColor: theme.colors.statusConfirmed,
+    borderColor: theme.colors.statusConfirmed,
+  },
+  timeSlotText: {
+    fontSize: hp(1.5),
+    fontWeight: theme.typography.fontWeight.semiBold as any,
+    color: theme.colors.textPrimary,
+  },
+  timeSlotTextSelected: {
+    color: theme.colors.surface,
+  },
+  timeSlotBooked: {
+    backgroundColor: theme.colors.disabled,
+    borderColor: theme.colors.error,
+    opacity: 0.6,
+  },
+  timeSlotTextBooked: {
+    color: theme.colors.error,
+    textDecorationLine: 'line-through',
+  },
+  bookedIcon: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+  },
+  dateCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.medium,
+    padding: wp(4),
+    marginBottom: hp(1.5),
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+  },
+  dateCardSelected: {
+    borderColor: theme.colors.statusConfirmed,
+    backgroundColor: theme.colors.primary + '10',
+  },
+  dateContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dateInfo: {
+    flex: 1,
+  },
+  dateDay: {
+    fontSize: hp(1.5),
+    fontWeight: theme.typography.fontWeight.semiBold as any,
+    color: theme.colors.textPrimary,
+  },
+  dateDisplay: {
+    fontSize: hp(1.8),
+    fontWeight: theme.typography.fontWeight.bold as any,
+    color: theme.colors.primary,
+    marginTop: hp(0.3),
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingBottom: hp(2),
+    paddingTop: hp(2),
+  },
+  backBtn: {
+    flex: 0.45,
+    backgroundColor: theme.colors.border,
+    paddingVertical: hp(2),
+    borderRadius: theme.borderRadius.medium,
+    alignItems: 'center',
+  },
+  backBtnText: {
+    fontSize: hp(1.8),
+    fontWeight: theme.typography.fontWeight.semiBold as any,
+    color: theme.colors.textPrimary,
+  },
+  nextBtn: {
+    flex: 0.45,
+    backgroundColor: theme.colors.accent,
+    paddingVertical: hp(2),
+    borderRadius: theme.borderRadius.medium,
+    alignItems: 'center',
+  },
+  nextBtnDisabled: {
+    backgroundColor: theme.colors.disabled,
+    opacity: 0.6,
+  },
+  nextBtnText: {
+    fontSize: hp(1.8),
+    fontWeight: theme.typography.fontWeight.semiBold as any,
+    color: theme.colors.surface,
+  },
+  nextBtnTextDisabled: {
+    color: theme.colors.textSecondary,
+  },
+});
