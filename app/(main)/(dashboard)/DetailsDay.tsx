@@ -123,7 +123,7 @@ export default function DetailsDay () {
     const [showFoodSearch, setShowFoodSearch] = useState(false);
     const [suggestedFoods, setSuggestedFoods] = useState<any[]>([]);
     const [mealQuantity, setMealQuantity] = useState<string>('1');
-    const [waterInput, setWaterInput] = useState<string>('0.25'); // Default to 250ml glass
+    const [waterInput, setWaterInput] = useState<string>('0'); // Default to 0
     const [showWaterTab, setShowWaterTab] = useState(false);
     const [trackingMode, setTrackingMode] = useState<'meal' | 'hydration'>('meal');
     
@@ -1349,7 +1349,7 @@ export default function DetailsDay () {
                   setCalorieInput('');
                   setMealQuantity('1');
                   setDescriptionInput('');
-                  setWaterInput('0.25');
+                  setWaterInput('0');
                   
                   // Use setTimeout to ensure state updates are processed
                   setTimeout(() => {
