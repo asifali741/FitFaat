@@ -1,7 +1,7 @@
 import { pakistaniDishes } from '@/app/Dataset/dataSet';
 import { drinksDataSet } from '@/app/Dataset/waterDataSet';
 import { goalBasedSuggestions, waterIntakeDatabase } from '@/constants/foodDatabase';
-import { HEADER_PADDING_HORIZONTAL, HEADER_PADDING_VERTICAL } from '@/constants/ui';
+import { HEADER_PADDING_HORIZONTAL } from '@/constants/ui';
 import { useTheme } from "@/contexts/ThemeContext";
 import { dailyLogsApi } from '@/utils/dailyLogsApi';
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
