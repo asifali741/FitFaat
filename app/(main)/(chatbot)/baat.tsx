@@ -36,6 +36,7 @@ export default function Baat() {
     clearAllChats
   } = useChatbotStorage();
   const router = useRouter();
+  const flatListRef = useRef<FlatList>(null);
   
   // Keep a stable ref to addMessage even if it changes
   const addMessageRef = useRef(addMessage);
@@ -50,25 +51,6 @@ export default function Baat() {
     }
   }, [currentSession, isLoading, createNewSession]);
 
-  // Clear chat handler
-  const handleClearChat = async () => {
-    Alert.alert(
-      "Clear Chat",
-      "Are you sure you want to delete all messages?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Clear",
-          style: "destructive",
-          onPress: async () => {
-            await clearAllChats();
-            createNewSession();
-          }
-        }
-      ]
-    );
-  };
-
   // Convert stored messages to display format
   const displayMessages: ChatMessage[] = storedMessages.length > 0 
     ? storedMessages.map(msg => ({
@@ -77,6 +59,15 @@ export default function Baat() {
         createdAt: msg.timestamp
       }))
     : [WelcomeText];
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (displayMessages.length > 0) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [displayMessages.length]);
 
   const handleAddMessage = useCallback((text: string, isUser: boolean, source?: string) => {
     try {
@@ -95,12 +86,6 @@ export default function Baat() {
           title="HeaLora Chat"
           showStepIndicator={false}
         />
-        <TouchableOpacity 
-          style={styles.clearButton}
-          onPress={handleClearChat}
-        >
-          <Text style={styles.clearButtonText}>Clear Chat</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Chat Content */}
@@ -116,6 +101,7 @@ export default function Baat() {
         
         <View style={styles.chatSection}>
           <FlatList
+            ref={flatListRef}
             data={displayMessages}
             keyExtractor={(_, index) => index.toString()}
             renderItem={({ item }) => <Message msg={item} />}
@@ -123,6 +109,7 @@ export default function Baat() {
             showsVerticalScrollIndicator={false}
             keyboardDismissMode="on-drag"
             keyboardShouldPersistTaps="handled"
+            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
           />
         </View>
         
@@ -149,16 +136,6 @@ const getStyles = (colors: any, insets: any) => StyleSheet.create({
   },
   headerContainer: {
     position: 'relative',
-  },
-  clearButton: {
-    position: 'absolute',
-    right: wp(4),
-    top: hp(1.5),
-    backgroundColor: '#FF6B6B',
-    paddingHorizontal: wp(3),
-    paddingVertical: hp(0.8),
-    borderRadius: 8,
-    zIndex: 10,
   },
   clearButtonText: {
     color: '#fff',
@@ -201,7 +178,7 @@ const getStyles = (colors: any, insets: any) => StyleSheet.create({
   },
   messageList: {
     padding: hp(1),
-    paddingBottom: hp(12), // Extra padding to account for fixed input bar
+    paddingBottom: Platform.OS === 'ios' ? hp(20) : hp(18),
     flexGrow: 1,
   },
   inputContainer: {

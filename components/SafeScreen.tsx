@@ -13,7 +13,6 @@ export default function SafeScreen({ children }: SafeScreenProps) {
     <View
       style={{
         flex: 1,
-        marginTop: insets.top,
       }}
     >
       {children}

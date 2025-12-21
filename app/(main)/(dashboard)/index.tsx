@@ -216,7 +216,7 @@ export default function DayPlan () {
       <View style={[styles.content, { backgroundColor: colors.screenColor }]}>
         <ScrollView 
           style={styles.list}
-          contentContainerStyle={{ paddingBottom: 100, paddingTop: 12 }}
+          contentContainerStyle={{ paddingBottom: 120, paddingTop: 12 }}
           showsVerticalScrollIndicator={false} 
           showsHorizontalScrollIndicator={false}
           scrollEventThrottle={16}
