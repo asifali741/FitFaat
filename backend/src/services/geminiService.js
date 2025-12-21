@@ -1,19 +1,9 @@
 import dotenv from 'dotenv';
-import { formatHealthResponse, searchHealthDataset } from '../constants/healthDataset.js';
 import { getLogger } from '../utils/chatLogger.js';
 import { getConversationManager } from '../utils/conversationContext.js';
 import {
-    detectHealthCategory,
-    isHealthQuery,
-    isNutritionQuery,
-    isRestrictedMedicalQuery
-} from '../utils/healthDetection.js';
-import {
     addPersonality,
-    generateErrorResponse,
-    generateFollowUp,
-    generateGreeting,
-    rejectOutOfScope
+    generateGreeting
 } from '../utils/responseTemplates.js';
 
 dotenv.config();
