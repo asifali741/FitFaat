@@ -24,9 +24,10 @@ const isChatAllowed = (appointment, userRole) => {
   
   appointmentDate.setHours(hours, minutes, 0, 0);
   
-  // Check status - only confirmed appointments allow chat
+  // If appointment is not confirmed, allow read-only viewing of the chat
+  // (this lets users and doctors review past or cancelled appointments' messages)
   if (appointment.status !== 'confirmed') {
-    return { allowed: false, canSend: false, reason: 'Appointment must be confirmed first' };
+    return { allowed: true, canSend: false, reason: `Appointment is ${appointment.status}. Chat is read-only` };
   }
   
   // Determine chat start time (either when doctor granted access or appointment time)
@@ -113,6 +114,28 @@ export const checkChatAccess = async (req, res) => {
     }
     
     if (!appointment) {
+      // Fallback: if appointment record is missing but there are existing messages from this user
+      // allow read-only access so users can view their previous chat history (doctor already sees it).
+      const fallbackMsg = await ChatMessage.findOne({ appointmentId, senderId: userId }).lean();
+      if (fallbackMsg) {
+        return res.json({
+          success: true,
+          allowed: true,
+          canSend: false,
+          userRole: 'user',
+          message: 'Appointment record missing; returning read-only chat based on message history',
+          appointment: {
+            id: appointmentId,
+            date: null,
+            time: null,
+            status: 'orphaned',
+            doctorId: fallbackMsg.senderRole === 'doctor' ? fallbackMsg.senderId : null,
+            patientId: fallbackMsg.senderRole === 'user' ? fallbackMsg.senderId : null,
+            chatAccessGrantedAt: null
+          }
+        });
+      }
+
       return res.status(404).json({
         success: false,
         message: 'Appointment not found'
@@ -198,10 +221,16 @@ export const getChatMessages = async (req, res) => {
     }
     
     if (!hasAccess) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied'
-      });
+      // Fallback: allow users who previously sent messages in this appointment to fetch history (read-only)
+      const fallbackMsg = await ChatMessage.findOne({ appointmentId, senderId: userId }).lean();
+      if (!fallbackMsg) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+      }
+      // Otherwise allow read-only fetch
+      console.log('Fallback access granted based on existing message from user:', userId);
     }
     
     // Get messages

@@ -25,9 +25,9 @@ const isChatAllowed = (appointment, userRole) => {
   
   appointmentDate.setHours(hours, minutes, 0, 0);
   
-  // Check status - only confirmed appointments allow chat
+  // If appointment is not confirmed, allow read-only viewing (matches REST behavior)
   if (appointment.status !== 'confirmed') {
-    return { allowed: false, canSend: false, reason: 'Appointment must be confirmed first' };
+    return { allowed: true, canSend: false, reason: `Appointment is ${appointment.status}. Chat is read-only` };
   }
   
   // Determine chat start time (either when doctor granted access or appointment time)
@@ -156,8 +156,27 @@ export const initializeSocketIO = (httpServer) => {
         }
         
         if (!appointment) {
-          socket.emit('error', { message: 'Appointment not found' });
-          return;
+          // Fallback: allow read-only join if there are existing messages for this appointment from this user
+          const fallbackMsg = await ChatMessage.findOne({ appointmentId, $or: [{ senderId: userId }, { recipientId: userId }] }).lean();
+          if (fallbackMsg) {
+            console.log('Fallback join allowed based on existing message for user:', userId);
+            // Create a minimal appointment object to allow joining the room (read-only)
+            appointment = {
+              _id: appointmentId,
+              date: null,
+              time: null,
+              status: 'orphaned',
+              chatAccessGrantedAt: null,
+              doctorId: fallbackMsg.senderRole === 'doctor' ? fallbackMsg.senderId : null,
+              userId: fallbackMsg.senderRole === 'user' ? fallbackMsg.senderId : null
+            };
+            // Keep userRole as detected earlier (doctor if found), otherwise default to 'user'
+            if (!userRole) userRole = 'user';
+            senderName = senderName || (userRole === 'doctor' ? 'Doctor' : 'User');
+          } else {
+            socket.emit('error', { message: 'Appointment not found' });
+            return;
+          }
         }
         
         // Check if chat is allowed

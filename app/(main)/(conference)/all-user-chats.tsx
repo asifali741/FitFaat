@@ -34,9 +34,8 @@ export default function AllUserChatsScreen() {
     try {
       const response = await authApi.getUserAppointments();
       if (response.success) {
-        // Filter only confirmed appointments and sort by most recent message
-        const confirmedAppointments = (response.appointments || [])
-          .filter((apt: any) => apt.status === 'confirmed')
+          // Include all appointments (confirmed, completed, cancelled, pending) and sort by most recent message or date
+        const allAppointments = (response.appointments || [])
           .sort((a: any, b: any) => {
             // If both have messages, sort by most recent message
             if (a.lastMessageAt && b.lastMessageAt) {
@@ -45,10 +44,10 @@ export default function AllUserChatsScreen() {
             // Chats with messages come first
             if (a.lastMessageAt) return -1;
             if (b.lastMessageAt) return 1;
-            // If no messages, sort by appointment date
+            // If no messages, sort by appointment dateas
             return new Date(b.date).getTime() - new Date(a.date).getTime();
           });
-        setAppointments(confirmedAppointments);
+        setAppointments(allAppointments);
       } else {
         Alert.alert('Error', 'Failed to load appointments');
       }
@@ -182,8 +181,22 @@ export default function AllUserChatsScreen() {
 
             <View style={styles.appointmentFooter}>
               <View style={styles.statusContainer}>
-                <View style={[styles.statusDot, { backgroundColor: '#4CAF50' }]} />
-                <Text style={styles.statusText}>Confirmed</Text>
+                {(() => {
+                  const statusColorMap: { [key: string]: string } = {
+                    confirmed: '#4CAF50',
+                    completed: theme.colors.textSecondary,
+                    cancelled: theme.colors.error,
+                    pending: '#F59E0B'
+                  };
+                  const statusColor = statusColorMap[item.status] || theme.colors.textSecondary;
+                  const statusText = item.status ? item.status.charAt(0).toUpperCase() + item.status.slice(1) : 'Unknown';
+                  return (
+                    <>
+                      <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+                      <Text style={styles.statusText}>{statusText}</Text>
+                    </>
+                  );
+                })()}
               </View>
               {item.chatAccessGrantedAt && (
                 <Text style={styles.accessGrantedText}>Early Access ✓</Text>
@@ -226,7 +239,7 @@ export default function AllUserChatsScreen() {
           <Ionicons name="chatbubbles-outline" size={80} color={theme.colors.border} />
           <Text style={styles.emptyTitle}>No Chats Available</Text>
           <Text style={styles.emptySubtitle}>
-            Your confirmed appointments will appear here
+            Your appointments will appear here
           </Text>
         </View>
       ) : (
