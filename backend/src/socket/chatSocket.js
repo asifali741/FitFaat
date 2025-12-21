@@ -456,6 +456,23 @@ export const initializeSocketIO = (httpServer) => {
             unreadCount
           });
           console.log(`✅ Notified user:${chatMessage.recipientId} about new message. unreadCount=${unreadCount}`);
+
+          // Also notify the sender's personal room so sender's chat list gets updated immediately
+          try {
+            const senderUnreadCount = await ChatMessage.countDocuments({ recipientId: chatMessage.senderId, isRead: false });
+            io.to(`user:${chatMessage.senderId}`).emit('user-new-message', {
+              appointmentId: chatMessage.appointmentId,
+              messageId: chatMessage._id,
+              senderName: chatMessage.senderName,
+              senderId: chatMessage.senderId,
+              createdAt: chatMessage.createdAt,
+              unreadCount: senderUnreadCount,
+              isSender: true
+            });
+            console.log(`✅ Notified sender user:${chatMessage.senderId} about sent message (local update). unreadCount=${senderUnreadCount}`);
+          } catch (e) {
+            console.warn('Failed to notify sender personal room:', e);
+          }
         }
 
         console.log(`Message broadcasted in appointment ${appointmentId} by ${socket.senderName}`);
