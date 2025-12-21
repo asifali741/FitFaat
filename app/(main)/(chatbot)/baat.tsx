@@ -5,7 +5,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import Controls from "@/Control/controls";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef } from "react";
-import { Alert, FlatList, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { FlatList, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 // type ChatMessage = {
