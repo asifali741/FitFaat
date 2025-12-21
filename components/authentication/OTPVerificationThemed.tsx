@@ -3,13 +3,13 @@
  * OTP Verification screen using themed components
  */
 
+import BackButton from '@/components/BackButton';
 import { KeyboardAwareContainer, ThemedButton } from '@/components/themed';
 import { theme } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import BackButton from '@/components/BackButton';
 
 import { authApi } from '../../utils/auth/authApi';
 

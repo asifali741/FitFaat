@@ -1,11 +1,11 @@
-import { Ionicons } from "@expo/vector-icons";
 import BackButton from '@/components/BackButton';
+import { theme } from "@/constants/theme";
+import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { theme } from "@/constants/theme";
 import { getDoctorById } from "./_doctorsData";
 
 export default function DoctorDetailsScreen() {
