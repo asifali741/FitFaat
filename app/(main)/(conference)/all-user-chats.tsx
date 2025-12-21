@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { widthPercentageToDP as wp } from 'react-native-responsive-screen';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { io } from 'socket.io-client';
 
 export default function AllUserChatsScreen() {
   const router = useRouter();
@@ -23,6 +24,7 @@ export default function AllUserChatsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState<{ [key: string]: number }>({});
+  const socketRef = useRef<any>(null);
 
   useEffect(() => {
     fetchAppointments();
@@ -34,19 +36,40 @@ export default function AllUserChatsScreen() {
     try {
       const response = await authApi.getUserAppointments();
       if (response.success) {
-          // Include all appointments (confirmed, completed, cancelled, pending) and sort by most recent message or date
-        const allAppointments = (response.appointments || [])
-          .sort((a: any, b: any) => {
-            // If both have messages, sort by most recent message
-            if (a.lastMessageAt && b.lastMessageAt) {
-              return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
-            }
-            // Chats with messages come first
-            if (a.lastMessageAt) return -1;
-            if (b.lastMessageAt) return 1;
-            // If no messages, sort by appointment dateas
-            return new Date(b.date).getTime() - new Date(a.date).getTime();
-          });
+        // Include all appointments (confirmed, completed, cancelled, pending) and sort like WhatsApp:
+        // 1) unread chats first, 2) most recent message (lastMessageAt) desc, 3) appointment date desc
+        const unreadByAppointmentMap = (await (async () => {
+          try {
+            const token = await SecureStore.getItemAsync('authToken');
+            if (!token) return {};
+            const ENV = Constants.expoConfig?.extra;
+            const API_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')).replace(/\/api\/?$/, '');
+            const resp = await fetch(`${API_URL}/api/chat/unread-by-appointment`, { method: 'GET', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } });
+            if (!resp.ok) return {};
+            const data = await resp.json();
+            return data.unreadByAppointment || {};
+          } catch (e) { return {}; }
+        })());
+
+        const allAppointments = (response.appointments || []).sort((a: any, b: any) => {
+          const aUnread = (unreadByAppointmentMap[a._id] || 0) > 0 ? 1 : 0;
+          const bUnread = (unreadByAppointmentMap[b._id] || 0) > 0 ? 1 : 0;
+
+          // Unread first
+          if (aUnread !== bUnread) return bUnread - aUnread;
+
+          // Most recent message
+          if (a.lastMessageAt && b.lastMessageAt) {
+            return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
+          }
+
+          if (a.lastMessageAt) return -1;
+          if (b.lastMessageAt) return 1;
+
+          // Finally by appointment date
+          return new Date(b.date).getTime() - new Date(a.date).getTime();
+        });
+
         setAppointments(allAppointments);
       } else {
         Alert.alert('Error', 'Failed to load appointments');
@@ -85,6 +108,75 @@ export default function AllUserChatsScreen() {
     }
   };
 
+  // Socket: listen for incoming message notifications and reorder list
+  useEffect(() => {
+    let socket: any = null;
+
+    const initSocket = async () => {
+      try {
+        const token = await SecureStore.getItemAsync('authToken');
+        if (!token) return;
+
+        const ENV = Constants.expoConfig?.extra;
+        const API_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')).replace(/\/api\/?$/, '');
+        socket = io(API_URL, { transports: ['websocket'], auth: { token } });
+        socketRef.current = socket;
+
+        socket.on('user-new-message', (payload: any) => {
+          if (!payload || !payload.appointmentId) return;
+
+          // Update unread mapping if provided
+          if (typeof payload.unreadCount === 'number') {
+            setUnreadMessages(prev => ({ ...prev, [payload.appointmentId]: payload.unreadCount }));
+          } else {
+            // increment locally
+            setUnreadMessages(prev => ({ ...prev, [payload.appointmentId]: (prev[payload.appointmentId] || 0) + 1 }));
+          }
+
+          // Move appointment to top if present, otherwise refresh list
+          setAppointments(prev => {
+            const idx = prev.findIndex(a => a._id === payload.appointmentId);
+            if (idx === -1) {
+              // appointment not in list, refresh
+              fetchAppointments();
+              return prev;
+            }
+
+            const updated = [...prev];
+            const item = { ...updated.splice(idx, 1)[0] };
+            // Update lastMessageAt if payload includes timestamp
+            if (payload.createdAt) item.lastMessageAt = payload.createdAt;
+            // Place at start
+            return [item, ...updated];
+          });
+        });
+
+        socket.on('messages-read', (payload: any) => {
+          if (!payload || !payload.appointmentId) return;
+          // Clear unread count for appointment when messages are read
+          setUnreadMessages(prev => ({ ...prev, [payload.appointmentId]: 0 }));
+        });
+
+        socket.on('message-status-update', () => {
+          // Refresh unread counts
+          fetchUnreadMessages();
+        });
+
+      } catch (error) {
+        console.log('Error setting up chat socket in AllUserChats:', error);
+      }
+    };
+
+    initSocket();
+
+    return () => {
+      try {
+        socketRef.current?.disconnect();
+      } catch (e) { }
+    };
+  }, []);
+
+  // Delete chat helper
   const deleteChat = async (appointmentId: string) => {
     Alert.alert(
       'Delete Chat',
@@ -110,7 +202,7 @@ export default function AllUserChatsScreen() {
 
               if (response.ok) {
                 // Remove from local state
-                setAppointments(appointments.filter(apt => apt._id !== appointmentId));
+                setAppointments(prev => prev.filter(apt => apt._id !== appointmentId));
                 Alert.alert('Success', 'Chat deleted successfully');
               } else {
                 Alert.alert('Error', 'Failed to delete chat');
