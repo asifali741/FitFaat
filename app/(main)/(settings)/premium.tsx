@@ -603,12 +603,12 @@ export default function PremiumScreen() {
 
             {/* Cancel Button */}
             <TouchableOpacity
-              style={styles.cancelButton}
+              style={[styles.cancelButton, { backgroundColor: colors.error, borderColor: colors.error }]}
               onPress={handleCancelPremium}
               disabled={processing}
             >
-              <Ionicons name="close-circle" size={20} color="#FF6B6B" />
-              <Text style={styles.cancelButtonText}>Cancel Premium</Text>
+              <Ionicons name="close-circle" size={20} color={colors.buttonText} />
+              <Text style={[styles.cancelButtonText, { color: colors.buttonText }]}>Cancel Premium</Text>
             </TouchableOpacity>
           </>
         )}
@@ -1059,13 +1059,19 @@ const getStyles = (colors: any) =>
       padding: hp(1.8),
       borderRadius: hp(1.2),
       borderWidth: 1.5,
-      borderColor: "#FF6B6B",
+      borderColor: colors.error,
+      backgroundColor: colors.error,
       marginBottom: hp(3),
       gap: wp(2),
+      shadowColor: colors.error,
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.22,
+      shadowRadius: 6,
+      elevation: 4,
     },
     cancelButtonText: {
       fontSize: hp(2),
       fontWeight: "bold",
-      color: "#FF6B6B",
+      color: colors.buttonText,
     },
   });
