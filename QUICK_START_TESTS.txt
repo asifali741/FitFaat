@@ -1,0 +1,224 @@
+🤖 CHATBOT TEST SCRIPTS - QUICK REFERENCE
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📂 FILES CREATED
+════════════════════════════════════════════════════════════════════════════════
+
+1. test-chatbot-basic.js
+   Location: /backend/
+   Time: 10-30 seconds
+   Use: Quick validation
+   Run: node test-chatbot-basic.js
+
+2. test-chatbot-interactive.js
+   Location: /backend/
+   Time: 30-60 seconds
+   Use: Detailed analysis + analytics
+   Run: node test-chatbot-interactive.js
+
+3. RUN_TESTS.sh
+   Location: /backend/
+   Use: Instructions and examples
+
+4. Documentation files:
+   - TEST_SCRIPTS_GUIDE.md (Complete guide)
+   - TEST_SCRIPTS_IMPLEMENTATION.md (This summary)
+
+════════════════════════════════════════════════════════════════════════════════
+
+🚀 HOW TO RUN
+════════════════════════════════════════════════════════════════════════════════
+
+Option 1: Quick Test (Recommended first)
+  cd /Users/mc/Desktop/FitFaat/backend
+  node test-chatbot-basic.js
+
+Option 2: Comprehensive Test (Full analysis)
+  cd /Users/mc/Desktop/FitFaat/backend
+  node test-chatbot-interactive.js
+
+Option 3: Run Both
+  cd /Users/mc/Desktop/FitFaat/backend
+  node test-chatbot-basic.js && node test-chatbot-interactive.js
+
+════════════════════════════════════════════════════════════════════════════════
+
+📊 WHAT GETS TESTED
+════════════════════════════════════════════════════════════════════════════════
+
+10 Sample Questions:
+
+✅ Dataset Queries (expect database hits):
+   • "I am gonna eat biryani, how many calories will I get?"
+   • "How much protein is in chicken tandoori?"
+   • "How many carbs are in a bowl of rice?"
+   • "What is the hydration level of orange juice?"
+
+❌ Non-Dataset Queries (expect guidance message):
+   • "How can I lose weight?"
+   • "How can I gain weight?"
+   • "Can you suggest post-workout nutrition?"
+   • "What can I eat to increase my energy levels?"
+
+🏥 Health Queries:
+   • "Tell me about vitamins in spinach"
+   • "I want to improve my sleep quality, any tips?"
+
+════════════════════════════════════════════════════════════════════════════════
+
+📊 EXPECTED OUTPUT
+════════════════════════════════════════════════════════════════════════════════
+
+BASIC TEST Output:
+  🤖 CHATBOT TEST START
+  
+  📌 Question 1/10
+  💬 "I am gonna eat biryani..."
+  🤖 🍽️ **Biryani** (1 serving) | 🔥 450 kcal...
+  📊 Source: dataset | Time: 45ms
+  
+  ... 9 more questions ...
+  
+  ✅ CHATBOT TEST END
+
+INTERACTIVE TEST Output:
+  🤖 FITFAAT CHATBOT INTERACTIVE TEST
+  📍 Session ID: test-session-001
+  📊 Total Questions: 10
+  
+  [Each question with full response details]
+  
+  📈 TEST SUMMARY:
+    ✅ Total Processed: 10
+    🍽️  Dataset Hits: 3-4
+    🏥 Health Queries: 2-3
+    ℹ️  Guidance Messages: 3-4
+  
+  📝 CONVERSATION HISTORY: 20 messages
+  📊 ANALYTICS: Breakdown by type/source/status
+  ⏱️  TIMING: Average/min/max response times
+
+════════════════════════════════════════════════════════════════════════════════
+
+✅ SUCCESS INDICATORS
+════════════════════════════════════════════════════════════════════════════════
+
+Look for these in output:
+
+✅ Dataset Queries:
+   Source: dataset
+   Response: Nutritional info with emojis (🍽️ 🔥 💪 🌾 🧈)
+   Time: <100ms
+
+✅ Guidance Messages:
+   Source: system
+   Response: "I can provide calories, protein, fat, carbs..."
+   Time: <10ms
+
+✅ Health Queries:
+   Source: health-dataset
+   Response: Health tips and information
+   Time: <500ms
+
+✅ Session History:
+   Total messages: 20 (10 user + 10 assistant)
+   All questions stored and retrievable
+
+✅ No Errors:
+   All 10 questions processed successfully
+   No exception or error messages
+
+════════════════════════════════════════════════════════════════════════════════
+
+🔧 SESSION ID
+════════════════════════════════════════════════════════════════════════════════
+
+Both tests use: test-session-001
+
+This maintains conversation context. After testing, you can view history:
+
+import { getSessionHistory } from './src/services/geminiService.js';
+const history = getSessionHistory('test-session-001');
+console.log(history); // 20 messages
+
+════════════════════════════════════════════════════════════════════════════════
+
+📈 ANALYTICS (Interactive Test Only)
+════════════════════════════════════════════════════════════════════════════════
+
+Queries by Type:
+  • nutrition: 7 (food/nutrition questions)
+  • health: 3 (health/wellness questions)
+
+Queries by Source:
+  • dataset: 3-4 (food database hits)
+  • system: 3-4 (guidance messages)
+  • health-dataset: 2-3 (health information)
+
+Queries by Status:
+  • success: 10 (all successful)
+  • not_found: 0-1 (food not in database)
+  • error: 0 (no errors)
+
+Timing:
+  • Average: 50-150ms
+  • Fastest: 2ms (guidance)
+  • Slowest: 500-1000ms (health)
+
+════════════════════════════════════════════════════════════════════════════════
+
+🎯 WHAT TO VERIFY
+════════════════════════════════════════════════════════════════════════════════
+
+After running tests, check:
+
+1. ✅ All 10 questions processed
+2. ✅ Dataset queries return nutritional info
+3. ✅ Non-dataset queries show guidance message
+4. ✅ Health queries return health information
+5. ✅ Response times are reasonable (<1000ms)
+6. ✅ Session has 20 messages (2 per question)
+7. ✅ Analytics shows correct breakdown
+8. ✅ No error messages in console
+
+════════════════════════════════════════════════════════════════════════════════
+
+❓ TROUBLESHOOTING
+════════════════════════════════════════════════════════════════════════════════
+
+Script won't run?
+  → cd /Users/mc/Desktop/FitFaat/backend
+  → ls src/services/geminiService.js (verify file exists)
+
+All responses "Not Found"?
+  → Check food datasets are loaded
+  → Run basic test first to see errors
+
+Slow responses?
+  → Dataset queries should be <100ms
+  → Health queries <500ms
+  → API calls may be 1-3s (expected)
+
+Session not working?
+  → Both tests use test-session-001
+  → View with getSessionHistory('test-session-001')
+
+════════════════════════════════════════════════════════════════════════════════
+
+📚 DOCUMENTATION
+════════════════════════════════════════════════════════════════════════════════
+
+Detailed guides:
+  • TEST_SCRIPTS_GUIDE.md - Complete test documentation
+  • TEST_SCRIPTS_IMPLEMENTATION.md - Implementation summary
+  • DATASET_FILTER_SUMMARY.md - Dataset filter info
+  • ENHANCED_CHATBOT_GUIDE.md - Full chatbot docs
+
+════════════════════════════════════════════════════════════════════════════════
+
+Status: ✅ READY TO TEST
+Version: 2.1
+Date: December 21, 2025
+
+════════════════════════════════════════════════════════════════════════════════
