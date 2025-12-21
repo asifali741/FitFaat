@@ -1031,9 +1031,9 @@ const getStyles = (colors: any) =>
       marginVertical: hp(1.5),
     },
     premiumActiveCard: {
-      backgroundColor: colors.primary + "10",
-      borderColor: colors.primary,
-      borderWidth: 2,
+      backgroundColor: colors.cardBackground,
+      borderColor: colors.cardBorder,
+      borderWidth: 1,
       alignItems: "center",
       marginBottom: hp(3),
     },
@@ -1049,7 +1049,7 @@ const getStyles = (colors: any) =>
     },
     premiumActiveSubtitle: {
       fontSize: hp(1.8),
-      color: "#666",
+      color: colors.textPrimary,
       textAlign: "center",
     },
     cancelButton: {
