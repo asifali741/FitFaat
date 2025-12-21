@@ -5,6 +5,7 @@ import { HEADER_PADDING_HORIZONTAL } from '@/constants/ui';
 import { useTheme } from "@/contexts/ThemeContext";
 import { dailyLogsApi } from '@/utils/dailyLogsApi';
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import BackButton from '@/components/BackButton';
 import { Audio } from 'expo-av';
 import Constants from 'expo-constants';
 import * as ImagePicker from 'expo-image-picker';
@@ -412,9 +413,7 @@ export default function DetailsDay () {
       >
         <View style={styles.heading}>
           <View style={styles.headerContent}>
-            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-              <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
-            </TouchableOpacity>
+            <BackButton style={styles.backButton} testID="detailsday-back" />
             <View style={styles.dayDateWrapper}>
               <View style={styles.dayBadge}>
                 <Text style={styles.dayNumber}>0{props.dayNo}</Text>

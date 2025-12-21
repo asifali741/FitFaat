@@ -44,8 +44,30 @@ export default function AppHeader({
   const handleBackPress = () => {
     if (onBackPress) {
       onBackPress();
-    } else {
+      return;
+    }
+
+    try {
+      // Prefer navigation.goBack if available
+      // @ts-ignore
+      if (navigation && typeof (navigation as any).canGoBack === 'function' && (navigation as any).canGoBack()) {
+        // @ts-ignore
+        (navigation as any).goBack();
+        return;
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    try {
       router.back();
+    } catch (e) {
+      // fallback: replace to dashboard
+      try {
+        router.replace('/(main)/(dashboard)');
+      } catch (err) {
+        // ignore
+      }
     }
   };
 

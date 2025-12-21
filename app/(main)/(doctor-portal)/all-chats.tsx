@@ -4,6 +4,7 @@ import { authApi } from '@/utils/auth/authApi';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
 import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from 'react';
 import {
@@ -19,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function AllChatsScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const [appointments, setAppointments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -37,6 +39,12 @@ export default function AllChatsScreen() {
       
       if (!doctorStatusResponse.success || !doctorStatusResponse.doctor) {
         Alert.alert('Error', 'You need to register as a doctor first');
+        try {
+          if (navigation && (navigation as any).canGoBack && (navigation as any).canGoBack()) {
+            (navigation as any).goBack();
+            return;
+          }
+        } catch (e) {}
         router.back();
         return;
       }
