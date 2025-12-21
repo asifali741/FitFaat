@@ -1,8 +1,8 @@
-import React from "react";
-import { StyleSheet, Text, View, Platform } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter, useLocalSearchParams } from "expo-router";
 import { useNavigation } from '@react-navigation/native';
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React from "react";
+import { StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 // Conditionally import Zego only on platforms that support it
 let ZegoUIKitPrebuiltCall: any = null;

@@ -1,13 +1,13 @@
-import React, { useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View, Platform } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
-import { useRouter } from "expo-router";
-import { useNavigation } from '@react-navigation/native';
 import BackButton from '@/components/BackButton';
-import { Ionicons } from "@expo/vector-icons";
 import { theme } from "@/constants/theme";
+import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { useNavigation } from '@react-navigation/native';
+import { useRouter } from "expo-router";
+import React, { useState } from "react";
+import { Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function SelectDateScreen() {
   const router = useRouter();

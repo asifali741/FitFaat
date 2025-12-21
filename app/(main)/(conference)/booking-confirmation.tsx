@@ -1,11 +1,11 @@
-import React, { useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View, ScrollView, TextInput } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
-import { useRouter, useLocalSearchParams } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 import BackButton from '@/components/BackButton';
 import { theme } from "@/constants/theme";
+import { Ionicons } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useState } from "react";
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { getDoctorById } from "./_doctorsData";
 
 export default function BookingConfirmationScreen() {

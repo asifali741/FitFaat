@@ -1,9 +1,9 @@
-import React from 'react';
-import { TouchableOpacity } from 'react-native';
+import { useTheme } from '@/contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { useTheme } from '@/contexts/ThemeContext';
+import React from 'react';
+import { TouchableOpacity } from 'react-native';
 
 type BackButtonProps = {
   style?: any;

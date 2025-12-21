@@ -1,9 +1,9 @@
+import BackButton from '@/components/BackButton';
 import { theme } from '@/constants/theme';
 import { tokenStorage } from '@/utils/auth/tokenStorage';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import { useNavigation } from '@react-navigation/native';
 import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -19,7 +19,6 @@ import {
     View
 } from 'react-native';
 import { io, Socket } from 'socket.io-client';
-import BackButton from '@/components/BackButton';
 
 interface ChatMessage {
   _id: string;
