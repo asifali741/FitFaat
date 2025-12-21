@@ -37,61 +37,175 @@ const GEMINI_TIMEOUT_MS = 15000;
 /**
  * Enhanced Nutrition Guard Prompt
  */
-const NUTRITION_GUARD_PROMPT = `You are FitFaat Nutrition Expert - friendly, informative, health-focused.
+const NUTRITION_GUARD_PROMPT = `You are HeaLora - a friendly, knowledgeable AI health companion for the FitFaat app.
 
-SCOPE: ONLY nutrition and food-related topics.
-- Food calories, macronutrients (protein/carbs/fat)
-- Meal planning and food combinations
-- Hydration and water intake
-- Vitamins and minerals in foods
-- Cooking and food preparation for health
-
-STRICT BOUNDARIES:
-❌ Medical diagnosis or disease treatment
-❌ Prescription medications
-❌ Weight loss/gain regimens
-❌ Exercise routines (health assistant handles this)
-❌ Unrelated topics
+YOUR EXPERTISE:
+✅ Nutrition advice: calories, protein, carbs, fats, vitamins, minerals
+✅ Weight management tips: healthy weight loss/gain strategies
+✅ Diet planning: meal suggestions, portion control, balanced eating
+✅ Fitness guidance: exercise recommendations, workout tips
+✅ Hydration: water intake, healthy beverages
+✅ Sleep & recovery: rest, relaxation techniques
+✅ General wellness: stress management, healthy lifestyle tips
 
 PERSONALITY:
-- Friendly and encouraging tone
-- Use emojis: 🍏 🥗 💧 🥑 🍽️
-- Keep responses concise (2-3 sentences)
-- Always suggest follow-up nutrition topics
+- Warm, supportive, and encouraging tone
+- Use emojis naturally: 🍏 🥗 💧 🥑 🍽️ 💪 😴 🌟
+- Give practical, actionable advice
+- Be conversational and friendly
+- Provide evidence-based information
 
-If asked outside scope: "I focus on nutrition and food advice 🍏. For other topics, consult a professional."`;
+RESPONSE STYLE:
+- Keep responses concise but helpful (3-5 sentences)
+- When giving tips, use bullet points or numbered lists
+- Include a helpful follow-up question or suggestion
+- For medical concerns, recommend consulting a healthcare professional
+
+IMPORTANT:
+- Be helpful and informative for general health questions
+- Don't refuse to answer legitimate health/nutrition/fitness questions
+- Provide mature, thoughtful responses
+- If user asks for food suggestions, recommend specific foods with their nutritional benefits`;
+
+/**
+ * Intent Detection Prompt - Used to classify user queries
+ */
+const INTENT_DETECTION_PROMPT = `Analyze the user's message and classify it into one of these categories:
+
+CATEGORIES:
+1. "specific_nutrient" - User asks for specific nutritional VALUE of a NAMED food
+   Examples: "how much protein in biryani", "calories in rice", "fat content of chicken"
+   
+2. "food_suggestion" - User asks for food RECOMMENDATIONS based on a nutrient
+   Examples: "what foods have high protein", "suggest foods for more energy", "what to eat for weight loss"
+   
+3. "general_health" - User asks general health/nutrition/fitness questions
+   Examples: "how can I lose weight", "tips for better sleep", "how to build muscle"
+   
+4. "greeting" - User greets or says thanks
+   Examples: "hi", "hello", "thanks", "bye"
+   
+5. "other" - Unrelated to health/nutrition
+
+Respond with ONLY the category name (e.g., "specific_nutrient" or "general_health").
+Do not include any explanation.
+
+User message: `;
 
 /**
  * Enhanced Health Guard Prompt
  */
-const HEALTH_GUARD_PROMPT = `You are FitFaat Wellness Coach - supportive, evidence-based, empathetic.
+const HEALTH_GUARD_PROMPT = `You are HeaLora - a supportive wellness coach for FitFaat users.
 
-SAFE TOPICS:
-✅ Sleep quality, duration, sleep hygiene
-✅ Hydration and water intake
-✅ Fitness, exercise, movement
-✅ Vitamins, minerals, supplements
-✅ Stress management, meditation
+YOUR EXPERTISE:
+✅ Sleep quality and sleep hygiene tips
+✅ Hydration and water intake guidance
+✅ Fitness, exercise, and movement advice
+✅ Vitamins, minerals, and supplements info
+✅ Stress management and meditation
 ✅ Mental wellness and focus
-✅ General energy and metabolism
-
-STRICT BOUNDARIES:
-❌ Medical diagnosis
-❌ Prescription or treatment advice
-❌ Pregnancy medical guidance
-❌ Emergency situations
-❌ Mental health conditions (needs professional)
+✅ Energy and metabolism optimization
+✅ Weight management strategies
+✅ Healthy lifestyle habits
 
 PERSONALITY:
 - Supportive and empathetic tone
-- Use wellness emojis: 💪 😴 💧 🧘 🌟
-- Provide evidence-based info
-- Always include disclaimer: "This is informational guidance. Consult a healthcare professional for medical concerns."
+- Use wellness emojis: 💪 😴 💧 🧘 🌟 🏃 🥗
+- Provide practical, actionable advice
+- Be encouraging and motivating
 
 RESPONSE STYLE:
-- Keep it short and actionable (2-3 sentences)
-- Suggest related wellness topics
-- Recommend professional help when needed`;
+- Give helpful, mature responses (3-5 sentences)
+- Use bullet points for tips and suggestions
+- Include actionable next steps
+- Add disclaimer only for medical-specific questions
+
+Note: For serious medical conditions, recommend consulting a healthcare professional.`;
+
+/**
+ * Call Gemini API to detect user intent
+ * @param {string} message - User message
+ * @returns {Promise<string>} - Intent category
+ */
+async function detectIntent(message) {
+  try {
+    if (!GEMINI_API_KEY) {
+      console.log('⚠️ No Gemini API key, using fallback intent detection');
+      return fallbackIntentDetection(message);
+    }
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: INTENT_DETECTION_PROMPT + message }] }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 50,
+        }
+      })
+    });
+
+    if (!response.ok) {
+      console.log('⚠️ Gemini intent detection failed, using fallback');
+      return fallbackIntentDetection(message);
+    }
+
+    const data = await response.json();
+    const intent = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim().toLowerCase();
+    
+    console.log(`🎯 Detected intent: ${intent}`);
+    
+    // Validate intent
+    const validIntents = ['specific_nutrient', 'food_suggestion', 'general_health', 'greeting', 'other'];
+    if (validIntents.includes(intent)) {
+      return intent;
+    }
+    
+    return fallbackIntentDetection(message);
+  } catch (error) {
+    console.error('Intent detection error:', error.message);
+    return fallbackIntentDetection(message);
+  }
+}
+
+/**
+ * Fallback intent detection using keywords
+ */
+function fallbackIntentDetection(message) {
+  const lowerMsg = message.toLowerCase();
+  
+  // Check for greetings
+  if (isGreeting(message)) {
+    return 'greeting';
+  }
+  
+  // Check for specific nutrient queries (asking about specific food)
+  const nutrientKeywords = ['how much', 'how many', 'tell me', 'what is the', 'calories in', 'protein in', 'fat in', 'carbs in', 'value of'];
+  const foodIndicators = ['in ', 'of ', 'has', 'does', 'contain'];
+  
+  const hasNutrientKeyword = nutrientKeywords.some(k => lowerMsg.includes(k));
+  const hasFoodIndicator = foodIndicators.some(k => lowerMsg.includes(k));
+  
+  if (hasNutrientKeyword && hasFoodIndicator) {
+    return 'specific_nutrient';
+  }
+  
+  // Check for food suggestion queries
+  const suggestionKeywords = ['suggest', 'recommend', 'what should i eat', 'what can i eat', 'what to eat', 'foods for', 'foods with', 'high in', 'rich in', 'best foods'];
+  if (suggestionKeywords.some(k => lowerMsg.includes(k))) {
+    return 'food_suggestion';
+  }
+  
+  // Check for general health queries
+  const healthKeywords = ['how can i', 'how do i', 'tips for', 'ways to', 'help me', 'advice', 'lose weight', 'gain weight', 'build muscle', 'sleep better', 'more energy', 'healthy'];
+  if (healthKeywords.some(k => lowerMsg.includes(k))) {
+    return 'general_health';
+  }
+  
+  return 'general_health'; // Default to general health instead of rejecting
+}
 
 /**
  * Extract food name from natural language queries
@@ -177,13 +291,13 @@ function generateGreetingResponse() {
 }
 
 /**
- * Call Google Gemini API with nutrition-guarded prompt
- * Only called when food is NOT found in dataset
+ * Call Google Gemini API for general health/nutrition advice
  * @param {string} userMessage - The user's question
  * @param {Array} conversationHistory - Previous messages for context
+ * @param {string} promptType - 'nutrition' or 'health' to select system prompt
  * @returns {Promise<string>} - AI response
  */
-async function callGeminiAPI(userMessage, conversationHistory = []) {
+async function callGeminiAPI(userMessage, conversationHistory = [], promptType = 'nutrition') {
   try {
     if (!GEMINI_API_KEY) {
       throw new Error('GEMINI_API_KEY is not configured in environment variables');
@@ -195,15 +309,17 @@ async function callGeminiAPI(userMessage, conversationHistory = []) {
       .map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
       .join('\n');
 
+    const systemPrompt = promptType === 'health' ? HEALTH_GUARD_PROMPT : NUTRITION_GUARD_PROMPT;
+
     // Construct the full prompt with context
-    const fullPrompt = `${NUTRITION_GUARD_PROMPT}
+    const fullPrompt = `${systemPrompt}
 
 Previous conversation:
 ${contextMessages}
 
-Current user question: ${userMessage}
+User question: ${userMessage}
 
-Provide a helpful nutrition-focused response:`;
+Provide a helpful, friendly, and informative response:`;
 
     // Create abort controller for timeout
     const controller = new AbortController();
@@ -440,19 +556,86 @@ function isDatasetQuery(userMessage) {
 }
 
 /**
- * DUAL-PURPOSE AI Chat Service
+ * Get food suggestions based on nutrient type
+ * @param {string} nutrientType - Type of nutrient (protein, carbs, fat, etc.)
+ * @param {number} limit - Number of suggestions to return
+ * @returns {Promise<Array>} - Array of food suggestions with nutrient values
+ */
+async function getFoodSuggestions(nutrientType, limit = 5) {
+  try {
+    const allFoods = [];
+    
+    // Load Pakistani dishes dataset
+    try {
+      const pakistaniDataModule = await import('../../../app/Dataset/dataSet.js');
+      if (pakistaniDataModule.pakistaniDishes) {
+        allFoods.push(...pakistaniDataModule.pakistaniDishes);
+      }
+    } catch (err) {
+      console.log('⚠️ Pakistani dishes dataset not found for suggestions');
+    }
+    
+    if (allFoods.length === 0) return [];
+
+    const nutrient = nutrientType.toLowerCase();
+    
+    // Sort foods by the requested nutrient (highest first)
+    const sortedFoods = allFoods
+      .filter(food => {
+        const value = food[nutrient] || food[`${nutrient}_g`] || 0;
+        return value > 0;
+      })
+      .sort((a, b) => {
+        const aValue = a[nutrient] || a[`${nutrient}_g`] || a.protein || a.protein_g || 0;
+        const bValue = b[nutrient] || b[`${nutrient}_g`] || b.protein || b.protein_g || 0;
+        return bValue - aValue;
+      })
+      .slice(0, limit);
+
+    return sortedFoods;
+  } catch (error) {
+    console.error('Error getting food suggestions:', error);
+    return [];
+  }
+}
+
+/**
+ * Format food suggestions response
+ * @param {Array} foods - Array of food items
+ * @param {string} nutrientType - Type of nutrient
+ * @returns {string} - Formatted response
+ */
+function formatFoodSuggestions(foods, nutrientType) {
+  if (!foods || foods.length === 0) {
+    return `I couldn't find specific food suggestions right now. Try asking about protein, carbs, or fats in specific foods! 🍽️`;
+  }
+
+  const nutrient = nutrientType.toLowerCase();
+  let response = `Here are some great foods high in **${nutrientType}** 💪:\n\n`;
+
+  foods.forEach((food, index) => {
+    const name = food.name || food.dish_name || food.item || 'Food';
+    const serving = food.serving_size || '1 serving';
+    const value = food[nutrient] || food[`${nutrient}_g`] || food.protein || food.protein_g || 0;
+    const calories = food.calories || food.calories_kcal || 0;
+    
+    response += `${index + 1}. **${name}** (${serving})\n`;
+    response += `   • ${nutrientType}: **${value}g** | Calories: ${calories} kcal\n\n`;
+  });
+
+  response += `\n💡 Would you like more details about any of these foods?`;
+  return response;
+}
+
+/**
+ * ENHANCED AI Chat Service with Smart Intent Detection
  * Flow:
- * 1. Check for greetings → warm response
- * 2. Check nutrition scope:
- *    a. If food query → search dataset FIRST
- *    b. If found in dataset → return (NO Gemini call)
- *    c. If not found → return "not found"
- * 3. Check health scope:
- *    a. If restricted medical → reject
- *    b. If health query → search health dataset
- *    c. Return with disclaimer
- * 4. Out of scope → reject politely
- * 5. Fallback → safe error handling
+ * 1. Use Gemini to detect user intent
+ * 2. greeting → warm response
+ * 3. specific_nutrient → search dataset for specific food nutritional value
+ * 4. food_suggestion → get food recommendations from dataset
+ * 5. general_health → use Gemini for helpful health/nutrition advice
+ * 6. other → still try to help with general response
  * 
  * @param {string} userMessage - User's question
  * @param {string} sessionId - Session identifier (optional)
@@ -478,84 +661,93 @@ export async function processAIChat(userMessage, sessionId = 'default', conversa
     let category = null;
     let status = 'success';
 
-    // ===== STEP 1: GREETINGS =====
-    if (isGreeting(userMessage)) {
+    // ===== STEP 1: DETECT INTENT =====
+    const intent = await detectIntent(userMessage);
+    console.log(`🎯 Intent: ${intent}`);
+    responseType = intent;
+
+    // ===== STEP 2: HANDLE BASED ON INTENT =====
+    
+    if (intent === 'greeting') {
+      // Handle greetings
       console.log('👋 Greeting detected');
       response = generateGreetingResponse();
       source = 'system';
-      responseType = 'greeting';
     }
+    
+    else if (intent === 'specific_nutrient') {
+      // User is asking for specific nutritional value of a food
+      console.log('🍽️ Specific nutrient query - searching dataset...');
+      const foodData = await searchFoodDataset(userMessage);
 
-    // ===== STEP 2: NUTRITION QUERIES =====
-    else if (isNutritionQuery(userMessage)) {
-      console.log('🥗 Nutrition query detected');
-      responseType = 'nutrition';
-
-      // Check if query is specifically asking for dataset information
-      if (isDatasetQuery(userMessage)) {
-        console.log('🍽️ Dataset query detected - searching food dataset...');
-        const foodData = await searchFoodDataset(userMessage);
-
-        if (foodData && foodData.length > 0) {
-          response = formatFoodResponse(foodData, userMessage);
-          source = 'dataset';
-          console.log('✅ Found in database');
-        } else {
-          response = generateErrorResponse('not_found');
-          source = 'system';
-          status = 'not_found';
-          console.log('❌ Not found in database');
-        }
+      if (foodData && foodData.length > 0) {
+        response = formatFoodResponse(foodData, userMessage);
+        source = 'dataset';
+        console.log('✅ Found in database');
+        response += '\n\n💡 Want to know about other foods? Just ask!';
       } else {
-        response = "I can provide calories, protein, fat, carbs, and hydration info. Please ask specifically about them. 🍏";
-        source = 'system';
-        console.log('ℹ️ Non-dataset nutrition query - showing guidance');
-      }
-
-      // Add follow-up suggestions for nutrition
-      if (source === 'dataset') {
-        response += generateFollowUp('nutrition');
-      }
-    }
-
-    // ===== STEP 3: HEALTH & WELLNESS QUERIES =====
-    else if (isHealthQuery(userMessage)) {
-      console.log('🏥 Health query detected');
-      responseType = 'health';
-
-      if (isRestrictedMedicalQuery(userMessage)) {
-        response = "I can't provide medical diagnoses or treatment advice 🏥. Please consult a healthcare professional.";
-        source = 'system';
-        status = 'restricted';
-        console.log('🚫 Restricted medical topic');
-      } else {
-        category = detectHealthCategory(userMessage);
-        const healthData = searchHealthDataset(category);
-
-        if (healthData) {
-          response = formatHealthResponse(healthData);
-          source = 'health-dataset';
-          response += generateFollowUp(category);
-          console.log(`✅ Health category: ${category}`);
-        } else {
-          response = "I can help with sleep 😴, fitness 💪, hydration 💧, vitamins 💊, stress 🧘, and wellness 🌟. What interests you?";
+        // Food not found - use Gemini to provide general info
+        console.log('❌ Not found in dataset, asking Gemini...');
+        try {
+          response = await callGeminiAPI(userMessage, history, 'nutrition');
+          source = 'gemini';
+          response += '\n\n📝 *Note: This food isn\'t in our local database yet, but here\'s what I know!*';
+        } catch (error) {
+          response = `I don't have that specific food in my database yet 🍽️. Try asking about common Pakistani foods like biryani, karahi, or nihari!`;
           source = 'system';
           status = 'not_found';
         }
       }
     }
-
-    // ===== STEP 4: OUT OF SCOPE =====
-    else {
-      console.log('🚫 Out-of-scope query');
-      responseType = 'rejected';
-      response = rejectOutOfScope();
-      source = 'system';
-      status = 'out_of_scope';
+    
+    else if (intent === 'food_suggestion') {
+      // User wants food recommendations
+      console.log('💡 Food suggestion query - finding recommendations...');
+      
+      // Detect which nutrient they want
+      const lowerMsg = userMessage.toLowerCase();
+      let nutrientType = 'protein'; // default
+      if (lowerMsg.includes('carb')) nutrientType = 'carbs';
+      else if (lowerMsg.includes('fat')) nutrientType = 'fat';
+      else if (lowerMsg.includes('calorie') || lowerMsg.includes('energy')) nutrientType = 'calories';
+      else if (lowerMsg.includes('fiber')) nutrientType = 'fiber';
+      
+      const suggestions = await getFoodSuggestions(nutrientType, 5);
+      
+      if (suggestions.length > 0) {
+        response = formatFoodSuggestions(suggestions, nutrientType);
+        source = 'dataset';
+      } else {
+        // Use Gemini for suggestions if dataset fails
+        try {
+          response = await callGeminiAPI(userMessage, history, 'nutrition');
+          source = 'gemini';
+        } catch (error) {
+          response = `Great question! 💪 For high protein, try eggs, chicken, lentils (daal), and yogurt. For energy, go for rice, roti, or fruits!`;
+          source = 'system';
+        }
+      }
+    }
+    
+    else if (intent === 'general_health' || intent === 'other') {
+      // General health questions - use Gemini for mature, helpful response
+      console.log('🏥 General health query - asking Gemini...');
+      
+      try {
+        response = await callGeminiAPI(userMessage, history, 'health');
+        source = 'gemini';
+        console.log('✅ Gemini response received');
+      } catch (error) {
+        console.error('Gemini API error:', error.message);
+        // Provide helpful fallback
+        response = `That's a great question! 🌟 For personalized advice on this topic, I'd recommend consulting with a healthcare professional. In the meantime, feel free to ask me about specific foods or their nutritional values!`;
+        source = 'system';
+        status = 'gemini_error';
+      }
     }
 
-    // Add personality to response
-    if (status === 'success') {
+    // Add personality to successful responses
+    if (status === 'success' && source !== 'system') {
       response = addPersonality(response, 'encouragement');
     }
 
