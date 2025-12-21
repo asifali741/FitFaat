@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { useFocusEffect, useRouter } from "expo-router";
+import { useNavigation } from '@react-navigation/native';
 import React, { useEffect, useState } from "react";
 import { Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import {
@@ -18,6 +19,7 @@ import { MainImages } from "../../../constants/list";
 export default function WorkoutScreen() {
   const { colors } = useTheme();
   const router = useRouter();
+  const navigation = useNavigation();
   const [favoritesCount, setFavoritesCount] = useState(0);
   const [isPremium, setIsPremium] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -76,7 +78,7 @@ export default function WorkoutScreen() {
           setIsPremium(false);
         }
       } catch (error) {
-        console.error('💥 Premium check error:', error.message, error.toString());
+        console.error('💥 Premium check error:', (error as any)?.message || String(error));
         console.log('😕 Setting to non-premium due to error');
         setIsPremium(false);
       } finally {
@@ -133,12 +135,11 @@ export default function WorkoutScreen() {
     return null;
   }
 
-  // TEMPORARY TEST: Always show modal for debugging
-  console.log('🎯 DEBUG MODE: Forcing modal display');
-  const navigation = useNavigation();
+  // Show premium modal only for non-premium users
+  console.log('🎯 Checking premium modal condition');
 
-  if (true) {  // Force true for testing
-    console.log('🚫 Showing premium modal (FORCED FOR DEBUG)');
+  if (!isPremium) {
+    console.log('🚫 Showing premium modal (User is not premium)');
     return (
       <View style={{ flex: 1 }}>
         <Modal
