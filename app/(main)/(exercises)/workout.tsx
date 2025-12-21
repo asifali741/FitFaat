@@ -135,6 +135,8 @@ export default function WorkoutScreen() {
 
   // TEMPORARY TEST: Always show modal for debugging
   console.log('🎯 DEBUG MODE: Forcing modal display');
+  const navigation = useNavigation();
+
   if (true) {  // Force true for testing
     console.log('🚫 Showing premium modal (FORCED FOR DEBUG)');
     return (
@@ -145,6 +147,7 @@ export default function WorkoutScreen() {
           animationType="fade"
           onRequestClose={() => {
             console.log('Modal close button pressed');
+            try { if ((navigation as any).canGoBack && (navigation as any).canGoBack()) { (navigation as any).goBack(); return; } } catch(e) {}
             router.back();
           }}
         >
@@ -153,6 +156,7 @@ export default function WorkoutScreen() {
               <TouchableOpacity
                 style={styles.closeButton}
                 onPress={() => {
+                  try { if ((navigation as any).canGoBack && (navigation as any).canGoBack()) { (navigation as any).goBack(); return; } } catch(e) {}
                   router.back();
                 }}
               >
@@ -203,6 +207,7 @@ export default function WorkoutScreen() {
               <TouchableOpacity
                 style={styles.laterButton}
                 onPress={() => {
+                  try { if ((navigation as any).canGoBack && (navigation as any).canGoBack()) { (navigation as any).goBack(); return; } } catch(e) {}
                   router.back();
                 }}
               >

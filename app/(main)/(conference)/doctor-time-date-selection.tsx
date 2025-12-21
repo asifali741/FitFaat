@@ -3,6 +3,7 @@ import { theme } from '@/constants/theme';
 import { authApi } from '@/utils/auth/authApi';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -161,6 +162,8 @@ export default function DoctorSelectionScreen() {
     }
   };
 
+  const navigation = useNavigation();
+
   const handleBack = () => {
     if (step === 'date') {
       setSelectedDoctor(null);
@@ -170,6 +173,12 @@ export default function DoctorSelectionScreen() {
       setSelectedTime(null);
       setStep('date');
     } else {
+      try {
+        if (navigation && (navigation as any).canGoBack && (navigation as any).canGoBack()) {
+          (navigation as any).goBack();
+          return;
+        }
+      } catch (e) {}
       router.back();
     }
   };

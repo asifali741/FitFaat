@@ -2,6 +2,7 @@ import React from "react";
 import { StyleSheet, Text, View, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import { useNavigation } from '@react-navigation/native';
 
 // Conditionally import Zego only on platforms that support it
 let ZegoUIKitPrebuiltCall: any = null;
@@ -34,8 +35,17 @@ export default function VideoCallScreen() {
   const displayName = userName || "Patient";
   const roomId = callId || `call_${Date.now()}`;
 
+  const navigation = useNavigation();
+
   const handleCallEnd = () => {
     // Navigate back to conference screen when call ends
+    try {
+      if (navigation && (navigation as any).canGoBack && (navigation as any).canGoBack()) {
+        (navigation as any).goBack();
+        return;
+      }
+    } catch (e) {}
+
     router.back();
   };
 

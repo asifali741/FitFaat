@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import BackButton from '@/components/BackButton';
 
 import { authApi } from '../../utils/auth/authApi';
 
@@ -131,12 +132,7 @@ export default function OTPVerificationThemed() {
     <KeyboardAwareContainer scrollable={false}>
       <View style={styles.content}>
         {/* Back Button */}
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Ionicons name="arrow-back" size={24} color={theme.colors.textPrimary} />
-        </TouchableOpacity>
+        <BackButton style={styles.backButton} testID="otp-back-button" />
 
         {/* Header */}
         <View style={styles.header}>

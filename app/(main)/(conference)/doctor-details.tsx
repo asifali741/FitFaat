@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import BackButton from '@/components/BackButton';
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -30,9 +31,7 @@ export default function DoctorDetailsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={theme.colors.textOnPrimary} />
-        </TouchableOpacity>
+        <BackButton style={styles.backButton} testID="doctor-details-back" />
         <Text style={styles.headerTitle}>Doctor Details</Text>
         <View style={styles.spacer} />
       </View>

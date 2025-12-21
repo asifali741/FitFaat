@@ -7,6 +7,7 @@ import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "rea
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@/contexts/ThemeContext";
+import BackButton from '@/components/BackButton';
 
 export default function ChatHistoryScreen() {
   const { colors } = useTheme();
@@ -108,12 +109,7 @@ export default function ChatHistoryScreen() {
           <Ionicons name="menu" size={24} color={colors.textOnPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Chat History</Text>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Ionicons name="arrow-back" size={24} color={colors.textOnPrimary} />
-        </TouchableOpacity>
+        <BackButton style={styles.backButton} testID="chathistory-back" />
       </View>
 
       {/* Main Content */}

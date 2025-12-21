@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import BackButton from '@/components/BackButton';
 import { theme } from "@/constants/theme";
 import { getDoctorById } from "./_doctorsData";
 
@@ -47,9 +48,7 @@ export default function BookingConfirmationScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={theme.colors.textOnPrimary} />
-        </TouchableOpacity>
+        <BackButton style={styles.backButton} testID="booking-confirmation-back" />
         <Text style={styles.headerTitle}>Finalize Booking</Text>
         <View style={styles.spacer} />
       </View>

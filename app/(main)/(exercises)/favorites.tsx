@@ -18,8 +18,16 @@ export default function FavoritesScreen() {
   const [favorites, setFavorites] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const navigation = require('@react-navigation/native').useNavigation();
+
   const handleBackPress = () => {
-    // Navigate back to workout screen explicitly
+    try {
+      if (navigation && (navigation as any).canGoBack && (navigation as any).canGoBack()) {
+        (navigation as any).goBack();
+        return;
+      }
+    } catch (e) {}
+
     router.push('/(main)/(exercises)/workout');
   };
 

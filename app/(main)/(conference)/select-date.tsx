@@ -3,6 +3,8 @@ import { StyleSheet, Text, TouchableOpacity, View, Platform } from "react-native
 import { SafeAreaView } from "react-native-safe-area-context";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { useRouter } from "expo-router";
+import { useNavigation } from '@react-navigation/native';
+import BackButton from '@/components/BackButton';
 import { Ionicons } from "@expo/vector-icons";
 import { theme } from "@/constants/theme";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -29,16 +31,22 @@ export default function SelectDateScreen() {
     });
   };
 
+  const navigation = useNavigation();
+
   const handleCancel = () => {
+    try {
+      if (navigation && (navigation as any).canGoBack && (navigation as any).canGoBack()) {
+        (navigation as any).goBack();
+        return;
+      }
+    } catch (e) {}
     router.back();
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={theme.colors.textOnPrimary} />
-        </TouchableOpacity>
+        <BackButton style={styles.backButton} testID="selectdate-back" />
         <Text style={styles.headerTitle}>Pick a Date to Schedule a Session</Text>
         <View style={styles.spacer} />
       </View>

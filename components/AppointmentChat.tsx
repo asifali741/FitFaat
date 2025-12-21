@@ -3,6 +3,7 @@ import { tokenStorage } from '@/utils/auth/tokenStorage';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
 import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -18,6 +19,7 @@ import {
     View
 } from 'react-native';
 import { io, Socket } from 'socket.io-client';
+import BackButton from '@/components/BackButton';
 
 interface ChatMessage {
   _id: string;
@@ -118,6 +120,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
       const token = await tokenStorage.getToken();
       if (!token) {
         Alert.alert('Error', 'Please login first');
+        try { const navigation = (require('@react-navigation/native').useNavigation)(); if (navigation && (navigation as any).canGoBack && (navigation as any).canGoBack()) { (navigation as any).goBack(); return; } } catch(e) {}
         router.back();
         return;
       }
@@ -572,7 +575,18 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
           <Text style={styles.closedReason}>{closedReason}</Text>
           <TouchableOpacity 
             style={styles.goBackButton}
-            onPress={() => router.back()}
+            onPress={() => {
+              // Prefer navigation goBack when possible
+              try {
+                // @ts-ignore
+                const navigation = require('@react-navigation/native').useNavigation();
+                if (navigation && typeof (navigation as any).canGoBack === 'function' && (navigation as any).canGoBack()) {
+                  (navigation as any).goBack();
+                  return;
+                }
+              } catch (e) {}
+              router.back();
+            }}
           >
             <Text style={styles.backButtonText}>Go Back</Text>
           </TouchableOpacity>
@@ -585,9 +599,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
     <SafeAreaView style={styles.container}>
       {/* Custom Header with Profile and Timer */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={theme.colors.surface} />
-        </TouchableOpacity>
+        <BackButton style={styles.backButton} testID="appointment-back" />
         
         <View style={styles.headerCenter}>
           <View style={styles.profileImageContainer}>

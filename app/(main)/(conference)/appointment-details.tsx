@@ -2,6 +2,7 @@ import CountdownTimer from "@/components/CountdownTimer";
 import { theme } from "@/constants/theme";
 import { Appointment, useAppointments } from "@/contexts/AppointmentContext";
 import { Ionicons } from "@expo/vector-icons";
+import BackButton from '@/components/BackButton';
 import { DrawerActions, useNavigation } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -74,12 +75,7 @@ export default function AppointmentDetailsScreen() {
             <Ionicons name="menu" size={24} color={theme.colors.surface} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Appointment Details</Text>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <Ionicons name="arrow-back" size={24} color={theme.colors.surface} />
-          </TouchableOpacity>
+          <BackButton style={styles.backButton} testID="appointment-details-back" />
         </View>
         <View style={styles.content}>
           <Text style={styles.errorText}>Appointment not found</Text>
@@ -99,12 +95,7 @@ export default function AppointmentDetailsScreen() {
           <Ionicons name="menu" size={24} color={theme.colors.surface} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Appointment Details</Text>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Ionicons name="arrow-back" size={24} color={theme.colors.surface} />
-        </TouchableOpacity>
+        <BackButton style={styles.backButton} testID="appointment-details-back" />
       </View>
 
       {/* Main Content */}
