@@ -1,58 +1,104 @@
 import dotenv from 'dotenv';
+import { formatHealthResponse, searchHealthDataset } from '../constants/healthDataset.js';
+import { getLogger } from '../utils/chatLogger.js';
+import { getConversationManager } from '../utils/conversationContext.js';
+import {
+    detectHealthCategory,
+    isHealthQuery,
+    isNutritionQuery,
+    isRestrictedMedicalQuery
+} from '../utils/healthDetection.js';
+import {
+    addPersonality,
+    generateErrorResponse,
+    generateFollowUp,
+    generateGreeting,
+    rejectOutOfScope
+} from '../utils/responseTemplates.js';
 
 dotenv.config();
 
 /**
- * NUTRITION-ONLY AI Chatbot Service
- * Strictly focused on food nutrition and calories
- * - Greetings and well-wishing
- * - Food nutrition queries only
- * - Dataset-first logic (no Gemini if food exists)
- * - Polite rejection of non-nutrition queries
+ * ENHANCED DUAL-PURPOSE AI CHATBOT SERVICE
+ * 
+ * Features:
+ * ✅ Health/nutrition-only scope enforcement
+ * ✅ Multi-turn context (last 2-3 messages)
+ * ✅ Dynamic, friendly responses with emojis
+ * ✅ Quick follow-up suggestions
+ * ✅ Comprehensive logging & analytics
+ * ✅ Typing indicators for API responses
+ * ✅ Safety & personality-driven responses
  */
 
-// Gemini API Configuration (only used when food not found in dataset)
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_TIMEOUT_MS = 15000; // 15 seconds timeout
+const GEMINI_TIMEOUT_MS = 15000;
 
 /**
- * Nutrition-only system prompt for Gemini AI
- * STRICTLY enforces food and nutrition topics only
+ * Enhanced Nutrition Guard Prompt
  */
-const NUTRITION_GUARD_PROMPT = `You are FitFaat Nutrition Assistant, specialized ONLY in food nutrition and calories.
+const NUTRITION_GUARD_PROMPT = `You are FitFaat Nutrition Expert - friendly, informative, health-focused.
 
-STRICT RULES:
-1. ONLY answer questions about:
-   - Food nutrition (calories, protein, carbs, fat)
-   - Macronutrients and micronutrients in foods
-   - Meal nutrition and dietary information
-   - Hydration and water content
+SCOPE: ONLY nutrition and food-related topics.
+- Food calories, macronutrients (protein/carbs/fat)
+- Meal planning and food combinations
+- Hydration and water intake
+- Vitamins and minerals in foods
+- Cooking and food preparation for health
 
-2. REJECT ALL other topics including:
-   - Exercise and fitness
-   - Weight loss/gain advice
-   - Medical or health advice
-   - General wellness or lifestyle
-   - Any non-nutrition topic
+STRICT BOUNDARIES:
+❌ Medical diagnosis or disease treatment
+❌ Prescription medications
+❌ Weight loss/gain regimens
+❌ Exercise routines (health assistant handles this)
+❌ Unrelated topics
 
-3. Response format:
-   - Keep responses short and focused on nutrition facts
-   - Always provide specific nutritional values when possible
-   - If you don't have data, say "I don't have nutritional data for that food"
-   
-4. If user asks non-nutrition questions, respond:
-   "Sorry, I can only help with food nutrition, calories, and dietary information."
+PERSONALITY:
+- Friendly and encouraging tone
+- Use emojis: 🍏 🥗 💧 🥑 🍽️
+- Keep responses concise (2-3 sentences)
+- Always suggest follow-up nutrition topics
 
-Remember: You are a nutrition data provider, not a health coach or fitness trainer.`;
+If asked outside scope: "I focus on nutrition and food advice 🍏. For other topics, consult a professional."`;
+
+/**
+ * Enhanced Health Guard Prompt
+ */
+const HEALTH_GUARD_PROMPT = `You are FitFaat Wellness Coach - supportive, evidence-based, empathetic.
+
+SAFE TOPICS:
+✅ Sleep quality, duration, sleep hygiene
+✅ Hydration and water intake
+✅ Fitness, exercise, movement
+✅ Vitamins, minerals, supplements
+✅ Stress management, meditation
+✅ Mental wellness and focus
+✅ General energy and metabolism
+
+STRICT BOUNDARIES:
+❌ Medical diagnosis
+❌ Prescription or treatment advice
+❌ Pregnancy medical guidance
+❌ Emergency situations
+❌ Mental health conditions (needs professional)
+
+PERSONALITY:
+- Supportive and empathetic tone
+- Use wellness emojis: 💪 😴 💧 🧘 🌟
+- Provide evidence-based info
+- Always include disclaimer: "This is informational guidance. Consult a healthcare professional for medical concerns."
+
+RESPONSE STYLE:
+- Keep it short and actionable (2-3 sentences)
+- Suggest related wellness topics
+- Recommend professional help when needed`;
 
 /**
  * Extract food name from natural language queries
- * Handles sentences like "I am going to eat Chicken Tandoori Roll"
  * @param {string} message - User message
  * @returns {string} - Cleaned food name
  */
 function extractFoodKeywords(message) {
-  // Common phrases to remove
   const phrasesToRemove = [
     'i am going to eat', 'i am gonna eat', 'i will eat', 'i want to eat',
     'tell me calories in', 'tell me calories of', 'show me calories in',
@@ -68,15 +114,11 @@ function extractFoodKeywords(message) {
   
   let cleaned = message.toLowerCase().trim();
   
-  // Remove common phrases
   phrasesToRemove.forEach(phrase => {
     cleaned = cleaned.replace(new RegExp(phrase, 'gi'), '');
   });
   
-  // Remove punctuation
   cleaned = cleaned.replace(/[?!.,;:]/g, '');
-  
-  // Remove extra spaces and trim
   cleaned = cleaned.trim().replace(/\s+/g, ' ');
   
   console.log(`🔍 Extracted food name: "${cleaned}" from "${message}"`);
@@ -84,24 +126,22 @@ function extractFoodKeywords(message) {
 }
 
 /**
- * Detect greetings and well-wishing messages
- * @param {string} message - User message to check
- * @returns {boolean} - True if greeting detected
+ * Detect greetings
  */
 function isGreeting(message) {
   const lowerMessage = message.toLowerCase().trim();
-  
-  // Common greetings
   const greetings = [
-    'hi', 'hello', 'hey', 'salam', 'assalamualaikum', 'assalam o alaikum',
-    'good morning', 'good afternoon', 'good evening', 'good night',
-    'how are you', 'whats up', "what's up", 'sup',
-    'thanks', 'thank you', 'tysm', 'ty', 'thx',
-    'bye', 'goodbye', 'see you', 'cya',
-    'help', 'assist', 'can you help', 'need help', 'help me'
+    'hi', 'hello', 'hey', 'salam', 'assalamualaikum',
+    'good morning', 'good afternoon', 'good evening',
+    'how are you', 'thanks', 'thank you', 'bye', 'goodbye',
+    'help', 'assist'
   ];
-  
-  return greetings.some(greeting => lowerMessage === greeting || lowerMessage.startsWith(greeting + ' ') || lowerMessage.endsWith(' ' + greeting));
+
+  return greetings.some(greeting => 
+    lowerMessage === greeting || 
+    lowerMessage.startsWith(greeting + ' ') || 
+    lowerMessage.endsWith(' ' + greeting)
+  );
 }
 
 /**
@@ -131,18 +171,9 @@ function isNutritionRelated(message) {
 
 /**
  * Generate warm greeting response
- * @returns {string} - Greeting message
  */
 function generateGreetingResponse() {
-  const greetings = [
-    "Hello! 😊 I'm here to help you with food nutrition and calories. What would you like to eat?",
-    "Hi there! 🍽️ I can tell you about calories and nutrition in your meals. What are you having today?",
-    "Hey! 👋 Ask me about any food's calories, protein, carbs, or fat. What would you like to know?",
-    "Assalamualaikum! 🌟 I'm your nutrition assistant. Tell me what you're eating and I'll share the nutritional info!",
-    "Good day! 😊 I can help you track nutrition in your meals. What food are you curious about?"
-  ];
-  
-  return greetings[Math.floor(Math.random() * greetings.length)];
+  return generateGreeting();
 }
 
 /**
@@ -339,178 +370,287 @@ async function searchFoodDataset(query) {
 }
 
 /**
- * Format food nutrition data for user-friendly response
- * Handles different query types (general, specific nutrient, multiple nutrients)
- * @param {Array} foods - Food items from dataset
- * @param {string} originalQuery - Original user query to detect intent
- * @returns {string} - Formatted response
+ * Format food response with emojis
  */
 function formatFoodResponse(foods, originalQuery = '') {
   if (!foods || foods.length === 0) return null;
 
-  const firstFood = foods[0];
+  const food = foods[0];
+  const name = food.name || food.dish_name || food.item || food.food || 'Food';
+  const serving = food.serving_size || '1 serving';
+  const calories = food.calories || food.calories_kcal || 0;
+  const protein = food.protein || food.protein_g || 0;
+  const carbs = food.carbs || food.carbohydrates || food.carbohydrates_g || 0;
+  const fats = food.fats || food.fat || food.fat_g || 0;
+
   const queryLower = originalQuery.toLowerCase();
-  
-  // Get food name from any available field
-  const foodName = firstFood.name || firstFood.dish_name || firstFood.item || firstFood.food || 'Unknown Food';
-  
-  // Get nutrition values with fallback field names
-  const servingSize = firstFood.serving_size || '1 serving';
-  const calories = firstFood.calories || firstFood.calories_kcal || 0;
-  const protein = firstFood.protein || firstFood.protein_g || 0;
-  const carbs = firstFood.carbs || firstFood.carbohydrates || firstFood.carbohydrates_g || 0;
-  const fats = firstFood.fats || firstFood.fat || firstFood.fat_g || 0;
-  
-  // DETECT QUERY TYPE
-  
-  // A) Specific nutrient query (user asks for one thing only)
-  if (queryLower.includes('how much protein') || queryLower.includes('protein in') || queryLower.includes('protein does') || queryLower.includes('protein value') || queryLower.includes('protein of')) {
-    return `${foodName} (${servingSize}) contains about ${protein} g of protein.`;
+
+  // Specific nutrient queries
+  if (queryLower.includes('protein')) {
+    return `${name} (${serving}) contains about **${protein}g** of protein 💪`;
   }
-  
-  if (queryLower.includes('how much calories') || queryLower.includes('how many calories') || queryLower.includes('calories in') || queryLower.includes('calories does') || queryLower.includes('calorie value') || queryLower.includes('calories of')) {
-    return `${foodName} (${servingSize}) contains approximately ${calories} kcal.`;
+  if (queryLower.includes('calorie')) {
+    return `${name} (${serving}) has approximately **${calories}** kcal 🔥`;
   }
-  
-  if (queryLower.includes('how much carbs') || queryLower.includes('how many carbs') || queryLower.includes('carbs in') || queryLower.includes('carbohydrates in') || queryLower.includes('carb value') || queryLower.includes('carbs of')) {
-    return `${foodName} (${servingSize}) contains about ${carbs} g of carbs.`;
+  if (queryLower.includes('carb')) {
+    return `${name} (${serving}) contains about **${carbs}g** of carbs 🌾`;
   }
-  
-  if (queryLower.includes('how much fat') || queryLower.includes('how many fat') || queryLower.includes('fat in') || queryLower.includes('fat value') || queryLower.includes('fat of')) {
-    return `${foodName} (${servingSize}) contains about ${fats} g of fat.`;
+  if (queryLower.includes('fat')) {
+    return `${name} (${serving}) has about **${fats}g** of fat 🧈`;
   }
-  
-  // B) General query or "I am going to eat..." format
-  // Provide complete nutrition breakdown
-  let response = `If you are going to eat ${foodName} (${servingSize}), it contains approximately:\n\n`;
-  response += `• Calories: ${calories} kcal\n`;
-  response += `• Protein: ${protein} g\n`;
-  response += `• Carbs: ${carbs} g\n`;
-  response += `• Fat: ${fats} g`;
-  
-  // Add fiber and water if available
-  if (firstFood.fiber) {
-    response += `\n• Fiber: ${firstFood.fiber} g`;
+
+  // Full breakdown
+  let response = `🍽️ **${name}** (${serving})\n\n`;
+  response += `🔥 **${calories}** kcal | `;
+  response += `💪 **${protein}g** protein | `;
+  response += `🌾 **${carbs}g** carbs | `;
+  response += `🧈 **${fats}g** fat`;
+
+  if (food.fiber) {
+    response += `\n📍 Fiber: **${food.fiber}g**`;
   }
-  if (firstFood.water_content || firstFood.water_content_g) {
-    const water = firstFood.water_content || firstFood.water_content_g;
-    response += `\n• Water: ${water} g`;
-  }
-  
+
   return response;
 }
 
 /**
- * Detect if query is asking about food/nutrition
- * @param {string} message - User message
- * @returns {boolean}
+ * Detect food queries
  */
 function isFoodQuery(message) {
   const foodKeywords = [
-    'calorie', 'protein', 'carb', 'fat', 'nutrition', 'nutrient',
-    'food', 'meal', 'diet', 'eat', 'eating', 'vitamin', 'mineral',
-    'macro', 'micro', 'kcal', 'gram', 'serving', 'biryani', 'chicken',
-    'rice', 'meat', 'egg', 'fruit', 'vegetable', 'dish', 'curry',
-    'roll', 'burger', 'pizza', 'sandwich', 'salad', 'soup',
-    'how many calories', 'how much calories', 'nutritional value',
-    'nutrients in', 'macros', 'how much protein', 'i am going to eat',
-    'i am gonna eat', 'tell me calories', 'show me calories'
+    'calorie', 'protein', 'carb', 'fat', 'nutrition', 'food',
+    'meal', 'diet', 'eat', 'eating', 'vitamin', 'macro',
+    'biryani', 'chicken', 'rice', 'meat', 'egg', 'fruit',
+    'vegetable', 'curry', 'roll', 'burger', 'pizza'
   ];
-  
-  const lowerMessage = message.toLowerCase();
-  return foodKeywords.some(keyword => lowerMessage.includes(keyword));
+
+  return foodKeywords.some(keyword => message.toLowerCase().includes(keyword));
 }
 
 /**
- * Main nutrition service function - NUTRITION-ONLY
+ * Check if query is specifically asking for dataset information
+ * Only allows: calories, protein, fat, carbs, hydration, water
+ * @param {string} userMessage - User message to check
+ * @returns {boolean} - True if message contains dataset keywords
+ */
+function isDatasetQuery(userMessage) {
+  const datasetKeywords = ['calorie', 'calories', 'protein', 'carb', 'carbs', 'fat', 'hydration', 'water'];
+  const lowerMessage = userMessage.toLowerCase();
+  return datasetKeywords.some(keyword => lowerMessage.includes(keyword));
+}
+
+/**
+ * DUAL-PURPOSE AI Chat Service
  * Flow:
- * 1. Check if greeting → return warm response
- * 2. Validate nutrition scope → reject if out of scope
- * 3. Search food dataset FIRST (dataset-based responses only)
- * 4. If not found in dataset → return polite "not found" message
- * 5. NEVER call Gemini if food exists in dataset
- * 6. Log all messages to database
+ * 1. Check for greetings → warm response
+ * 2. Check nutrition scope:
+ *    a. If food query → search dataset FIRST
+ *    b. If found in dataset → return (NO Gemini call)
+ *    c. If not found → return "not found"
+ * 3. Check health scope:
+ *    a. If restricted medical → reject
+ *    b. If health query → search health dataset
+ *    c. Return with disclaimer
+ * 4. Out of scope → reject politely
+ * 5. Fallback → safe error handling
  * 
  * @param {string} userMessage - User's question
- * @param {Array} conversationHistory - Previous messages
- * @returns {Promise<Object>} - Response with content and source
+ * @param {string} sessionId - Session identifier (optional)
+ * @param {Array} conversationHistory - Previous messages (legacy)
+ * @returns {Promise<Object>} - {content, source, sessionId, processingTime}
  */
-export async function processAIChat(userMessage, conversationHistory = []) {
+export async function processAIChat(userMessage, sessionId = 'default', conversationHistory = []) {
+  const startTime = Date.now();
+  const logger = getLogger();
+  const conversationMgr = getConversationManager();
+
   try {
-    console.log('\n🤖 Processing nutrition query:', userMessage);
+    console.log('\n🤖 Processing query:', userMessage);
+    console.log('📍 Session:', sessionId);
     console.log('━'.repeat(60));
-    
-    // STEP 1: Check for greetings first
+
+    const session = conversationMgr.getSession(sessionId);
+    const history = conversationMgr.getHistory(sessionId);
+
+    let response;
+    let source;
+    let responseType;
+    let category = null;
+    let status = 'success';
+
+    // ===== STEP 1: GREETINGS =====
     if (isGreeting(userMessage)) {
-      console.log('👋 Greeting detected - sending warm response');
-      console.log('━'.repeat(60));
-      return {
-        content: generateGreetingResponse(),
-        source: 'system',
-      };
+      console.log('👋 Greeting detected');
+      response = generateGreetingResponse();
+      source = 'system';
+      responseType = 'greeting';
     }
 
-    // STEP 2: Validate nutrition scope (reject non-nutrition queries)
-    if (!isNutritionRelated(userMessage)) {
-      console.log('🚫 OUT-OF-SCOPE query detected - not nutrition-related');
-      console.log('━'.repeat(60));
-      return {
-        content: "Sorry, I can only help with food nutrition, calories, and dietary information.",
-        source: 'system',
-      };
+    // ===== STEP 2: NUTRITION QUERIES =====
+    else if (isNutritionQuery(userMessage)) {
+      console.log('🥗 Nutrition query detected');
+      responseType = 'nutrition';
+
+      // Check if query is specifically asking for dataset information
+      if (isDatasetQuery(userMessage)) {
+        console.log('🍽️ Dataset query detected - searching food dataset...');
+        const foodData = await searchFoodDataset(userMessage);
+
+        if (foodData && foodData.length > 0) {
+          response = formatFoodResponse(foodData, userMessage);
+          source = 'dataset';
+          console.log('✅ Found in database');
+        } else {
+          response = generateErrorResponse('not_found');
+          source = 'system';
+          status = 'not_found';
+          console.log('❌ Not found in database');
+        }
+      } else {
+        response = "I can provide calories, protein, fat, carbs, and hydration info. Please ask specifically about them. 🍏";
+        source = 'system';
+        console.log('ℹ️ Non-dataset nutrition query - showing guidance');
+      }
+
+      // Add follow-up suggestions for nutrition
+      if (source === 'dataset') {
+        response += generateFollowUp('nutrition');
+      }
     }
 
-    // STEP 3: Check food dataset (DATASET-FIRST - NO GEMINI IF FOUND)
-    if (isFoodQuery(userMessage)) {
-      console.log('🍽️ Food query detected - searching dataset...');
-      const foodData = await searchFoodDataset(userMessage);
-      
-      if (foodData && foodData.length > 0) {
-        // Format response based on query type
-        const response = formatFoodResponse(foodData, userMessage);
-        if (response) {
-          console.log('✅ DATASET HIT - Returning nutrition data (no Gemini call)');
-          console.log('━'.repeat(60));
-          return {
-            content: response,
-            source: 'dataset',
-          };
+    // ===== STEP 3: HEALTH & WELLNESS QUERIES =====
+    else if (isHealthQuery(userMessage)) {
+      console.log('🏥 Health query detected');
+      responseType = 'health';
+
+      if (isRestrictedMedicalQuery(userMessage)) {
+        response = "I can't provide medical diagnoses or treatment advice 🏥. Please consult a healthcare professional.";
+        source = 'system';
+        status = 'restricted';
+        console.log('🚫 Restricted medical topic');
+      } else {
+        category = detectHealthCategory(userMessage);
+        const healthData = searchHealthDataset(category);
+
+        if (healthData) {
+          response = formatHealthResponse(healthData);
+          source = 'health-dataset';
+          response += generateFollowUp(category);
+          console.log(`✅ Health category: ${category}`);
+        } else {
+          response = "I can help with sleep 😴, fitness 💪, hydration 💧, vitamins 💊, stress 🧘, and wellness 🌟. What interests you?";
+          source = 'system';
+          status = 'not_found';
         }
       }
-      
-      // Food not found in dataset
-      console.log('❌ Food not found in dataset');
-      console.log('━'.repeat(60));
-      return {
-        content: "Sorry, I don't have nutritional data for this food yet.",
-        source: 'system',
-      };
     }
 
-    // STEP 4: If not a food query but nutrition-related, provide guidance
-    console.log('ℹ️ Nutrition-related but not a food query - providing guidance');
+    // ===== STEP 4: OUT OF SCOPE =====
+    else {
+      console.log('🚫 Out-of-scope query');
+      responseType = 'rejected';
+      response = rejectOutOfScope();
+      source = 'system';
+      status = 'out_of_scope';
+    }
+
+    // Add personality to response
+    if (status === 'success') {
+      response = addPersonality(response, 'encouragement');
+    }
+
+    // Log the interaction
+    const processingTime = Date.now() - startTime;
+    logger.log({
+      sessionId,
+      userMessage,
+      responseType,
+      source,
+      category,
+      response,
+      processingTime,
+      status,
+      error: null
+    });
+
+    // Store in conversation history
+    conversationMgr.addMessage(sessionId, 'user', userMessage, category);
+    conversationMgr.addMessage(sessionId, 'assistant', response);
+
+    console.log(`✅ Response time: ${processingTime}ms`);
     console.log('━'.repeat(60));
+
     return {
-      content: "I can help you find calories, protein, carbs, and fat in foods. Try asking like:\n• 'How many calories in biryani?'\n• 'I am going to eat Chicken Tandoori Roll'\n• 'Tell me nutrition of rice'",
-      source: 'system',
+      content: response,
+      source,
+      sessionId,
+      processingTime
     };
 
   } catch (error) {
-    // STEP 5: Safe fallback - NEVER crash
-    console.error('❌ processAIChat error:', {
-      message: error.message,
-      stack: error.stack?.substring(0, 200)
-    });
+    const processingTime = Date.now() - startTime;
+
+    console.error('❌ Error:', error.message);
     console.log('━'.repeat(60));
-    
-    return {
-      content: "I apologize, but I'm experiencing technical difficulties right now. Please try again in a moment.",
+
+    const logger = getLogger();
+    logger.log({
+      sessionId,
+      userMessage,
+      responseType: 'error',
       source: 'system',
+      response: null,
+      processingTime,
+      status: 'error',
+      error: error.message
+    });
+
+    return {
+      content: "I apologize for the technical issue. Please try again. 😊",
+      source: 'system',
+      sessionId,
+      processingTime
     };
   }
 }
 
+/**
+ * Get conversation history for a session
+ */
+export function getSessionHistory(sessionId = 'default') {
+  const conversationMgr = getConversationManager();
+  return conversationMgr.getHistory(sessionId);
+}
+
+/**
+ * Clear session
+ */
+export function clearSession(sessionId = 'default') {
+  const conversationMgr = getConversationManager();
+  conversationMgr.clearSession(sessionId);
+}
+
+/**
+ * Get analytics
+ */
+export function getAnalytics(hours = 24) {
+  const logger = getLogger();
+  return logger.getAnalytics(hours);
+}
+
+/**
+ * Print analytics report
+ */
+export function printAnalyticsReport(hours = 24) {
+  const logger = getLogger();
+  logger.printReport(hours);
+}
+
 export default {
   processAIChat,
-  searchFoodDataset,
+  getSessionHistory,
+  clearSession,
+  getAnalytics,
+  printAnalyticsReport,
+  searchFoodDataset
 };
