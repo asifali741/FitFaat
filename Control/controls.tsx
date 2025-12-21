@@ -249,6 +249,7 @@ const styles = StyleSheet.create({
   wrapper: {
     paddingHorizontal: hp(2),
     paddingVertical: hp(1.5),
+    paddingBottom: Platform.OS === 'ios' ? hp(2) : hp(1.5),
     backgroundColor: 'transparent',
   },
   modalOverlay: {
