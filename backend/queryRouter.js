@@ -216,7 +216,7 @@ async function testRouter() {
 }
 
 // Export functions for use in other modules
-export { routeQuery, hasDatasetKeywords, sendToDatasetEndpoint, sendToGeneralChatbot };
+export { hasDatasetKeywords, routeQuery, sendToDatasetEndpoint, sendToGeneralChatbot };
 
 // Run tests if this file is executed directly
 testRouter().catch(error => {

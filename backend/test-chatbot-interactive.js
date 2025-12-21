@@ -4,7 +4,7 @@
  * Simulates conversation context using single sessionId
  */
 
-import { processAIChat, getSessionHistory, getAnalytics } from './src/services/geminiService.js';
+import { getAnalytics, getSessionHistory, processAIChat } from './src/services/geminiService.js';
 
 const sessionId = 'test-session-001';
 
