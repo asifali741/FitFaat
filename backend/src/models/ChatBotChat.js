@@ -30,7 +30,7 @@ const chatBotChatSchema = new mongoose.Schema({
   // Track source: user input, AI response, dataset response, or system message
   source: {
     type: String,
-    enum: ['user', 'ai', 'dataset', 'system'],
+    enum: ['user', 'ai', 'dataset', 'system', 'gemini', 'health-dataset'],
     default: 'user',
   },
   // Store any relevant metadata
