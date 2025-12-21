@@ -7,12 +7,12 @@ import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList, Platform, RefreshControl, StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  FlatList, Platform, RefreshControl, StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { widthPercentageToDP as wp } from 'react-native-responsive-screen';
 import { SafeAreaView } from 'react-native-safe-area-context';
