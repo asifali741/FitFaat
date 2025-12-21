@@ -27,35 +27,17 @@ const GEMINI_TIMEOUT_MS = 15000;
 /**
  * Enhanced Nutrition Guard Prompt
  */
-const NUTRITION_GUARD_PROMPT = `You are HeaLora - a friendly, knowledgeable AI health companion for the FitFaat app.
+const NUTRITION_GUARD_PROMPT = `You are HeaLora - a friendly AI health companion for FitFaat app.
 
-YOUR EXPERTISE:
-✅ Nutrition advice: calories, protein, carbs, fats, vitamins, minerals
-✅ Weight management tips: healthy weight loss/gain strategies
-✅ Diet planning: meal suggestions, portion control, balanced eating
-✅ Fitness guidance: exercise recommendations, workout tips
-✅ Hydration: water intake, healthy beverages
-✅ Sleep & recovery: rest, relaxation techniques
-✅ General wellness: stress management, healthy lifestyle tips
+RULES:
+- Keep responses SHORT (2-3 sentences MAX)
+- Use 1-2 emojis naturally
+- Be helpful and practical
+- For tips, use max 3 bullet points
 
-PERSONALITY:
-- Warm, supportive, and encouraging tone
-- Use emojis naturally: 🍏 🥗 💧 🥑 🍽️ 💪 😴 🌟
-- Give practical, actionable advice
-- Be conversational and friendly
-- Provide evidence-based information
+EXPERTISE: Nutrition, weight management, diet, fitness, hydration, sleep, wellness.
 
-RESPONSE STYLE:
-- Keep responses concise but helpful (3-5 sentences)
-- When giving tips, use bullet points or numbered lists
-- Include a helpful follow-up question or suggestion
-- For medical concerns, recommend consulting a healthcare professional
-
-IMPORTANT:
-- Be helpful and informative for general health questions
-- Don't refuse to answer legitimate health/nutrition/fitness questions
-- Provide mature, thoughtful responses
-- If user asks for food suggestions, recommend specific foods with their nutritional benefits`;
+IMPORTANT: Be concise! No long explanations.`;
 
 /**
  * Intent Detection Prompt - Used to classify user queries
@@ -85,32 +67,17 @@ User message: `;
 /**
  * Enhanced Health Guard Prompt
  */
-const HEALTH_GUARD_PROMPT = `You are HeaLora - a supportive wellness coach for FitFaat users.
+const HEALTH_GUARD_PROMPT = `You are HeaLora - a supportive wellness coach for FitFaat.
 
-YOUR EXPERTISE:
-✅ Sleep quality and sleep hygiene tips
-✅ Hydration and water intake guidance
-✅ Fitness, exercise, and movement advice
-✅ Vitamins, minerals, and supplements info
-✅ Stress management and meditation
-✅ Mental wellness and focus
-✅ Energy and metabolism optimization
-✅ Weight management strategies
-✅ Healthy lifestyle habits
+RULES:
+- Keep responses SHORT (2-3 sentences MAX)
+- Use 1-2 emojis
+- Be practical and actionable
+- For tips, use max 3 bullet points
 
-PERSONALITY:
-- Supportive and empathetic tone
-- Use wellness emojis: 💪 😴 💧 🧘 🌟 🏃 🥗
-- Provide practical, actionable advice
-- Be encouraging and motivating
+EXPERTISE: Sleep, hydration, fitness, vitamins, stress management, weight management, wellness.
 
-RESPONSE STYLE:
-- Give helpful, mature responses (3-5 sentences)
-- Use bullet points for tips and suggestions
-- Include actionable next steps
-- Add disclaimer only for medical-specific questions
-
-Note: For serious medical conditions, recommend consulting a healthcare professional.`;
+IMPORTANT: Be concise! Give quick, helpful answers.`;
 
 /**
  * Call Gemini API to detect user intent
@@ -118,53 +85,38 @@ Note: For serious medical conditions, recommend consulting a healthcare professi
  * @returns {Promise<string>} - Intent category
  */
 async function detectIntent(message) {
-  try {
-    if (!GEMINI_API_KEY) {
-      console.log('⚠️ No Gemini API key, using fallback intent detection');
-      return fallbackIntentDetection(message);
-    }
-
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: INTENT_DETECTION_PROMPT + message }] }],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 50,
-        }
-      })
-    });
-
-    if (!response.ok) {
-      console.log('⚠️ Gemini intent detection failed, using fallback');
-      return fallbackIntentDetection(message);
-    }
-
-    const data = await response.json();
-    const intent = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim().toLowerCase();
-    
-    console.log(`🎯 Detected intent: ${intent}`);
-    
-    // Validate intent
-    const validIntents = ['specific_nutrient', 'food_suggestion', 'general_health', 'greeting', 'other'];
-    if (validIntents.includes(intent)) {
-      return intent;
-    }
-    
-    return fallbackIntentDetection(message);
-  } catch (error) {
-    console.error('Intent detection error:', error.message);
-    return fallbackIntentDetection(message);
-  }
+  // Use fast keyword-based detection instead of Gemini API call
+  // This saves ~2-3 seconds per request
+  return fallbackIntentDetection(message);
 }
 
 /**
  * Fallback intent detection using keywords
  */
 function fallbackIntentDetection(message) {
-  const lowerMsg = message.toLowerCase();
+  let lowerMsg = message.toLowerCase();
+  
+  // Fix common typos
+  const typoFixes = {
+    'loose': 'lose', 'loosing': 'losing', 'looss': 'lose',
+    'wieght': 'weight', 'weigt': 'weight', 'weitght': 'weight',
+    'protien': 'protein', 'protine': 'protein',
+    'muscel': 'muscle', 'muscels': 'muscles', 'muscl': 'muscle',
+    'calries': 'calories', 'calorie': 'calories', 'caloris': 'calories',
+    'excersize': 'exercise', 'excercise': 'exercise', 'exersice': 'exercise',
+    'helthy': 'healthy', 'healthly': 'healthy', 'heathy': 'healthy',
+    'nutrtion': 'nutrition', 'nutriton': 'nutrition',
+    'carbz': 'carbs', 'carbes': 'carbs',
+    'fatt': 'fat', 'fats': 'fat',
+    'slep': 'sleep', 'slepp': 'sleep',
+    'watter': 'water', 'watre': 'water',
+    'gainn': 'gain', 'gian': 'gain',
+    'bild': 'build', 'biuld': 'build'
+  };
+  
+  for (const [typo, correct] of Object.entries(typoFixes)) {
+    lowerMsg = lowerMsg.replace(new RegExp(typo, 'g'), correct);
+  }
   
   // Check for greetings
   if (isGreeting(message)) {
@@ -332,7 +284,7 @@ Provide a helpful, friendly, and informative response:`;
           }],
           generationConfig: {
             temperature: 0.7,
-            maxOutputTokens: 800,
+            maxOutputTokens: 1024,
             topP: 0.8,
             topK: 40,
           },
