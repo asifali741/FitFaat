@@ -2,8 +2,8 @@ import { ChatBotStyles } from "@/components/ChatBotStyles";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Image, StyleSheet, Text, TouchableOpacity, View, Platform } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -17,6 +17,9 @@ export default function Index() {
   const [visibleText, setVisibleText] = useState("");
   const router = useRouter();
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
+  // Increase bottom spacing to account for tab bar height + safe area.
+  const bottomSpace = insets.bottom > 0 ? insets.bottom + hp(4) : hp(12);
 
   const openDrawer = () => {
     navigation.dispatch(DrawerActions.openDrawer());
@@ -74,7 +77,7 @@ export default function Index() {
         </View>
 
         {/* Start Button */}
-        <View style={styles.buttonContainer}>
+        <View style={[styles.buttonContainer, { marginBottom: bottomSpace }] }>
           <TouchableOpacity 
             style={styles.gradientButtonContainer}
             onPress={() => router.push("/baat")}
