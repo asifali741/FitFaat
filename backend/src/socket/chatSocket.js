@@ -210,16 +210,19 @@ export const initializeSocketIO = (httpServer) => {
         
         // Get other user's name for display
         let otherUserName = '';
+        let otherUserId = '';
         if (userRole === 'doctor') {
           // Doctor is viewing chat - get patient name
           const patient = await User.findById(appointment.userId);
           otherUserName = patient?.userInfo?.name || patient?.username || 'Patient';
+          otherUserId = appointment.userId?.toString() || '';
           console.log(`👤 Doctor viewing chat with patient: ${otherUserName} (ID: ${appointment.userId})`);
         } else {
           // User is viewing chat - get doctor name
           const doctorDoc = await Doctor.findById(appointment.doctorId);
           if (doctorDoc) {
             otherUserName = `Dr. ${doctorDoc.personalInfo.firstName} ${doctorDoc.personalInfo.lastName}`;
+            otherUserId = appointment.doctorId?.toString() || '';
           } else {
             otherUserName = 'Doctor';
           }
@@ -230,6 +233,7 @@ export const initializeSocketIO = (httpServer) => {
           appointmentId,
           userRole,
           otherUserName,
+          otherUserId,
           canSend: accessCheck.canSend,
           message: accessCheck.reason || 'Successfully joined chat'
         });
@@ -677,6 +681,135 @@ export const initializeSocketIO = (httpServer) => {
     /**
      * Leave appointment
      */
+    /**
+     * Video Call: Initiate call
+     */
+    socket.on('call:initiate', async ({ callerId, receiverId, callerRole, chatSessionId }) => {
+      try {
+        console.log(`📞 Call initiated by ${callerRole} in session ${chatSessionId}`);
+        
+        // Verify the socket is in the appointment room
+        if (socket.appointmentId !== chatSessionId) {
+          socket.emit('call:error', { message: 'Not in the appointment room' });
+          return;
+        }
+        
+        // Verify chat access (must have canSend permission to call)
+        const userId = socket.userId;
+        let appointment = null;
+        let userRole = socket.userRole;
+        
+        const user = await User.findById(userId);
+        if (user) {
+          appointment = user.appointmentsBooked.id(chatSessionId);
+        }
+        
+        if (!appointment) {
+          const doctor = await Doctor.findOne({ userId });
+          if (doctor) {
+            appointment = doctor.bookedAppointments.id(chatSessionId);
+          }
+        }
+        
+        if (!appointment) {
+          socket.emit('call:error', { message: 'Appointment not found' });
+          return;
+        }
+        
+        const accessCheck = isChatAllowed(appointment, userRole);
+        if (!accessCheck.canSend) {
+          socket.emit('call:error', { 
+            message: 'You need chat access before starting a video call',
+            reason: accessCheck.reason
+          });
+          return;
+        }
+        
+        // Emit incoming call to all other sockets in the room
+        socket.to(chatSessionId).emit('call:incoming', {
+          callerId: socket.userId,
+          callerName: socket.senderName,
+          callerRole: socket.userRole,
+          chatSessionId,
+        });
+        
+        console.log(`✅ Call notification sent to other users in room ${chatSessionId}`);
+        
+      } catch (error) {
+        console.error('Error initiating call:', error);
+        socket.emit('call:error', { message: 'Failed to initiate call' });
+      }
+    });
+
+    /**
+     * Video Call: Accept call
+     */
+    socket.on('call:accept', async ({ callerId, chatSessionId }) => {
+      try {
+        console.log(`✅ Call accepted in session ${chatSessionId}`);
+        
+        // Notify the caller that call was accepted
+        socket.to(chatSessionId).emit('call:accepted', {
+          receiverId: socket.userId,
+          chatSessionId,
+        });
+        
+        console.log(`📞 Call acceptance notification sent to caller`);
+        
+      } catch (error) {
+        console.error('Error accepting call:', error);
+        socket.emit('call:error', { message: 'Failed to accept call' });
+      }
+    });
+
+    /**
+     * Video Call: Reject call
+     */
+    socket.on('call:reject', async ({ callerId, chatSessionId, reason }) => {
+      try {
+        console.log(`❌ Call rejected in session ${chatSessionId}: ${reason}`);
+        
+        // Notify the caller that call was rejected
+        socket.to(chatSessionId).emit('call:rejected', {
+          reason: reason || 'Call declined',
+        });
+        
+        console.log(`📴 Call rejection notification sent to caller`);
+        
+      } catch (error) {
+        console.error('Error rejecting call:', error);
+        socket.emit('call:error', { message: 'Failed to reject call' });
+      }
+    });
+
+    /**
+     * Video Call: End call
+     */
+    socket.on('call:end', async ({ chatSessionId, reason }) => {
+      try {
+        console.log(`📴 Call ended by userId: ${socket.userId} in session ${chatSessionId}: ${reason}`);
+        
+        // Get all sockets in the room
+        const socketsInRoom = await io.in(chatSessionId).fetchSockets();
+        console.log(`📴 Sockets in room ${chatSessionId}: ${socketsInRoom.length}`);
+        socketsInRoom.forEach(s => {
+          console.log(`  - Socket ${s.id} (userId: ${s.userId})`);
+        });
+        
+        // Notify all users in the room that call ended
+        io.to(chatSessionId).emit('call:ended', {
+          endedBy: socket.userId,
+          reason: reason || 'Call ended',
+        });
+        
+        console.log(`📴 Call end notification (call:ended) sent to room ${chatSessionId}`);
+        
+      } catch (error) {
+        console.error('Error ending call:', error);
+        socket.emit('call:error', { message: 'Failed to end call' });
+      }
+    });
+
     socket.on('leave-appointment', ({ appointmentId }) => {
       if (socket.appointmentId === appointmentId) {
         socket.leave(appointmentId);
