@@ -2,6 +2,7 @@ import { DrawerSceneWrapper } from "@/components/CustomDrawerLayout";
 import { theme } from "@/constants/theme";
 import { AppointmentProvider } from "@/contexts/AppointmentContext";
 import { ChatbotStorageProvider } from "@/contexts/ChatbotStorage";
+import { GlobalCallProvider } from "@/contexts/GlobalCallContext";
 import { NewsProvider } from "@/contexts/NewsContext";
 import { authApi } from "@/utils/auth/authApi";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
@@ -107,6 +108,7 @@ export default function MainLayout() {
       return null; // or a loading screen
     }
     return <GestureHandlerRootView style={{ flex: 1 }}>
+  <GlobalCallProvider>
   <AppointmentProvider>
   <ChatbotStorageProvider>
   <NewsProvider>
@@ -164,10 +166,10 @@ export default function MainLayout() {
       options={doctorPortalOptions}
     />
   </Drawer>
-
   </NewsProvider>
   </ChatbotStorageProvider>
   </AppointmentProvider>
+  </GlobalCallProvider>
 </GestureHandlerRootView>
 
 }

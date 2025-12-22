@@ -1,5 +1,8 @@
 import BackButton from '@/components/BackButton';
+import IncomingCallModal from '@/components/IncomingCallModal';
+import VideoCallButton from '@/components/VideoCallButton';
 import { theme } from '@/constants/theme';
+import { useVideoCall } from '@/hooks/useVideoCall';
 import { tokenStorage } from '@/utils/auth/tokenStorage';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
@@ -57,6 +60,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
   const [chatAccessGranted, setChatAccessGranted] = useState(false);
   const [isGrantingAccess, setIsGrantingAccess] = useState(false);
   const [otherUserName, setOtherUserName] = useState('');
+  const [otherUserId, setOtherUserId] = useState<string>(''); // For video calls
   const [patientName, setPatientName] = useState(''); // For doctor's view
   const [timeRemaining, setTimeRemaining] = useState('');
   const [chatEndTime, setChatEndTime] = useState<Date | null>(null);
@@ -65,14 +69,42 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
   const flatListRef = useRef<FlatList | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
   const timerIntervalRef = useRef<number | null>(null);
+  const isInVideoCall = useRef<boolean>(false);
+
+  // Video call functionality
+  const {
+    initiateCall,
+    acceptCall,
+    rejectCall,
+    incomingCall,
+    isCallInProgress,
+    isInitiatingCall,
+    isVideoCallAvailable,
+  } = useVideoCall({
+    socketRef,
+    appointmentId,
+    userRole,
+    otherUserId,
+    otherUserName,
+    canSend,
+    isInVideoCallRef: isInVideoCall,
+  });
 
   // Initialize socket and load chat
   useEffect(() => {
     initializeChat();
     
     return () => {
+      // Only disconnect socket if not in video call
+      // During video call, just leave the room but keep socket connected
       if (socketRef.current) {
-        socketRef.current.disconnect();
+        if (isInVideoCall.current) {
+          console.log('📞 In video call - leaving room but keeping socket connected');
+          socketRef.current.emit('leave-appointment', { appointmentId });
+        } else {
+          console.log('🔌 Disconnecting socket');
+          socketRef.current.disconnect();
+        }
       }
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
@@ -222,6 +254,11 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
         console.log('✅ Room details - appointmentId:', data.appointmentId, 'userRole:', data.userRole, 'canSend:', data.canSend);
         const otherName = data.otherUserName || (accessData.userRole === 'doctor' ? 'Patient' : 'Doctor');
         setOtherUserName(otherName);
+        
+        // Set other user ID for video calls
+        if (data.otherUserId) {
+          setOtherUserId(data.otherUserId);
+        }
         
         // Set patient name if user is doctor
         if (accessData.userRole === 'doctor') {
@@ -619,6 +656,14 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
           </View>
         </View>
         
+        {/* Video Call Button */}
+        <VideoCallButton
+          onPress={initiateCall}
+          disabled={!isVideoCallAvailable || chatClosed}
+          loading={isInitiatingCall}
+          size={24}
+        />
+        
         <TouchableOpacity style={styles.infoButton}>
           <Ionicons name="information-circle-outline" size={26} color={theme.colors.surface} />
         </TouchableOpacity>
@@ -707,6 +752,17 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Incoming Call Modal */}
+      {incomingCall && (
+        <IncomingCallModal
+          visible={!!incomingCall}
+          callerName={incomingCall.callerName}
+          callerRole={incomingCall.callerRole}
+          onAccept={acceptCall}
+          onReject={rejectCall}
+        />
+      )}
     </SafeAreaView>
   );
 }
