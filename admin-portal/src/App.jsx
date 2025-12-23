@@ -6,7 +6,7 @@ import DashboardPage from './pages/DashboardPage';
 import LoginPage from './pages/LoginPage';
 
 // Get API base URL from environment variable or use default
-const API_BASE_URL = process.env.REACT_APP_BACKEND_API_URL || 'http://localhost:5001/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
