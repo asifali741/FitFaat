@@ -643,16 +643,17 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
               name={userRole === 'doctor' ? 'person' : 'medical'} 
               size={38} 
               color={theme.colors.primary} 
+              
             />
           </View>
           <View style={styles.headerInfo}>
             <Text style={styles.headerName}>
               {otherUserName || (userRole === 'doctor' ? 'Patient' : 'Doctor')}
             </Text>
-            <View style={styles.timerContainer}>
+            {/* <View style={styles.timerContainer}>
               <Ionicons name="time-outline" size={14} color={theme.colors.surface} />
               <Text style={styles.timerText}>{timeRemaining || 'Loading...'}</Text>
-            </View>
+            </View> */}
           </View>
         </View>
         
@@ -791,6 +792,7 @@ const styles = StyleSheet.create({
   },
   profileImageContainer: {
     marginRight: 14,
+    marginTop: 13,
     backgroundColor: theme.colors.surface,
     borderRadius: 25,
     padding: 3,

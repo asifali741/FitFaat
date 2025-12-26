@@ -5,61 +5,61 @@
 
 export const theme = {
   colors: {
-    // Primary Colors
-    primary: '#2E86AB',        // Medical Blue
-    secondary: '#4CAF50',      // Healthy Green
-    accent: '#22C55E',         // Fresh Green (CTA)
+    // Primary Colors - Professional Health App Palette
+    primary: '#0891B2',        // Trustworthy Teal (Medical, Professional)
+    secondary: '#10B981',      // Vital Green (Health, Wellness)
+    accent: '#06B6D4',         // Energetic Cyan (CTAs, Highlights)
     
     // Backgrounds
     background: '#F8FAFC',     // Soft Off-White
     surface: '#FFFFFF',        // Card backgrounds
-    screenColor: '#F8FAFC',    // Screen background
+    screenColor: '#FFFFFF',    // Screen background (Clean White)
     cardBackground: '#FFFFFF', // Card/Item backgrounds
-    offWhite: '#F5F7FA',       // Subtle backgrounds
+    offWhite: '#F1F5F9',       // Subtle backgrounds
     
     // Text
-    textPrimary: '#1F2933',    // Dark Gray
-    textSecondary: '#6B7280',  // Medium Gray
-    textTertiary: '#9CA3AF',   // Light Gray
+    textPrimary: '#0F172A',    // Deep Slate (High Contrast)
+    textSecondary: '#64748B',  // Slate Gray (Readable)
+    textTertiary: '#94A3B8',   // Light Slate (Subtle)
     textOnPrimary: '#FFFFFF',  // White text on primary
-    textLight: '#9CA3AF',      // Light text
+    textLight: '#94A3B8',      // Light text
     buttonText: '#FFFFFF',     // Button text
     
     // Semantic Colors
-    success: '#22C55E',
-    warning: '#F59E0B',
-    error: '#EF4444',
-    info: '#2E86AB',
+    success: '#10B981',        // Healthy Green
+    warning: '#F59E0B',       // Amber Warning
+    error: '#EF4444',          // Alert Red
+    info: '#0891B2',           // Info Teal
     
     // Chart & Data Visualization
-    chartProtein: '#22C55E',
-    chartCarbs: '#2E86AB',
-    chartFat: '#F59E0B',
-    chartCalories: '#F97316',
+    chartProtein: '#10B981',   // Green for Protein
+    chartCarbs: '#0891B2',      // Teal for Carbs
+    chartFat: '#F59E0B',        // Amber for Fat
+    chartCalories: '#F97316',  // Orange for Calories
     
     // UI Elements
-    border: '#E5E7EB',
-    divider: '#E5E7EB',
-    disabled: '#D1D5DB',
-    lightGray: '#E5E7EB',
-    gray: '#9CA3AF',
-    primarySoft: '#E0F2FE',    // Soft primary background
+    border: '#E2E8F0',          // Subtle Border
+    divider: '#E2E8F0',         // Divider
+    disabled: '#CBD5E1',        // Disabled State
+    lightGray: '#F1F5F9',       // Light Gray Background
+    gray: '#94A3B8',            // Medium Gray
+    primarySoft: '#E0F2FE',     // Soft Teal Background
     
     // Status Colors
-    statusActive: '#22C55E',
-    statusPending: '#F59E0B',
-    statusCancelled: '#EF4444',
-    statusConfirmed: '#4CAF50',
-    finishedStatus: '#4CAF50',  // Finished/completed
-    lockedStatus: '#95A5A6',    // Locked state
+    statusActive: '#10B981',    // Active Green
+    statusPending: '#F59E0B',   // Pending Amber
+    statusCancelled: '#EF4444', // Cancelled Red
+    statusConfirmed: '#10B981', // Confirmed Green
+    finishedStatus: '#10B981',   // Finished/Completed
+    lockedStatus: '#94A3B8',     // Locked State
     
     // Chat Backgrounds
-    chatDoctor: '#E0F2FE',     // Light Blue
-    chatUser: '#DCFCE7',       // Light Green
+    chatDoctor: '#E0F2FE',      // Light Teal (Doctor messages)
+    chatUser: '#D1FAE5',        // Light Green (User messages)
     
     // Additional Backgrounds
-    backgroundHeader: '#E0F2FE',
-    backgroundHighlight: '#F0F9FF',
+    backgroundHeader: '#F0F9FF', // Soft Teal Header
+    backgroundHighlight: '#F0F9FF', // Highlight Background
   },
   
   typography: {

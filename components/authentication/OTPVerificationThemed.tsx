@@ -7,6 +7,7 @@ import BackButton from '@/components/BackButton';
 import { KeyboardAwareContainer, ThemedButton } from '@/components/themed';
 import { theme } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -130,14 +131,26 @@ export default function OTPVerificationThemed() {
 
   return (
     <KeyboardAwareContainer scrollable={false}>
-      <View style={styles.content}>
-        {/* Back Button */}
+      {/* Professional Header with Gradient */}
+      <LinearGradient
+        colors={[theme.colors.primary, theme.colors.accent]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.headerGradient}
+      >
         <BackButton style={styles.backButton} testID="otp-back-button" />
+      </LinearGradient>
 
+      <View style={styles.content}>
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.iconContainer}>
-            <Ionicons name="mail-open-outline" size={64} color={theme.colors.primary} />
+            <LinearGradient
+              colors={[theme.colors.primary, theme.colors.accent]}
+              style={styles.iconGradient}
+            >
+              <Ionicons name="mail-open-outline" size={56} color={theme.colors.surface} />
+            </LinearGradient>
           </View>
           <Text style={styles.title}>Verify Your Email</Text>
           <Text style={styles.subtitle}>
@@ -209,33 +222,54 @@ export default function OTPVerificationThemed() {
 }
 
 const styles = StyleSheet.create({
+  headerGradient: {
+    height: 180,
+    paddingTop: 60,
+    paddingHorizontal: theme.spacing.xl,
+  },
   content: {
     flex: 1,
     paddingHorizontal: theme.spacing.xl,
-    paddingTop: theme.spacing.xl,
+    paddingTop: theme.spacing.xxl,
+    backgroundColor: theme.colors.screenColor,
+    marginTop: -40,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    ...theme.shadows.large,
   },
   backButton: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: theme.spacing.xl,
-    ...theme.shadows.small,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    ...theme.shadows.medium,
   },
   header: {
     alignItems: 'center',
     marginBottom: theme.spacing.xxxl,
+    marginTop: -20,
   },
   iconContainer: {
     marginBottom: theme.spacing.lg,
   },
+  iconGradient: {
+    width: 100,
+    height: 100,
+    borderRadius: theme.borderRadius.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...theme.shadows.large,
+  },
   title: {
-    fontSize: theme.typography.fontSize.xxxl,
+    fontSize: theme.typography.fontSize.xxxl + 4,
     fontWeight: theme.typography.fontWeight.bold,
     color: theme.colors.textPrimary,
     marginBottom: theme.spacing.sm,
+    letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: theme.typography.fontSize.base,
@@ -251,23 +285,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: theme.spacing.xl,
-    gap: theme.spacing.sm,
+    gap: theme.spacing.md,
   },
   otpInput: {
     flex: 1,
-    height: 60,
-    borderWidth: 2,
+    height: 68,
+    borderWidth: 2.5,
     borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.medium,
-    fontSize: theme.typography.fontSize.xxl,
+    borderRadius: theme.borderRadius.large,
+    fontSize: theme.typography.fontSize.xxl + 4,
     fontWeight: theme.typography.fontWeight.bold,
     color: theme.colors.textPrimary,
     textAlign: 'center',
     backgroundColor: theme.colors.surface,
+    ...theme.shadows.small,
   },
   otpInputFilled: {
     borderColor: theme.colors.primary,
     backgroundColor: theme.colors.backgroundHighlight,
+    ...theme.shadows.medium,
   },
   timerContainer: {
     alignItems: 'center',
