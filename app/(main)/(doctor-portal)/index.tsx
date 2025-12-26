@@ -60,10 +60,18 @@ export default function DoctorPortal() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <AppHeader 
-        title="Doctor Portal"
-        showStepIndicator={false}
-      />
+      {/* Professional Header with Gradient */}
+      <LinearGradient
+        colors={[theme.colors.primary, theme.colors.accent]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.headerGradient}
+      >
+        <AppHeader 
+          title="Doctor Portal"
+          showStepIndicator={false}
+        />
+      </LinearGradient>
 
       {/* Main Content */}
       <ScrollView 
@@ -72,98 +80,144 @@ export default function DoctorPortal() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.welcomeSection}>
-          <Image 
-            source={require("../../../assets/images/logo.png")} 
-            style={styles.logo}
-          />
+          <View style={styles.logoContainer}>
+            <Image 
+              source={require("../../../assets/images/logo.png")} 
+              style={styles.logo}
+            />
+          </View>
           <Text style={styles.welcomeTitle}>Welcome to FitFaat Doctor Portal</Text>
           <Text style={styles.welcomeSubtitle}>
             Join our network of healthcare professionals and help patients achieve their fitness goals
           </Text>
         </View>
 
-        {/* Features */}
+        {/* Features Grid */}
         <View style={styles.featuresContainer}>
           <TouchableOpacity 
-            style={[styles.featureItem, doctorStatus !== 'approved' && styles.featureItemDisabled]}
+            style={[styles.featureCard, doctorStatus !== 'approved' && styles.featureCardDisabled]}
             disabled={doctorStatus !== 'approved'}
-            activeOpacity={doctorStatus === 'approved' ? 0.7 : 1}
+            activeOpacity={doctorStatus === 'approved' ? 0.8 : 1}
           >
-            <Ionicons 
-              name="videocam" 
-              size={30} 
-              color={doctorStatus === 'approved' ? theme.colors.primary : theme.colors.textSecondary} 
-            />
-            <Text style={[styles.featureText, doctorStatus !== 'approved' && styles.featureTextDisabled]}>
+            <LinearGradient
+              colors={doctorStatus === 'approved' ? [theme.colors.primary + '15', theme.colors.accent + '10'] : ['#F1F5F9', '#F1F5F9']}
+              style={styles.featureIconContainer}
+            >
+              <Ionicons 
+                name="videocam" 
+                size={32} 
+                color={doctorStatus === 'approved' ? theme.colors.primary : theme.colors.textSecondary} 
+              />
+            </LinearGradient>
+            <Text style={[styles.featureTitle, doctorStatus !== 'approved' && styles.featureTitleDisabled]}>
               Video Consultations
             </Text>
+            <Text style={[styles.featureDescription, doctorStatus !== 'approved' && styles.featureDescriptionDisabled]}>
+              Connect with patients via secure video calls
+            </Text>
             {doctorStatus !== 'approved' && (
-              <Ionicons name="lock-closed" size={20} color={theme.colors.textSecondary} style={styles.lockIcon} />
+              <View style={styles.lockBadge}>
+                <Ionicons name="lock-closed" size={16} color={theme.colors.textSecondary} />
+                <Text style={styles.lockText}>Locked</Text>
+              </View>
             )}
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={[styles.featureItem, doctorStatus !== 'approved' && styles.featureItemDisabled]}
+            style={[styles.featureCard, doctorStatus !== 'approved' && styles.featureCardDisabled]}
             disabled={doctorStatus !== 'approved'}
             onPress={() => doctorStatus === 'approved' && router.push('/(main)/(doctor-portal)/all-chats')}
-            activeOpacity={doctorStatus === 'approved' ? 0.7 : 1}
+            activeOpacity={doctorStatus === 'approved' ? 0.8 : 1}
           >
-            <Ionicons 
-              name="chatbubbles" 
-              size={30} 
-              color={doctorStatus === 'approved' ? theme.colors.primary : theme.colors.textSecondary} 
-            />
-            <Text style={[styles.featureText, doctorStatus !== 'approved' && styles.featureTextDisabled]}>
+            <LinearGradient
+              colors={doctorStatus === 'approved' ? [theme.colors.secondary + '15', theme.colors.success + '10'] : ['#F1F5F9', '#F1F5F9']}
+              style={styles.featureIconContainer}
+            >
+              <Ionicons 
+                name="chatbubbles" 
+                size={32} 
+                color={doctorStatus === 'approved' ? theme.colors.secondary : theme.colors.textSecondary} 
+              />
+            </LinearGradient>
+            <Text style={[styles.featureTitle, doctorStatus !== 'approved' && styles.featureTitleDisabled]}>
               All Chats
             </Text>
+            <Text style={[styles.featureDescription, doctorStatus !== 'approved' && styles.featureDescriptionDisabled]}>
+              Manage patient conversations
+            </Text>
             {doctorStatus !== 'approved' && (
-              <Ionicons name="lock-closed" size={20} color={theme.colors.textSecondary} style={styles.lockIcon} />
+              <View style={styles.lockBadge}>
+                <Ionicons name="lock-closed" size={16} color={theme.colors.textSecondary} />
+                <Text style={styles.lockText}>Locked</Text>
+              </View>
             )}
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={[styles.featureItem, doctorStatus !== 'approved' && styles.featureItemDisabled]}
+            style={[styles.featureCard, doctorStatus !== 'approved' && styles.featureCardDisabled]}
             onPress={() => doctorStatus === 'approved' && router.push('/(main)/(doctor-portal)/patient-management')}
             disabled={doctorStatus !== 'approved'}
-            activeOpacity={doctorStatus === 'approved' ? 0.7 : 1}
+            activeOpacity={doctorStatus === 'approved' ? 0.8 : 1}
           >
-            <Ionicons 
-              name="people" 
-              size={30} 
-              color={doctorStatus === 'approved' ? theme.colors.primary : theme.colors.textSecondary} 
-            />
-            <Text style={[styles.featureText, doctorStatus !== 'approved' && styles.featureTextDisabled]}>
-              Appointments Management
+            <LinearGradient
+              colors={doctorStatus === 'approved' ? [theme.colors.accent + '15', theme.colors.primary + '10'] : ['#F1F5F9', '#F1F5F9']}
+              style={styles.featureIconContainer}
+            >
+              <Ionicons 
+                name="people" 
+                size={32} 
+                color={doctorStatus === 'approved' ? theme.colors.accent : theme.colors.textSecondary} 
+              />
+            </LinearGradient>
+            <Text style={[styles.featureTitle, doctorStatus !== 'approved' && styles.featureTitleDisabled]}>
+              Appointments
+            </Text>
+            <Text style={[styles.featureDescription, doctorStatus !== 'approved' && styles.featureDescriptionDisabled]}>
+              Manage patient appointments
             </Text>
             {doctorStatus === 'approved' ? (
-              <View style={styles.featureBadge}>
-                <Text style={styles.featureBadgeText}>New</Text>
+              <View style={styles.newBadge}>
+                <Text style={styles.newBadgeText}>New</Text>
               </View>
             ) : (
-              <Ionicons name="lock-closed" size={20} color={theme.colors.textSecondary} style={styles.lockIcon} />
+              <View style={styles.lockBadge}>
+                <Ionicons name="lock-closed" size={16} color={theme.colors.textSecondary} />
+                <Text style={styles.lockText}>Locked</Text>
+              </View>
             )}
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={[styles.featureItem, doctorStatus !== 'approved' && styles.featureItemDisabled]}
+            style={[styles.featureCard, doctorStatus !== 'approved' && styles.featureCardDisabled]}
             disabled={doctorStatus !== 'approved'}
-            activeOpacity={doctorStatus === 'approved' ? 0.7 : 1}
+            activeOpacity={doctorStatus === 'approved' ? 0.8 : 1}
           >
-            <Ionicons 
-              name="nutrition" 
-              size={30} 
-              color={doctorStatus === 'approved' ? theme.colors.secondary : theme.colors.textSecondary} 
-            />
-            <Text style={[styles.featureText, doctorStatus !== 'approved' && styles.featureTextDisabled]}>
-              Diet Plan Creation
+            <LinearGradient
+              colors={doctorStatus === 'approved' ? [theme.colors.secondary + '15', theme.colors.success + '10'] : ['#F1F5F9', '#F1F5F9']}
+              style={styles.featureIconContainer}
+            >
+              <Ionicons 
+                name="nutrition" 
+                size={32} 
+                color={doctorStatus === 'approved' ? theme.colors.secondary : theme.colors.textSecondary} 
+              />
+            </LinearGradient>
+            <Text style={[styles.featureTitle, doctorStatus !== 'approved' && styles.featureTitleDisabled]}>
+              Diet Plans
+            </Text>
+            <Text style={[styles.featureDescription, doctorStatus !== 'approved' && styles.featureDescriptionDisabled]}>
+              Create personalized diet plans
             </Text>
             {doctorStatus !== 'approved' && (
-              <Ionicons name="lock-closed" size={20} color={theme.colors.textSecondary} style={styles.lockIcon} />
+              <View style={styles.lockBadge}>
+                <Ionicons name="lock-closed" size={16} color={theme.colors.textSecondary} />
+                <Text style={styles.lockText}>Locked</Text>
+              </View>
             )}
           </TouchableOpacity>
         </View>
 
-        {/* Action Buttons */}
+        {/* Action Button */}
         <View style={styles.buttonContainer}>
           <TouchableOpacity 
             style={styles.gradientButtonContainer}
@@ -172,13 +226,19 @@ export default function DoctorPortal() {
             disabled={isLoadingStatus}
           >
             <LinearGradient
-              colors={[theme.colors.primary, theme.colors.secondary, theme.colors.accent]}
+              colors={[theme.colors.primary, theme.colors.secondary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.gradientButton}
             >
+              <Ionicons 
+                name={doctorStatus === 'approved' ? "checkmark-circle" : "add-circle"} 
+                size={24} 
+                color={theme.colors.surface} 
+                style={styles.buttonIcon}
+              />
               <Text style={styles.gradientButtonText}>
-                {isLoadingStatus ? 'Loading...' : doctorStatus === 'approved' && doctorName ? `Hey Dr. ${doctorName} ` : 'Join as Doctor ✨'}
+                {isLoadingStatus ? 'Loading...' : doctorStatus === 'approved' && doctorName ? `Welcome Dr. ${doctorName}` : 'Join as Doctor'}
               </Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -191,141 +251,166 @@ export default function DoctorPortal() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.screenColor,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: wp(5),
-    paddingVertical: hp(2),
-    backgroundColor: theme.colors.primary,
-  },
-  menuButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: Math.min(hp(2.5), wp(6)),
-    fontWeight: "bold",
-    color: theme.colors.surface,
-    textAlign: "center",
-    flex: 1,
+  headerGradient: {
+    paddingBottom: hp(2),
   },
   content: {
     flex: 1,
-    backgroundColor: theme.colors.background,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
+    backgroundColor: theme.colors.screenColor,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    marginTop: -20,
+    ...theme.shadows.large,
   },
   scrollContent: {
-    paddingTop: hp(4),
-    paddingHorizontal: wp(6),
+    paddingTop: hp(3),
+    paddingHorizontal: wp(5),
     paddingBottom: hp(12),
   },
   welcomeSection: {
     alignItems: "center",
-    marginBottom: hp(4),
+    marginBottom: hp(5),
+    marginTop: hp(2),
+  },
+  logoContainer: {
+    width: hp(12),
+    height: hp(12),
+    borderRadius: hp(6),
+    backgroundColor: theme.colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: hp(2),
+    ...theme.shadows.medium,
+    borderWidth: 3,
+    borderColor: theme.colors.primary + '20',
   },
   logo: {
-    width: hp(8),
-    height: hp(8),
-    marginBottom: hp(2),
+    width: hp(9),
+    height: hp(9),
+    resizeMode: 'contain',
   },
   welcomeTitle: {
-    fontSize: Math.min(hp(2.8), wp(7)),
-    fontWeight: "bold",
+    fontSize: Math.min(hp(3), wp(7.5)),
+    fontWeight: "800",
     color: theme.colors.textPrimary,
     textAlign: "center",
     marginBottom: hp(1),
-    paddingHorizontal: wp(2),
+    paddingHorizontal: wp(4),
+    letterSpacing: -0.5,
   },
   welcomeSubtitle: {
-    fontSize: Math.min(hp(1.8), wp(4.5)),
+    fontSize: Math.min(hp(1.9), wp(4.8)),
     color: theme.colors.textSecondary,
     textAlign: "center",
-    lineHeight: Math.min(hp(2.5), wp(6)),
-    paddingHorizontal: wp(6),
+    lineHeight: Math.min(hp(2.8), wp(7)),
+    paddingHorizontal: wp(8),
+    fontWeight: '500',
   },
   featuresContainer: {
     marginBottom: hp(4),
+    gap: hp(2),
   },
-  featureItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: hp(2),
-    paddingHorizontal: wp(4),
+  featureCard: {
     backgroundColor: theme.colors.surface,
-    borderRadius: 16,
+    borderRadius: 20,
+    padding: wp(5),
     marginBottom: hp(1.5),
-    borderWidth: 2,
-    borderColor: '#000000',
-    shadowColor: theme.colors.primary,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  featureItemDisabled: {
-    opacity: 0.6,
-    backgroundColor: theme.colors.offWhite,
+    ...theme.shadows.medium,
+    borderWidth: 1.5,
     borderColor: theme.colors.border,
+    minHeight: hp(14),
+    justifyContent: 'space-between',
   },
-  featureText: {
-    fontSize: hp(2),
+  featureCardDisabled: {
+    opacity: 0.7,
+    backgroundColor: theme.colors.offWhite,
+  },
+  featureIconContainer: {
+    width: hp(7),
+    height: hp(7),
+    borderRadius: hp(3.5),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: hp(1.5),
+    ...theme.shadows.small,
+  },
+  featureTitle: {
+    fontSize: hp(2.2),
     color: theme.colors.textPrimary,
-    marginLeft: wp(4),
-    fontWeight: "500",
-    flex: 1,
+    fontWeight: "700",
+    marginBottom: hp(0.5),
+    letterSpacing: 0.2,
   },
-  featureTextDisabled: {
+  featureTitleDisabled: {
     color: theme.colors.textSecondary,
   },
-  lockIcon: {
-    marginLeft: 'auto',
+  featureDescription: {
+    fontSize: hp(1.7),
+    color: theme.colors.textSecondary,
+    fontWeight: "400",
+    lineHeight: hp(2.4),
   },
-  featureBadge: {
-    backgroundColor: theme.colors.primary,
-    paddingVertical: hp(0.4),
-    paddingHorizontal: wp(2),
+  featureDescriptionDisabled: {
+    color: theme.colors.textTertiary,
+  },
+  lockBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginTop: hp(1),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(0.5),
+    backgroundColor: theme.colors.offWhite,
     borderRadius: 12,
-    marginLeft: 'auto',
+    gap: wp(1.5),
   },
-  featureBadgeText: {
-    color: theme.colors.surface,
-    fontSize: hp(1.3),
+  lockText: {
+    fontSize: hp(1.4),
+    color: theme.colors.textSecondary,
     fontWeight: '600',
   },
+  newBadge: {
+    alignSelf: 'flex-start',
+    marginTop: hp(1),
+    paddingHorizontal: wp(3.5),
+    paddingVertical: hp(0.6),
+    backgroundColor: theme.colors.primary,
+    borderRadius: 12,
+  },
+  newBadgeText: {
+    color: theme.colors.surface,
+    fontSize: hp(1.4),
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
   buttonContainer: {
-    marginTop: hp(4),
+    marginTop: hp(2),
     marginBottom: hp(2),
   },
   gradientButtonContainer: {
-    borderRadius: 30,
+    borderRadius: 18,
     overflow: "hidden",
     marginBottom: hp(2),
-    shadowColor: theme.colors.primary,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    ...theme.shadows.large,
   },
   gradientButton: {
-    paddingVertical: hp(2.5),
+    paddingVertical: hp(2.2),
     paddingHorizontal: wp(8),
-    borderRadius: 30,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
+    flexDirection: 'row',
+    gap: wp(2),
+  },
+  buttonIcon: {
+    marginRight: wp(1),
   },
   gradientButtonText: {
     color: theme.colors.surface,
-    fontSize: hp(2.4),
+    fontSize: hp(2.2),
     fontWeight: "700",
-    letterSpacing: 0.5,
-  },
-  spacer: {
-    width: wp(18),
+    letterSpacing: 0.3,
   },
 });

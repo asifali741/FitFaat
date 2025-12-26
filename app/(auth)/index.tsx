@@ -60,10 +60,17 @@ export default function Index() {
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-        <Image
-          source={require("../../assets/images/salad.jpg")}
-          style={styles.bannerImage}
-        />
+        {/* Hero Section with Gradient Background */}
+        <LinearGradient
+          colors={isDarkMode ? ['#0F172A', '#1E293B'] : ['#E0F2FE', '#F0F9FF']}
+          style={styles.heroSection}
+        >
+          <Image
+            source={require("../../assets/images/salad.jpg")}
+            style={styles.bannerImage}
+          />
+          <View style={styles.overlay} />
+        </LinearGradient>
         
         <View style={styles.contentContainer}>
           <View style={styles.mainHeading}>
@@ -101,7 +108,14 @@ export default function Index() {
             style={styles.emailButton}
             activeOpacity={0.8}
           >
-            <Text style={styles.emailButtonText}>Login with Email</Text>
+            <LinearGradient
+              colors={[colors.primary, colors.secondary]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.emailButtonGradient}
+            >
+              <Text style={styles.emailButtonText}>Login with Email</Text>
+            </LinearGradient>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -128,12 +142,27 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
   },
-  bannerImage: {
+  heroSection: {
     width: wp(100),
-    height: hp(30),
-    minHeight: 200,
-    maxHeight: 350,
+    height: hp(35),
+    minHeight: 250,
+    maxHeight: 400,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  bannerImage: {
+    width: '100%',
+    height: '100%',
     resizeMode: "cover",
+    opacity: 0.9,
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.7)' : 'rgba(240, 249, 255, 0.6)',
   },
   contentContainer: {
     paddingHorizontal: wp(6),
@@ -173,19 +202,19 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: isDarkMode ? colors.white : "#FFFFFF",
+    backgroundColor: isDarkMode ? colors.cardBackground : "#FFFFFF",
     paddingVertical: Math.max(hp(1.8), 14),
     paddingHorizontal: wp(4),
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: isDarkMode ? colors.gray : "#E0E0E0",
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: isDarkMode ? colors.border : "#E2E8F0",
     marginBottom: hp(2),
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    minHeight: 50,
+    shadowRadius: 8,
+    elevation: 4,
+    minHeight: 56,
   },
   googleLogo: {
     width: 24,
@@ -215,33 +244,37 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
     fontWeight: "500",
   },
   emailButton: {
-    backgroundColor: colors.primary,
-    paddingVertical: Math.max(hp(1.8), 14),
-    paddingHorizontal: wp(4),
-    borderRadius: 12,
-    alignItems: "center",
+    borderRadius: 16,
     marginBottom: hp(1.5),
     shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-    minHeight: 50,
+    shadowRadius: 12,
+    elevation: 8,
+    overflow: 'hidden',
+    minHeight: 56,
+  },
+  emailButtonGradient: {
+    paddingVertical: Math.max(hp(1.8), 16),
+    paddingHorizontal: wp(4),
+    alignItems: "center",
+    justifyContent: "center",
   },
   emailButtonText: {
-    fontSize: Math.min(hp(2), 16),
+    fontSize: Math.min(hp(2.1), 17),
     fontWeight: "700",
     color: "#FFFFFF",
+    letterSpacing: 0.5,
   },
   signupButton: {
     backgroundColor: "transparent",
-    paddingVertical: Math.max(hp(1.8), 14),
+    paddingVertical: Math.max(hp(1.8), 16),
     paddingHorizontal: wp(4),
-    borderRadius: 12,
+    borderRadius: 16,
     alignItems: "center",
     borderWidth: 2,
     borderColor: colors.primary,
-    minHeight: 50,
+    minHeight: 56,
   },
   signupButtonText: {
     fontSize: Math.min(hp(2), 16),

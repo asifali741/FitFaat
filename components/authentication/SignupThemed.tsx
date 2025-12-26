@@ -6,6 +6,7 @@
 import { KeyboardAwareContainer, ThemedButton, ThemedInput } from '@/components/themed';
 import { theme } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -124,18 +125,25 @@ export default function SignupThemed() {
 
   return (
     <KeyboardAwareContainer>
-      {/* Decorative Header */}
-      <View style={styles.decorativeHeader}>
-        <View style={[styles.circle, styles.circle1]} />
-        <View style={[styles.circle, styles.circle2]} />
-      </View>
+      {/* Professional Header with Gradient */}
+      <LinearGradient
+        colors={[theme.colors.secondary, theme.colors.primary]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.headerGradient}
+      >
+        <View style={styles.decorativeHeader}>
+          <View style={[styles.circle, styles.circle1]} />
+          <View style={[styles.circle, styles.circle2]} />
+        </View>
+      </LinearGradient>
 
       <View style={styles.formContainer}>
         {/* Header Section */}
         <View style={styles.header}>
           <View style={styles.logoContainer}>
             <View style={styles.logoBg}>
-              <Ionicons name="heart" size={32} color={theme.colors.surface} />
+              <Ionicons name="heart" size={36} color={theme.colors.surface} />
             </View>
           </View>
           <Text style={styles.title}>Create Account</Text>
@@ -281,64 +289,77 @@ export default function SignupThemed() {
 }
 
 const styles = StyleSheet.create({
+  headerGradient: {
+    height: 220,
+    position: 'relative',
+    overflow: 'hidden',
+  },
   decorativeHeader: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: 200,
+    bottom: 0,
     overflow: 'hidden',
-    backgroundColor: theme.colors.secondary,
-    opacity: 0.05,
   },
   circle: {
     position: 'absolute',
     borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.secondary,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   circle1: {
-    width: 200,
-    height: 200,
-    top: -80,
-    right: -60,
+    width: 250,
+    height: 250,
+    top: -100,
+    right: -80,
   },
   circle2: {
-    width: 150,
-    height: 150,
-    top: 60,
-    left: -40,
+    width: 180,
+    height: 180,
+    top: 80,
+    left: -50,
   },
   formContainer: {
     flex: 1,
     paddingHorizontal: theme.spacing.xl,
-    paddingTop: theme.spacing.xl,
+    paddingTop: theme.spacing.xxl,
+    backgroundColor: theme.colors.screenColor,
+    marginTop: -40,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    ...theme.shadows.large,
   },
   header: {
     alignItems: 'center',
     marginBottom: theme.spacing.xl,
+    marginTop: -60,
   },
   logoContainer: {
-    marginBottom: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
   },
   logoBg: {
-    width: 70,
-    height: 70,
+    width: 80,
+    height: 80,
     borderRadius: theme.borderRadius.full,
     backgroundColor: theme.colors.secondary,
     justifyContent: 'center',
     alignItems: 'center',
-    ...theme.shadows.medium,
+    borderWidth: 4,
+    borderColor: theme.colors.surface,
+    ...theme.shadows.large,
   },
   title: {
-    fontSize: theme.typography.fontSize.xxxl,
+    fontSize: theme.typography.fontSize.xxxl + 4,
     fontWeight: theme.typography.fontWeight.bold,
     color: theme.colors.textPrimary,
     marginBottom: theme.spacing.xs,
+    letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: theme.typography.fontSize.base,
     color: theme.colors.textSecondary,
     textAlign: 'center',
+    lineHeight: 22,
   },
   progressContainer: {
     flexDirection: 'row',
@@ -347,18 +368,20 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.xl,
   },
   progressStep: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.background,
-    borderWidth: 2,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 2.5,
     borderColor: theme.colors.border,
     justifyContent: 'center',
     alignItems: 'center',
+    ...theme.shadows.small,
   },
   progressStepActive: {
     backgroundColor: theme.colors.secondary,
     borderColor: theme.colors.secondary,
+    ...theme.shadows.medium,
   },
   progressText: {
     fontSize: theme.typography.fontSize.base,
