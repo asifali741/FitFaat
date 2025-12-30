@@ -13053,5 +13053,693 @@ export const pakistaniDishes = [
     "protein_g": 20,
     "carbs_g": 15,
     "fat_g": 16
-  }
+  },
+  {
+    "food_name": "Zinger Burger (Pak Style)",
+    "serving_size": "1 burger",
+    "calories_kcal": 450,
+    "protein_g": 25,
+    "carbs_g": 42,
+    "fat_g": 22
+  },
+  {
+    "food_name": "Chicken Burger Plain",
+    "serving_size": "1 burger",
+    "calories_kcal": 380,
+    "protein_g": 22,
+    "carbs_g": 40,
+    "fat_g": 15
+  },
+  {
+    "food_name": "Beef Burger Plain",
+    "serving_size": "1 burger",
+    "calories_kcal": 420,
+    "protein_g": 24,
+    "carbs_g": 38,
+    "fat_g": 20
+  },
+  {
+    "food_name": "Double Zinger Burger",
+    "serving_size": "1 burger",
+    "calories_kcal": 620,
+    "protein_g": 38,
+    "carbs_g": 45,
+    "fat_g": 32
+  },
+  {
+    "food_name": "Chicken Mayo Garlic Burger",
+    "serving_size": "1 burger",
+    "calories_kcal": 470,
+    "protein_g": 26,
+    "carbs_g": 41,
+    "fat_g": 24
+  },
+  {
+    "food_name": "Chicken Cheese Burger",
+    "serving_size": "1 burger",
+    "calories_kcal": 520,
+    "protein_g": 28,
+    "carbs_g": 43,
+    "fat_g": 28
+  },
+  {
+    "food_name": "Beef Cheese Burger",
+    "serving_size": "1 burger",
+    "calories_kcal": 560,
+    "protein_g": 30,
+    "carbs_g": 41,
+    "fat_g": 30
+  },
+  {
+    "food_name": "Chicken Shawarma Roll",
+    "serving_size": "1 roll",
+    "calories_kcal": 350,
+    "protein_g": 20,
+    "carbs_g": 38,
+    "fat_g": 14
+  },
+  {
+    "food_name": "Beef Shawarma Roll",
+    "serving_size": "1 roll",
+    "calories_kcal": 390,
+    "protein_g": 22,
+    "carbs_g": 36,
+    "fat_g": 18
+  },
+  {
+    "food_name": "Chicken Tikka Roll",
+    "serving_size": "1 roll",
+    "calories_kcal": 370,
+    "protein_g": 21,
+    "carbs_g": 39,
+    "fat_g": 16
+  },
+  {
+    "food_name": "Beef Tikka Roll",
+    "serving_size": "1 roll",
+    "calories_kcal": 400,
+    "protein_g": 23,
+    "carbs_g": 37,
+    "fat_g": 19
+  },
+  {
+    "food_name": "Chicken Seekh Kabab Roll",
+    "serving_size": "1 roll",
+    "calories_kcal": 360,
+    "protein_g": 20,
+    "carbs_g": 38,
+    "fat_g": 15
+  },
+  {
+    "food_name": "Beef Seekh Kabab Roll",
+    "serving_size": "1 roll",
+    "calories_kcal": 390,
+    "protein_g": 22,
+    "carbs_g": 36,
+    "fat_g": 18
+  },
+  {
+    "food_name": "Chicken Club Sandwich",
+    "serving_size": "1 sandwich",
+    "calories_kcal": 480,
+    "protein_g": 26,
+    "carbs_g": 44,
+    "fat_g": 22
+  },
+  {
+    "food_name": "Grilled Chicken Sandwich",
+    "serving_size": "1 sandwich",
+    "calories_kcal": 420,
+    "protein_g": 28,
+    "carbs_g": 40,
+    "fat_g": 16
+  },
+  {
+    "food_name": "Chicken Cheese Sandwich",
+    "serving_size": "1 sandwich",
+    "calories_kcal": 460,
+    "protein_g": 25,
+    "carbs_g": 41,
+    "fat_g": 20
+  },
+  {
+    "food_name": "French Fries Regular",
+    "serving_size": "1 serving",
+    "calories_kcal": 310,
+    "protein_g": 4,
+    "carbs_g": 40,
+    "fat_g": 15
+  },
+  {
+    "food_name": "French Fries Large",
+    "serving_size": "1 serving",
+    "calories_kcal": 420,
+    "protein_g": 5,
+    "carbs_g": 55,
+    "fat_g": 20
+  },
+  {
+    "food_name": "Masala Fries",
+    "serving_size": "1 serving",
+    "calories_kcal": 350,
+    "protein_g": 4,
+    "carbs_g": 42,
+    "fat_g": 18
+  },
+  {
+    "food_name": "Chicken Nuggets (6 pcs)",
+    "serving_size": "6 pieces",
+    "calories_kcal": 290,
+    "protein_g": 15,
+    "carbs_g": 18,
+    "fat_g": 18
+  },
+  {
+    "food_name": "Chicken Nuggets (10 pcs)",
+    "serving_size": "10 pieces",
+    "calories_kcal": 470,
+    "protein_g": 24,
+    "carbs_g": 30,
+    "fat_g": 28
+  },
+  {
+    "food_name": "Chicken Popcorn Small",
+    "serving_size": "1 box",
+    "calories_kcal": 280,
+    "protein_g": 16,
+    "carbs_g": 20,
+    "fat_g": 16
+  },
+  {
+    "food_name": "Chicken Popcorn Large",
+    "serving_size": "1 box",
+    "calories_kcal": 420,
+    "protein_g": 25,
+    "carbs_g": 30,
+    "fat_g": 25
+  },
+  {
+    "food_name": "Pizza Slice Chicken Fajita",
+    "serving_size": "1 slice",
+    "calories_kcal": 300,
+    "protein_g": 14,
+    "carbs_g": 32,
+    "fat_g": 14
+  },
+  {
+    "food_name": "Pizza Slice Chicken Tikka",
+    "serving_size": "1 slice",
+    "calories_kcal": 310,
+    "protein_g": 15,
+    "carbs_g": 33,
+    "fat_g": 14
+  },
+  {
+    "food_name": "Pizza Slice Cheese",
+    "serving_size": "1 slice",
+    "calories_kcal": 280,
+    "protein_g": 12,
+    "carbs_g": 34,
+    "fat_g": 12
+  },
+  {
+    "food_name": "Chicken Paratha Roll",
+    "serving_size": "1 roll",
+    "calories_kcal": 420,
+    "protein_g": 20,
+    "carbs_g": 45,
+    "fat_g": 18
+  },
+  {
+    "food_name": "Beef Paratha Roll",
+    "serving_size": "1 roll",
+    "calories_kcal": 450,
+    "protein_g": 22,
+    "carbs_g": 43,
+    "fat_g": 22
+  },
+  {
+    "food_name": "Chicken Cheese Paratha Roll",
+    "serving_size": "1 roll",
+    "calories_kcal": 480,
+    "protein_g": 22,
+    "carbs_g": 44,
+    "fat_g": 24
+  },
+  {
+    "food_name": "Anda Burger",
+    "serving_size": "1 burger",
+    "calories_kcal": 330,
+    "protein_g": 14,
+    "carbs_g": 38,
+    "fat_g": 14
+  },
+  {
+    "food_name": "Anda Shami Burger",
+    "serving_size": "1 burger",
+    "calories_kcal": 380,
+    "protein_g": 18,
+    "carbs_g": 36,
+    "fat_g": 18
+  },
+  {
+    "food_name": "Chicken Hot Dog",
+    "serving_size": "1 hot dog",
+    "calories_kcal": 360,
+    "protein_g": 15,
+    "carbs_g": 34,
+    "fat_g": 18
+  },
+  {
+    "food_name": "Beef Hot Dog",
+    "serving_size": "1 hot dog",
+    "calories_kcal": 390,
+    "protein_g": 17,
+    "carbs_g": 32,
+    "fat_g": 22
+  },
+  {
+    "food_name": "Chicken Cheese Hot Dog",
+    "serving_size": "1 hot dog",
+    "calories_kcal": 430,
+    "protein_g": 18,
+    "carbs_g": 34,
+    "fat_g": 26
+  },
+  {
+    "food_name": "Chicken Loaded Fries",
+    "serving_size": "1 serving",
+    "calories_kcal": 520,
+    "protein_g": 22,
+    "carbs_g": 48,
+    "fat_g": 28
+  },
+  {
+    "food_name": "Beef Loaded Fries",
+    "serving_size": "1 serving",
+    "calories_kcal": 560,
+    "protein_g": 25,
+    "carbs_g": 46,
+    "fat_g": 32
+  },
+  {
+    "food_name": "Chicken Mayo Fries",
+    "serving_size": "1 serving",
+    "calories_kcal": 450,
+    "protein_g": 14,
+    "carbs_g": 50,
+    "fat_g": 22
+  },
+  {
+    "food_name": "Chicken Cheese Fries",
+    "serving_size": "1 serving",
+    "calories_kcal": 490,
+    "protein_g": 16,
+    "carbs_g": 48,
+    "fat_g": 26
+  },
+  {
+    "food_name": "Zinger Burger Single",
+    "serving_size": "1 burger",
+    "calories_kcal": 480,
+    "protein_g": 26,
+    "carbs_g": 45,
+    "fat_g": 22
+  },
+  {
+    "food_name": "Zinger Burger Double",
+    "serving_size": "1 burger",
+    "calories_kcal": 620,
+    "protein_g": 38,
+    "carbs_g": 46,
+    "fat_g": 32
+  },
+  {
+    "food_name": "Chicken Cheese Burger",
+    "serving_size": "1 burger",
+    "calories_kcal": 510,
+    "protein_g": 28,
+    "carbs_g": 44,
+    "fat_g": 25
+  },
+  {
+    "food_name": "Beef Cheese Burger",
+    "serving_size": "1 burger",
+    "calories_kcal": 560,
+    "protein_g": 30,
+    "carbs_g": 42,
+    "fat_g": 30
+  },
+  {
+    "food_name": "Chapli Burger",
+    "serving_size": "1 burger",
+    "calories_kcal": 590,
+    "protein_g": 32,
+    "carbs_g": 40,
+    "fat_g": 34
+  },
+  {
+    "food_name": "Chicken Shawarma Wrap",
+    "serving_size": "1 wrap",
+    "calories_kcal": 420,
+    "protein_g": 24,
+    "carbs_g": 38,
+    "fat_g": 18
+  },
+  {
+    "food_name": "Beef Shawarma Wrap",
+    "serving_size": "1 wrap",
+    "calories_kcal": 470,
+    "protein_g": 26,
+    "carbs_g": 36,
+    "fat_g": 24
+  },
+  {
+    "food_name": "Chicken Roll Paratha",
+    "serving_size": "1 roll",
+    "calories_kcal": 450,
+    "protein_g": 22,
+    "carbs_g": 41,
+    "fat_g": 20
+  },
+  {
+    "food_name": "Beef Roll Paratha",
+    "serving_size": "1 roll",
+    "calories_kcal": 520,
+    "protein_g": 25,
+    "carbs_g": 40,
+    "fat_g": 28
+  },
+  {
+    "food_name": "Chicken Nuggets (6 pcs)",
+    "serving_size": "6 pieces",
+    "calories_kcal": 310,
+    "protein_g": 15,
+    "carbs_g": 22,
+    "fat_g": 18
+  },
+  {
+    "food_name": "Chicken Nuggets (12 pcs)",
+    "serving_size": "12 pieces",
+    "calories_kcal": 520,
+    "protein_g": 28,
+    "carbs_g": 38,
+    "fat_g": 30
+  },
+  {
+    "food_name": "Loaded Fries",
+    "serving_size": "1 box",
+    "calories_kcal": 480,
+    "protein_g": 10,
+    "carbs_g": 52,
+    "fat_g": 26
+  },
+  {
+    "food_name": "Masala Fries",
+    "serving_size": "1 box",
+    "calories_kcal": 360,
+    "protein_g": 6,
+    "carbs_g": 46,
+    "fat_g": 16
+  },
+  {
+    "food_name": "Chicken Popcorn",
+    "serving_size": "1 cup",
+    "calories_kcal": 390,
+    "protein_g": 20,
+    "carbs_g": 28,
+    "fat_g": 22
+  },
+  {
+    "food_name": "Broast Chicken Quarter",
+    "serving_size": "1 piece",
+    "calories_kcal": 340,
+    "protein_g": 24,
+    "carbs_g": 10,
+    "fat_g": 22
+  },
+  {
+    "food_name": "Broast Chicken Half",
+    "serving_size": "2 pieces",
+    "calories_kcal": 620,
+    "protein_g": 42,
+    "carbs_g": 18,
+    "fat_g": 38
+  },
+  {
+    "food_name": "Chicken Cheese Fries",
+    "serving_size": "1 plate",
+    "calories_kcal": 520,
+    "protein_g": 18,
+    "carbs_g": 48,
+    "fat_g": 30
+  },
+  {
+    "food_name": "BBQ Chicken Sandwich",
+    "serving_size": "1 sandwich",
+    "calories_kcal": 460,
+    "protein_g": 27,
+    "carbs_g": 40,
+    "fat_g": 20
+  },
+  {
+    "food_name": "Club Sandwich Pakistani Style",
+    "serving_size": "1 sandwich",
+    "calories_kcal": 550,
+    "protein_g": 30,
+    "carbs_g": 44,
+    "fat_g": 28
+  },
+  {
+    "food_name": "Chicken Mayo Sandwich",
+    "serving_size": "1 sandwich",
+    "calories_kcal": 490,
+    "protein_g": 24,
+    "carbs_g": 42,
+    "fat_g": 26
+  },
+  {
+    "food_name": "Chicken Fajita Pizza Slice",
+    "serving_size": "1 slice",
+    "calories_kcal": 285,
+    "protein_g": 14,
+    "carbs_g": 32,
+    "fat_g": 12
+  },
+  {
+    "food_name": "Chicken Tikka Pizza Slice",
+    "serving_size": "1 slice",
+    "calories_kcal": 295,
+    "protein_g": 15,
+    "carbs_g": 33,
+    "fat_g": 13
+  },
+  {
+    "food_name": "Malai Boti Pizza Slice",
+    "serving_size": "1 slice",
+    "calories_kcal": 310,
+    "protein_g": 16,
+    "carbs_g": 34,
+    "fat_g": 15
+  },
+  {
+    "food_name": "BBQ Chicken Pizza Slice",
+    "serving_size": "1 slice",
+    "calories_kcal": 300,
+    "protein_g": 15,
+    "carbs_g": 31,
+    "fat_g": 14
+  },
+  {
+    "food_name": "Vegetable Pizza Slice",
+    "serving_size": "1 slice",
+    "calories_kcal": 240,
+    "protein_g": 9,
+    "carbs_g": 34,
+    "fat_g": 8
+  },
+  {
+    "food_name": "Chicken Alfredo Pasta",
+    "serving_size": "1 plate",
+    "calories_kcal": 540,
+    "protein_g": 28,
+    "carbs_g": 48,
+    "fat_g": 26
+  },
+  {
+    "food_name": "Chicken Fajita Pasta",
+    "serving_size": "1 plate",
+    "calories_kcal": 510,
+    "protein_g": 26,
+    "carbs_g": 46,
+    "fat_g": 24
+  },
+  {
+    "food_name": "Creamy Mushroom Pasta",
+    "serving_size": "1 plate",
+    "calories_kcal": 480,
+    "protein_g": 16,
+    "carbs_g": 52,
+    "fat_g": 22
+  },
+  {
+    "food_name": "Chicken Lasagna Slice",
+    "serving_size": "1 slice",
+    "calories_kcal": 420,
+    "protein_g": 24,
+    "carbs_g": 34,
+    "fat_g": 20
+  },
+  {
+    "food_name": "Bun Kabab",
+    "serving_size": "1 bun",
+    "calories_kcal": 330,
+    "protein_g": 12,
+    "carbs_g": 38,
+    "fat_g": 14
+  },
+  {
+    "food_name": "Anday Wala Burger",
+    "serving_size": "1 burger",
+    "calories_kcal": 360,
+    "protein_g": 14,
+    "carbs_g": 40,
+    "fat_g": 16
+  },
+  {
+    "food_name": "Shami Kabab Burger",
+    "serving_size": "1 burger",
+    "calories_kcal": 390,
+    "protein_g": 18,
+    "carbs_g": 38,
+    "fat_g": 18
+  },
+  {
+    "food_name": "Chicken Samosa",
+    "serving_size": "1 piece",
+    "calories_kcal": 170,
+    "protein_g": 6,
+    "carbs_g": 18,
+    "fat_g": 8
+  },
+  {
+    "food_name": "Aloo Samosa",
+    "serving_size": "1 piece",
+    "calories_kcal": 150,
+    "protein_g": 3,
+    "carbs_g": 20,
+    "fat_g": 7
+  },
+  {
+    "food_name": "Samosa Chaat",
+    "serving_size": "1 plate",
+    "calories_kcal": 420,
+    "protein_g": 10,
+    "carbs_g": 54,
+    "fat_g": 18
+  },
+  {
+    "food_name": "Chaat Papri",
+    "serving_size": "1 plate",
+    "calories_kcal": 380,
+    "protein_g": 9,
+    "carbs_g": 50,
+    "fat_g": 16
+  },
+  {
+    "food_name": "Chicken Hot Wings (6 pcs)",
+    "serving_size": "6 wings",
+    "calories_kcal": 410,
+    "protein_g": 24,
+    "carbs_g": 12,
+    "fat_g": 28
+  },
+  {
+    "food_name": "Chicken Hot Wings (12 pcs)",
+    "serving_size": "12 wings",
+    "calories_kcal": 720,
+    "protein_g": 42,
+    "carbs_g": 20,
+    "fat_g": 48
+  },
+  {
+    "food_name": "Chicken Quesadilla",
+    "serving_size": "1 wrap",
+    "calories_kcal": 460,
+    "protein_g": 26,
+    "carbs_g": 40,
+    "fat_g": 22
+  },
+  {
+    "food_name": "Cheese Garlic Bread",
+    "serving_size": "2 slices",
+    "calories_kcal": 320,
+    "protein_g": 10,
+    "carbs_g": 34,
+    "fat_g": 16
+  },
+  {
+    "food_name": "Anday Wala Burger (Classic)",
+    "serving_size": "1 burger",
+    "calories_kcal": 360,
+    "protein_g": 14,
+    "carbs_g": 40,
+    "fat_g": 16
+  },
+  {
+    "food_name": "Anday Wala Burger (Double Egg)",
+    "serving_size": "1 burger",
+    "calories_kcal": 420,
+    "protein_g": 20,
+    "carbs_g": 40,
+    "fat_g": 22
+  },
+  {
+    "food_name": "Anday Wala Burger with Cheese",
+    "serving_size": "1 burger",
+    "calories_kcal": 430,
+    "protein_g": 18,
+    "carbs_g": 41,
+    "fat_g": 24
+  },
+  {
+    "food_name": "Anday Wala Burger with Mayo",
+    "serving_size": "1 burger",
+    "calories_kcal": 450,
+    "protein_g": 15,
+    "carbs_g": 42,
+    "fat_g": 26
+  },
+  {
+    "food_name": "Anday Wala Burger (Cheese + Mayo)",
+    "serving_size": "1 burger",
+    "calories_kcal": 510,
+    "protein_g": 19,
+    "carbs_g": 43,
+    "fat_g": 30
+  },
+  {
+    "food_name": "Anday Wala Burger with Shami Kabab",
+    "serving_size": "1 burger",
+    "calories_kcal": 520,
+    "protein_g": 26,
+    "carbs_g": 44,
+    "fat_g": 28
+  },
+  {
+    "food_name": "Anday Wala Burger (Spicy Street Style)",
+    "serving_size": "1 burger",
+    "calories_kcal": 390,
+    "protein_g": 15,
+    "carbs_g": 41,
+    "fat_g": 18
+  },
+  {
+    "food_name": "Anday Wala Burger (Whole Wheat Bun)",
+    "serving_size": "1 burger",
+    "calories_kcal": 330,
+    "protein_g": 14,
+    "carbs_g": 36,
+    "fat_g": 14
+  },
 ]; 
