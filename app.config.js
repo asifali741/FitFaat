@@ -7,7 +7,7 @@ export default {
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
-    scheme: "mobile", // 👈 crucial for Clerk redirect
+    scheme: "mobile", 
     userInterfaceStyle: "automatic",
     newArchEnabled: true,
 
@@ -29,7 +29,7 @@ export default {
           data: [
             {
               scheme: "mobile",
-              host: "oauth-native-callback", // 👈 change * to specific host
+              host: "oauth-native-callback",
             },
           ],
           category: ["BROWSABLE", "DEFAULT"],
@@ -62,9 +62,14 @@ export default {
     },
 
     extra: {
+      // EAS Project ID manually added here
+      eas: {
+        projectId: "0dcfb6cf-6803-4ec4-bda1-a6c442b19fb1"
+      },
       OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
-      EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY, // 👈 optional but helpful
-      EXPO_PUBLIC_BACKEND_API_URL: process.env.EXPO_PUBLIC_BACKEND_API_URL || 'http://localhost:5001',
+      EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY,
+      // Updated to your LIVE Railway URL for APK access
+      EXPO_PUBLIC_BACKEND_API_URL: process.env.EXPO_PUBLIC_BACKEND_API_URL || 'https://fitfaatbackend-production.up.railway.app',
     },
   },
 };
