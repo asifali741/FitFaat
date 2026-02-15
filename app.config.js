@@ -9,7 +9,7 @@ export default {
     icon: "./assets/images/icon.png",
     scheme: "mobile", 
     userInterfaceStyle: "automatic",
-    newArchEnabled: false, // 👈 Changed to false for better stability in APKs
+    newArchEnabled: true, // 👈 MUST be true for Reanimated/Worklets to build
 
     ios: {
       supportsTablet: true,
@@ -64,7 +64,6 @@ export default {
       eas: {
         projectId: "0dcfb6cf-6803-4ec4-bda1-a6c442b19fb1"
       },
-      // Hardcoded keys for APK stability
       OPENROUTER_API_KEY: "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",
       EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_ZW1lcmdpbmctcGVnYXN1cy0xMi5jbGVyay5hY2NvdW50cy5kZXYk",
       EXPO_PUBLIC_BACKEND_API_URL: "https://fitfaatbackend-production.up.railway.app/api",
