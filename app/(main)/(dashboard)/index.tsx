@@ -1,12 +1,14 @@
 import AppHeader from "@/components/AppHeader";
 import NewsModalPopup from "@/components/NewsModalPopup";
+import PatientDietPlanViewer from "@/components/PatientDietPlanViewer";
 import { useNews } from "@/contexts/NewsContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { dailyLogsApi } from "@/utils/dailyLogsApi";
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Days } from "./_Day";
 import { Day, jsonResponse } from "./types";
@@ -59,6 +61,7 @@ export default function DayPlan () {
   const { news, unreadCount, markNewsAsRead } = useNews();
   const [JsonResponse, setJsonResponse] = useState<null|jsonResponse>(null);
   const [showNewsModal, setShowNewsModal] = useState(false);
+  const [showDietPlanViewer, setShowDietPlanViewer] = useState(false);
 
   //Get Data from API or Local Storage
   useEffect( () => { 
@@ -212,6 +215,12 @@ export default function DayPlan () {
         onNewsRead={handleNewsRead}
       />
 
+      {/* Diet Plan Viewer */}
+      <PatientDietPlanViewer
+        visible={showDietPlanViewer}
+        onClose={() => setShowDietPlanViewer(false)}
+      />
+
       {/* Main Content */}
       <View style={[styles.content, { backgroundColor: colors.screenColor }]}>
         <ScrollView 
@@ -228,6 +237,15 @@ export default function DayPlan () {
             ))
           }
         </ScrollView>
+
+        {/* Floating Diet Plan Button */}
+        <TouchableOpacity
+          style={[styles.floatingButton, { backgroundColor: colors.primary }]}
+          onPress={() => setShowDietPlanViewer(true)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="nutrition" size={24} color={colors.surface} />
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -244,6 +262,24 @@ const styles = StyleSheet.create({
   list: {
     flex: 1,
     width: "100%",
+  },
+  floatingButton: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
   },
 });
 

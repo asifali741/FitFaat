@@ -1,6 +1,7 @@
 import { pakistaniDishes } from '@/app/Dataset/dataSet';
 import { drinksDataSet } from '@/app/Dataset/waterDataSet';
 import BackButton from '@/components/BackButton';
+import PatientDietPlanViewer from '@/components/PatientDietPlanViewer';
 import { goalBasedSuggestions, waterIntakeDatabase } from '@/constants/foodDatabase';
 import { HEADER_PADDING_HORIZONTAL } from '@/constants/ui';
 import { useTheme } from "@/contexts/ThemeContext";
@@ -138,6 +139,9 @@ export default function DetailsDay () {
     // Image detection states
     const [isDetectingDish, setIsDetectingDish] = useState(false);
     const [detectedDishName, setDetectedDishName] = useState<string>('');
+    
+    // Diet plan viewer state
+    const [showDietPlanViewer, setShowDietPlanViewer] = useState(false);
     
     // Initialize suggested foods based on user's goal
     useEffect(() => {
@@ -746,6 +750,24 @@ export default function DetailsDay () {
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
+              </View>
+
+              {/* View Diet Plan Button */}
+              <View style={styles.sectionContainer}>
+                <TouchableOpacity
+                  style={styles.dietPlanButton}
+                  onPress={() => setShowDietPlanViewer(true)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.dietPlanIconContainer}>
+                    <Ionicons name="nutrition-outline" size={24} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.dietPlanTextContainer}>
+                    <Text style={styles.dietPlanTitle}>View My Diet Plans</Text>
+                    <Text style={styles.dietPlanSubtitle}>See doctor-assigned meal plans</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+                </TouchableOpacity>
               </View>
 
               {/* Image Upload Button */}
@@ -1376,6 +1398,12 @@ export default function DetailsDay () {
         </View>
       </KeyboardAwareScrollView>
     )}
+    
+    {/* Diet Plan Viewer Modal */}
+    <PatientDietPlanViewer
+      visible={showDietPlanViewer}
+      onClose={() => setShowDietPlanViewer(false)}
+    />
   </View>
 );
 
@@ -3233,6 +3261,41 @@ const getStyles = (colors: any) => StyleSheet.create({
         height: '100%',
         backgroundColor: colors.primary,
         borderRadius: 4,
+    },
+    // Diet Plan Button Styles
+    dietPlanButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#8B5CF6', // Purple color for diet plan
+        borderRadius: 12,
+        padding: 16,
+        shadowColor: '#8B5CF6',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 5,
+    },
+    dietPlanIconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    dietPlanTextContainer: {
+        flex: 1,
+    },
+    dietPlanTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#FFFFFF',
+        marginBottom: 2,
+    },
+    dietPlanSubtitle: {
+        fontSize: 12,
+        color: 'rgba(255, 255, 255, 0.8)',
     },
     calProgressText: {
         flexDirection: 'row',
