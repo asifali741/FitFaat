@@ -1,4 +1,5 @@
 import BackButton from '@/components/BackButton';
+import DietPlanModal from '@/components/DietPlanModal';
 import IncomingCallModal from '@/components/IncomingCallModal';
 import VideoCallButton from '@/components/VideoCallButton';
 import { theme } from '@/constants/theme';
@@ -69,6 +70,9 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
   const [patientStats, setPatientStats] = useState<any>(null);
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [loadingStats, setLoadingStats] = useState(false);
+  const [showDietPlanModal, setShowDietPlanModal] = useState(false);
+  const [loadingDietPlan, setLoadingDietPlan] = useState(false);
+  const [appointmentData, setAppointmentData] = useState<any>(null);
   
   const socketRef = useRef<Socket | null>(null);
   const flatListRef = useRef<FlatList | null>(null);
@@ -223,6 +227,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
       setCanSend(accessData.canSend);
       setAccessMessage(accessData.message || '');
       setChatAccessGranted(!!accessData.appointment?.chatAccessGrantedAt);
+      setAppointmentData(accessData.appointment);
 
       // Calculate chat end time
       const appointment = accessData.appointment;
@@ -714,6 +719,32 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
           </TouchableOpacity>
         )}
         
+        {/* Diet Plan Button - Doctor Only */}
+        {userRole === 'doctor' && (
+          <TouchableOpacity 
+            style={styles.statsButton} 
+            onPress={() => {
+              console.log('Diet plan button pressed');
+              console.log('Appointment data:', appointmentData);
+              console.log('Patient ID:', appointmentData?.patientId);
+              
+              if (!appointmentData?.patientId) {
+                Alert.alert('Error', 'Patient information not available. Please refresh the chat.');
+                return;
+              }
+              
+              setShowDietPlanModal(true);
+            }}
+            activeOpacity={0.7}
+          >
+            {loadingDietPlan ? (
+              <ActivityIndicator size="small" color={theme.colors.surface} />
+            ) : (
+              <Ionicons name="nutrition-outline" size={24} color={theme.colors.surface} />
+            )}
+          </TouchableOpacity>
+        )}
+        
         <TouchableOpacity style={styles.infoButton}>
           <Ionicons name="information-circle-outline" size={26} color={theme.colors.surface} />
         </TouchableOpacity>
@@ -906,6 +937,17 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
           </View>
         </View>
       </Modal>
+
+      {/* Diet Plan Modal */}
+      <DietPlanModal 
+        visible={showDietPlanModal}
+        onClose={() => setShowDietPlanModal(false)}
+        appointmentId={appointmentId}
+        patientId={appointmentData?.patientId || ''}
+        patientName={otherUserName}
+        loading={loadingDietPlan}
+        setLoading={setLoadingDietPlan}
+      />
     </SafeAreaView>
   );
 }
