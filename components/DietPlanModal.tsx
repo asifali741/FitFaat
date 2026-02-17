@@ -34,6 +34,26 @@ interface FoodItem {
   quantity?: number;
 }
 
+interface MealFood {
+  foodName: string;
+  quantity: number;
+  unit: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  baseCalories: number;
+  baseProtein: number;
+  baseCarbs: number;
+  baseFats: number;
+}
+
+interface WeeklyMeals {
+  [day: string]: {
+    [mealType: string]: MealFood[];
+  };
+}
+
 interface DietPlanModalProps {
   visible: boolean;
   onClose: () => void;
@@ -80,7 +100,7 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
   };
   
   // Weekly meals structure
-  const [weeklyMeals, setWeeklyMeals] = useState(() => getInitialWeeklyMeals());
+  const [weeklyMeals, setWeeklyMeals] = useState<WeeklyMeals>(() => getInitialWeeklyMeals());
 
   const [showFoodSelector, setShowFoodSelector] = useState(false);
 
@@ -158,7 +178,7 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
   };
 
   const addFoodToMeal = (food: FoodItem) => {
-    const foodWithQuantity = {
+    const foodWithQuantity: MealFood = {
       foodName: food.name,
       quantity: 100, // default quantity
       unit: 'grams',
@@ -173,7 +193,7 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
       baseFats: food.fats
     };
 
-    setWeeklyMeals(prev => {
+    setWeeklyMeals((prev: WeeklyMeals) => {
       // Ensure prev is not null and has the expected structure
       if (!prev || typeof prev !== 'object') {
         console.warn('Invalid weeklyMeals state, resetting...');
@@ -213,7 +233,7 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
   };
 
   const removeFoodFromMeal = (dayKey: string, mealKey: string, index: number) => {
-    setWeeklyMeals(prev => {
+    setWeeklyMeals((prev: WeeklyMeals) => {
       // Validate state structure
       if (!prev || !prev[dayKey] || !Array.isArray(prev[dayKey][mealKey])) {
         console.warn('Invalid state structure in removeFoodFromMeal');
@@ -224,7 +244,7 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
         ...prev,
         [dayKey]: {
           ...prev[dayKey],
-          [mealKey]: prev[dayKey][mealKey].filter((_: any, i: number) => i !== index)
+          [mealKey]: prev[dayKey][mealKey].filter((_: MealFood, i: number) => i !== index)
         }
       };
     });
@@ -233,7 +253,7 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
   const updateFoodQuantity = (dayKey: string, mealKey: string, index: number, quantity: number) => {
     if (quantity <= 0) return;
 
-    setWeeklyMeals(prev => {
+    setWeeklyMeals((prev: WeeklyMeals) => {
       // Validate state structure
       if (!prev || !prev[dayKey] || !Array.isArray(prev[dayKey][mealKey]) || !prev[dayKey][mealKey][index]) {
         console.warn('Invalid state structure in updateFoodQuantity:', {
@@ -429,7 +449,7 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
       if (weeklyMeals && weeklyMeals[day]) {
         MEAL_TYPES.forEach(meal => {
           if (Array.isArray(weeklyMeals[day][meal])) {
-            weeklyMeals[day][meal].forEach((food: any) => {
+            weeklyMeals[day][meal].forEach((food: MealFood) => {
               total += food.calories || 0;
             });
           }
@@ -528,6 +548,54 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
                     <Text style={styles.planCalories}>
                       Target: {plan.customDailyCalories} kcal/day
                     </Text>
+                    
+                    {/* Show meal summary */}
+                    {plan.weeklyMeals && (
+                      <View style={styles.planMealsPreview}>
+                        <Text style={styles.planMealsTitle}>Meal Plan Summary:</Text>
+                        {DAYS.slice(0, 3).map((day) => {
+                          const dayMeals = plan.weeklyMeals[day];
+                          if (!dayMeals) return null;
+                          
+                          let totalFoods = 0;
+                          MEAL_TYPES.forEach(meal => {
+                            if (dayMeals[meal] && Array.isArray(dayMeals[meal])) {
+                              totalFoods += dayMeals[meal].length;
+                            }
+                          });
+                          
+                          if (totalFoods === 0) return null;
+                          
+                          return (
+                            <View key={day} style={styles.dayPreview}>
+                              <Text style={styles.dayPreviewTitle}>
+                                {day.charAt(0).toUpperCase() + day.slice(1)}:
+                              </Text>
+                              {MEAL_TYPES.map(meal => {
+                                if (!dayMeals[meal] || !Array.isArray(dayMeals[meal]) || dayMeals[meal].length === 0) {
+                                  return null;
+                                }
+                                return (
+                                  <Text key={meal} style={styles.mealPreview}>
+                                    • {meal.charAt(0).toUpperCase() + meal.slice(1)}: {dayMeals[meal].length} items
+                                  </Text>
+                                );
+                              })}
+                            </View>
+                          );
+                        })}
+                        {/* Show how many total days have meals */}
+                        <Text style={styles.totalDaysText}>
+                          {DAYS.filter(day => {
+                            const dayMeals = plan.weeklyMeals[day];
+                            if (!dayMeals) return false;
+                            return MEAL_TYPES.some(meal => 
+                              dayMeals[meal] && Array.isArray(dayMeals[meal]) && dayMeals[meal].length > 0
+                            );
+                          }).length} days planned
+                        </Text>
+                      </View>
+                    )}
                     
                     {plan.notes ? (
                       <Text style={styles.planNotes} numberOfLines={2}>
@@ -670,7 +738,7 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
                   </TouchableOpacity>
                 </View>
               ) : (
-                weeklyMeals[selectedDay] && weeklyMeals[selectedDay][selectedMealType] && weeklyMeals[selectedDay][selectedMealType].map((food: any, index: number) => (
+                weeklyMeals[selectedDay] && weeklyMeals[selectedDay][selectedMealType] && weeklyMeals[selectedDay][selectedMealType].map((food: MealFood, index: number) => (
                   <View key={index} style={styles.selectedFood}>
                     <View style={styles.selectedFoodInfo}>
                       <Text style={styles.selectedFoodName}>{food.foodName}</Text>
@@ -1098,6 +1166,42 @@ const styles = StyleSheet.create({
     color: theme.colors.surface,
     fontSize: 15,
     fontWeight: '600',
+  },
+  // Meal preview styles 
+  planMealsPreview: {
+    marginBottom: 12,
+    padding: 12,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  planMealsTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
+    marginBottom: 6,
+  },
+  dayPreview: {
+    marginBottom: 4,
+  },
+  dayPreviewTitle: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: theme.colors.primary,
+    marginBottom: 2,
+  },
+  mealPreview: {
+    fontSize: 10,
+    color: theme.colors.textSecondary,
+    marginLeft: 8,
+    lineHeight: 14,
+  },
+  totalDaysText: {
+    fontSize: 10,
+    color: theme.colors.textTertiary,
+    marginTop: 4,
+    fontStyle: 'italic',
   },
 });
 
