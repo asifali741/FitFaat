@@ -122,6 +122,15 @@ export default function AllUserChatsScreen() {
         socket = io(API_URL, { transports: ['websocket'], auth: { token } });
         socketRef.current = socket;
 
+        socket.on('connect', () => {
+          console.log('✅ Socket connected in AllUserChats. Socket ID:', socket.id);
+          console.log('✅ Listening for video:incoming-call events');
+        });
+
+        socket.on('disconnect', () => {
+          console.log('❌ Socket disconnected in AllUserChats');
+        });
+
         socket.on('user-new-message', (payload: any) => {
           if (!payload || !payload.appointmentId) return;
 
@@ -160,6 +169,61 @@ export default function AllUserChatsScreen() {
         socket.on('message-status-update', () => {
           // Refresh unread counts
           fetchUnreadMessages();
+        });
+
+        // Listen for incoming video calls
+        socket.on('video:incoming-call', (payload: any) => {
+          console.log('📞 [MOBILE] Incoming video call received:', payload);
+          const { roomName, callerId, callerName, receiverId } = payload;
+          
+          Alert.alert(
+            '📹 Incoming Video Call',
+            `${callerName || 'Doctor'} is calling you`,
+            [
+              {
+                text: 'Decline',
+                style: 'cancel',
+                onPress: () => {
+                  console.log('📞 [MOBILE] User declined call');
+                  socket.emit('video:reject-call', {
+                    roomName,
+                    callerId,
+                    reason: 'User declined'
+                  });
+                }
+              },
+              {
+                text: 'Accept',
+                onPress: async () => {
+                  console.log('📞 [MOBILE] User accepted call');
+                  // Extract appointmentId from roomName (format: appointment_<id>)
+                  const appointmentId = roomName.replace('appointment_', '');
+                  
+                  // Get current user ID
+                  const currentUserId = receiverId || socket.userId;
+                  
+                  // Notify caller that call was accepted
+                  socket.emit('video:accept-call', {
+                    roomName,
+                    callerId,
+                    receiverId: currentUserId
+                  });
+                  
+                  console.log('📞 [MOBILE] Navigating to video call screen');
+                  // Navigate to video call screen
+                  router.push({
+                    pathname: '/(main)/(conference)/video-call',
+                    params: {
+                      callId: roomName,
+                      userName: 'Patient',
+                      appointmentId: appointmentId
+                    }
+                  });
+                }
+              }
+            ],
+            { cancelable: false }
+          );
         });
 
       } catch (error) {

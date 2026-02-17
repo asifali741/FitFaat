@@ -78,6 +78,7 @@
     "react-native-worklets": "0.5.1",
     "socket.io-client": "^4.8.1",
     "tailwindcss": "^3.4.17",
+    "twilio": "^5.12.1",
     "typescript": "~5.9.2"
   },
   "devDependencies": {
