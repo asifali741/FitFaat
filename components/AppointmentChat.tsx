@@ -13,8 +13,10 @@ import {
   Alert,
   FlatList,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -64,6 +66,9 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
   const [patientName, setPatientName] = useState(''); // For doctor's view
   const [timeRemaining, setTimeRemaining] = useState('');
   const [chatEndTime, setChatEndTime] = useState<Date | null>(null);
+  const [patientStats, setPatientStats] = useState<any>(null);
+  const [showStatsModal, setShowStatsModal] = useState(false);
+  const [loadingStats, setLoadingStats] = useState(false);
   
   const socketRef = useRef<Socket | null>(null);
   const flatListRef = useRef<FlatList | null>(null);
@@ -145,6 +150,35 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
       }
     };
   }, [chatEndTime]);
+
+  const fetchPatientStats = async () => {
+    setLoadingStats(true);
+    try {
+      const token = await tokenStorage.getToken();
+      const response = await fetch(
+        `${BACKEND_URL}/api/chat/appointment/${appointmentId}/patient-stats`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      const data = await response.json();
+      if (data.success) {
+        setPatientStats(data.stats);
+        setShowStatsModal(true);
+      } else {
+        Alert.alert('Error', data.message || 'Failed to fetch patient stats');
+      }
+    } catch (error) {
+      console.error('Error fetching patient stats:', error);
+      Alert.alert('Error', 'Failed to load patient statistics');
+    } finally {
+      setLoadingStats(false);
+    }
+  };
 
   const initializeChat = async () => {
     try {
@@ -665,6 +699,21 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
           size={24}
         />
         
+        {/* Patient Stats Button - Doctor Only */}
+        {userRole === 'doctor' && (
+          <TouchableOpacity 
+            style={styles.statsButton} 
+            onPress={fetchPatientStats}
+            activeOpacity={0.7}
+          >
+            {loadingStats ? (
+              <ActivityIndicator size="small" color={theme.colors.surface} />
+            ) : (
+              <Ionicons name="bar-chart-outline" size={24} color={theme.colors.surface} />
+            )}
+          </TouchableOpacity>
+        )}
+        
         <TouchableOpacity style={styles.infoButton}>
           <Ionicons name="information-circle-outline" size={26} color={theme.colors.surface} />
         </TouchableOpacity>
@@ -764,6 +813,99 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
           onReject={rejectCall}
         />
       )}
+
+      {/* Patient Stats Modal */}
+      <Modal
+        visible={showStatsModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowStatsModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Patient Health Overview</Text>
+              <TouchableOpacity onPress={() => setShowStatsModal(false)}>
+                <Ionicons name="close" size={24} color={theme.colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+              {patientStats ? (
+                <>
+                  <View style={styles.statsCard}>
+                    <View style={styles.statItem}>
+                      <Text style={styles.statLabel}>Weight</Text>
+                      <Text style={styles.statValue}>{patientStats.weight || '--'} kg</Text>
+                    </View>
+                    <View style={styles.statDivider} />
+                    <View style={styles.statItem}>
+                      <Text style={styles.statLabel}>Height</Text>
+                      <Text style={styles.statValue}>{patientStats.height || '--'} cm</Text>
+                    </View>
+                    <View style={styles.statDivider} />
+                    <View style={styles.statItem}>
+                      <Text style={styles.statLabel}>BMI</Text>
+                      <Text style={styles.statValue}>{patientStats.bmi || '--'}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.sectionContainer}>
+                    <Text style={styles.sectionTitle}>Daily Calorie Goal</Text>
+                    <View style={styles.goalCard}>
+                      <Ionicons name="flame" size={24} color="#FF9500" />
+                      <View style={styles.goalInfo}>
+                        <Text style={styles.goalValue}>{patientStats.goalCalories || 'Not set'} kcal</Text>
+                        <Text style={styles.goalLabel}>Daily Target</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.sectionContainer}>
+                    <Text style={styles.sectionTitle}>Recent Intake (Last 7 Days)</Text>
+                    {patientStats.recentLogs && patientStats.recentLogs.length > 0 ? (
+                      patientStats.recentLogs.map((log: any, index: number) => (
+                        <View key={index} style={styles.logItem}>
+                          <View style={styles.logHeader}>
+                            <Text style={styles.logDate}>
+                              {new Date(log.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                            </Text>
+                            <Text style={styles.logValues}>
+                              {log.achievedCalories} / {log.targetCalories} kcal
+                            </Text>
+                          </View>
+                          <View style={styles.logBarContainer}>
+                            <View 
+                              style={[
+                                styles.logBar, 
+                                { 
+                                  width: `${Math.min((log.achievedCalories / (log.targetCalories || 2000)) * 100, 100)}%`,
+                                  backgroundColor: log.achievedCalories > log.targetCalories ? '#FF3B30' : theme.colors.primary 
+                                }
+                              ]} 
+                            />
+                          </View>
+                        </View>
+                      ))
+                    ) : (
+                      <View style={styles.emptyContainer}>
+                        <Ionicons name="calendar-outline" size={48} color={theme.colors.textTertiary} />
+                        <Text style={styles.emptyText}>No recent tracking logs found</Text>
+                      </View>
+                    )}
+                  </View>
+                </>
+              ) : (
+                <View style={[styles.loadingContainer, { height: 300 }]}>
+                  <ActivityIndicator size="large" color={theme.colors.primary} />
+                  <Text style={styles.loadingText}>Loading health data...</Text>
+                </View>
+              )}
+              <View style={{ height: 30 }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1072,5 +1214,140 @@ const styles = StyleSheet.create({
     color: theme.colors.surface,
     fontSize: theme.typography.fontSize.base,
     fontWeight: theme.typography.fontWeight.semiBold as any
+  },
+  statsButton: {
+    padding: theme.spacing.sm,
+    marginRight: 4
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: theme.colors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    height: '85%',
+    padding: theme.spacing.xl,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing.xl,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: theme.colors.textPrimary,
+  },
+  modalBody: {
+    flex: 1,
+  },
+  statsCard: {
+    flexDirection: 'row',
+    backgroundColor: theme.colors.background,
+    borderRadius: 16,
+    padding: theme.spacing.lg,
+    marginBottom: theme.spacing.xl,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  statItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statDivider: {
+    width: 1,
+    height: '60%',
+    backgroundColor: theme.colors.border,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: theme.colors.primary,
+  },
+  sectionContainer: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: theme.colors.textPrimary,
+    marginBottom: 12,
+  },
+  goalCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF4E5',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FFE0B2',
+  },
+  goalInfo: {
+    marginLeft: 12,
+  },
+  goalValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#E65100',
+  },
+  goalLabel: {
+    fontSize: 12,
+    color: '#F57C00',
+  },
+  logItem: {
+    marginBottom: 16,
+  },
+  logHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  logDate: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: theme.colors.textSecondary,
+  },
+  logValues: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: theme.colors.textPrimary,
+  },
+  logBarContainer: {
+    height: 8,
+    backgroundColor: theme.colors.border,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  logBar: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    padding: 32,
+    backgroundColor: theme.colors.background,
+    borderRadius: 12,
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  emptyText: {
+    marginTop: 12,
+    color: theme.colors.textSecondary,
+    fontSize: 14,
   }
 });
