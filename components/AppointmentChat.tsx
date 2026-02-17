@@ -285,6 +285,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
       // Socket event listeners
       socket.on('connect', () => {
         console.log('✅ Socket connected successfully, joining appointment:', appointmentId);
+        console.log('✅ [CHAT SCREEN] Now listening for video:incoming-call events');
         socket.emit('join-appointment', { appointmentId });
       });
 
@@ -435,6 +436,61 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
       socket.on('reconnect', (attemptNumber) => {
         console.log('🔄 Socket reconnected after', attemptNumber, 'attempts');
         socket.emit('join-appointment', { appointmentId });
+      });
+
+      // Listen for incoming video calls
+      socket.on('video:incoming-call', (payload: any) => {
+        console.log('📞 [CHAT SCREEN] Incoming video call received:', payload);
+        const { roomName, callerId, callerName, receiverId } = payload;
+        
+        Alert.alert(
+          '📹 Incoming Video Call',
+          `${callerName || 'Doctor'} is calling you`,
+          [
+            {
+              text: 'Decline',
+              style: 'cancel',
+              onPress: () => {
+                console.log('📞 [CHAT SCREEN] User declined call');
+                socket.emit('video:reject-call', {
+                  roomName,
+                  callerId,
+                  reason: 'User declined'
+                });
+              }
+            },
+            {
+              text: 'Accept',
+              onPress: async () => {
+                console.log('📞 [CHAT SCREEN] User accepted call');
+                // Extract appointmentId from roomName (format: appointment_<id>)
+                const callAppointmentId = roomName.replace('appointment_', '');
+                
+                // Get current user ID
+                const currentUserId = receiverId || accessData.userId;
+                
+                // Notify caller that call was accepted
+                socket.emit('video:accept-call', {
+                  roomName,
+                  callerId,
+                  receiverId: currentUserId
+                });
+                
+                console.log('📞 [CHAT SCREEN] Navigating to video call screen');
+                // Navigate to video call screen
+                router.push({
+                  pathname: '/(main)/(conference)/video-call',
+                  params: {
+                    callId: roomName,
+                    userName: accessData.userRole === 'user' ? 'Patient' : 'Doctor',
+                    appointmentId: callAppointmentId
+                  }
+                });
+              }
+            }
+          ],
+          { cancelable: false }
+        );
       });
 
     } catch (error) {

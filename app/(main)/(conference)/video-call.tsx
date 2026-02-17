@@ -8,6 +8,10 @@ import { Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native
 import { SafeAreaView } from "react-native-safe-area-context";
 import { io } from 'socket.io-client';
 
+// Twilio Video will be used instead of ZegoCloud
+const isZegoAvailable = false; // Disabled - using Twilio Video
+
+/* COMMENTED OUT - REPLACED WITH TWILIO VIDEO
 // Conditionally import Zego only on platforms that support it
 let ZegoUIKitPrebuiltCall: any = null;
 let ONE_ON_ONE_VIDEO_CALL_CONFIG: any = null;
@@ -26,6 +30,7 @@ try {
 // ZegoCloud credentials
 const APP_ID = parseInt('96ec17b2e9a1f1c54b8c6653fa691ab4', 16);
 const APP_SIGN = "96ec17b2e9a1f1c54b8c6653fa691ab4f7bf1f47e6b589ef4d1159784da7b5db";
+END COMMENTED OUT */
 
 export default function VideoCallScreen() {
   const router = useRouter();
@@ -43,6 +48,8 @@ export default function VideoCallScreen() {
   const roomId = callId || `call_${Date.now()}`;
 
   const socketRef = React.useRef<any>(null);
+
+  // Audio call state (using existing state variables)
   const isSocketInRoom = React.useRef<boolean>(false);
   
   // Demo mode state for Expo Go
@@ -314,6 +321,7 @@ export default function VideoCallScreen() {
     );
   }
 
+  /* COMMENTED OUT - REPLACED WITH TWILIO VIDEO
   // Real Zego video call (for development builds)
   return (
     <SafeAreaView style={styles.container}>
@@ -351,6 +359,79 @@ export default function VideoCallScreen() {
       />
     </SafeAreaView>
   );
+  END COMMENTED OUT */
+
+  // TODO: Implement Twilio Video for mobile app
+  // For now, showing audio-only call interface
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.demoContainer}>
+        {/* Header */}
+        <View style={styles.headerContainer}>
+          <Text style={styles.headerText}>Voice Call Active</Text>
+          <Text style={styles.subHeaderText}>Connected with {displayName || "Doctor"}</Text>
+        </View>
+
+        {/* Call Duration */}
+        <View style={styles.callInfoContainer}>
+          <View style={styles.timerContainer}>
+            <Ionicons name="time-outline" size={20} color="#4CAF50" />
+            <Text style={styles.timerText}>{formatDuration(callDuration)}</Text>
+          </View>
+        </View>
+
+        {/* Doctor Avatar/Placeholder */}
+        <View style={styles.avatarContainer}>
+          <View style={styles.avatarCircle}>
+            <Ionicons name="person" size={80} color="#fff" />
+          </View>
+          <Text style={styles.doctorName}>{displayName || "Doctor"}</Text>
+          <Text style={styles.connectionStatus}>Audio Connected</Text>
+        </View>
+
+        {/* Video Note */}
+        <View style={styles.videoNoteContainer}>
+          <Ionicons name="videocam-off" size={24} color="#FFB800" />
+          <Text style={styles.videoNoteText}>
+            Video calls require web browser for doctors.{'\n'}
+            Audio conversation is active.
+          </Text>
+        </View>
+
+        {/* Controls */}
+        <View style={styles.controlsContainer}>
+          <TouchableOpacity
+            style={[styles.controlButton, isMuted && styles.controlButtonActive]}
+            onPress={() => setIsMuted(!isMuted)}
+          >
+            <Ionicons 
+              name={isMuted ? "micoff" : "mic"} 
+              size={24} 
+              color={isMuted ? "#fff" : "#4CAF50"} 
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.endCallButton}
+            onPress={handleCallEnd}
+          >
+            <Ionicons name="call" size={28} color="#fff" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.controlButton}
+            onPress={() => setIsSpeakerOn(!isSpeakerOn)}
+          >
+            <Ionicons 
+              name={isSpeakerOn ? "volume-high" : "volume-low"} 
+              size={24} 
+              color="#4CAF50" 
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </SafeAreaView>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -364,6 +445,82 @@ const styles = StyleSheet.create({
   demoContainer: {
     flex: 1,
     backgroundColor: "#1a1a1a",
+    paddingHorizontal: 20,
+  },
+  headerContainer: {
+    paddingTop: 40,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  headerText: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  subHeaderText: {
+    color: '#888',
+    fontSize: 16,
+    marginTop: 8,
+  },
+  callInfoContainer: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  timerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(76, 175, 80, 0.2)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  timerText: {
+    color: '#4CAF50',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  avatarContainer: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  avatarCircle: {
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    borderWidth: 3,
+    borderColor: '#4CAF50',
+  },
+  doctorName: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  connectionStatus: {
+    color: '#4CAF50',
+    fontSize: 16,
+  },
+  videoNoteContainer: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 184, 0, 0.1)',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 40,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 184, 0, 0.3)',
+  },
+  videoNoteText: {
+    color: '#FFB800',
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 20,
   },
   remoteVideoContainer: {
     flex: 1,
