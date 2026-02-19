@@ -12,7 +12,7 @@ import Constants from 'expo-constants';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Modal } from "react-native";
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import Animated, { Easing, runOnJS, useAnimatedProps, useSharedValue, withTiming } from "react-native-reanimated";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
@@ -38,6 +38,11 @@ export default function DetailsDay () {
     const [dayData, setDayData] = useState<any>(props);
     const [isLoading, setIsLoading] = useState(false);
     const [isCompletingDay, setIsCompletingDay] = useState(false);
+    
+    // Completion popup states
+    const [showCompletionModal, setShowCompletionModal] = useState(false);
+    const [completionModalType, setCompletionModalType] = useState<'confirm' | 'success' | 'weekComplete' | 'error'>('confirm');
+    const [completionModalData, setCompletionModalData] = useState<any>({});
     
     // Calculate time remaining in the day (from current time to 11:59:59 PM)
     function getRemainingTime(){
@@ -111,67 +116,62 @@ export default function DetailsDay () {
 
     // Complete Day functionality
     const handleCompleteDay = async () => {
-      Alert.alert(
-        "Complete Day?",
-        `Are you sure you want to complete Day ${dayData.dayNo}? This action cannot be undone.`,
-        [
-          {
-            text: "Cancel",
-            style: "cancel"
-          },
-          {
-            text: "Complete Day",
-            style: "destructive",
-            onPress: async () => {
-              try {
-                setIsCompletingDay(true);
-                
-                // Get weekly tracking ID from storage
-                const weeklyTrackingId = await AsyncStorage.getItem('weeklyTrackingId');
-                if (!weeklyTrackingId) {
-                  Alert.alert('Error', 'Weekly tracking ID not found');
-                  return;
-                }
-
-                console.log(`🚀 Completing Day ${dayData.dayNo}...`);
-                const result = await dailyLogsApi.completeDay(weeklyTrackingId, dayData.dayNo);
-                
-                if (result.cycleRestarted) {
-                  Alert.alert(
-                    '🎉 Week Completed!',
-                    `Day ${dayData.dayNo} completed successfully! A new weekly cycle has started. You'll now see Day 1 again with all other days locked.`,
-                    [{
-                      text: 'Continue to New Cycle',
-                      onPress: () => {
-                        // Navigate back to dashboard to see new cycle
-                        router.back();
-                      }
-                    }]
-                  );
-                } else {
-                  Alert.alert(
-                    '✅ Day Completed!',
-                    `Day ${dayData.dayNo} has been completed successfully. The next day is now unlocked.`,
-                    [{
-                      text: 'OK',
-                      onPress: () => {
-                        // Navigate back to dashboard
-                        router.back();
-                      }
-                    }]
-                  );
-                }
-                
-              } catch (error) {
-                console.error('Error completing day:', error);
-                
-              } finally {
-                setIsCompletingDay(false);
-              }
+      setCompletionModalType('confirm');
+      setCompletionModalData({
+        dayNumber: dayData.dayNo,
+        onConfirm: async () => {
+          setShowCompletionModal(false);
+          
+          try {
+            setIsCompletingDay(true);
+            
+            // Get weekly tracking ID from storage
+            const weeklyTrackingId = await AsyncStorage.getItem('weeklyTrackingId');
+            if (!weeklyTrackingId) {
+              setCompletionModalType('error');
+              setCompletionModalData({ message: 'Weekly tracking ID not found. Please restart the app.' });
+              setShowCompletionModal(true);
+              return;
             }
+
+            console.log(`🚀 Completing Day ${dayData.dayNo}...`);
+            const result = await dailyLogsApi.completeDay(weeklyTrackingId, dayData.dayNo);
+            
+            if (result.cycleRestarted) {
+              setCompletionModalType('weekComplete');
+              setCompletionModalData({
+                dayNumber: dayData.dayNo,
+                onContinue: () => {
+                  setShowCompletionModal(false);
+                  router.back();
+                }
+              });
+            } else {
+              setCompletionModalType('success');
+              setCompletionModalData({
+                dayNumber: dayData.dayNo,
+                onContinue: () => {
+                  setShowCompletionModal(false);
+                  router.back();
+                }
+              });
+            }
+            setShowCompletionModal(true);
+            
+          } catch (error) {
+            console.error('Error completing day:', error);
+            setCompletionModalType('error');
+            setCompletionModalData({ 
+              message: error instanceof Error ? error.message : 'Failed to complete day. Please try again.' 
+            });
+            setShowCompletionModal(true);
+          } finally {
+            setIsCompletingDay(false);
           }
-        ]
-      );
+        },
+        onCancel: () => setShowCompletionModal(false)
+      });
+      setShowCompletionModal(true);
     };
     
     const [showMenu, setShowMenu] = useState<Boolean>(false)
@@ -1484,6 +1484,128 @@ export default function DetailsDay () {
         </View>
       </KeyboardAwareScrollView>
     )}
+    
+    {/* Beautiful Completion Modal */}
+    <Modal
+      visible={showCompletionModal}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={() => {
+        if (completionModalType === 'confirm') {
+          setShowCompletionModal(false);
+        }
+      }}
+    >
+      <View style={styles.modalOverlay}>
+        <Animated.View style={styles.modalContainer}>
+          {completionModalType === 'confirm' && (
+            <View style={styles.modalContent}>
+              <View style={[styles.modalIconContainer, { backgroundColor: colors.warning + '15' }]}>
+                <Ionicons name="warning" size={48} color={colors.warning} />
+              </View>
+              <Text style={styles.modalTitle}>Complete Day {completionModalData.dayNumber}?</Text>
+              <Text style={styles.modalMessage}>
+                Are you sure you want to complete Day {completionModalData.dayNumber}? 
+                This action cannot be undone and will lock this day's progress.
+              </Text>
+              <View style={styles.modalButtonsRow}>
+                <Pressable 
+                  style={[styles.modalButton, styles.modalCancelButton]}
+                  onPress={completionModalData.onCancel}
+                >
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </Pressable>
+                <Pressable 
+                  style={[styles.modalButton, styles.modalConfirmButton, { backgroundColor: colors.warning }]}
+                  onPress={completionModalData.onConfirm}
+                  disabled={isCompletingDay}
+                >
+                  {isCompletingDay ? (
+                    <>
+                      <Ionicons name="hourglass" size={18} color="white" />
+                      <Text style={styles.modalConfirmText}>Completing...</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Ionicons name="checkmark-circle" size={18} color="white" />
+                      <Text style={styles.modalConfirmText}>Complete Day</Text>
+                    </>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          )}
+
+          {completionModalType === 'success' && (
+            <View style={styles.modalContent}>
+              <View style={[styles.modalIconContainer, { backgroundColor: colors.success + '15' }]}>
+                <Ionicons name="checkmark-circle" size={48} color={colors.success} />
+              </View>
+              <Text style={[styles.modalTitle, { color: colors.success }]}>Day Completed! 🎉</Text>
+              <Text style={styles.modalMessage}>
+                Congratulations! Day {completionModalData.dayNumber} has been completed successfully. 
+                The next day is now unlocked and ready for your progress.
+              </Text>
+              <View style={styles.modalSingleButtonContainer}>
+                <Pressable 
+                  style={[styles.modalButton, styles.modalSuccessButton, { backgroundColor: colors.success }]}
+                  onPress={completionModalData.onContinue}
+                >
+                  <Ionicons name="arrow-forward" size={18} color="white" />
+                  <Text style={styles.modalSuccessText}>Continue</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+
+          {completionModalType === 'weekComplete' && (
+            <View style={styles.modalContent}>
+              <View style={[styles.modalIconContainer, { backgroundColor: colors.primary + '15' }]}>
+                <Ionicons name="trophy" size={48} color={colors.primary} />
+              </View>
+              <Text style={[styles.modalTitle, { color: colors.primary }]}>Week Completed! 🏆</Text>
+              <Text style={styles.modalMessage}>
+                Amazing achievement! You've completed Day {completionModalData.dayNumber} and finished your entire week. 
+                A fresh new weekly cycle has started - you'll now see Day 1 again with all other days locked.
+              </Text>
+              <View style={styles.celebrationContainer}>
+                <Text style={styles.celebrationText}>🎊 New Weekly Cycle Started! 🎊</Text>
+              </View>
+              <View style={styles.modalSingleButtonContainer}>
+                <Pressable 
+                  style={[styles.modalButton, styles.modalPrimaryButton, { backgroundColor: colors.primary }]}
+                  onPress={completionModalData.onContinue}
+                >
+                  <Ionicons name="rocket" size={18} color="white" />
+                  <Text style={styles.modalPrimaryText}>Start New Cycle</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+
+          {completionModalType === 'error' && (
+            <View style={styles.modalContent}>
+              <View style={[styles.modalIconContainer, { backgroundColor: colors.error + '15' }]}>
+                <Ionicons name="alert-circle" size={48} color={colors.error} />
+              </View>
+              <Text style={[styles.modalTitle, { color: colors.error }]}>Error Occurred</Text>
+              <Text style={styles.modalMessage}>
+                {completionModalData.message}
+              </Text>
+              <View style={styles.modalSingleButtonContainer}>
+                <Pressable 
+                  style={[styles.modalButton, styles.modalErrorButton, { backgroundColor: colors.error }]}
+                  onPress={() => setShowCompletionModal(false)}
+                >
+                  <Ionicons name="close" size={18} color="white" />
+                  <Text style={styles.modalErrorText}>Close</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+        </Animated.View>
+      </View>
+    </Modal>
     
     {/* Diet Plan Viewer Modal */}
     <PatientDietPlanViewer
@@ -3419,6 +3541,133 @@ const getStyles = (colors: any) => StyleSheet.create({
     calProgressTarget: {
         fontSize: Math.min(hp(1), wp(2.5)),
         color: colors.textSecondary,
+    },
+    
+    // Beautiful Completion Modal Styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: wp(8),
+    },
+    modalContainer: {
+        backgroundColor: colors.screenColor || '#FFFFFF',
+        borderRadius: 24,
+        width: '100%',
+        maxWidth: wp(85),
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 20 },
+        shadowOpacity: 0.3,
+        shadowRadius: 25,
+        elevation: 25,
+        borderWidth: 3,
+        borderColor: colors.primary || '#007AFF',
+    },
+    modalContent: {
+        padding: wp(6),
+        alignItems: 'center',
+    },
+    modalIconContainer: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: hp(2),
+    },
+    modalTitle: {
+        fontSize: Math.min(hp(2.8), wp(6.5)),
+        fontWeight: '800',
+        color: colors.textPrimary,
+        textAlign: 'center',
+        marginBottom: hp(1.5),
+        letterSpacing: 0.3,
+    },
+    modalMessage: {
+        fontSize: Math.min(hp(1.8), wp(4.2)),
+        color: colors.textSecondary,
+        textAlign: 'center',
+        lineHeight: Math.min(hp(2.6), wp(6)),
+        marginBottom: hp(3),
+        paddingHorizontal: wp(2),
+    },
+    celebrationContainer: {
+        backgroundColor: colors.primary + '10',
+        borderRadius: 12,
+        paddingVertical: hp(1),
+        paddingHorizontal: wp(4),
+        marginBottom: hp(2),
+    },
+    celebrationText: {
+        fontSize: Math.min(hp(1.6), wp(3.8)),
+        fontWeight: '700',
+        color: colors.primary,
+        textAlign: 'center',
+    },
+    modalButtonsRow: {
+        flexDirection: 'row',
+        gap: wp(3),
+        width: '100%',
+    },
+    modalSingleButtonContainer: {
+        width: '100%',
+    },
+    modalButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: hp(2),
+        paddingHorizontal: wp(4),
+        borderRadius: 16,
+        gap: wp(2),
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 6,
+    },
+    modalCancelButton: {
+        backgroundColor: colors.cardBackground,
+        borderWidth: 2,
+        borderColor: colors.gray + '30',
+    },
+    modalCancelText: {
+        fontSize: Math.min(hp(1.8), wp(4.2)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+    },
+    modalConfirmButton: {
+        shadowColor: colors.warning,
+    },
+    modalConfirmText: {
+        fontSize: Math.min(hp(1.8), wp(4.2)),
+        fontWeight: '700',
+        color: 'white',
+    },
+    modalSuccessButton: {
+        shadowColor: colors.success,
+    },
+    modalSuccessText: {
+        fontSize: Math.min(hp(1.8), wp(4.2)),
+        fontWeight: '700',
+        color: 'white',
+    },
+    modalPrimaryButton: {
+        shadowColor: colors.primary,
+    },
+    modalPrimaryText: {
+        fontSize: Math.min(hp(1.8), wp(4.2)),
+        fontWeight: '700',
+        color: 'white',
+    },
+    modalErrorButton: {
+        shadowColor: colors.error,
+    },
+    modalErrorText: {
+        fontSize: Math.min(hp(1.8), wp(4.2)),
+        fontWeight: '700',
+        color: 'white',
     },
 })
 
