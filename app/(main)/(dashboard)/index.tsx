@@ -79,6 +79,28 @@ export default function DayPlan () {
   fetchData();
   },[]);
 
+  // Listen for weekly cycle changes
+  useEffect(() => {
+    const checkForCycleChange = async () => {
+      // This effect runs when JsonResponse changes
+      // Check if all days are finished, indicating a need to refresh
+      if (JsonResponse) {
+        const allDays = Object.values(JsonResponse);
+        const allFinished = allDays.every(day => day.status === 'finished');
+        
+        if (allFinished) {
+          console.log('🔄 All days finished, checking for new cycle...');
+          // Wait a moment then refresh data to get new cycle
+          setTimeout(async () => {
+            await callApi();
+          }, 2000);
+        }
+      }
+    };
+    
+    checkForCycleChange();
+  }, [JsonResponse]);
+
   const loadJson = async ({data, timestamp} : {data:jsonResponse, timestamp: Date}) =>{
     var entry : keyof jsonResponse
     for (const key in data)

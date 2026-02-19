@@ -1,5 +1,6 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ENV = Constants.expoConfig?.extra;
 
@@ -208,6 +209,11 @@ export const dailyLogsApi = {
   // Complete a day and unlock the next
   completeDay: async (weeklyTrackingId: string, dayNumber: number) => {
     try {
+      console.log('🔧 API Request Details:');
+      console.log('- URL:', `${API_BASE_URL}/daily-logs/complete-day`);
+      console.log('- weeklyTrackingId:', weeklyTrackingId);
+      console.log('- dayNumber:', dayNumber);
+      
       const response = await fetch(`${API_BASE_URL}/daily-logs/complete-day`, {
         method: 'POST',
         headers: {
@@ -219,13 +225,44 @@ export const dailyLogsApi = {
         }),
       });
 
+      console.log('📡 Response Status:', response.status, response.statusText);
+      
       const data = await response.json();
+      console.log('📦 Response Data:', JSON.stringify(data, null, 2));
+      
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to complete day');
+        console.error('❌ API Error:', data);
+        throw new Error(data.message || `HTTP ${response.status}: Failed to complete day`);
       }
+      
+      // Check if a new weekly cycle was created (Day 7 completion)
+      if (data.data && data.data.weekCompleted && data.data.newWeeklyTrackingId) {
+        // Update AsyncStorage with new weekly tracking ID
+        try {
+          await AsyncStorage.setItem('weeklyTrackingId', data.data.newWeeklyTrackingId);
+          console.log('🔄 New weekly cycle started! Updated weeklyTrackingId:', data.data.newWeeklyTrackingId);
+          
+          // Clear old cached data to force fresh data fetch
+          await AsyncStorage.removeItem('JsonResponse');
+          
+          return {
+            ...data.data,
+            cycleRestarted: true,
+            newWeeklyTrackingId: data.data.newWeeklyTrackingId
+          };
+        } catch (storageError) {
+          console.error('Error updating weekly tracking ID:', storageError);
+        }
+      }
+      
       return data.data;
     } catch (error) {
-      console.error('Error completing day:', error);
+      console.error('💥 Complete Day Error:', error);
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
       throw error;
     }
   },

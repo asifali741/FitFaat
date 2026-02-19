@@ -18,6 +18,7 @@ import Animated, { Easing, runOnJS, useAnimatedProps, useSharedValue, withTiming
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Day as typeDay } from "./types";
 interface ProgressCircleProps {
   achievedCalories: number;
@@ -36,6 +37,7 @@ export default function DetailsDay () {
     // State for fetched day data from backend
     const [dayData, setDayData] = useState<any>(props);
     const [isLoading, setIsLoading] = useState(false);
+    const [isCompletingDay, setIsCompletingDay] = useState(false);
     
     // Calculate time remaining in the day (from current time to 11:59:59 PM)
     function getRemainingTime(){
@@ -106,6 +108,71 @@ export default function DetailsDay () {
       
       return () => clearInterval(timerInterval);
     }, []);
+
+    // Complete Day functionality
+    const handleCompleteDay = async () => {
+      Alert.alert(
+        "Complete Day?",
+        `Are you sure you want to complete Day ${dayData.dayNo}? This action cannot be undone.`,
+        [
+          {
+            text: "Cancel",
+            style: "cancel"
+          },
+          {
+            text: "Complete Day",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                setIsCompletingDay(true);
+                
+                // Get weekly tracking ID from storage
+                const weeklyTrackingId = await AsyncStorage.getItem('weeklyTrackingId');
+                if (!weeklyTrackingId) {
+                  Alert.alert('Error', 'Weekly tracking ID not found');
+                  return;
+                }
+
+                console.log(`🚀 Completing Day ${dayData.dayNo}...`);
+                const result = await dailyLogsApi.completeDay(weeklyTrackingId, dayData.dayNo);
+                
+                if (result.cycleRestarted) {
+                  Alert.alert(
+                    '🎉 Week Completed!',
+                    `Day ${dayData.dayNo} completed successfully! A new weekly cycle has started. You'll now see Day 1 again with all other days locked.`,
+                    [{
+                      text: 'Continue to New Cycle',
+                      onPress: () => {
+                        // Navigate back to dashboard to see new cycle
+                        router.back();
+                      }
+                    }]
+                  );
+                } else {
+                  Alert.alert(
+                    '✅ Day Completed!',
+                    `Day ${dayData.dayNo} has been completed successfully. The next day is now unlocked.`,
+                    [{
+                      text: 'OK',
+                      onPress: () => {
+                        // Navigate back to dashboard
+                        router.back();
+                      }
+                    }]
+                  );
+                }
+                
+              } catch (error) {
+                console.error('Error completing day:', error);
+                
+              } finally {
+                setIsCompletingDay(false);
+              }
+            }
+          }
+        ]
+      );
+    };
     
     const [showMenu, setShowMenu] = useState<Boolean>(false)
     const [timeInput, setTimeInput] = useState<string>('');
@@ -563,6 +630,25 @@ export default function DetailsDay () {
               >
                 <Ionicons name="add-circle" size={20} color="white" />
                 <Text style={styles.trayButtonText}>Track Meal</Text>
+              </TouchableOpacity>
+              
+              {/* Complete Day Button */}
+              <TouchableOpacity
+                style={[styles.completeDayButton, {
+                  backgroundColor: isCompletingDay ? colors.gray : colors.success,
+                  opacity: isCompletingDay ? 0.6 : 1
+                }]}
+                onPress={handleCompleteDay}
+                disabled={isCompletingDay}
+              >
+                <Ionicons 
+                  name={isCompletingDay ? "hourglass" : "checkmark-circle"} 
+                  size={20} 
+                  color="white" 
+                />
+                <Text style={styles.completeDayButtonText}>
+                  {isCompletingDay ? 'Completing...' : 'Complete Day'}
+                </Text>
               </TouchableOpacity>
             </>
           ) : (
@@ -1641,6 +1727,29 @@ const getStyles = (colors: any) => StyleSheet.create({
         borderColor: colors.primary,
     },
     trayButtonText: {
+        color: '#fff',
+        fontSize: Math.min(hp(1.7), wp(4)),
+        fontWeight: '700',
+        letterSpacing: 0.3,
+    },
+    completeDayButton: {
+        flexDirection: 'row',
+        paddingVertical: hp(1.8),
+        paddingHorizontal: wp(6),
+        marginHorizontal: wp(4),
+        marginTop: hp(1),
+        marginBottom: hp(1.5),
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+        shadowOpacity: 0.4,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 5 },
+        elevation: 6,
+        borderWidth: 1,
+    },
+    completeDayButtonText: {
         color: '#fff',
         fontSize: Math.min(hp(1.7), wp(4)),
         fontWeight: '700',
