@@ -130,9 +130,12 @@ export function BottomTabBar() {
 
         // When the server notifies this specific user about a new message
         socket.on('user-new-message', (payload) => {
-          // If server provided unreadCount, update immediately; otherwise, fallback to fetching
-          if (payload && typeof payload.unreadCount === 'number') {
-            setUnreadCount(payload.unreadCount);
+          // Use totalUnreadCount for bottom tab badge (total across all appointments)
+          if (payload && typeof payload.totalUnreadCount === 'number') {
+            setUnreadCount(payload.totalUnreadCount);
+          } else if (payload && typeof payload.unreadCount === 'number') {
+            // Fallback to per-appointment count - better to refetch for accuracy
+            fetchUnreadCount();
           } else {
             fetchUnreadCount();
           }
@@ -357,22 +360,28 @@ const styles = StyleSheet.create({
   },
   badge: {
     position: 'absolute',
-    top: -5,
-    right: -5,
-    backgroundColor: '#FF4444',
-    borderRadius: 12,
-    minWidth: 24,
-    height: 24,
+    top: 2,
+    right: 2,
+    backgroundColor: '#EF4444',
+    borderRadius: 11,
+    minWidth: 22,
+    height: 22,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#FFF',
+    borderColor: theme.colors.surface,
+    elevation: 4,
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 3,
   },
   badgeText: {
     color: '#FFF',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 'bold',
     textAlign: 'center',
     paddingHorizontal: 4,
+    includeFontPadding: false,
   },
 });

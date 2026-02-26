@@ -345,6 +345,8 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
           // Mark message as delivered if it's from the other user
           if (message.senderRole !== userRole && socketRef.current) {
             socketRef.current.emit('message-delivered', { messageId: message._id });
+            // Also mark as read immediately since user is viewing the chat
+            socketRef.current.emit('mark-all-read', { appointmentId });
           }
           
           return newMessages;

@@ -6,7 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -19,6 +19,30 @@ import { widthPercentageToDP as wp } from 'react-native-responsive-screen';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { io } from 'socket.io-client';
 
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+const formatChatTime = (dateStr: string | null | undefined): string => {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffDays === 0 && date.getDate() === now.getDate()) {
+    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  }
+  if (diffDays === 1 || (diffDays === 0 && date.getDate() !== now.getDate())) return 'Yesterday';
+  if (diffDays < 7) return date.toLocaleDateString('en-US', { weekday: 'short' });
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
+
+const truncateMessage = (text: string | null | undefined, maxLen = 40): string => {
+  if (!text) return '';
+  if (text.length <= maxLen) return text;
+  return text.slice(0, maxLen).trimEnd() + '…';
+};
+
+// ── Component ──────────────────────────────────────────────────────────────────
+
 export default function AllChatsScreen() {
   const router = useRouter();
   const navigation = useNavigation();
@@ -27,6 +51,7 @@ export default function AllChatsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [doctorId, setDoctorId] = useState<string | null>(null);
   const [unreadMessages, setUnreadMessages] = useState<{ [key: string]: number }>({});
+  const [lastMessages, setLastMessages] = useState<{ [key: string]: { text: string; senderRole: string; createdAt: string } }>({});
   const socketRef = useRef<any>(null);
 
   useEffect(() => {
@@ -34,19 +59,29 @@ export default function AllChatsScreen() {
     fetchUnreadMessages();
   }, []);
 
+  // ── Data fetching ──────────────────────────────────────────────────────
+
+  const fetchUnreadMap = async (): Promise<{ [key: string]: number }> => {
+    try {
+      const token = await SecureStore.getItemAsync('authToken');
+      if (!token) return {};
+      const ENV = Constants.expoConfig?.extra;
+      const API_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')).replace(/\/api\/?$/, '');
+      const resp = await fetch(`${API_URL}/api/chat/unread-by-appointment`, { method: 'GET', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } });
+      if (!resp.ok) { console.log('⚠️ [DoctorChats] unread-by-appointment API failed:', resp.status); return {}; }
+      const data = await resp.json();
+      console.log('📊 [DoctorChats] unread-by-appointment API response:', JSON.stringify(data.unreadByAppointment || {}));
+      return data.unreadByAppointment || {};
+    } catch (e) { console.log('⚠️ [DoctorChats] fetchUnreadMap error:', e); return {}; }
+  };
+
   const fetchAppointments = async () => {
     setIsLoading(true);
     try {
       const doctorStatusResponse = await authApi.getDoctorStatus();
-      
       if (!doctorStatusResponse.success || !doctorStatusResponse.doctor) {
         Alert.alert('Error', 'You need to register as a doctor first');
-        try {
-          if (navigation && (navigation as any).canGoBack && (navigation as any).canGoBack()) {
-            (navigation as any).goBack();
-            return;
-          }
-        } catch (e) {}
+        try { if (navigation && (navigation as any).canGoBack && (navigation as any).canGoBack()) { (navigation as any).goBack(); return; } } catch (e) {}
         router.back();
         return;
       }
@@ -56,39 +91,32 @@ export default function AllChatsScreen() {
 
       const appointmentsResponse = await authApi.getDoctorAppointments(doctorIdValue);
       if (appointmentsResponse.success) {
-        // Filter only confirmed appointments and sort like WhatsApp:
-        // 1) unread chats first, 2) most recent message (lastMessageAt) desc, 3) appointment date desc
-        const unreadByAppointmentMap = (await (async () => {
-          try {
-            const token = await SecureStore.getItemAsync('authToken');
-            if (!token) return {};
-            const ENV = Constants.expoConfig?.extra;
-            const API_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')).replace(/\/api\/?$/, '');
-            const resp = await fetch(`${API_URL}/api/chat/unread-by-appointment`, { method: 'GET', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } });
-            if (!resp.ok) return {};
-            const data = await resp.json();
-            return data.unreadByAppointment || {};
-          } catch (e) { return {}; }
-        })());
+        const unreadByAppointmentMap = await fetchUnreadMap();
+        console.log('📋 [DoctorChats] Setting unreadMessages from API:', JSON.stringify(unreadByAppointmentMap));
+        setUnreadMessages(unreadByAppointmentMap);
+
+        // Build lastMessages map from API response
+        const msgMap: typeof lastMessages = {};
+        (appointmentsResponse.appointments || []).forEach((apt: any) => {
+          if (apt.lastMessageText) {
+            msgMap[apt._id] = {
+              text: apt.lastMessageText,
+              senderRole: apt.lastMessageSenderRole || 'doctor',
+              createdAt: apt.lastMessageAt,
+            };
+          }
+        });
+        setLastMessages(prev => ({ ...prev, ...msgMap }));
 
         const confirmedAppointments = (appointmentsResponse.appointments || [])
           .filter((apt: any) => apt.status === 'confirmed')
           .sort((a: any, b: any) => {
             const aUnread = (unreadByAppointmentMap[a._id] || 0) > 0 ? 1 : 0;
             const bUnread = (unreadByAppointmentMap[b._id] || 0) > 0 ? 1 : 0;
-
-            // Unread first
             if (aUnread !== bUnread) return bUnread - aUnread;
-
-            // Most recent message
-            if (a.lastMessageAt && b.lastMessageAt) {
-              return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
-            }
-
+            if (a.lastMessageAt && b.lastMessageAt) return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
             if (a.lastMessageAt) return -1;
             if (b.lastMessageAt) return 1;
-
-            // Finally by appointment date
             return new Date(b.date).getTime() - new Date(a.date).getTime();
           });
         setAppointments(confirmedAppointments);
@@ -103,31 +131,15 @@ export default function AllChatsScreen() {
 
   const fetchUnreadMessages = async () => {
     try {
-      const token = await SecureStore.getItemAsync('authToken');
-      if (!token) return;
-
-      const ENV = Constants.expoConfig?.extra;
-      const API_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')).replace(/\/api\/?$/, '');
-      const response = await fetch(`${API_URL}/api/chat/unread-by-appointment`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.unreadByAppointment) {
-          setUnreadMessages(data.unreadByAppointment);
-        }
-      }
+      const map = await fetchUnreadMap();
+      setUnreadMessages(map);
     } catch (error) {
       console.log('Error fetching unread messages:', error);
     }
   };
 
-  // Socket: listen for incoming message notifications and reorder list
+  // ── Socket ─────────────────────────────────────────────────────────────
+
   useEffect(() => {
     let socket: any = null;
 
@@ -135,7 +147,6 @@ export default function AllChatsScreen() {
       try {
         const token = await SecureStore.getItemAsync('authToken');
         if (!token) return;
-
         const ENV = Constants.expoConfig?.extra;
         const API_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')).replace(/\/api\/?$/, '');
         socket = io(API_URL, { transports: ['websocket'], auth: { token } });
@@ -143,43 +154,64 @@ export default function AllChatsScreen() {
 
         socket.on('user-new-message', (payload: any) => {
           if (!payload || !payload.appointmentId) return;
+          console.log('📩 [DoctorChats] user-new-message received:', JSON.stringify({
+            appointmentId: payload.appointmentId,
+            senderRole: payload.senderRole,
+            isSender: payload.isSender,
+            unreadCount: payload.unreadCount,
+            messageText: payload.messageText?.substring(0, 30),
+          }));
 
-          // Update unread mapping if provided
-          if (typeof payload.unreadCount === 'number') {
-            setUnreadMessages(prev => ({ ...prev, [payload.appointmentId]: payload.unreadCount }));
-          } else {
-            // increment locally
-            setUnreadMessages(prev => ({ ...prev, [payload.appointmentId]: (prev[payload.appointmentId] || 0) + 1 }));
+          // Update last message preview
+          if (payload.messageText) {
+            setLastMessages(prev => ({
+              ...prev,
+              [payload.appointmentId]: {
+                text: payload.messageText,
+                senderRole: payload.senderRole || 'user',
+                createdAt: payload.createdAt,
+              },
+            }));
           }
 
-          // Move appointment to top if present, otherwise refresh list
+          // Only increment unread count for messages we RECEIVED (not ones we sent)
+          if (!payload.isSender) {
+            if (typeof payload.unreadCount === 'number' && payload.unreadCount > 0) {
+              setUnreadMessages(prev => {
+                const updated = { ...prev, [payload.appointmentId]: payload.unreadCount };
+                console.log('🔴 [DoctorChats] Unread updated from payload:', payload.appointmentId, '->', payload.unreadCount);
+                return updated;
+              });
+            } else {
+              setUnreadMessages(prev => {
+                const newCount = (prev[payload.appointmentId] || 0) + 1;
+                console.log('🔴 [DoctorChats] Unread incremented:', payload.appointmentId, '->', newCount);
+                return { ...prev, [payload.appointmentId]: newCount };
+              });
+            }
+          }
+
           setAppointments(prev => {
             const idx = prev.findIndex(a => a._id === payload.appointmentId);
-            if (idx === -1) {
-              // appointment not in list, refresh
-              fetchAppointments();
-              return prev;
-            }
-
+            if (idx === -1) { fetchAppointments(); return prev; }
             const updated = [...prev];
             const item = { ...updated.splice(idx, 1)[0] };
-            // Update lastMessageAt if payload includes timestamp
             if (payload.createdAt) item.lastMessageAt = payload.createdAt;
-            // Place at start
+            if (payload.messageText) {
+              item.lastMessageText = payload.messageText;
+              item.lastMessageSenderRole = payload.senderRole || 'user';
+            }
             return [item, ...updated];
           });
         });
 
         socket.on('messages-read', (payload: any) => {
           if (!payload || !payload.appointmentId) return;
-          // Clear unread count for appointment when messages are read
+          console.log('✅ [DoctorChats] messages-read received:', payload.appointmentId);
           setUnreadMessages(prev => ({ ...prev, [payload.appointmentId]: 0 }));
         });
 
-        socket.on('message-status-update', () => {
-          // Refresh unread counts
-          fetchUnreadMessages();
-        });
+        socket.on('message-status-update', () => { fetchUnreadMessages(); });
 
       } catch (error) {
         console.log('Error setting up chat socket in AllChats (doctor):', error);
@@ -187,55 +219,10 @@ export default function AllChatsScreen() {
     };
 
     initSocket();
-
-    return () => {
-      try {
-        socketRef.current?.disconnect();
-      } catch (e) { }
-    };
+    return () => { try { socketRef.current?.disconnect(); } catch (e) { } };
   }, []);
 
-  // Delete chat helper
-  const deleteChat = async (appointmentId: string) => {
-    Alert.alert(
-      'Delete Chat',
-      'Are you sure you want to delete this chat? This action cannot be undone.',
-      [
-        { text: 'Cancel', onPress: () => {}, style: 'cancel' },
-        {
-          text: 'Delete',
-          onPress: async () => {
-            try {
-              const token = await SecureStore.getItemAsync('authToken');
-              if (!token) return;
-
-              const ENV = Constants.expoConfig?.extra;
-              const API_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')).replace(/\/api\/?$/, '');
-              const response = await fetch(`${API_URL}/api/chat/delete/${appointmentId}`, {
-                method: 'DELETE',
-                headers: {
-                  'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json',
-                },
-              });
-
-              if (response.ok) {
-                // Remove from local state
-                setAppointments(prev => prev.filter(apt => apt._id !== appointmentId));
-                Alert.alert('Success', 'Chat deleted successfully');
-              } else {
-                Alert.alert('Error', 'Failed to delete chat');
-              }
-            } catch (error) {
-              console.error('Error deleting chat:', error);
-              Alert.alert('Error', 'Failed to delete chat');
-            }
-          },
-          style: 'destructive',
-        },
-      ]
-    );
-  };
+  // ── Actions ────────────────────────────────────────────────────────────
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -244,83 +231,83 @@ export default function AllChatsScreen() {
     setRefreshing(false);
   };
 
-  const openChat = (appointmentId: string) => {
-    router.push({
-      pathname: '/(main)/(conference)/appointment-chat',
-      params: { appointmentId }
-    });
-  };
+  const openChat = useCallback((appointmentId: string) => {
+    setUnreadMessages(prev => ({ ...prev, [appointmentId]: 0 }));
+    router.push({ pathname: '/(main)/(conference)/appointment-chat', params: { appointmentId } });
+  }, [router]);
+
+  // ── Render ─────────────────────────────────────────────────────────────
 
   const renderAppointment = ({ item }: { item: any }) => {
-    const appointmentDate = new Date(item.date);
-    const formattedDate = appointmentDate.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
     const unreadCount = unreadMessages[item._id] || 0;
+    const hasUnread = unreadCount > 0;
+
+    const lastMsg = lastMessages[item._id] || (item.lastMessageText
+      ? { text: item.lastMessageText, senderRole: item.lastMessageSenderRole, createdAt: item.lastMessageAt }
+      : null);
+
+    const timeLabel = formatChatTime(lastMsg?.createdAt || item.lastMessageAt);
+
+    let previewText = 'Tap to start chatting';
+    if (lastMsg?.text) {
+      const prefix = lastMsg.senderRole === 'user' ? `${item.userName || 'Patient'}: ` : 'You: ';
+      previewText = prefix + truncateMessage(lastMsg.text, 35);
+    }
 
     return (
-      <View
-        style={[styles.appointmentCard, unreadCount > 0 && styles.unreadCard]}
+      <TouchableOpacity
+        style={styles.chatRow}
+        onPress={() => openChat(item._id)}
+        activeOpacity={0.65}
       >
-        <View style={styles.cardContent}>
-          <TouchableOpacity 
-            style={styles.chatTouchable}
-            onPress={() => openChat(item._id)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.appointmentHeader}>
-              <View style={styles.patientInfo}>
-                <Ionicons name="person-circle" size={40} color={theme.colors.primary} />
-                <View style={styles.patientDetails}>
-                  <Text style={styles.patientName}>{item.userName || 'Patient'}</Text>
-                  <Text style={styles.appointmentDate}>{formattedDate} at {item.time}</Text>
-                </View>
-              </View>
-              <View style={styles.chatIconContainer}>
-                <Ionicons name="chatbubbles" size={24} color={theme.colors.primary} />
-                {unreadCount > 0 && (
-                  <View style={styles.unreadBadge}>
-                    <Text style={styles.unreadBadgeText}>
-                      {unreadCount > 99 ? '99+' : unreadCount}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </View>
+        {/* Avatar */}
+        <View style={styles.avatar}>
+          <Ionicons name="person" size={26} color={theme.colors.primary} />
+          <View style={[styles.statusDot, { backgroundColor: theme.colors.statusConfirmed }]} />
+        </View>
 
-            <View style={styles.appointmentFooter}>
-              <View style={styles.statusContainer}>
-                <View style={[styles.statusDot, { backgroundColor: theme.colors.statusConfirmed }]} />
-                <Text style={styles.statusText}>Confirmed</Text>
-              </View>
-              {item.chatAccessGrantedAt && (
-                <View style={styles.accessBadge}>
-                  <Text style={styles.accessBadgeText}>✓</Text>
-                </View>
-              )}
-            </View>
-          </TouchableOpacity>
+        {/* Content */}
+        <View style={styles.chatContent}>
+          <View style={styles.topRow}>
+            <Text style={[styles.chatName, hasUnread && styles.chatNameBold]} numberOfLines={1}>
+              {item.userName || 'Patient'}
+            </Text>
+            <Text style={[styles.chatTime, hasUnread && styles.chatTimeUnread]}>
+              {timeLabel}
+            </Text>
+          </View>
 
-          <View style={{ display: 'none' }}>
-            <TouchableOpacity
-              style={styles.deleteButtonTop}
-              onPress={() => deleteChat(item._id)}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          <View style={styles.bottomRow}>
+            <Text
+              style={[styles.chatPreview, hasUnread && styles.chatPreviewUnread]}
+              numberOfLines={1}
             >
-              <Ionicons name="trash-outline" size={26} color={theme.colors.error} />
-            </TouchableOpacity>
+              {previewText}
+            </Text>
+
+            {hasUnread ? (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadBadgeText}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </Text>
+              </View>
+            ) : (
+              lastMsg?.senderRole === 'doctor' && lastMsg?.text ? (
+                <View style={styles.checkContainer}>
+                  <Ionicons name="checkmark-done" size={16} color={theme.colors.info} />
+                </View>
+              ) : null
+            )}
           </View>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
-        <AppHeader title="All Chats" showBackButton />
+        <AppHeader title="Patient Chats" showBackButton />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
           <Text style={styles.loadingText}>Loading chats...</Text>
@@ -331,15 +318,13 @@ export default function AllChatsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <AppHeader title="All Chats" showBackButton />
-      
+      <AppHeader title="Patient Chats" showBackButton />
+
       {appointments.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="chatbubbles-outline" size={80} color={theme.colors.border} />
-          <Text style={styles.emptyTitle}>No Chats Available</Text>
-          <Text style={styles.emptySubtitle}>
-            Confirmed appointments will appear here
-          </Text>
+          <Ionicons name="chatbubbles-outline" size={72} color={theme.colors.border} />
+          <Text style={styles.emptyTitle}>No Chats Yet</Text>
+          <Text style={styles.emptySubtitle}>Confirmed patient appointments will appear here</Text>
         </View>
       ) : (
         <FlatList
@@ -348,9 +333,10 @@ export default function AllChatsScreen() {
           keyExtractor={(item) => item._id}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
           refreshControl={
-            <RefreshControl 
-              refreshing={refreshing} 
+            <RefreshControl
+              refreshing={refreshing}
               onRefresh={onRefresh}
               tintColor={theme.colors.primary}
               colors={[theme.colors.primary]}
@@ -362,156 +348,150 @@ export default function AllChatsScreen() {
   );
 }
 
+// ── Styles ───────────────────────────────────────────────────────────────────
+
+const AVATAR_SIZE = 56;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background
+    backgroundColor: theme.colors.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
   },
   loadingText: {
     marginTop: theme.spacing.md,
     fontSize: theme.typography.fontSize.base,
-    color: theme.colors.textSecondary
+    color: theme.colors.textSecondary,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: theme.spacing.xl
+    padding: theme.spacing.xl,
   },
   emptyTitle: {
     fontSize: theme.typography.fontSize.xl,
     fontWeight: theme.typography.fontWeight.bold as any,
     color: theme.colors.textPrimary,
-    marginTop: theme.spacing.lg
+    marginTop: theme.spacing.lg,
   },
   emptySubtitle: {
     fontSize: theme.typography.fontSize.base,
     color: theme.colors.textSecondary,
     textAlign: 'center',
-    marginTop: theme.spacing.sm
+    marginTop: theme.spacing.sm,
   },
+
+  // ── List ────────────────
   listContainer: {
-    padding: theme.spacing.lg
+    paddingTop: 4,
+    paddingBottom: 100,
   },
-  appointmentCard: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.large,
-    marginBottom: theme.spacing.lg,
-    ...theme.shadows.medium,
-    borderLeftWidth: 4,
-    borderLeftColor: theme.colors.statusConfirmed
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: theme.colors.border,
+    marginLeft: AVATAR_SIZE + 28,
   },
-  unreadCard: {
-    backgroundColor: theme.colors.chatDoctor,
-    borderLeftColor: theme.colors.error,
-  },
-  cardContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    padding: theme.spacing.lg,
-  },
-  chatTouchable: {
-    flex: 1,
-  },
-  appointmentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing.md
-  },
-  patientInfo: {
+
+  // ── Chat Row (WhatsApp-style) ────────────────
+  chatRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
-  patientDetails: {
-    marginLeft: theme.spacing.md,
-    flex: 1
-  },
-  patientName: {
-    fontSize: wp(4.5),
-    fontWeight: theme.typography.fontWeight.semiBold as any,
-    color: theme.colors.textPrimary
-  },
-  appointmentDate: {
-    fontSize: wp(3.5),
-    color: theme.colors.textSecondary,
-    marginTop: 2
-  },
-  chatIconContainer: {
-    position: 'relative'
-  },
-  accessBadge: {
-    position: 'absolute',
-    top: -5,
-    right: -5,
-    backgroundColor: theme.colors.statusConfirmed,
-    borderRadius: 10,
-    width: 20,
-    height: 20,
+
+  // Avatar
+  avatar: {
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: AVATAR_SIZE / 2,
+    backgroundColor: theme.colors.chatUser,
     justifyContent: 'center',
-    alignItems: 'center'
-  },
-  accessBadgeText: {
-    color: theme.colors.surface,
-    fontSize: 12,
-    fontWeight: theme.typography.fontWeight.bold as any
-  },
-  appointmentFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: theme.spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border
-  },
-  statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center'
+    borderWidth: 2,
+    borderColor: theme.colors.secondary,
+    position: 'relative',
   },
   statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6
-  },
-  statusText: {
-    fontSize: wp(3.5),
-    color: theme.colors.textSecondary
-  },
-  accessGrantedText: {
-    fontSize: wp(3),
-    color: theme.colors.statusConfirmed,
-    fontWeight: theme.typography.fontWeight.medium as any
-  },
-  unreadBadge: {
     position: 'absolute',
-    top: -8,
-    right: -8,
-    backgroundColor: theme.colors.error,
+    bottom: 1,
+    right: 1,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: theme.colors.background,
+  },
+
+  // Content
+  chatContent: {
+    flex: 1,
+    marginLeft: 12,
+    justifyContent: 'center',
+  },
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  chatName: {
+    flex: 1,
+    fontSize: wp(4.2),
+    fontWeight: theme.typography.fontWeight.medium as any,
+    color: theme.colors.textPrimary,
+    marginRight: 8,
+  },
+  chatNameBold: {
+    fontWeight: theme.typography.fontWeight.bold as any,
+  },
+  chatTime: {
+    fontSize: wp(3),
+    color: theme.colors.textTertiary,
+  },
+  chatTimeUnread: {
+    color: theme.colors.primary,
+    fontWeight: theme.typography.fontWeight.semiBold as any,
+  },
+
+  bottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  chatPreview: {
+    flex: 1,
+    fontSize: wp(3.4),
+    color: theme.colors.textTertiary,
+    marginRight: 8,
+  },
+  chatPreviewUnread: {
+    color: theme.colors.textSecondary,
+    fontWeight: theme.typography.fontWeight.semiBold as any,
+  },
+
+  // Badge
+  unreadBadge: {
+    backgroundColor: theme.colors.primary,
     borderRadius: 12,
     minWidth: 24,
     height: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: theme.colors.surface,
+    paddingHorizontal: 6,
   },
   unreadBadgeText: {
-    color: theme.colors.surface,
-    fontSize: 11,
+    color: '#FFF',
+    fontSize: 12,
     fontWeight: theme.typography.fontWeight.bold as any,
-    paddingHorizontal: 4,
   },
-  deleteButtonTop: {
-    padding: theme.spacing.sm,
-    marginLeft: theme.spacing.xs,
-    justifyContent: 'center',
+  checkContainer: {
+    width: 24,
     alignItems: 'center',
-  },});
+  },
+});
