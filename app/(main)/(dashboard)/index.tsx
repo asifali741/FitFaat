@@ -4,10 +4,11 @@ import PatientDietPlanViewer from "@/components/PatientDietPlanViewer";
 import { useNews } from "@/contexts/NewsContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { dailyLogsApi } from "@/utils/dailyLogsApi";
+import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Days } from "./_Day";
@@ -62,6 +63,7 @@ export default function DayPlan () {
   const [JsonResponse, setJsonResponse] = useState<null|jsonResponse>(null);
   const [showNewsModal, setShowNewsModal] = useState(false);
   const [showDietPlanViewer, setShowDietPlanViewer] = useState(false);
+  const hasCheckedForNewCycle = useRef(false);
 
   //Get Data from API or Local Storage
   useEffect( () => { 
@@ -84,16 +86,17 @@ export default function DayPlan () {
     const checkForCycleChange = async () => {
       // This effect runs when JsonResponse changes
       // Check if all days are finished, indicating a need to refresh
-      if (JsonResponse) {
+      if (JsonResponse && !hasCheckedForNewCycle.current) {
         const allDays = Object.values(JsonResponse);
         const allFinished = allDays.every(day => day.status === 'finished');
         
         if (allFinished) {
           console.log('🔄 All days finished, checking for new cycle...');
-          // Wait a moment then refresh data to get new cycle
+          hasCheckedForNewCycle.current = true; // Prevent infinite loop
+          // Wait a moment then check/create new cycle
           setTimeout(async () => {
-            await callApi();
-          }, 2000);
+            await checkAndCreateNewCycle();
+          }, 1000);
         }
       }
     };
@@ -101,49 +104,37 @@ export default function DayPlan () {
     checkForCycleChange();
   }, [JsonResponse]);
 
-  const loadJson = async ({data, timestamp} : {data:jsonResponse, timestamp: Date}) =>{
-    var entry : keyof jsonResponse
-    for (const key in data)
-    {
-      entry = key as keyof jsonResponse
-      if(data[entry].status === 'active')
-      {
-        //                   current time - timestamp of localStorage    in seconds
-        const timeElapsed = (Date.now() - new Date(timestamp).getTime()) / 1000;
-        //                activeDay.duration - timepassed since creation
-        const timeLeft = data[entry].duration - timeElapsed;
-        if(timeLeft>0)
-        {
-          //yes local stored is valid and i am updating data variable with its remaining time and break
-          data[entry].duration = timeLeft;
-          setJsonResponse(data)
-          break;
-        }
-        else{
-          //no local stored data expired, call api and break
-          await callApi()
-          break;
-        }
-      }
-    }}
-  const callApi = async () => {
+  // Check and create new cycle if needed
+  const checkAndCreateNewCycle = async () => {
     try {
-      console.log("Fetching data from API...");
+      console.log("Checking if new cycle needed...");
       
-      // Get weeklyTrackingId from AsyncStorage
-      const weeklyTrackingId = await AsyncStorage.getItem('weeklyTrackingId');
-      
-      if (!weeklyTrackingId) {
-        console.log('No weekly tracking ID found');
+      // Get user info
+      const user = await tokenStorage.getUser();
+      if (!user || !user.id) {
+        console.log('No user found');
         return;
       }
 
-      // Fetch weekly progress from backend
-      const weeklyData = await dailyLogsApi.getWeeklyProgress(weeklyTrackingId);
-      console.log('Weekly data received:', weeklyData);
+      const weeklyTrackingId = await AsyncStorage.getItem('weeklyTrackingId');
+      
+      // Call the check-cycle endpoint
+      const result = await dailyLogsApi.checkAndCreateCycle(
+        user.id,
+        weeklyTrackingId,
+        user.userInfo?.goalCalories,
+        user.userInfo?.hydrationGoal
+      );
+
+      console.log('Cycle check result:', result.message, 'New cycle created:', result.newCycleCreated);
 
       // Convert to jsonResponse format
-      const data = convertToJsonResponse(weeklyData);
+      const data = convertToJsonResponse(result.data);
+      
+      // Reset the cycle check flag if a new cycle was created
+      if (result.newCycleCreated) {
+        hasCheckedForNewCycle.current = false;
+      }
       
       setJsonResponse(data);
 
@@ -161,8 +152,46 @@ export default function DayPlan () {
         console.log('Error saving to local storage:', e);
       }
     } catch (error) {
-      console.error('Error calling API:', error);
+      console.error('Error checking/creating cycle:', error);
     }
+  };
+
+  const loadJson = async ({data, timestamp} : {data:jsonResponse, timestamp: Date}) =>{
+    var entry : keyof jsonResponse
+    let foundActive = false;
+    for (const key in data)
+    {
+      entry = key as keyof jsonResponse
+      if(data[entry].status === 'active')
+      {
+        foundActive = true;
+        //                   current time - timestamp of localStorage    in seconds
+        const timeElapsed = (Date.now() - new Date(timestamp).getTime()) / 1000;
+        //                activeDay.duration - timepassed since creation
+        const timeLeft = data[entry].duration - timeElapsed;
+        if(timeLeft>0)
+        {
+          //yes local stored is valid and i am updating data variable with its remaining time and break
+          data[entry].duration = timeLeft;
+          setJsonResponse(data)
+          break;
+        }
+        else{
+          //no local stored data expired, check/create cycle
+          await checkAndCreateNewCycle()
+          break;
+        }
+      }
+    }
+    // If no active day found (all finished), check and create new cycle
+    if (!foundActive) {
+      console.log('No active day found in local storage, checking for new cycle...');
+      await checkAndCreateNewCycle();
+    }
+  }
+  const callApi = async () => {
+    // Delegate to the new checkAndCreateNewCycle function
+    await checkAndCreateNewCycle();
   };
   //function called by child component to navigate to detailed day view
   const navigateToDayDetails = (dayNo: number) : void => {
