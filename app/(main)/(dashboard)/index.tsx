@@ -18,8 +18,12 @@ import { Day, jsonResponse } from "./types";
 const convertToJsonResponse = (weeklyTracking: any): jsonResponse => {
   const data: any = {};
   
+  console.log('📊 [convertToJsonResponse] Converting weekly tracking data...');
+  console.log('📊 [convertToJsonResponse] Number of daily logs:', weeklyTracking.dailyLogs?.length);
+  
   weeklyTracking.dailyLogs.forEach((dailyLog: any) => {
     const dayKey = `day0${dailyLog.dayNumber}` as keyof jsonResponse;
+    console.log(`📊 [convertToJsonResponse] Day ${dailyLog.dayNumber}: _id = ${dailyLog._id}, date = ${dailyLog.date}`);
     data[dayKey] = {
       _id: dailyLog._id, // Include MongoDB daily log ID
       dayNo: dailyLog.dayNumber,
@@ -67,9 +71,26 @@ export default function DayPlan () {
 
   //Get Data from API or Local Storage
   useEffect( () => { 
-    const fetchData =async () => {
+    const fetchData = async () => {
     console.log("Fetching Day Data...");  //JsonResponse recieved here
-    const stored  = await checkLocalStorage()
+    
+    // First check if our local weeklyTrackingId matches the user's current one
+    const storedWeeklyId = await AsyncStorage.getItem('weeklyTrackingId');
+    const user = await tokenStorage.getUser();
+    const userWeeklyId = user?.weeklyTrackingId;
+    
+    console.log('📋 Stored weeklyTrackingId:', storedWeeklyId);
+    console.log('📋 User weeklyTrackingId:', userWeeklyId);
+    
+    // If weeklyTrackingIds don't match or user doesn't have one, fetch fresh from backend
+    if (!storedWeeklyId || !userWeeklyId || storedWeeklyId !== userWeeklyId) {
+      console.log('📋 WeeklyTrackingId mismatch or missing - fetching fresh data');
+      await AsyncStorage.removeItem('JsonResponse');
+      await callApi();
+      return;
+    }
+    
+    const stored = await checkLocalStorage();
     if(stored && stored.data)
     {
       await loadJson(stored)
@@ -201,7 +222,7 @@ export default function DayPlan () {
       return;
     }
     const selectedDay: Day  = JsonResponse[key]
-    console.log(`Navigating to details of Day ${selectedDay.dayNo}`);
+    console.log(`🚀 [navigateToDayDetails] Day ${selectedDay.dayNo}, _id: ${selectedDay._id}, date: ${selectedDay.date}`);
     if (!selectedDay) {
       console.warn(`Day ${dayNo} is locked or missing.`);
       return;

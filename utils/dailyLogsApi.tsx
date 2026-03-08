@@ -1,6 +1,7 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { tokenStorage } from '@/utils/auth/tokenStorage';
 
 const ENV = Constants.expoConfig?.extra;
 
@@ -41,11 +42,20 @@ export const dailyLogsApi = {
         throw new Error(data.message || 'Failed to check/create cycle');
       }
       
-      // If a new cycle was created, update AsyncStorage
+      // If a new cycle was created, update AsyncStorage and tokenStorage
       if (data.newCycleCreated && data.newWeeklyTrackingId) {
         await AsyncStorage.setItem('weeklyTrackingId', data.newWeeklyTrackingId);
         // Clear old cached data
         await AsyncStorage.removeItem('JsonResponse');
+        
+        // Also update user's weeklyTrackingId in tokenStorage
+        const user = await tokenStorage.getUser();
+        if (user) {
+          user.weeklyTrackingId = data.newWeeklyTrackingId;
+          await tokenStorage.saveUser(user);
+          console.log('[checkAndCreateCycle] Updated user weeklyTrackingId in tokenStorage');
+        }
+        
         console.log('[checkAndCreateCycle] New cycle created! Updated weeklyTrackingId:', data.newWeeklyTrackingId);
       }
       
@@ -146,6 +156,9 @@ export const dailyLogsApi = {
     notes?: string
   ) => {
     try {
+      console.log('🍽️ [addMeal] Adding meal to dayId:', dayId);
+      console.log('🍽️ [addMeal] API URL:', `${API_BASE_URL}/daily-logs/${dayId}/meal`);
+      
       const response = await fetch(`${API_BASE_URL}/daily-logs/${dayId}/meal`, {
         method: 'POST',
         headers: {
@@ -163,13 +176,16 @@ export const dailyLogsApi = {
         }),
       });
 
+      console.log('🍽️ [addMeal] Response status:', response.status);
       const data = await response.json();
+      console.log('🍽️ [addMeal] Response data:', JSON.stringify(data));
+      
       if (!response.ok) {
         throw new Error(data.message || 'Failed to add meal');
       }
       return data.data;
     } catch (error) {
-      console.error('Error adding meal:', error);
+      console.error('❌ [addMeal] Error adding meal:', error);
       throw error;
     }
   },
