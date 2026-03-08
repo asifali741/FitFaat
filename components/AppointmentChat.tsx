@@ -6,9 +6,10 @@ import { theme } from '@/constants/theme';
 import { useVideoCall } from '@/hooks/useVideoCall';
 import { tokenStorage } from '@/utils/auth/tokenStorage';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -111,8 +112,9 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
           console.log('📞 In video call - leaving room but keeping socket connected');
           socketRef.current.emit('leave-appointment', { appointmentId });
         } else {
-          console.log('🔌 Disconnecting socket');
+          console.log('🔌 Disconnecting socket (component unmount)');
           socketRef.current.disconnect();
+          socketRef.current = null;
         }
       }
       if (typingTimeoutRef.current) {
@@ -123,6 +125,29 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
       }
     };
   }, [appointmentId]);
+
+  // CRITICAL: Disconnect socket when screen loses focus (user navigates away)
+  // This prevents the chat socket from receiving messages and marking them as read
+  // when the user is on a different screen (like the chat list)
+  useFocusEffect(
+    useCallback(() => {
+      // Screen is focused - reconnect if needed
+      console.log('👁️ [AppointmentChat] Screen focused');
+      if (!socketRef.current?.connected && !isInVideoCall.current) {
+        console.log('🔄 [AppointmentChat] Reconnecting socket...');
+        initializeChat();
+      }
+      
+      return () => {
+        // Screen lost focus - disconnect socket to prevent marking messages as read
+        console.log('👁️ [AppointmentChat] Screen UNFOCUSED - disconnecting socket');
+        if (socketRef.current && !isInVideoCall.current) {
+          socketRef.current.disconnect();
+          socketRef.current = null;
+        }
+      };
+    }, [appointmentId])
+  );
 
   // Timer countdown
   useEffect(() => {
@@ -185,6 +210,12 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
   };
 
   const initializeChat = async () => {
+    // Prevent multiple socket connections
+    if (socketRef.current?.connected) {
+      console.log('⚠️ [AppointmentChat] Socket already connected, skipping init');
+      return;
+    }
+    
     try {
       const token = await tokenStorage.getToken();
       if (!token) {

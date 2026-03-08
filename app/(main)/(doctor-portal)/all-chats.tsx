@@ -152,6 +152,24 @@ export default function AllChatsScreen() {
         socket = io(API_URL, { transports: ['websocket'], auth: { token } });
         socketRef.current = socket;
 
+        socket.on('connect', () => {
+          console.log('\n🔌 [DoctorChats] Socket CONNECTED! Socket ID:', socket.id);
+          console.log('   This socket should receive user-new-message events\n');
+        });
+
+        socket.on('disconnect', () => {
+          console.log('❌ [DoctorChats] Socket disconnected');
+        });
+
+        socket.on('connect_error', (err: any) => {
+          console.log('⚠️ [DoctorChats] Socket connect error:', err.message);
+        });
+
+        // Log ALL events for debugging
+        socket.onAny((eventName: string, ...args: any[]) => {
+          console.log(`📡 [DoctorChats] Event received: ${eventName}`, JSON.stringify(args).substring(0, 100));
+        });
+
         socket.on('user-new-message', (payload: any) => {
           if (!payload || !payload.appointmentId) return;
           console.log('📩 [DoctorChats] user-new-message received:', JSON.stringify({

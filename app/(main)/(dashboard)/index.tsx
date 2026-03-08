@@ -266,7 +266,7 @@ export default function DayPlan () {
           onPress={() => setShowDietPlanViewer(true)}
           activeOpacity={0.7}
         >
-          <Ionicons name="nutrition" size={24} color={colors.surface} />
+          <Ionicons name="nutrition" size={24} color={colors.white} />
         </TouchableOpacity>
       </View>
     </SafeAreaView>
