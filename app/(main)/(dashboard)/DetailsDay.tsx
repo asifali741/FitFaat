@@ -1377,8 +1377,14 @@ export default function DetailsDay () {
               try {
                 const dayLogId = (dayData as any)._id || (props as any)._id;
 
+                console.log('🔍 [DetailsDay] Saving meal - dayLogId:', dayLogId);
+                console.log('🔍 [DetailsDay] dayData._id:', (dayData as any)._id);
+                console.log('🔍 [DetailsDay] props._id:', (props as any)._id);
+                console.log('🔍 [DetailsDay] Full props:', JSON.stringify(props, null, 2));
+
                 if (!dayLogId) {
                   Alert.alert('Error', 'Unable to find day log. Please refresh and try again.');
+                  console.error('❌ [DetailsDay] No dayLogId found!');
                   return;
                 }
 
@@ -1470,9 +1476,29 @@ export default function DetailsDay () {
                 } else {
                   Alert.alert('Error', 'Please enter at least meal calories or water amount');
                 }
-              } catch (error) {
+              } catch (error: any) {
                 console.error('Error logging:', error);
-                Alert.alert('Error', 'Failed to log entry. Please check your connection.');
+                
+                // Handle expired cycle error
+                if (error.message?.includes('old/completed cycle') || error.message?.includes('CYCLE_EXPIRED')) {
+                  Alert.alert(
+                    'Cycle Expired',
+                    'Your data is outdated. A new weekly cycle has been created. Please go back to refresh.',
+                    [
+                      {
+                        text: 'Go Back',
+                        onPress: () => {
+                          // Clear local storage to force refresh
+                          AsyncStorage.removeItem('JsonResponse').then(() => {
+                            router.back();
+                          });
+                        }
+                      }
+                    ]
+                  );
+                } else {
+                  Alert.alert('Error', 'Failed to log entry. Please check your connection.');
+                }
               } finally {
                 setIsLoading(false);
               }

@@ -369,15 +369,7 @@ export default function Settings() {
               icon="notifications-outline"
               title="Notifications"
               subtitle="Manage notification preferences"
-              rightComponent={
-                <Switch
-                  value={notifications}
-                  onValueChange={setNotifications}
-                  trackColor={{ false: colors.textSecondary + '40', true: colors.primary + '40' }}
-                  thumbColor={notifications ? colors.primary : colors.textSecondary}
-                />
-              }
-              showArrow={false}
+              onPress={() => router.push("/notification-settings")}
             />
             <SettingItem
               icon="moon-outline"

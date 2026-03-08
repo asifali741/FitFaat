@@ -1,6 +1,7 @@
 import AppHeader from "@/components/AppHeader";
 import CountdownTimer from "@/components/CountdownTimer";
 import { useAppointments } from "@/contexts/AppointmentContext";
+import { useNotifications } from "@/contexts/NotificationContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { authApi } from "@/utils/auth/authApi";
 import { Ionicons } from "@expo/vector-icons";
@@ -13,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ScheduleAppointmentScreen() {
   const router = useRouter();
+  const { scheduleAppointmentReminder } = useNotifications();
   const { addAppointment } = useAppointments();
   const { colors } = useTheme();
   const [currentStep, setCurrentStep] = useState(1);
@@ -124,14 +126,17 @@ export default function ScheduleAppointmentScreen() {
     </View>
   );
 
-  const handleConfirmAppointment = () => {
+  const handleConfirmAppointment = async () => {
     // Calculate appointment time based on selected date and time
     const appointmentDateTime = calculateAppointmentDateTime(selectedDate, selectedTime);
     setAppointmentTime(appointmentDateTime);
     
     // Save appointment to context
     if (selectedDoctor) {
+      const appointmentId = `apt_${Date.now()}`;
+      
       addAppointment({
+        id: appointmentId,
         doctorName: selectedDoctor.name,
         doctorSpecialty: selectedDoctor.specialty,
         doctorExperience: selectedDoctor.experience,
@@ -141,6 +146,20 @@ export default function ScheduleAppointmentScreen() {
         problemDescription: problemDescription,
         appointmentDateTime: appointmentDateTime
       });
+
+      // Schedule appointment reminder notification
+      try {
+        const notificationId = await scheduleAppointmentReminder(
+          appointmentId,
+          appointmentDateTime,
+          selectedDoctor.name
+        );
+        if (notificationId) {
+          console.log('📅 Appointment reminder scheduled:', notificationId);
+        }
+      } catch (error) {
+        console.error('Failed to schedule reminder:', error);
+      }
     }
     
     setCurrentStep(6);
