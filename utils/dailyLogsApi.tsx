@@ -19,6 +19,48 @@ const getBaseURL = () => {
 const API_BASE_URL = getBaseURL();
 
 export const dailyLogsApi = {
+  // Check and create new cycle if needed (handles expired/completed cycles)
+  checkAndCreateCycle: async (userId: string, weeklyTrackingId?: string | null, baseTargetCalories?: number, baseTargetHydration?: number) => {
+    try {
+      console.log('[checkAndCreateCycle] Checking cycle for user:', userId);
+      const response = await fetch(`${API_BASE_URL}/daily-logs/check-cycle`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          weeklyTrackingId,
+          baseTargetCalories,
+          baseTargetHydration,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to check/create cycle');
+      }
+      
+      // If a new cycle was created, update AsyncStorage
+      if (data.newCycleCreated && data.newWeeklyTrackingId) {
+        await AsyncStorage.setItem('weeklyTrackingId', data.newWeeklyTrackingId);
+        // Clear old cached data
+        await AsyncStorage.removeItem('JsonResponse');
+        console.log('[checkAndCreateCycle] New cycle created! Updated weeklyTrackingId:', data.newWeeklyTrackingId);
+      }
+      
+      return {
+        data: data.data,
+        newCycleCreated: data.newCycleCreated,
+        newWeeklyTrackingId: data.newWeeklyTrackingId,
+        message: data.message
+      };
+    } catch (error) {
+      console.error('Error checking/creating cycle:', error);
+      throw error;
+    }
+  },
+
   // Create a new weekly plan
   createWeeklyPlan: async (userId: string, baseTargetCalories: number, baseTargetHydration: number) => {
     try {
