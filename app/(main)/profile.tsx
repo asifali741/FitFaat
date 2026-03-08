@@ -128,7 +128,8 @@ export default function ProfileScreen() {
             shadowRadius: 8,
             elevation: 5,
             marginBottom: hp(2),
-          }}>            <Image 
+          }}>
+            <Image 
               source={
                 profileImageUrl
                   ? { uri: profileImageUrl }

@@ -120,7 +120,8 @@ export function BottomTabBar() {
         });
 
         socket.on('connect_error', (error) => {
-          console.error('Socket connection error:', error.message);
+          // Silently log connection errors, don't show red box
+          console.log('[Socket] Connection error (will retry):', error.message);
         });
 
         // When a new message is broadcasted in an appointment room (server emits 'new-message')
