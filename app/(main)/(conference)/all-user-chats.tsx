@@ -151,11 +151,21 @@ export default function AllUserChatsScreen() {
         socketRef.current = socket;
 
         socket.on('connect', () => {
-          console.log('✅ Socket connected in AllUserChats. Socket ID:', socket.id);
+          console.log('\n🔌 [AllUserChats] Socket CONNECTED! Socket ID:', socket.id);
+          console.log('   This socket should receive user-new-message events\n');
         });
 
         socket.on('disconnect', () => {
-          console.log('❌ Socket disconnected in AllUserChats');
+          console.log('❌ [AllUserChats] Socket disconnected');
+        });
+
+        socket.on('connect_error', (err: any) => {
+          console.log('⚠️ [AllUserChats] Socket connect error:', err.message);
+        });
+
+        // Log ALL events for debugging
+        socket.onAny((eventName: string, ...args: any[]) => {
+          console.log(`📡 [AllUserChats] Event received: ${eventName}`, JSON.stringify(args).substring(0, 100));
         });
 
         socket.on('user-new-message', (payload: any) => {
