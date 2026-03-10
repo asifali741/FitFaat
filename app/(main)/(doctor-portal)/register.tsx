@@ -8,12 +8,11 @@ import { ActivityIndicator, Alert, Image, ScrollView, Text, TextInput, Touchable
 import { heightPercentageToDP as hp } from "react-native-responsive-screen";
 
 const specializations = [
-  { id: 1, name: "Cardiologist", icon: "heart", color: theme.colors.error },
-  { id: 2, name: "Dermatologist", icon: "person", color: theme.colors.warning },
-  { id: 3, name: "Neurologist", icon: "medical", color: theme.colors.info },
-  { id: 4, name: "Pediatrician", icon: "happy", color: theme.colors.primary + '40' },
-  { id: 5, name: "Orthopedic", icon: "body", color: theme.colors.primary },
-  { id: 6, name: "Gynecologist", icon: "female", color: theme.colors.secondary },
+  { id: 1, name: "Nutrition", icon: "nutrition", color: theme.colors.success },
+  { id: 2, name: "Weight Loss", icon: "fitness", color: theme.colors.error },
+  { id: 3, name: "Weight Gain", icon: "trending-up", color: theme.colors.primary },
+  { id: 4, name: "Muscle Gain", icon: "barbell", color: theme.colors.info },
+  { id: 5, name: "Fitness Coaching", icon: "body", color: theme.colors.warning },
 ];
 
 const consultationModes = [
@@ -30,16 +29,11 @@ const genderOptions = [
 ];
 
 const specializationOptions = [
-  { label: "Cardiologist", value: "cardiologist" },
-  { label: "Dermatologist", value: "dermatologist" },
-  { label: "Neurologist", value: "neurologist" },
-  { label: "Pediatrician", value: "pediatrician" },
-  { label: "Orthopedic", value: "orthopedic" },
-  { label: "Gynecologist", value: "gynecologist" },
-  { label: "General Practitioner", value: "general_practitioner" },
-  { label: "Psychiatrist", value: "psychiatrist" },
-  { label: "Oncologist", value: "oncologist" },
-  { label: "Endocrinologist", value: "endocrinologist" },
+  { label: "Nutrition", value: "Nutrition" },
+  { label: "Weight Loss", value: "Weight Loss" },
+  { label: "Weight Gain", value: "Weight Gain" },
+  { label: "Muscle Gain", value: "Muscle Gain" },
+  { label: "Fitness Coaching", value: "Fitness Coaching" },
 ];
 
 const consultationModeOptions = [
@@ -109,15 +103,10 @@ export default function DoctorRegistration() {
     password: "",
     profilePicture: "",
     selectedGender: null,
-    birthDate: { day: "", month: "", year: "" },
     specialization: "",
-    medicalLicense: "",
-    licenseAuthority: "",
     yearsExperience: "",
     qualification: "",
     university: "",
-    clinicName: "",
-    clinicAddress: "",
     consultationFee: "",
     primaryLanguage: "",
     bio: "",
@@ -135,9 +124,9 @@ export default function DoctorRegistration() {
   // Validation function
   const validateForm = () => {
     const required = [
-      'fullName', 'email', 'phoneNumber', 'password', 'medicalLicense', 
-      'licenseAuthority', 'yearsExperience', 'qualification', 'university',
-      'clinicName', 'clinicAddress', 'consultationFee', 'primaryLanguage',
+      'fullName', 'email', 'phoneNumber', 'password',
+      'yearsExperience', 'qualification', 'university',
+      'consultationFee', 'primaryLanguage',
       'bio', 'availableDays', 'availableHours'
     ];
     
@@ -150,9 +139,6 @@ export default function DoctorRegistration() {
     });
     
     if (!formData.selectedGender) missingFields.push('gender');
-    if (!formData.birthDate.day.trim() || !formData.birthDate.month.trim() || !formData.birthDate.year.trim()) {
-      missingFields.push('date of birth');
-    }
     if (!formData.specialization) missingFields.push('specialization');
     if (!formData.selectedConsultationMode) missingFields.push('consultation mode');
     
@@ -293,39 +279,6 @@ export default function DoctorRegistration() {
           </View>
         </View>
 
-        {/* Date of Birth */}
-        <View>
-          <Text style={dataScreenStyles.subHeading}>Date of Birth *</Text>
-          <View style={dataScreenStyles.dob}>
-            <TextInput
-              style={dataScreenStyles.dobInput}
-              placeholder="DD"
-              keyboardType="numeric"
-              maxLength={2}
-              value={formData.birthDate.day}
-              onChangeText={(text) => updateFormData('birthDate', { ...formData.birthDate, day: text })}
-            />
-            <Text style={dataScreenStyles.dobText}>:</Text>
-            <TextInput
-              style={dataScreenStyles.dobInput}
-              placeholder="MM"
-              keyboardType="numeric"
-              maxLength={2}
-              value={formData.birthDate.month}
-              onChangeText={(text) => updateFormData('birthDate', { ...formData.birthDate, month: text })}
-            />
-            <Text style={dataScreenStyles.dobText}>:</Text>
-            <TextInput
-              style={dataScreenStyles.dobInput}
-              placeholder="YYYY"
-              keyboardType="numeric"
-              maxLength={4}
-              value={formData.birthDate.year}
-              onChangeText={(text) => updateFormData('birthDate', { ...formData.birthDate, year: text })}
-            />
-          </View>
-        </View>
-
         {/* Professional Information */}
         <Text style={[dataScreenStyles.subHeading, {marginTop: hp(2)}]}>Professional Information</Text>
         
@@ -338,27 +291,6 @@ export default function DoctorRegistration() {
           value={formData.specialization}
           onChangeText={(value) => updateFormData('specialization', value)}
         />
-
-        <View style={dataScreenStyles.subContainer}>
-          <View>
-            <Text style={dataScreenStyles.subsubHeading}>Medical License *</Text>
-            <TextInput
-              style={dataScreenStyles.miniTextInput}
-              placeholder="License Number"
-              value={formData.medicalLicense}
-              onChangeText={(value) => updateFormData('medicalLicense', value)}
-            />
-          </View>
-          <View>
-            <Text style={dataScreenStyles.subsubHeading}>License Authority *</Text>
-            <TextInput
-              style={dataScreenStyles.miniTextInput}
-              placeholder="Issuing Authority"
-              value={formData.licenseAuthority}
-              onChangeText={(value) => updateFormData('licenseAuthority', value)}
-            />
-          </View>
-        </View>
 
         <View style={dataScreenStyles.subContainer}>
           <View>
@@ -393,24 +325,6 @@ export default function DoctorRegistration() {
         {/* Clinic Information */}
         <Text style={[dataScreenStyles.subHeading, {marginTop: hp(2)}]}>Clinic Information</Text>
         
-        <Text style={dataScreenStyles.subHeading}>Clinic/Hospital Name *</Text>
-        <TextInput
-          placeholderTextColor="#999"
-          placeholder="Enter clinic or hospital name"
-          style={dataScreenStyles.mainTextInput}
-          value={formData.clinicName}
-          onChangeText={(value) => updateFormData('clinicName', value)}
-        />
-
-        <Text style={dataScreenStyles.subHeading}>Clinic Address *</Text>
-        <TextInput
-          placeholderTextColor="#999"
-          placeholder="Enter complete address"
-          style={dataScreenStyles.mainTextInput}
-          value={formData.clinicAddress}
-          onChangeText={(value) => updateFormData('clinicAddress', value)}
-        />
-
         <View style={dataScreenStyles.subContainer}>
           <View>
             <Text style={dataScreenStyles.subsubHeading}>Consultation Fee *</Text>
