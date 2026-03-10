@@ -6,6 +6,7 @@ import { goalBasedSuggestions, waterIntakeDatabase } from '@/constants/foodDatab
 import { HEADER_PADDING_HORIZONTAL } from '@/constants/ui';
 import { useTheme } from "@/contexts/ThemeContext";
 import { dailyLogsApi } from '@/utils/dailyLogsApi';
+import { customRecipesApi, CustomRecipeData } from '@/utils/customRecipesApi';
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { Audio } from 'expo-av';
 import Constants from 'expo-constants';
@@ -210,31 +211,112 @@ export default function DetailsDay () {
     // Diet plan viewer state
     const [showDietPlanViewer, setShowDietPlanViewer] = useState(false);
     
-    // Initialize suggested foods based on user's goal
-    useEffect(() => {
-      const userGoal = (props as any).userGoal || 3; // Default to maintenance
-      const suggestions = goalBasedSuggestions[userGoal as keyof typeof goalBasedSuggestions];
-      if (suggestions) {
-        setSuggestedFoods(suggestions.foods);
-      }
-    }, [props]);
+    // Custom recipes list
+    const [userCustomRecipes, setUserCustomRecipes] = useState<CustomRecipeData[]>([]);
     
-    // Handle food search with Pakistani dishes dataset
+    // Custom recipe states
+    const [showCustomRecipeModal, setShowCustomRecipeModal] = useState(false);
+    const [customRecipeName, setCustomRecipeName] = useState<string>('');
+    const [customRecipeIngredients, setCustomRecipeIngredients] = useState<Array<{
+      name: string;
+      protein_g: number;
+      carbs_g: number;
+      fat_g: number;
+    }>>([]);
+    const [customRecipeServingSize, setCustomRecipeServingSize] = useState<string>('1 serving');
+    const [customRecipeCalories, setCustomRecipeCalories] = useState<string>('');
+    const [customRecipeProtein, setCustomRecipeProtein] = useState<string>('');
+    const [customRecipeCarbs, setCustomRecipeCarbs] = useState<string>('');
+    const [customRecipeFat, setCustomRecipeFat] = useState<string>('');
+    const [useCollectiveValues, setUseCollectiveValues] = useState<boolean>(true);
+    const [currentIngredient, setCurrentIngredient] = useState({
+      name: '',
+      protein_g: '',
+      carbs_g: '',
+      fat_g: ''
+    });
+    
+    // Fetch user's custom recipes on mount
+    useEffect(() => {
+      const fetchCustomRecipes = async () => {
+        try {
+          const recipes = await customRecipesApi.getUserRecipes();
+          setUserCustomRecipes(recipes);
+          console.log('✅ Custom recipes loaded:', recipes.length);
+        } catch (error) {
+          console.error('Error loading custom recipes:', error);
+        }
+      };
+      fetchCustomRecipes();
+    }, []);
+    
+    // Extract userGoal to avoid infinite loop with props dependency
+    const userGoal = (props as any).userGoal || 3;
+    
+    // Memoize suggested foods to prevent infinite re-renders
+    const combinedSuggestedFoods = useMemo(() => {
+      const suggestions = goalBasedSuggestions[userGoal as keyof typeof goalBasedSuggestions];
+      
+      // Convert custom recipes to food format
+      const customRecipesAsFoods = userCustomRecipes.map(recipe => ({
+        food_name: recipe.recipeName,
+        serving_size: recipe.servingSize,
+        calories_kcal: recipe.calories_kcal,
+        calories: recipe.calories_kcal,
+        protein_g: recipe.protein_g,
+        carbs_g: recipe.carbs_g,
+        fat_g: recipe.fat_g,
+        category: 'Custom Recipe',
+        isCustomRecipe: true,
+        _id: recipe._id
+      }));
+      
+      // Custom recipes first, then goal-based suggestions
+      return [...customRecipesAsFoods, ...(suggestions?.foods || [])];
+    }, [userGoal, userCustomRecipes]);
+    
+    // Update suggested foods when combined suggestions change
+    useEffect(() => {
+      setSuggestedFoods(combinedSuggestedFoods);
+    }, [combinedSuggestedFoods]);
+    
+    // Handle food search with custom recipes and Pakistani dishes dataset
     useEffect(() => {
       if (foodSearch.trim().length > 1) {
         const query = foodSearch.toLowerCase();
-        const results = pakistaniDishes.filter((dish: any) => {
+        
+        // Search custom recipes first
+        const customRecipeMatches = userCustomRecipes
+          .filter(recipe => recipe.recipeName.toLowerCase().includes(query))
+          .map(recipe => ({
+            food_name: recipe.recipeName,
+            serving_size: recipe.servingSize,
+            calories_kcal: recipe.calories_kcal,
+            calories: recipe.calories_kcal,
+            protein_g: recipe.protein_g,
+            carbs_g: recipe.carbs_g,
+            fat_g: recipe.fat_g,
+            category: '⭐ My Recipe',
+            isCustomRecipe: true,
+            _id: recipe._id
+          }));
+        
+        // Search Pakistani dishes
+        const dishMatches = pakistaniDishes.filter((dish: any) => {
           const name = dish.food_name || dish.name || '';
           const category = dish.category || '';
           return name.toLowerCase().includes(query) || category.toLowerCase().includes(query);
-        }).slice(0, 15);
+        }).slice(0, 10);
+        
+        // Combine: custom recipes first, then database dishes
+        const results = [...customRecipeMatches, ...dishMatches].slice(0, 15);
         setFilteredFoods(results);
         setShowFoodSearch(true);
       } else {
         setShowFoodSearch(false);
         setFilteredFoods([]);
       }
-    }, [foodSearch]);
+    }, [foodSearch, userCustomRecipes]);
 
     // Handle drink search with drinks dataset
     useEffect(() => {
@@ -633,7 +715,7 @@ export default function DetailsDay () {
               </TouchableOpacity>
               
               {/* Complete Day Button */}
-              <TouchableOpacity
+              {/* <TouchableOpacity
                 style={[styles.completeDayButton, {
                   backgroundColor: isCompletingDay ? colors.gray : colors.success,
                   opacity: isCompletingDay ? 0.6 : 1
@@ -649,7 +731,7 @@ export default function DetailsDay () {
                 <Text style={styles.completeDayButtonText}>
                   {isCompletingDay ? 'Completing...' : 'Complete Day'}
                 </Text>
-              </TouchableOpacity>
+              </TouchableOpacity> */}
             </>
           ) : (
             <>
@@ -851,6 +933,24 @@ export default function DetailsDay () {
                   <View style={styles.dietPlanTextContainer}>
                     <Text style={styles.dietPlanTitle}>View My Diet Plans</Text>
                     <Text style={styles.dietPlanSubtitle}>See doctor-assigned meal plans</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Create Custom Recipe Button */}
+              <View style={styles.sectionContainer}>
+                <TouchableOpacity
+                  style={styles.customRecipeButton}
+                  onPress={() => setShowCustomRecipeModal(true)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.customRecipeIconContainer}>
+                    <Ionicons name="create-outline" size={24} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.customRecipeTextContainer}>
+                    <Text style={styles.customRecipeTitle}>Create Your Own Recipe</Text>
+                    <Text style={styles.customRecipeSubtitle}>Build a custom meal with ingredients</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
                 </TouchableOpacity>
@@ -1638,6 +1738,413 @@ export default function DetailsDay () {
       visible={showDietPlanViewer}
       onClose={() => setShowDietPlanViewer(false)}
     />
+
+    {/* Custom Recipe Modal */}
+    <Modal
+      visible={showCustomRecipeModal}
+      animationType="slide"
+      transparent={false}
+      onRequestClose={() => setShowCustomRecipeModal(false)}
+    >
+      <View style={styles.customRecipeModalContainer}>
+        <View style={styles.customRecipeModalHeader}>
+          <TouchableOpacity onPress={() => setShowCustomRecipeModal(false)}>
+            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+          </TouchableOpacity>
+          <Text style={styles.customRecipeModalTitle}>Create Custom Recipe</Text>
+          <View style={{ width: 24 }} />
+        </View>
+
+        <KeyboardAwareScrollView
+          style={styles.customRecipeModalContent}
+          showsVerticalScrollIndicator={false}
+          enableOnAndroid={true}
+        >
+          {/* Recipe Name */}
+          <View style={styles.customRecipeSection}>
+            <Text style={styles.customRecipeLabel}>Recipe Name *</Text>
+            <TextInput
+              style={styles.customRecipeInput}
+              placeholder="e.g., My Special Biryani"
+              placeholderTextColor={colors.textSecondary}
+              value={customRecipeName}
+              onChangeText={setCustomRecipeName}
+            />
+          </View>
+
+          {/* Serving Size */}
+          <View style={styles.customRecipeSection}>
+            <Text style={styles.customRecipeLabel}>Serving Size *</Text>
+            <TextInput
+              style={styles.customRecipeInput}
+              placeholder="e.g., 1 bowl, 2 pieces"
+              placeholderTextColor={colors.textSecondary}
+              value={customRecipeServingSize}
+              onChangeText={setCustomRecipeServingSize}
+            />
+          </View>
+
+          {/* Nutrition Values Method Toggle */}
+          <View style={styles.customRecipeSection}>
+            <Text style={styles.customRecipeLabel}>How would you like to add nutrition values?</Text>
+            <View style={styles.nutritionMethodToggle}>
+              <TouchableOpacity
+                style={[
+                  styles.nutritionMethodButton,
+                  useCollectiveValues && styles.nutritionMethodButtonActive
+                ]}
+                onPress={() => setUseCollectiveValues(true)}
+              >
+                <Text style={[
+                  styles.nutritionMethodButtonText,
+                  useCollectiveValues && styles.nutritionMethodButtonTextActive
+                ]}>
+                  Collective Values
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.nutritionMethodButton,
+                  !useCollectiveValues && styles.nutritionMethodButtonActive
+                ]}
+                onPress={() => setUseCollectiveValues(false)}
+              >
+                <Text style={[
+                  styles.nutritionMethodButtonText,
+                  !useCollectiveValues && styles.nutritionMethodButtonTextActive
+                ]}>
+                  Per Ingredient
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Collective Nutritional Values */}
+          {useCollectiveValues && (
+            <View style={styles.customRecipeSection}>
+              <Text style={styles.customRecipeSectionTitle}>Nutritional Values (Total)</Text>
+              <View style={styles.nutritionInputsGrid}>
+                <View style={styles.nutritionInputWrapper}>
+                  <Text style={styles.nutritionInputLabel}>Calories (kcal) *</Text>
+                  <TextInput
+                    style={styles.nutritionInput}
+                    placeholder="210"
+                    placeholderTextColor={colors.textSecondary}
+                    value={customRecipeCalories}
+                    onChangeText={setCustomRecipeCalories}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View style={styles.nutritionInputWrapper}>
+                  <Text style={styles.nutritionInputLabel}>Protein (g)</Text>
+                  <TextInput
+                    style={styles.nutritionInput}
+                    placeholder="4"
+                    placeholderTextColor={colors.textSecondary}
+                    value={customRecipeProtein}
+                    onChangeText={setCustomRecipeProtein}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View style={styles.nutritionInputWrapper}>
+                  <Text style={styles.nutritionInputLabel}>Carbs (g)</Text>
+                  <TextInput
+                    style={styles.nutritionInput}
+                    placeholder="20"
+                    placeholderTextColor={colors.textSecondary}
+                    value={customRecipeCarbs}
+                    onChangeText={setCustomRecipeCarbs}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View style={styles.nutritionInputWrapper}>
+                  <Text style={styles.nutritionInputLabel}>Fat (g)</Text>
+                  <TextInput
+                    style={styles.nutritionInput}
+                    placeholder="12"
+                    placeholderTextColor={colors.textSecondary}
+                    value={customRecipeFat}
+                    onChangeText={setCustomRecipeFat}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Ingredients List with Individual Values */}
+          {!useCollectiveValues && (
+            <>
+              <View style={styles.customRecipeSection}>
+                <Text style={styles.customRecipeSectionTitle}>Add Ingredients</Text>
+                
+                {/* Current Ingredient Input */}
+                <View style={styles.ingredientInputCard}>
+                  <TextInput
+                    style={styles.customRecipeInput}
+                    placeholder="Ingredient name"
+                    placeholderTextColor={colors.textSecondary}
+                    value={currentIngredient.name}
+                    onChangeText={(text) => setCurrentIngredient({ ...currentIngredient, name: text })}
+                  />
+                  
+                  <View style={styles.ingredientNutritionRow}>
+                    <TextInput
+                      style={styles.ingredientNutritionInput}
+                      placeholder="Protein (g)"
+                      placeholderTextColor={colors.textSecondary}
+                      value={currentIngredient.protein_g}
+                      onChangeText={(text) => setCurrentIngredient({ ...currentIngredient, protein_g: text })}
+                      keyboardType="numeric"
+                    />
+                    <TextInput
+                      style={styles.ingredientNutritionInput}
+                      placeholder="Carbs (g)"
+                      placeholderTextColor={colors.textSecondary}
+                      value={currentIngredient.carbs_g}
+                      onChangeText={(text) => setCurrentIngredient({ ...currentIngredient, carbs_g: text })}
+                      keyboardType="numeric"
+                    />
+                    <TextInput
+                      style={styles.ingredientNutritionInput}
+                      placeholder="Fat (g)"
+                      placeholderTextColor={colors.textSecondary}
+                      value={currentIngredient.fat_g}
+                      onChangeText={(text) => setCurrentIngredient({ ...currentIngredient, fat_g: text })}
+                      keyboardType="numeric"
+                    />
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.addIngredientButton}
+                    onPress={() => {
+                      if (currentIngredient.name.trim()) {
+                        setCustomRecipeIngredients([
+                          ...customRecipeIngredients,
+                          {
+                            name: currentIngredient.name,
+                            protein_g: parseFloat(currentIngredient.protein_g) || 0,
+                            carbs_g: parseFloat(currentIngredient.carbs_g) || 0,
+                            fat_g: parseFloat(currentIngredient.fat_g) || 0,
+                          }
+                        ]);
+                        setCurrentIngredient({ name: '', protein_g: '', carbs_g: '', fat_g: '' });
+                      } else {
+                        Alert.alert('Error', 'Please enter ingredient name');
+                      }
+                    }}
+                  >
+                    <Ionicons name="add-circle" size={20} color="#FFFFFF" />
+                    <Text style={styles.addIngredientButtonText}>Add Ingredient</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Ingredients List */}
+                {customRecipeIngredients.length > 0 && (
+                  <View style={styles.ingredientsList}>
+                    <Text style={styles.ingredientsListTitle}>
+                      Ingredients ({customRecipeIngredients.length})
+                    </Text>
+                    {customRecipeIngredients.map((ingredient, index) => (
+                      <View key={index} style={styles.ingredientCard}>
+                        <View style={styles.ingredientCardHeader}>
+                          <Text style={styles.ingredientCardName}>{ingredient.name}</Text>
+                          <TouchableOpacity
+                            onPress={() => {
+                              setCustomRecipeIngredients(
+                                customRecipeIngredients.filter((_, i) => i !== index)
+                              );
+                            }}
+                          >
+                            <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                          </TouchableOpacity>
+                        </View>
+                        <View style={styles.ingredientCardNutrition}>
+                          <Text style={styles.ingredientNutritionText}>
+                            P: {ingredient.protein_g}g • C: {ingredient.carbs_g}g • F: {ingredient.fat_g}g
+                          </Text>
+                        </View>
+                      </View>
+                    ))}
+
+                    {/* Total Calculated Values */}
+                    <View style={styles.calculatedTotalsCard}>
+                      <Text style={styles.calculatedTotalsTitle}>Calculated Totals</Text>
+                      <View style={styles.calculatedTotalsGrid}>
+                        <View style={styles.calculatedTotalItem}>
+                          <Text style={styles.calculatedTotalLabel}>Protein</Text>
+                          <Text style={styles.calculatedTotalValue}>
+                            {customRecipeIngredients.reduce((sum, ing) => sum + ing.protein_g, 0).toFixed(1)}g
+                          </Text>
+                        </View>
+                        <View style={styles.calculatedTotalItem}>
+                          <Text style={styles.calculatedTotalLabel}>Carbs</Text>
+                          <Text style={styles.calculatedTotalValue}>
+                            {customRecipeIngredients.reduce((sum, ing) => sum + ing.carbs_g, 0).toFixed(1)}g
+                          </Text>
+                        </View>
+                        <View style={styles.calculatedTotalItem}>
+                          <Text style={styles.calculatedTotalLabel}>Fat</Text>
+                          <Text style={styles.calculatedTotalValue}>
+                            {customRecipeIngredients.reduce((sum, ing) => sum + ing.fat_g, 0).toFixed(1)}g
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              {/* Calories Input for Ingredient Method */}
+              <View style={styles.customRecipeSection}>
+                <Text style={styles.customRecipeLabel}>Total Calories (kcal) *</Text>
+                <TextInput
+                  style={styles.customRecipeInput}
+                  placeholder="210"
+                  placeholderTextColor={colors.textSecondary}
+                  value={customRecipeCalories}
+                  onChangeText={setCustomRecipeCalories}
+                  keyboardType="numeric"
+                />
+                <Text style={styles.helperText}>
+                  Note: Calories should be entered manually (not auto-calculated from macros)
+                </Text>
+              </View>
+            </>
+          )}
+
+          {/* Ingredients List (for collective method) */}
+          {useCollectiveValues && (
+            <View style={styles.customRecipeSection}>
+              <Text style={styles.customRecipeSectionTitle}>Ingredients (Optional)</Text>
+              <TextInput
+                style={[styles.customRecipeInput, styles.customRecipeTextArea]}
+                placeholder="e.g., &#10;- 2 cups rice&#10;- 500g chicken&#10;- 1 onion"
+                placeholderTextColor={colors.textSecondary}
+                multiline
+                numberOfLines={4}
+                value={customRecipeIngredients.map(i => i.name).join('\n')}
+                onChangeText={(text) => {
+                  const ingredients = text.split('\n').filter(i => i.trim()).map(name => ({
+                    name: name.trim(),
+                    protein_g: 0,
+                    carbs_g: 0,
+                    fat_g: 0,
+                  }));
+                  setCustomRecipeIngredients(ingredients);
+                }}
+              />
+            </View>
+          )}
+
+          {/* Action Buttons */}
+          <View style={styles.customRecipeActions}>
+            <TouchableOpacity
+              style={styles.customRecipeCancelButton}
+              onPress={() => {
+                setShowCustomRecipeModal(false);
+                setCustomRecipeName('');
+                setCustomRecipeServingSize('1 serving');
+                setCustomRecipeCalories('');
+                setCustomRecipeProtein('');
+                setCustomRecipeCarbs('');
+                setCustomRecipeFat('');
+                setCustomRecipeIngredients([]);
+                setCurrentIngredient({ name: '', protein_g: '', carbs_g: '', fat_g: '' });
+              }}
+            >
+              <Text style={styles.customRecipeCancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.customRecipeAddButton}
+              onPress={async () => {
+                // Validate inputs
+                if (!customRecipeName.trim()) {
+                  Alert.alert('Error', 'Please enter a recipe name');
+                  return;
+                }
+                if (!customRecipeCalories.trim()) {
+                  Alert.alert('Error', 'Please enter calories');
+                  return;
+                }
+
+                try {
+                  // Calculate values based on method
+                  let protein = 0;
+                  let carbs = 0;
+                  let fat = 0;
+
+                  if (useCollectiveValues) {
+                    protein = parseFloat(customRecipeProtein) || 0;
+                    carbs = parseFloat(customRecipeCarbs) || 0;
+                    fat = parseFloat(customRecipeFat) || 0;
+                  } else {
+                    protein = customRecipeIngredients.reduce((sum, ing) => sum + ing.protein_g, 0);
+                    carbs = customRecipeIngredients.reduce((sum, ing) => sum + ing.carbs_g, 0);
+                    fat = customRecipeIngredients.reduce((sum, ing) => sum + ing.fat_g, 0);
+                  }
+
+                  const calories = parseFloat(customRecipeCalories);
+
+                  // Save recipe to backend
+                  const savedRecipe = await customRecipesApi.createRecipe({
+                    recipeName: customRecipeName,
+                    servingSize: customRecipeServingSize,
+                    calories_kcal: calories,
+                    protein_g: protein,
+                    carbs_g: carbs,
+                    fat_g: fat,
+                    ingredients: customRecipeIngredients,
+                    useCollectiveValues: useCollectiveValues,
+                    isCustomRecipe: true
+                  });
+
+                  // Update local custom recipes list
+                  setUserCustomRecipes(prev => [savedRecipe, ...prev]);
+
+                  // Create the custom recipe as a meal
+                  setSelectedFoodItem({
+                    food_name: savedRecipe.recipeName,
+                    serving_size: savedRecipe.servingSize,
+                    calories_kcal: savedRecipe.calories_kcal,
+                    calories: savedRecipe.calories_kcal,
+                    protein_g: savedRecipe.protein_g,
+                    carbs_g: savedRecipe.carbs_g,
+                    fat_g: savedRecipe.fat_g,
+                    category: '⭐ My Recipe',
+                    isCustomRecipe: true,
+                    _id: savedRecipe._id
+                  });
+
+                  setCalorieInput(String(calories));
+                  setMealQuantity('1');
+
+                  // Close modal and reset
+                  setShowCustomRecipeModal(false);
+                  setCustomRecipeName('');
+                  setCustomRecipeServingSize('1 serving');
+                  setCustomRecipeCalories('');
+                  setCustomRecipeProtein('');
+                  setCustomRecipeCarbs('');
+                  setCustomRecipeFat('');
+                  setCustomRecipeIngredients([]);
+                  setCurrentIngredient({ name: '', protein_g: '', carbs_g: '', fat_g: '' });
+
+                  Alert.alert('Success', 'Custom recipe saved! You can now add it to your meal.');
+                } catch (error) {
+                  console.error('Error saving custom recipe:', error);
+                  Alert.alert('Error', 'Failed to save custom recipe. Please try again.');
+                }
+              }}
+            >
+              <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+              <Text style={styles.customRecipeAddButtonText}>Use This Recipe</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAwareScrollView>
+      </View>
+    </Modal>
   </View>
 );
 
@@ -3553,6 +4060,287 @@ const getStyles = (colors: any) => StyleSheet.create({
     dietPlanSubtitle: {
         fontSize: 12,
         color: 'rgba(255, 255, 255, 0.8)',
+    },
+    // Custom Recipe Button Styles
+    customRecipeButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F59E0B', // Amber color for custom recipe
+        borderRadius: 12,
+        padding: 16,
+        shadowColor: '#F59E0B',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 5,
+    },
+    customRecipeIconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    customRecipeTextContainer: {
+        flex: 1,
+    },
+    customRecipeTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#FFFFFF',
+        marginBottom: 2,
+    },
+    customRecipeSubtitle: {
+        fontSize: 12,
+        color: 'rgba(255, 255, 255, 0.8)',
+    },
+    // Custom Recipe Modal Styles
+    customRecipeModalContainer: {
+        flex: 1,
+        backgroundColor: colors.screenColor,
+    },
+    customRecipeModalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.gray + '20',
+        backgroundColor: colors.cardBackground,
+    },
+    customRecipeModalTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: colors.textPrimary,
+    },
+    customRecipeModalContent: {
+        flex: 1,
+        padding: 20,
+    },
+    customRecipeSection: {
+        marginBottom: 24,
+    },
+    customRecipeLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: colors.textPrimary,
+        marginBottom: 8,
+    },
+    customRecipeSectionTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: colors.textPrimary,
+        marginBottom: 12,
+    },
+    customRecipeInput: {
+        borderWidth: 1,
+        borderColor: colors.gray + '40',
+        borderRadius: 10,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        fontSize: 15,
+        color: colors.textPrimary,
+        backgroundColor: colors.cardBackground,
+    },
+    customRecipeTextArea: {
+        minHeight: 100,
+        textAlignVertical: 'top',
+    },
+    nutritionMethodToggle: {
+        flexDirection: 'row',
+        backgroundColor: colors.cardBackground,
+        borderRadius: 10,
+        padding: 4,
+        marginTop: 8,
+    },
+    nutritionMethodButton: {
+        flex: 1,
+        paddingVertical: 10,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    nutritionMethodButtonActive: {
+        backgroundColor: colors.primary,
+    },
+    nutritionMethodButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: colors.textSecondary,
+    },
+    nutritionMethodButtonTextActive: {
+        color: '#FFFFFF',
+    },
+    nutritionInputsGrid: {
+        gap: 12,
+    },
+    nutritionInputWrapper: {
+        marginBottom: 8,
+    },
+    nutritionInputLabel: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: colors.textSecondary,
+        marginBottom: 6,
+    },
+    nutritionInput: {
+        borderWidth: 1,
+        borderColor: colors.gray + '40',
+        borderRadius: 8,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        fontSize: 15,
+        color: colors.textPrimary,
+        backgroundColor: colors.cardBackground,
+    },
+    ingredientInputCard: {
+        backgroundColor: colors.cardBackground,
+        borderRadius: 12,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: colors.gray + '20',
+        marginBottom: 16,
+    },
+    ingredientNutritionRow: {
+        flexDirection: 'row',
+        gap: 8,
+        marginTop: 12,
+    },
+    ingredientNutritionInput: {
+        flex: 1,
+        borderWidth: 1,
+        borderColor: colors.gray + '40',
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        fontSize: 13,
+        color: colors.textPrimary,
+        backgroundColor: colors.surface,
+    },
+    addIngredientButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.primary,
+        borderRadius: 8,
+        paddingVertical: 10,
+        marginTop: 12,
+        gap: 6,
+    },
+    addIngredientButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#FFFFFF',
+    },
+    ingredientsList: {
+        marginTop: 16,
+    },
+    ingredientsListTitle: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: colors.textPrimary,
+        marginBottom: 12,
+    },
+    ingredientCard: {
+        backgroundColor: colors.cardBackground,
+        borderRadius: 10,
+        padding: 12,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: colors.gray + '20',
+    },
+    ingredientCardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 6,
+    },
+    ingredientCardName: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: colors.textPrimary,
+        flex: 1,
+    },
+    ingredientCardNutrition: {
+        marginTop: 4,
+    },
+    ingredientNutritionText: {
+        fontSize: 12,
+        color: colors.textSecondary,
+    },
+    calculatedTotalsCard: {
+        backgroundColor: colors.primary + '10',
+        borderRadius: 10,
+        padding: 14,
+        marginTop: 12,
+        borderWidth: 1,
+        borderColor: colors.primary + '30',
+    },
+    calculatedTotalsTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: colors.primary,
+        marginBottom: 10,
+    },
+    calculatedTotalsGrid: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    calculatedTotalItem: {
+        alignItems: 'center',
+    },
+    calculatedTotalLabel: {
+        fontSize: 12,
+        color: colors.textSecondary,
+        marginBottom: 4,
+    },
+    calculatedTotalValue: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: colors.textPrimary,
+    },
+    helperText: {
+        fontSize: 12,
+        color: colors.textSecondary,
+        marginTop: 6,
+        fontStyle: 'italic',
+    },
+    customRecipeActions: {
+        flexDirection: 'row',
+        gap: 12,
+        marginTop: 24,
+        marginBottom: 20,
+    },
+    customRecipeCancelButton: {
+        flex: 1,
+        paddingVertical: 14,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: colors.gray + '40',
+        backgroundColor: colors.cardBackground,
+        alignItems: 'center',
+    },
+    customRecipeCancelButtonText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: colors.textPrimary,
+    },
+    customRecipeAddButton: {
+        flex: 2,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 14,
+        borderRadius: 10,
+        backgroundColor: colors.primary,
+        gap: 8,
+    },
+    customRecipeAddButtonText: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#FFFFFF',
     },
     calProgressText: {
         flexDirection: 'row',
