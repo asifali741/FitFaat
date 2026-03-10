@@ -17,33 +17,17 @@ import {
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
 
 const specializations = [
-  'General Practice',
-  'Cardiology',
-  'Dermatology',
-  'Orthopedics',
-  'Neurology',
-  'Psychiatry',
-  'Pediatrics',
-  'Gynecology',
-  'Surgery',
-  'Dentistry',
-  'Physiotherapy',
   'Nutrition',
-  'Fitness Coaching',
-  'Other'
+  'Weight Loss',
+  'Weight Gain',
+  'Muscle Gain',
+  'Fitness Coaching'
 ];
 
 const domains = [
-  'Medical',
-  'Fitness',
   'Nutrition',
-  'Mental Health',
-  'Dental',
-  'Physiotherapy',
-  'Other'
+  'Fitness'
 ];
-
-const jobTypes = ['Full-time', 'Part-time', 'Contract', 'Freelance'];
 
 const consultationModes = ['In-person', 'Online', 'Phone'];
 
@@ -59,17 +43,11 @@ export default function DoctorRegistrationForm() {
     phoneNumber: '',
     gender: '',
     bio: '',
-    licenseNumber: '',
-    licenseAuthority: '',
-    registrationYear: new Date().getFullYear().toString(),
     yearsOfExperience: '',
     specialization: '',
     qualifications: '',
     university: '',
     domain: '',
-    jobType: '',
-    clinicName: '',
-    clinicAddress: '',
     consultationFee: '',
     consultationMode: [] as string[]
   });
@@ -95,8 +73,8 @@ export default function DoctorRegistrationForm() {
   const validateForm = () => {
     const requiredFields = [
       'firstName', 'lastName', 'phoneNumber', 'gender',
-      'licenseNumber', 'licenseAuthority', 'yearsOfExperience', 'specialization',
-      'qualifications', 'university', 'domain', 'jobType'
+      'yearsOfExperience', 'specialization',
+      'qualifications', 'university', 'domain'
     ];
 
     const missingFields = requiredFields.filter(field => !formData[field as keyof typeof formData]);
@@ -128,7 +106,6 @@ export default function DoctorRegistrationForm() {
         ...formData,
         gender: formData.gender as 'male' | 'female' | 'other',
         yearsOfExperience: parseInt(formData.yearsOfExperience),
-        registrationYear: parseInt(formData.registrationYear),
         consultationFee: formData.consultationFee ? parseFloat(formData.consultationFee) : 0,
         languages: ['English']
       });
@@ -287,48 +264,15 @@ export default function DoctorRegistrationForm() {
 
         {expandedSection === 'professional' && (
           <View style={styles.sectionContent}>
-            <Text style={styles.label}>License Number *</Text>
+            <Text style={styles.label}>Years of Experience *</Text>
             <TextInput
               style={styles.input}
-              placeholder="LIC123456"
-              value={formData.licenseNumber}
-              onChangeText={(value) => handleInputChange('licenseNumber', value)}
+              placeholder="5"
+              keyboardType="number-pad"
+              value={formData.yearsOfExperience}
+              onChangeText={(value) => handleInputChange('yearsOfExperience', value.replace(/[^0-9]/g, ''))}
               placeholderTextColor={colors.textSecondary}
             />
-
-            <Text style={styles.label}>License Authority *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Medical Board of State"
-              value={formData.licenseAuthority}
-              onChangeText={(value) => handleInputChange('licenseAuthority', value)}
-              placeholderTextColor={colors.textSecondary}
-            />
-
-            <View style={styles.row}>
-              <View style={styles.halfWidth}>
-                <Text style={styles.label}>Registration Year *</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder={new Date().getFullYear().toString()}
-                  keyboardType="number-pad"
-                  value={formData.registrationYear}
-                  onChangeText={(value) => handleInputChange('registrationYear', value.replace(/[^0-9]/g, ''))}
-                  placeholderTextColor={colors.textSecondary}
-                />
-              </View>
-              <View style={styles.halfWidth}>
-                <Text style={styles.label}>Years of Experience *</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="5"
-                  keyboardType="number-pad"
-                  value={formData.yearsOfExperience}
-                  onChangeText={(value) => handleInputChange('yearsOfExperience', value.replace(/[^0-9]/g, ''))}
-                  placeholderTextColor={colors.textSecondary}
-                />
-              </View>
-            </View>
 
             <Text style={styles.label}>Specialization *</Text>
             <ScrollView
@@ -416,31 +360,6 @@ export default function DoctorRegistrationForm() {
 
         {expandedSection === 'job' && (
           <View style={styles.sectionContent}>
-            <Text style={styles.label}>Job Type *</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.horizontalScroll}
-            >
-              {jobTypes.map(type => (
-                <TouchableOpacity
-                  key={type}
-                  style={[
-                    styles.tag,
-                    formData.jobType === type && styles.tagActive
-                  ]}
-                  onPress={() => handleInputChange('jobType', type)}
-                >
-                  <Text style={[
-                    styles.tagText,
-                    formData.jobType === type && styles.tagTextActive
-                  ]}>
-                    {type}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
             <Text style={styles.label}>Consultation Mode(s) *</Text>
             <View style={styles.checkboxContainer}>
               {consultationModes.map(mode => (
@@ -461,24 +380,6 @@ export default function DoctorRegistrationForm() {
                 </TouchableOpacity>
               ))}
             </View>
-
-            <Text style={styles.label}>Clinic Name</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Your Clinic Name"
-              value={formData.clinicName}
-              onChangeText={(value) => handleInputChange('clinicName', value)}
-              placeholderTextColor={colors.textSecondary}
-            />
-
-            <Text style={styles.label}>Clinic Address</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Full Address"
-              value={formData.clinicAddress}
-              onChangeText={(value) => handleInputChange('clinicAddress', value)}
-              placeholderTextColor={colors.textSecondary}
-            />
 
             <Text style={styles.label}>Consultation Fee ($)</Text>
             <TextInput
