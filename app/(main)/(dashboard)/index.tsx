@@ -1,8 +1,10 @@
 import AppHeader from "@/components/AppHeader";
 import NewsModalPopup from "@/components/NewsModalPopup";
 import PatientDietPlanViewer from "@/components/PatientDietPlanViewer";
+import StreakDisplay from "@/components/StreakDisplay";
 import { useNews } from "@/contexts/NewsContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import useStreak from "@/hooks/useStreak";
 import { dailyLogsApi } from "@/utils/dailyLogsApi";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from '@expo/vector-icons';
@@ -67,16 +69,25 @@ export default function DayPlan () {
   const [JsonResponse, setJsonResponse] = useState<null|jsonResponse>(null);
   const [showNewsModal, setShowNewsModal] = useState(false);
   const [showDietPlanViewer, setShowDietPlanViewer] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   const hasCheckedForNewCycle = useRef(false);
+  
+  // Fetch streak data
+  const { streak, loading: streakLoading, refetchStreak } = useStreak(userId);
 
   //Get Data from API or Local Storage
   useEffect( () => { 
     const fetchData = async () => {
     console.log("Fetching Day Data...");  //JsonResponse recieved here
     
+    // Get user info first to set userId for streak
+    const user = await tokenStorage.getUser();
+    if (user && user.id) {
+      setUserId(user.id);
+    }
+    
     // First check if our local weeklyTrackingId matches the user's current one
     const storedWeeklyId = await AsyncStorage.getItem('weeklyTrackingId');
-    const user = await tokenStorage.getUser();
     const userWeeklyId = user?.weeklyTrackingId;
     
     console.log('📋 Stored weeklyTrackingId:', storedWeeklyId);
@@ -124,6 +135,14 @@ export default function DayPlan () {
     
     checkForCycleChange();
   }, [JsonResponse]);
+
+  // Refetch streak when JsonResponse changes (meal added)
+  useEffect(() => {
+    if (JsonResponse && userId) {
+      // Refetch streak data when a meal is added
+      refetchStreak();
+    }
+  }, [JsonResponse, userId]);
 
   // Check and create new cycle if needed
   const checkAndCreateNewCycle = async () => {
@@ -302,6 +321,18 @@ export default function DayPlan () {
           showsHorizontalScrollIndicator={false}
           scrollEventThrottle={16}
         >
+          {/* Streak Display Component */}
+          {streak && (
+            <StreakDisplay
+              streakCount={streak.streakCount}
+              longestStreak={streak.longestStreak}
+              message={streak.message}
+              streakPercentage={streak.streakPercentage}
+              shouldSendReminder={streak.shouldSendReminder}
+              loading={streakLoading}
+            />
+          )}
+          
           {
             //calling 7 <Day> components with jsonResponse useState data
             daysArray.map((dayData, index) => (
