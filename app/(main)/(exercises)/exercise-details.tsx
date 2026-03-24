@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { ScrollView, Text, TouchableOpacity, View, StyleSheet } from "react-native";
+import { ScrollView, Text, TouchableOpacity, View, StyleSheet, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -11,6 +11,8 @@ import {
   widthPercentageToDP as wp,
 } from "react-native-responsive-screen";
 import { useTheme } from "@/contexts/ThemeContext";
+import { exerciseApi } from "@/utils/exerciseApi";
+import { tokenStorage } from "@/utils/auth/tokenStorage";
 
 export default function ExerciseDetails() {
   const { colors } = useTheme();
@@ -18,6 +20,12 @@ export default function ExerciseDetails() {
   const navigation = useNavigation();
   const { exercise } = useLocalSearchParams();
   const [isFavorite, setIsFavorite] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [isFinishing, setIsFinishing] = useState(false);
+  const [timerSeconds, setTimerSeconds] = useState(0);
+  const [isRunning, setIsRunning] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [totalTime, setTotalTime] = useState(0);
 
   const handleBackPress = () => {
     // Use React Navigation's goBack for proper navigation stack handling
@@ -35,11 +43,50 @@ export default function ExerciseDetails() {
   // Reset state when component mounts or exercise changes
   useEffect(() => {
     setIsFavorite(false); // Reset state first
+    setTimerSeconds(0);   // Reset timer
+    setTotalTime(0);      // Reset total time
+    setIsRunning(false);  // Stop running
+    setIsPaused(false);   // Reset pause state
+    setIsFinishing(false); // Reset finishing state
+    
     if (exerciseData) {
       console.log('Exercise changed, checking favorite status for:', exerciseData.name);
       checkFavoriteStatus();
     }
   }, [exercise]); // Changed dependency from exerciseData to exercise parameter
+
+  // Fetch userId from tokenStorage
+  useEffect(() => {
+    const fetchUserId = async () => {
+      try {
+        const user = await tokenStorage.getUser();
+        if (user && user.id) {
+          setUserId(user.id);
+          console.log('UserId fetched:', user.id);
+        }
+      } catch (error) {
+        console.error('Error fetching userId:', error);
+      }
+    };
+    
+    fetchUserId();
+  }, []);
+
+  // Timer interval effect
+  useEffect(() => {
+    let interval: any;
+    
+    if (isRunning && !isPaused) {
+      interval = setInterval(() => {
+        setTimerSeconds(prev => prev + 1);
+        setTotalTime(prev => prev + 1);
+      }, 1000);
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isRunning, isPaused]);
 
   const checkFavoriteStatus = async () => {
     try {
@@ -89,6 +136,78 @@ export default function ExerciseDetails() {
       setIsFavorite(!isFavorite);
     } catch (error) {
       console.error('Error toggling favorite:', error);
+    }
+  };
+
+  // Timer functions
+  const handleStartTimer = () => {
+    setIsRunning(true);
+    setIsPaused(false);
+  };
+
+  const handlePauseTimer = () => {
+    setIsPaused(!isPaused);
+  };
+
+  const handleStopTimer = () => {
+    setIsRunning(false);
+    setIsPaused(false);
+    setTimerSeconds(0);
+  };
+
+  // Format seconds to MM:SS
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Handle finish exercise - save to backend
+  const handleFinishExercise = async () => {
+    if (!userId) {
+      Alert.alert('Error', 'User ID not found. Please log in again.');
+      return;
+    }
+
+    if (totalTime === 0) {
+      Alert.alert('No Time', 'Please exercise for at least a few seconds before finishing.');
+      return;
+    }
+
+    setIsFinishing(true);
+    try {
+      const response = await exerciseApi.finishExercise(
+        userId,
+        exerciseData.name,
+        totalTime
+      );
+
+      if (response.success) {
+        Alert.alert(
+          'Success! 🎉',
+          `Exercise "${exerciseData.name}" saved!\nDuration: ${formatTime(totalTime)}`,
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Reset timer after success
+                setTimerSeconds(0);
+                setTotalTime(0);
+                setIsRunning(false);
+                setIsPaused(false);
+              }
+            }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Error finishing exercise:', error);
+      Alert.alert(
+        'Error',
+        'Failed to save exercise. Please try again.'
+      );
+    } finally {
+      setIsFinishing(false);
     }
   };
 
@@ -261,6 +380,181 @@ export default function ExerciseDetails() {
             </Text>
           ))}
         </View>
+
+        {/* Timer Section */}
+        <View style={{
+          backgroundColor: colors.cardBackground,
+          margin: hp(2),
+          borderRadius: hp(2),
+          padding: hp(2),
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 3,
+        }}>
+          {/* Timer Display */}
+          <View style={{
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginBottom: hp(3),
+          }}>
+            <Text style={{
+              fontSize: hp(2),
+              color: colors.textSecondary,
+              marginBottom: hp(1),
+              fontWeight: '600',
+            }}>
+              {isRunning ? (isPaused ? 'Paused' : 'Running') : 'Exercise Timer'}
+            </Text>
+            <View style={{
+              backgroundColor: colors.screenColor,
+              borderRadius: hp(2),
+              paddingVertical: hp(2),
+              paddingHorizontal: hp(3),
+              marginBottom: hp(2),
+            }}>
+              <Text style={{
+                fontSize: hp(5),
+                fontWeight: 'bold',
+                color: colors.primary,
+                textAlign: 'center',
+              }}>
+                {formatTime(timerSeconds)}
+              </Text>
+            </View>
+
+            {/* Total Time Display */}
+            {totalTime > 0 && (
+              <Text style={{
+                fontSize: hp(1.8),
+                color: colors.textSecondary,
+                fontWeight: '500',
+              }}>
+                Total: {formatTime(totalTime)}
+              </Text>
+            )}
+          </View>
+
+          {/* Timer Control Buttons */}
+          <View style={{
+            flexDirection: 'row',
+            justifyContent: 'space-around',
+            alignItems: 'center',
+            gap: wp(3),
+          }}>
+            {/* Start Button */}
+            <TouchableOpacity
+              style={{
+                flex: 1,
+                backgroundColor: !isRunning ? colors.primary : colors.textSecondary,
+                paddingVertical: hp(1.5),
+                borderRadius: hp(1.5),
+                justifyContent: 'center',
+                alignItems: 'center',
+                opacity: isRunning ? 0.5 : 1,
+              }}
+              onPress={handleStartTimer}
+              disabled={isRunning}
+            >
+              <Text style={{
+                color: colors.white,
+                fontSize: hp(2),
+                fontWeight: 'bold',
+              }}>
+                ▶ Start
+              </Text>
+            </TouchableOpacity>
+
+            {/* Pause Button */}
+            <TouchableOpacity
+              style={{
+                flex: 1,
+                backgroundColor: isRunning ? colors.warning : colors.textSecondary,
+                paddingVertical: hp(1.5),
+                borderRadius: hp(1.5),
+                justifyContent: 'center',
+                alignItems: 'center',
+                opacity: !isRunning ? 0.5 : 1,
+              }}
+              onPress={handlePauseTimer}
+              disabled={!isRunning}
+            >
+              <Text style={{
+                color: colors.white,
+                fontSize: hp(2),
+                fontWeight: 'bold',
+              }}>
+                {isPaused ? '▶ Resume' : '⏸ Pause'}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Stop Button */}
+            <TouchableOpacity
+              style={{
+                flex: 1,
+                backgroundColor: isRunning || timerSeconds > 0 ? colors.error : colors.textSecondary,
+                paddingVertical: hp(1.5),
+                borderRadius: hp(1.5),
+                justifyContent: 'center',
+                alignItems: 'center',
+                opacity: (isRunning || timerSeconds > 0) ? 1 : 0.5,
+              }}
+              onPress={handleStopTimer}
+              disabled={!isRunning && timerSeconds === 0}
+            >
+              <Text style={{
+                color: colors.white,
+                fontSize: hp(2),
+                fontWeight: 'bold',
+              }}>
+                ⏹ Stop
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Finish Exercise Button */}
+        {totalTime > 0 && (
+          <View style={{
+            alignItems: 'center',
+            marginHorizontal: hp(2),
+            marginVertical: hp(1),
+          }}>
+            <TouchableOpacity
+              style={{
+                backgroundColor: colors.success || '#4CAF50',
+                paddingHorizontal: wp(8),
+                paddingVertical: hp(2),
+                borderRadius: hp(2.5),
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 3 },
+                shadowOpacity: 0.3,
+                shadowRadius: 5,
+                elevation: 6,
+                flexDirection: 'row',
+                alignItems: 'center',
+                opacity: isFinishing ? 0.7 : 1,
+              }}
+              onPress={handleFinishExercise}
+              disabled={isFinishing}
+            >
+              <Text style={{
+                fontSize: hp(2.5),
+                marginRight: wp(2),
+              }}>
+                ✓
+              </Text>
+              <Text style={{
+                color: colors.white,
+                fontSize: hp(2.2),
+                fontWeight: 'bold',
+              }}>
+                {isFinishing ? 'Saving...' : 'Finish Exercise'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Favorite Button */}
         <View style={{
