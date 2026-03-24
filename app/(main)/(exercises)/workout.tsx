@@ -7,8 +7,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import Constants from 'expo-constants';
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
-import { Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useState, useMemo } from "react";
+import { Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import {
   heightPercentageToDP as hp,
   widthPercentageToDP as wp,
@@ -24,6 +24,7 @@ export default function WorkoutScreen() {
   const [isPremium, setIsPremium] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   console.log('🎬 WorkoutScreen rendered. Loading:', loading, 'isPremium:', isPremium);
 
@@ -111,6 +112,19 @@ export default function WorkoutScreen() {
       setFavoritesCount(0);
     }
   };
+
+  // Filter body parts based on search query
+  const filteredBodyParts = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return MainImages;
+    }
+    
+    const query = searchQuery.toLowerCase().trim();
+    return MainImages.filter(item => 
+      item.name.toLowerCase().includes(query) ||
+      (item.description && item.description.toLowerCase().includes(query))
+    );
+  }, [searchQuery]);
 
   const handleFavoritesPress = () => {
     console.log('Opening favorites list');
@@ -264,25 +278,53 @@ export default function WorkoutScreen() {
               Choose Your Focus
             </Text>
 
-            <View style={styles.bodyPartsGrid}>
-              {MainImages.map((item, index) => (
-                <TouchableOpacity
-                  key={index}
-                  onPress={() => handleBodyPartPress(item)}
-                  style={styles.bodyPartCard}
-                >
-                  <Text style={styles.bodyPartEmoji}>
-                    {item.emoji}
-                  </Text>
-                  <Text style={styles.bodyPartName}>
-                    {item?.name}
-                  </Text>
-                  <Text style={styles.bodyPartDescription}>
-                    {item?.description}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+            {/* Search Bar */}
+            <View style={{ paddingHorizontal: wp(4), marginVertical: hp(2) }}>
+              <View style={[styles.searchContainer, { backgroundColor: colors.cardBackground }]}>
+                <Ionicons name="search" size={20} color={colors.textSecondary} style={{ marginRight: wp(2) }} />
+                <TextInput
+                  style={[styles.searchInput, { color: colors.textPrimary }]}
+                  placeholder="Search body parts..."
+                  placeholderTextColor={colors.textSecondary}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+                {searchQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => setSearchQuery('')}>
+                    <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
+
+            {/* Body Parts Grid */}
+            {filteredBodyParts.length === 0 ? (
+              <View style={styles.noResultsContainer}>
+                <Ionicons name="body" size={48} color={colors.textSecondary} style={{ marginBottom: hp(2) }} />
+                <Text style={styles.noResultsText}>No body parts found</Text>
+                <Text style={styles.noResultsSubtext}>Try different keywords</Text>
+              </View>
+            ) : (
+              <View style={styles.bodyPartsGrid}>
+                {filteredBodyParts.map((item, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    onPress={() => handleBodyPartPress(item)}
+                    style={styles.bodyPartCard}
+                  >
+                    <Text style={styles.bodyPartEmoji}>
+                      {item.emoji}
+                    </Text>
+                    <Text style={styles.bodyPartName}>
+                      {item?.name}
+                    </Text>
+                    <Text style={styles.bodyPartDescription}>
+                      {item?.description}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </View>
 
           {/* Premium Features */}
@@ -603,5 +645,42 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontSize: hp(1.9),
     fontWeight: '600',
     color: '#666',
+  },
+  // Search Bar Styles
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: hp(2.5),
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: Math.min(hp(1.8), wp(4.5)),
+    marginLeft: wp(2),
+    paddingVertical: hp(0.8),
+  },
+  noResultsContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: hp(8),
+    paddingHorizontal: wp(5),
+  },
+  noResultsText: {
+    fontSize: Math.min(hp(2.2), wp(5.5)),
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: hp(1),
+  },
+  noResultsSubtext: {
+    fontSize: Math.min(hp(1.6), wp(4)),
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
 });
