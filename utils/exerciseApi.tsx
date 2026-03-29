@@ -27,9 +27,10 @@ export const exerciseApi = {
     const url = `${API_BASE_URL}/finish`;
     const body = { userId, exerciseName, durationSeconds };
     
-    console.log('\n🚀 finishExercise()');
+    console.log('\n🏃 [finishExercise]');
     console.log('   URL:', url);
-    console.log('   Body:', JSON.stringify(body));
+    console.log('   Exercise:', exerciseName);
+    console.log('   Duration:', durationSeconds, 'seconds');
     
     try {
       const controller = new AbortController();
@@ -43,12 +44,9 @@ export const exerciseApi = {
       });
 
       clearTimeout(timeoutId);
-
-      console.log('   ↩️  Status:', response.status, response.statusText);
+      console.log('   Status:', response.status);
 
       const responseText = await response.text();
-      console.log('   📦 Body:', responseText || '[empty]');
-
       if (!responseText) {
         if (response.ok) {
           return {
@@ -57,7 +55,7 @@ export const exerciseApi = {
             data: { exerciseName, duration: durationSeconds }
           };
         } else {
-          throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+          throw new Error(`Server returned ${response.status}`);
         }
       }
 
@@ -65,15 +63,21 @@ export const exerciseApi = {
       if (!response.ok) {
         throw new Error(data.message || `Status ${response.status}`);
       }
+      
+      // Log calories data if available
+      if (data.data?.calorieData) {
+        console.log('   📊 Calories Burned:', data.data.calorieData.calories, 'kcal');
+        console.log('   🔥 Fat Burn:', data.data.calorieData.fatBurnGrams, 'grams');
+        console.log('   💪 Intensity:', data.data.calorieData.intensity);
+        console.log('   Message:', data.data.motivationalMessage);
+      }
+      
       return data;
     } catch (error: any) {
-      console.error('\n❌ finishExercise() Error');
-      console.error('   Type:', error.name);
-      console.error('   Message:', error.message);
-      console.error('   URL attempted:', url);
+      console.error('\n❌ [finishExercise] Error:', error.message);
       
       if (error.name === 'AbortError') {
-        throw new Error(`Timeout - Backend not responding at ${url}`);
+        throw new Error('Request timeout - Backend not responding');
       }
       throw error;
     }
