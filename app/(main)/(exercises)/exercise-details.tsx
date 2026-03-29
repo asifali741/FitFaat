@@ -183,22 +183,32 @@ export default function ExerciseDetails() {
       );
 
       if (response.success) {
-        Alert.alert(
-          'Success! 🎉',
-          `Exercise "${exerciseData.name}" saved!\nDuration: ${formatTime(totalTime)}`,
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                // Reset timer after success
-                setTimerSeconds(0);
-                setTotalTime(0);
-                setIsRunning(false);
-                setIsPaused(false);
-              }
+        // Build success message with calorie info
+        let successMessage = `Exercise "${exerciseData.name}" saved!\n`;
+        successMessage += `⏱️  Duration: ${formatTime(totalTime)}\n`;
+
+        if (response.data?.calorieData) {
+          successMessage += `\n🔥 Calories Burned: ${response.data.calorieData.calories} kcal\n`;
+          successMessage += `💪 Fat Burned: ~${response.data.calorieData.fatBurnGrams}g\n`;
+          successMessage += `📊 Intensity: ${response.data.calorieData.intensity}\n`;
+        }
+
+        if (response.data?.motivationalMessage) {
+          successMessage += `\n${response.data.motivationalMessage}`;
+        }
+
+        Alert.alert('Success! 🎉', successMessage, [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Reset timer after success
+              setTimerSeconds(0);
+              setTotalTime(0);
+              setIsRunning(false);
+              setIsPaused(false);
             }
-          ]
-        );
+          }
+        ]);
       }
     } catch (error) {
       console.error('Error finishing exercise:', error);
@@ -426,13 +436,27 @@ export default function ExerciseDetails() {
 
             {/* Total Time Display */}
             {totalTime > 0 && (
-              <Text style={{
-                fontSize: hp(1.8),
-                color: colors.textSecondary,
-                fontWeight: '500',
-              }}>
-                Total: {formatTime(totalTime)}
-              </Text>
+              <View style={{ marginBottom: hp(2) }}>
+                <Text style={{
+                  fontSize: hp(1.8),
+                  color: colors.textSecondary,
+                  fontWeight: '500',
+                  marginBottom: hp(1),
+                }}>
+                  Total: {formatTime(totalTime)}
+                </Text>
+                {/* Estimated Calories Display */}
+                {exerciseData && (
+                  <Text style={{
+                    fontSize: hp(1.6),
+                    color: colors.primary,
+                    fontWeight: '600',
+                    marginTop: hp(1),
+                  }}>
+                    💪 Exercise tracked - Calories will be calculated
+                  </Text>
+                )}
+              </View>
             )}
           </View>
 
