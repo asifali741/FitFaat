@@ -64,16 +64,13 @@ export default {
       eas: {
         projectId: "0dcfb6cf-6803-4ec4-bda1-a6c442b19fb1"
       },
-      OPENROUTER_API_KEY: "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",
-      EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_ZW1lcmdpbmctcGVnYXN1cy0xMi5jbGVyay5hY2NvdW50cy5kZXYk",
-     
-      EXPO_PUBLIC_BACKEND_API_URL: "http://10.0.2.2:5001/api", 
-      // EXPO_PUBLIC_BACKEND_API_URL: "http://192.168.1.7:5001/api",
-      // EXPO_PUBLIC_BACKEND_API_URL: "https://fitfaatbackend-production.up.railway.app/api",
-      EXPO_PUBLIC_STRIPE_PK: "pk_test_51SUbhkPoREsUsXRD7Hecf6utdE2VWt89DHykcnNEWfaShrdc3kraUeoWEQhsBt9IjM4cv5R3F6WZE0OHhROByqnk00jLCklYPq",
-      CLARIFAI_API_KEY: "2f0a0971e7164e52a7b005edf6798976",
-      Email: "sohail.shafiq002@gmail.com",
-      EmailPassword: "iiqo qzyw mmgh pvjz"
+      EXPO_PUBLIC_BACKEND_API_URL: process.env.EXPO_PUBLIC_BACKEND_API_URL, 
+      EXPO_PUBLIC_STRIPE_PK: process.env.EXPO_PUBLIC_STRIPE_PK,
+      CLARIFAI_API_KEY: process.env.CLARIFAI_API_KEY,
+      Email: process.env.Email,
+      EmailPassword: process.env.EmailPassword,
+      EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY,
+      OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
     },
   },
 };

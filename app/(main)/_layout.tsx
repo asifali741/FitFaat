@@ -1,3 +1,4 @@
+console.log("TOP OF FILE")
 import { DrawerSceneWrapper } from "@/components/CustomDrawerLayout";
 import { theme } from "@/constants/theme";
 import { AppointmentProvider } from "@/contexts/AppointmentContext";
@@ -11,7 +12,7 @@ import Constants from "expo-constants";
 import { useRouter } from "expo-router";
 import { Drawer } from "expo-router/drawer";
 import { useEffect, useMemo, useState } from "react";
-import { Platform, StyleSheet } from "react-native";
+import { StyleSheet } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 type DrawerSceneWrapperProps = DrawerContentComponentProps;
 
@@ -56,7 +57,7 @@ export default function MainLayout() {
             const token = await tokenStorage.getToken();
             if (token) {
               const ENV = Constants.expoConfig?.extra;
-              const API_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')).replace(/\/api\/?$/, '');
+              const API_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL /*|| (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')*/).replace(/\/api\/?$/, '');
               const response = await fetch(`${API_URL}/api/payment/premium-status`, {
                 method: 'GET',
                 headers: {
