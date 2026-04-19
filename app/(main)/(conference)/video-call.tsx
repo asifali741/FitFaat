@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { ONE_ON_ONE_VIDEO_CALL_CONFIG, ZegoUIKitPrebuiltCall } from '@zegocloud/zego-uikit-prebuilt-call-rn';
 import Constants from 'expo-constants';
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as SecureStore from 'expo-secure-store';
@@ -8,29 +9,13 @@ import { Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native
 import { SafeAreaView } from "react-native-safe-area-context";
 import { io } from 'socket.io-client';
 
-// Twilio Video will be used instead of ZegoCloud
-const isZegoAvailable = false; // Disabled - using Twilio Video
 
-/* COMMENTED OUT - REPLACED WITH TWILIO VIDEO
-// Conditionally import Zego only on platforms that support it
-let ZegoUIKitPrebuiltCall: any = null;
-let ONE_ON_ONE_VIDEO_CALL_CONFIG: any = null;
-let isZegoAvailable = false;
+// Conditionally import Zego for video calls
+let isZegoAvailable = true;
 
-try {
-  const ZegoModule = require('@zegocloud/zego-uikit-prebuilt-call-rn');
-  ZegoUIKitPrebuiltCall = ZegoModule.default;
-  ONE_ON_ONE_VIDEO_CALL_CONFIG = ZegoModule.ONE_ON_ONE_VIDEO_CALL_CONFIG;
-  isZegoAvailable = true;
-} catch (error) {
-  console.warn('Zego SDK not available - using demo mode for Expo Go');
-  isZegoAvailable = false;
-}
-
-// ZegoCloud credentials
-const APP_ID = parseInt('96ec17b2e9a1f1c54b8c6653fa691ab4', 16);
-const APP_SIGN = "96ec17b2e9a1f1c54b8c6653fa691ab4f7bf1f47e6b589ef4d1159784da7b5db";
-END COMMENTED OUT */
+// ZegoCloud credentials - get from environment or constants
+const APP_ID = Number(process.env.EXPO_PUBLIC_ZEGO_APP_ID || 123456789);
+const APP_SIGN = process.env.EXPO_PUBLIC_ZEGO_APP_SIGN;
 
 export default function VideoCallScreen() {
   const router = useRouter();
@@ -226,209 +211,77 @@ export default function VideoCallScreen() {
     }
   };
 
-  // If Zego SDK is not available (Expo Go), show demo video call UI
-  if (!isZegoAvailable) {
+  // Real Zego video call (for native development builds)
+  if (isZegoAvailable && ZegoUIKitPrebuiltCall) {
     return (
-      <SafeAreaView style={styles.demoContainer}>
-        <View style={styles.remoteVideoContainer}>
-          <View style={styles.demoVideoPlaceholder}>
-            <Ionicons name="person" size={80} color="#fff" />
-            <Text style={styles.remoteUserName}>{displayName}</Text>
-            <Text style={styles.callStatus}>Connected</Text>
-          </View>
+      <SafeAreaView style={styles.container}>
+        <ZegoUIKitPrebuiltCall
+          appID={APP_ID}
+          appSign={APP_SIGN}
+          userID={userID}
+          userName={displayName}
+          callID={roomId}
           
-          <View style={styles.durationBadge}>
-            <Text style={styles.durationText}>{formatDuration(callDuration)}</Text>
-          </View>
-        </View>
-
-        <View style={styles.localVideoContainer}>
-          <View style={styles.localVideoPlaceholder}>
-            <Ionicons name="person-circle" size={60} color="#fff" />
-            <Text style={{color: '#fff', fontSize: 10, marginTop: 4}}>Your Video</Text>
-            {isVideoOff && (
-              <View style={styles.videoOffOverlay}>
-                <Ionicons name="videocam-off" size={24} color="#fff" />
-              </View>
-            )}
-          </View>
-        </View>
-
-        <View style={styles.demoBanner}>
-          <Ionicons name="information-circle" size={20} color="#FFB800" />
-          <Text style={styles.demoText}>Demo Mode (Expo Go)</Text>
-        </View>
-
-        <View style={styles.controlsContainer}>
-          <TouchableOpacity
-            style={[styles.controlButton, isMuted && styles.controlButtonActive]}
-            onPress={() => setIsMuted(!isMuted)}
-          >
-            <Ionicons 
-              name={isMuted ? "mic-off" : "mic"} 
-              size={28} 
-              color="#fff" 
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.controlButton, isVideoOff && styles.controlButtonActive]}
-            onPress={() => setIsVideoOff(!isVideoOff)}
-          >
-            <Ionicons 
-              name={isVideoOff ? "videocam-off" : "videocam"} 
-              size={28} 
-              color="#fff" 
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.endCallButton}
-            onPress={handleCallEnd}
-          >
-            <Ionicons name="call" size={32} color="#fff" />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.controlButton, isSpeakerOn && styles.controlButtonActive]}
-            onPress={() => setIsSpeakerOn(!isSpeakerOn)}
-          >
-            <Ionicons 
-              name={isSpeakerOn ? "volume-high" : "volume-mute"} 
-              size={28} 
-              color="#fff" 
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.controlButton}
-            onPress={() => setFacing(current => current === 'front' ? 'back' : 'front')}
-          >
-            <Ionicons name="camera-reverse" size={28} color="#fff" />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.instructionsContainer}>
-          <Text style={styles.instructionsTitle}>✨ Testing in Expo Go</Text>
-          <Text style={styles.instructionsText}>
-            ⚠️ Expo Go doesn't support real video calls.
-            To see both users' video with WebRTC:
-          </Text>
-          <Text style={styles.instructionsCode}>npx expo run:android</Text>
-          <Text style={styles.instructionsCode}>npx expo run:ios</Text>
-        </View>
+          config={{
+            ...ONE_ON_ONE_VIDEO_CALL_CONFIG,
+            onCallEnd: handleCallEnd,
+            
+            bottomMenuBarConfig: {
+              buttons: [
+                'toggleCameraButton',
+                'toggleMicrophoneButton',
+                'hangUpButton',
+                'switchCameraButton',
+              ],
+            },
+            
+            turnOnCameraWhenJoining: true,
+            turnOnMicrophoneWhenJoining: true,
+            useSpeakerWhenJoining: true,
+            
+            layout: {
+              mode: 'pictureInPicture',
+              config: {
+                switchLargeOrSmallViewByClick: true,
+              },
+            },
+          }}
+        />
       </SafeAreaView>
     );
   }
 
-  /* COMMENTED OUT - REPLACED WITH TWILIO VIDEO
-  // Real Zego video call (for development builds)
-  return (
-    <SafeAreaView style={styles.container}>
-      <ZegoUIKitPrebuiltCall
-        appID={APP_ID}
-        appSign={APP_SIGN}
-        userID={userID}
-        userName={displayName}
-        callID={roomId}
-        
-        config={{
-          ...ONE_ON_ONE_VIDEO_CALL_CONFIG,
-          onCallEnd: handleCallEnd,
-          
-          bottomMenuBarConfig: {
-            buttons: [
-              'toggleCameraButton',
-              'toggleMicrophoneButton',
-              'hangUpButton',
-              'switchCameraButton',
-            ],
-          },
-          
-          turnOnCameraWhenJoining: true,
-          turnOnMicrophoneWhenJoining: true,
-          useSpeakerWhenJoining: true,
-          
-          layout: {
-            mode: 'pictureInPicture',
-            config: {
-              switchLargeOrSmallViewByClick: true,
-            },
-          },
-        }}
-      />
-    </SafeAreaView>
-  );
-  END COMMENTED OUT */
-
-  // TODO: Implement Twilio Video for mobile app
-  // For now, showing audio-only call interface
+  // Fallback: If Zego SDK is not available (Expo Go), show error message
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.demoContainer}>
         {/* Header */}
         <View style={styles.headerContainer}>
-          <Text style={styles.headerText}>Voice Call Active</Text>
-          <Text style={styles.subHeaderText}>Connected with {displayName || "Doctor"}</Text>
+          <Text style={styles.headerText}>Video Call Not Supported</Text>
+          <Text style={styles.subHeaderText}>Native build required for video calls</Text>
         </View>
 
-        {/* Call Duration */}
-        <View style={styles.callInfoContainer}>
-          <View style={styles.timerContainer}>
-            <Ionicons name="time-outline" size={20} color="#4CAF50" />
-            <Text style={styles.timerText}>{formatDuration(callDuration)}</Text>
-          </View>
-        </View>
-
-        {/* Doctor Avatar/Placeholder */}
-        <View style={styles.avatarContainer}>
-          <View style={styles.avatarCircle}>
-            <Ionicons name="person" size={80} color="#fff" />
-          </View>
-          <Text style={styles.doctorName}>{displayName || "Doctor"}</Text>
-          <Text style={styles.connectionStatus}>Audio Connected</Text>
-        </View>
-
-        {/* Video Note */}
-        <View style={styles.videoNoteContainer}>
-          <Ionicons name="videocam-off" size={24} color="#FFB800" />
-          <Text style={styles.videoNoteText}>
-            Video calls require web browser for doctors.{'\n'}
-            Audio conversation is active.
+        {/* Error Message */}
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={80} color="#FF6B6B" />
+          <Text style={styles.errorTitle}>Build Required</Text>
+          <Text style={styles.errorMessage}>
+            Zego Cloud SDK requires a native build. Expo Go cannot support video calling.
           </Text>
+          <Text style={styles.errorSubText}>
+            Run one of these commands to create a native build:
+          </Text>
+          <Text style={styles.commandCode}>npx expo run:android</Text>
+          <Text style={styles.commandCode}>npx expo run:ios</Text>
         </View>
 
-        {/* Controls */}
-        <View style={styles.controlsContainer}>
-          <TouchableOpacity
-            style={[styles.controlButton, isMuted && styles.controlButtonActive]}
-            onPress={() => setIsMuted(!isMuted)}
-          >
-            <Ionicons 
-              name={isMuted ? "micoff" : "mic"} 
-              size={24} 
-              color={isMuted ? "#fff" : "#4CAF50"} 
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.endCallButton}
-            onPress={handleCallEnd}
-          >
-            <Ionicons name="call" size={28} color="#fff" />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.controlButton}
-            onPress={() => setIsSpeakerOn(!isSpeakerOn)}
-          >
-            <Ionicons 
-              name={isSpeakerOn ? "volume-high" : "volume-low"} 
-              size={24} 
-              color="#4CAF50" 
-            />
-          </TouchableOpacity>
-        </View>
+        {/* End Call Button */}
+        <TouchableOpacity
+          style={styles.endCallButton}
+          onPress={handleCallEnd}
+        >
+          <Ionicons name="call" size={32} color="#fff" />
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -658,5 +511,43 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     marginTop: 4,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 40,
+  },
+  errorTitle: {
+    color: '#FF6B6B',
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginTop: 20,
+    marginBottom: 16,
+  },
+  errorMessage: {
+    color: '#ccc',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 24,
+  },
+  errorSubText: {
+    color: '#999',
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  commandCode: {
+    color: '#4CAF50',
+    fontSize: 13,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    marginVertical: 6,
+    overflow: 'hidden',
   },
 });
