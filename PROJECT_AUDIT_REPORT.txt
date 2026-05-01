@@ -7,7 +7,7 @@ Framework: Expo (SDK 54), React Native 0.81, React 19
 1. SECURITY ISSUES
 ------------------
 [CRITICAL] Hardcoded Secrets and API Keys
-- Issue: Sensitive API keys (Clerk, Stripe, Clarifai, OpenRouter, Zego) are hardcoded in `utils/config.ts` and `app.config.js`.
+- Issue: Sensitive API keys (Stripe, Clarifai, OpenRouter, Zego) are hardcoded in `utils/config.ts` and `app.config.js`.
 - Risk: These keys are included in the JS bundle and can be extracted by anyone.
 - Priority: Critical
 - Fix: Use a `.env` file and `EXPO_PUBLIC_` environment variables.

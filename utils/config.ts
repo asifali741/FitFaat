@@ -13,7 +13,6 @@ import Constants from "expo-constants";
 const FALLBACKS: Record<string, string> = {
   EXPO_PUBLIC_BACKEND_API_URL: "",
   EXPO_PUBLIC_STRIPE_PK: "",
-  EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_aGFyZHktY2F0dGxlLTMuY2xlcmsuYWNjb3VudHMuZGV2JA",
   CLARIFAI_API_KEY: "",
   OPENROUTER_API_KEY: "",
   ZEGO_APP_ID: "",
@@ -49,13 +48,6 @@ export function getBackendUrl(): string {
  */
 export function getBackendBaseUrl(): string {
   return getBackendUrl().replace(/\/api\/?$/, "");
-}
-
-/**
- * Get the Clerk publishable key, guaranteed to return a valid string.
- */
-export function getClerkPublishableKey(): string {
-  return getConfigValue("EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY");
 }
 
 /**

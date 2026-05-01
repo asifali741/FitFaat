@@ -3,7 +3,6 @@ import { ScreenSceneWrapper } from "@/components/common/ScreenTiltAnimation";
 import { authApi } from "@/utils/auth/authApi";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
-import { useUser } from "@clerk/clerk-expo";
 import Constants from "expo-constants";
 import { useRouter, useFocusEffect } from "expo-router";
 import * as SecureStore from 'expo-secure-store';
@@ -34,15 +33,8 @@ const getAPIURL = () => {
 
 const API_URL = getAPIURL();
 
-const getClerkDisplayName = (clerkUser: any) => {
-  const fullName = clerkUser?.fullName?.trim?.();
-  const nameParts = [clerkUser?.firstName, clerkUser?.lastName].filter(Boolean).join(' ').trim();
-  const emailName = clerkUser?.primaryEmailAddress?.emailAddress?.split('@')?.[0];
-
-  return fullName || nameParts || clerkUser?.username || emailName || 'User';
-};
-
 const getStoredDisplayName = (storedUser: any) => (
+  storedUser?.userInfo?.name ||
   storedUser?.username ||
   storedUser?.name ||
   storedUser?.fullName ||
@@ -271,7 +263,6 @@ export default function ProfileScreen() {
   const { colors, isDarkMode } = useTheme();
   const styles = getStyles(colors);
   const router = useRouter();
-  const { user: clerkUser, isLoaded: isClerkLoaded } = useUser();
   const [selectedTab, setSelectedTab] = useState('overview');
   const [user, setUser] = useState<any>(null);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
@@ -285,29 +276,13 @@ export default function ProfileScreen() {
   const [showHealthRecords, setShowHealthRecords] = useState(false);
   const [healthRecords, setHealthRecords] = useState<HealthRecordSummary | null>(null);
   const [healthRecordsLoading, setHealthRecordsLoading] = useState(false);
-  const isClerkProfile = isClerkLoaded && !!clerkUser;
-  const displayName = isClerkProfile ? getClerkDisplayName(clerkUser) : getStoredDisplayName(user);
-  const displayEmail = isClerkProfile
-    ? clerkUser?.primaryEmailAddress?.emailAddress || user?.email || 'user@example.com'
-    : user?.email || 'user@example.com';
-  const displayImageUrl = isClerkProfile ? clerkUser?.imageUrl || null : profileImageUrl;
+  const displayName = getStoredDisplayName(user);
+  const displayEmail = user?.email || 'user@example.com';
+  const displayImageUrl = profileImageUrl;
 
   useEffect(() => {
     const loadUser = async () => {
       try {
-        if (!isClerkLoaded) return;
-
-        if (clerkUser) {
-          setUser({
-            id: clerkUser.id,
-            username: getClerkDisplayName(clerkUser),
-            email: clerkUser.primaryEmailAddress?.emailAddress,
-            isClerkUser: true,
-          });
-          setProfileImageUrl(clerkUser.imageUrl || null);
-          return;
-        }
-
         const userData = await tokenStorage.getUser();
         setUser(userData);
         
@@ -336,16 +311,7 @@ export default function ProfileScreen() {
       }
     };
     loadUser();
-  }, [
-    isClerkLoaded,
-    clerkUser?.id,
-    clerkUser?.fullName,
-    clerkUser?.firstName,
-    clerkUser?.lastName,
-    clerkUser?.username,
-    clerkUser?.imageUrl,
-    clerkUser?.primaryEmailAddress?.emailAddress,
-  ]);
+  }, []);
 
   // Update stats when screen comes into focus
   useFocusEffect(

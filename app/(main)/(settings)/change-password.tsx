@@ -1,10 +1,9 @@
 import AppHeader from "@/components/AppHeader";
 import { useTheme } from "@/contexts/ThemeContext";
-import { useUser } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import * as SecureStore from 'expo-secure-store';
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -34,8 +33,6 @@ const API_URL = getAPIURL();
 
 export default function ChangePassword() {
   const { colors } = useTheme();
-  const { user, isLoaded } = useUser();
-  const [isClerkUser, setIsClerkUser] = useState(false);
   
   const [formData, setFormData] = useState({
     currentPassword: "",
@@ -57,14 +54,6 @@ export default function ChangePassword() {
   
   const [isChanging, setIsChanging] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
-
-  useEffect(() => {
-    if (user && isLoaded) {
-      setIsClerkUser(true);
-    } else {
-      setIsClerkUser(false);
-    }
-  }, [user, isLoaded]);
 
   const checkPasswordStrength = (password: string) => {
     let strength = 0;
@@ -107,71 +96,49 @@ export default function ChangePassword() {
 
   const handleChangePassword = async () => {
     if (!validateForm()) return;
-    
+
     setIsChanging(true);
     try {
-      if (isClerkUser) {
-        // Clerk user - use Clerk's API
-        await user?.updatePassword({
+      const token = await SecureStore.getItemAsync('fitfaat_auth_token');
+
+      if (!token) {
+        Alert.alert("Error", "Authentication required. Please log in again.");
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/api/user/change-password`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           currentPassword: formData.currentPassword,
           newPassword: formData.newPassword,
-        });
-        
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
         Alert.alert(
-          "Success", 
-          "Your password has been changed successfully.",
-          [{ text: "OK", onPress: () => {
-            setFormData({
-              currentPassword: "",
-              newPassword: "",
-              confirmPassword: "",
-            });
-          }}]
+          "Success",
+          "Your password has been changed successfully. Please log in with your new password.",
+          [{
+            text: "OK",
+            onPress: async () => {
+              await SecureStore.deleteItemAsync('fitfaat_auth_token');
+              await SecureStore.deleteItemAsync('fitfaat_user');
+              setFormData({
+                currentPassword: "",
+                newPassword: "",
+                confirmPassword: "",
+              });
+            }
+          }]
         );
       } else {
-        // Backend email user - use backend API
-        const token = await SecureStore.getItemAsync('fitfaat_auth_token');
-        
-        if (!token) {
-          Alert.alert("Error", "Authentication required. Please log in again.");
-          return;
-        }
-
-        const response = await fetch(`${API_URL}/api/user/change-password`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            currentPassword: formData.currentPassword,
-            newPassword: formData.newPassword,
-          }),
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-          Alert.alert(
-            "Success", 
-            "Your password has been changed successfully. Please log in with your new password.",
-            [{ 
-              text: "OK", 
-              onPress: async () => {
-                // Clear stored credentials and redirect to login
-                await SecureStore.deleteItemAsync('fitfaat_auth_token');
-                await SecureStore.deleteItemAsync('fitfaat_user');
-                setFormData({
-                  currentPassword: "",
-                  newPassword: "",
-                  confirmPassword: "",
-                });
-              }
-            }]
-          );
-        } else {
-          Alert.alert("Error", data.message || "Failed to change password");
-        }
+        Alert.alert("Error", data.message || "Failed to change password");
       }
     } catch (error: any) {
       Alert.alert("Error", error.message || "Failed to change password");
@@ -212,14 +179,14 @@ export default function ChangePassword() {
           <ScrollView showsVerticalScrollIndicator={false}>
             {/* Authentication Method Badge */}
             <View style={styles.authBadgeContainer}>
-              <View style={[styles.authBadge, { backgroundColor: isClerkUser ? colors.primary : colors.secondary }]}>
+              <View style={[styles.authBadge, { backgroundColor: colors.secondary }]}>
                 <Ionicons 
-                  name={isClerkUser ? "logo-google" : "mail"} 
+                  name="mail"
                   size={16} 
                   color="white" 
                 />
                 <Text style={styles.authBadgeText}>
-                  {isClerkUser ? "Clerk Authentication" : "Email Authentication"}
+                  Email Authentication
                 </Text>
               </View>
             </View>
@@ -228,9 +195,7 @@ export default function ChangePassword() {
             <View style={styles.securityNotice}>
               <Ionicons name="shield-checkmark" size={26} color={colors.primary} />
               <Text style={styles.securityText}>
-                {isClerkUser 
-                  ? "For your security, you'll need to sign in again after changing your password"
-                  : "After changing your password, you will be logged out. Please log in with your new password."}
+                After changing your password, you will be logged out. Please log in with your new password.
               </Text>
             </View>
 

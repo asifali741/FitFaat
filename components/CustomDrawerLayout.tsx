@@ -1,11 +1,13 @@
 import { useTheme } from "@/contexts/ThemeContext";
-import { useAuth, useUser } from "@clerk/clerk-expo";
+import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
 import {
     DrawerContentComponentProps,
     DrawerItem
 } from "@react-navigation/drawer";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
+import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Animated, {
@@ -20,7 +22,9 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { DrawerFonts } from "../app/(main)/(settings)/_ui_elements";
 import { getBackendBaseUrl } from '@/utils/config';
-type DrawerSceneWrapperProps = DrawerContentComponentProps;
+type DrawerSceneWrapperProps = DrawerContentComponentProps & {
+  onDrawerStatusChange?: (isOpen: boolean) => void;
+};
 
 const getAPIURL = () => {
   return getBackendBaseUrl();
@@ -56,7 +60,6 @@ const AnimatedLogoutLetter = ({
 export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { user } = useUser(); // Get Clerk user
   const [userName, setUserName] = useState('User');
   const [userEmail, setUserEmail] = useState('user@example.com');
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
@@ -66,7 +69,22 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
   useEffect(() => {
     fetchUserData();
     checkDoctorStatus();
-  }, [user]);
+  }, []);
+
+  useEffect(() => {
+    const navigation = props.navigation as any;
+    const unsubscribeOpen = navigation.addListener?.('drawerOpen', () => {
+      props.onDrawerStatusChange?.(true);
+    });
+    const unsubscribeClose = navigation.addListener?.('drawerClose', () => {
+      props.onDrawerStatusChange?.(false);
+    });
+
+    return () => {
+      unsubscribeOpen?.();
+      unsubscribeClose?.();
+    };
+  }, [props.navigation, props.onDrawerStatusChange]);
 
   const checkDoctorStatus = async () => {
     try {
@@ -101,32 +119,15 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
   const fetchUserData = async () => {
     try {
       console.log('=== Drawer: Fetching user data ===');
-      console.log('Clerk user object:', JSON.stringify(user, null, 2));
-      console.log('Clerk user exists:', !!user);
-      
-      // Check if user is logged in with Clerk
-      if (user) {
-        console.log('Using Clerk user data');
-        console.log('Clerk firstName:', user.firstName);
-        console.log('Clerk username:', user.username);
-        console.log('Clerk email:', user.primaryEmailAddress?.emailAddress);
-        console.log('Clerk imageUrl:', user.imageUrl);
-        
-        const name = user.firstName || user.username || 'User';
-        const email = user.primaryEmailAddress?.emailAddress || 'user@example.com';
-        const imageUrl = user.imageUrl || null;
-        
-        console.log('Setting Clerk data - Name:', name, 'Email:', email);
-        setUserName(name);
-        setUserEmail(email);
-        setProfileImageUrl(imageUrl);
-        return;
-      }
 
-      console.log('No Clerk user, checking backend token');
-      // Otherwise, fetch from backend for email/password users
       const token = await SecureStore.getItemAsync('fitfaat_auth_token');
       console.log('Backend token:', token ? `Found (${token.substring(0, 20)}...)` : 'Not found');
+
+      const storedUser = await tokenStorage.getUser();
+      if (storedUser) {
+        setUserName(storedUser.userInfo?.name || storedUser.name || storedUser.username || 'User');
+        setUserEmail(storedUser.email || 'user@example.com');
+      }
       
       if (!token) {
         console.log('No token found, using defaults');
@@ -159,7 +160,7 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
         if (result.success && result.data && result.data.user) {
           const data = result.data.user;
           console.log('Setting user data from backend:', data.username, data.email);
-          setUserName(data.username || 'User');
+          setUserName(data.userInfo?.name || data.name || data.username || 'User');
           setUserEmail(data.email || 'user@example.com');
           
           // Fetch profile image if available
@@ -199,17 +200,17 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
   const styles = getStyles(colors, insets.bottom);
   const drawerLabelStyle = {
     marginLeft: wp(2),
-    fontSize: Math.min(hp(2.2), wp(4.8)),
+    fontSize: Math.min(hp(2.05), wp(4.6)),
     fontFamily: "PoppinsMedium500",
     color: colors.textOnPrimary,
   };
   const drawerItemStyle = (isActive: boolean) => ({
     marginHorizontal: wp(3.2),
-    marginVertical: hp(0.2),
+    marginVertical: hp(0.05),
     borderRadius: wp(6.5),
     paddingHorizontal: wp(5),
-    paddingVertical: hp(1),
-    minHeight: hp(5.6),
+    paddingVertical: hp(0.45),
+    minHeight: hp(4.9),
     backgroundColor: isActive ? colors.drawerActiveTabColor : 'transparent',
   });
 
@@ -295,8 +296,7 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
 const Logout_Button = () => {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { signOut } = useAuth();
-  const { user } = useUser();
+  const router = useRouter();
   const baseText = "Logout".split(""); // Array of letters
   const [activeIndex, setActiveIndex] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -319,22 +319,11 @@ const Logout_Button = () => {
     setActiveIndex(0);
 
     try {
-      // Check if user is logged in with Clerk
-      if (user) {
-        console.log("Logging out Clerk user");
-        await signOut();
-        console.log("Clerk user signed out successfully");
-      } else {
-        // Backend email/password user - clear token and navigate to auth
-        console.log("Logging out backend user");
-        await SecureStore.deleteItemAsync('fitfaat_auth_token');
-        await SecureStore.deleteItemAsync('fitfaat_user_data');
-        console.log("Backend user signed out successfully");
-        
-        // Navigate to auth screen (you'll need to import router)
-        const { router } = require('expo-router');
-        router.replace('/(auth)');
-      }
+      console.log("Logging out user");
+      await tokenStorage.clearAll();
+      await SecureStore.deleteItemAsync('fitfaat_user_data');
+      await AsyncStorage.removeItem('weeklyTrackingId');
+      router.replace('/(auth)');
     } catch (err) {
       console.error("Error signing out:", err);
     }
@@ -374,7 +363,7 @@ const getStyles = (colors: any, bottomInset = 0) => StyleSheet.create({
   borderBottomWidth: 1,
   borderBottomColor: colors.cardBorder,
   borderRadius: wp(6.5),
-  marginBottom: hp(2.5),
+  marginBottom: hp(1.4),
 },
 
 userInfo: {
@@ -406,17 +395,17 @@ userEmail: {
     flex: 1,
   },
   drawerItemsContent: {
-    paddingVertical: hp(1.2),
-    paddingBottom: hp(2),
+    paddingVertical: hp(0.4),
+    paddingBottom: hp(0.6),
   },
   logoutButton: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: hp(1.7),
+    paddingVertical: hp(1.45),
     paddingHorizontal: wp(4),
     marginHorizontal: wp(3.2),
-    marginTop: hp(1.2),
-    marginBottom: bottomInset + hp(13),
+    marginTop: hp(0.5),
+    marginBottom: bottomInset + hp(2.2),
     backgroundColor: colors.error,
     borderRadius: wp(6.5),
     justifyContent: "center",

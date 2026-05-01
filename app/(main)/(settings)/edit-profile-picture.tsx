@@ -1,8 +1,6 @@
 import AppHeader from "@/components/AppHeader";
 import { useTheme } from "@/contexts/ThemeContext";
-import { useUser } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from "expo-constants";
 import * as ImagePicker from 'expo-image-picker';
 import * as SecureStore from 'expo-secure-store';
@@ -33,12 +31,9 @@ const getAPIURL = () => {
 };
 
 const API_URL = getAPIURL();
-const PROFILE_IMAGE_KEY = 'fitfaat_profile_image';
 
 export default function EditProfilePicture() {
   const { colors } = useTheme();
-  const { user, isLoaded } = useUser();
-  const [isClerkUser, setIsClerkUser] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,51 +42,38 @@ export default function EditProfilePicture() {
 
   useEffect(() => {
     loadUserData();
-  }, [user, isLoaded]);
+  }, []);
 
   const loadUserData = async () => {
     try {
       setIsLoading(true);
-      
-      // Check if user is Clerk user or backend user
-      if (user && isLoaded) {
-        setIsClerkUser(true);
-        setUserName(user.fullName || "User");
-        setUserEmail(user.primaryEmailAddress?.emailAddress || "");
-        // For Clerk users, use their Clerk image first, then check AsyncStorage
-        const savedImage = await AsyncStorage.getItem(PROFILE_IMAGE_KEY);
-        setSelectedImage(savedImage || user.imageUrl || null);
-      } else {
-        setIsClerkUser(false);
-        // For backend users, get data from backend API
-        const token = await SecureStore.getItemAsync('fitfaat_auth_token');
-        const userDataStr = await SecureStore.getItemAsync('fitfaat_user');
-        
-        if (userDataStr) {
-          const userData = JSON.parse(userDataStr);
-          setUserName(userData.username || "User");
-          setUserEmail(userData.email || "");
-        }
-        
-        // Fetch profile image from backend
-        if (token) {
-          try {
-            const response = await fetch(`${API_URL}/api/user/profile-picture`, {
-              method: 'GET',
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-              },
-            });
 
-            const data = await response.json();
-            if (data.success && data.data.imageUrl) {
-              const imageUrl = `${API_URL}${data.data.imageUrl}`;
-              setSelectedImage(imageUrl);
-            }
-          } catch (error) {
-            console.log('No profile picture found, using default');
+      const token = await SecureStore.getItemAsync('fitfaat_auth_token');
+      const userDataStr = await SecureStore.getItemAsync('fitfaat_user');
+      
+      if (userDataStr) {
+        const userData = JSON.parse(userDataStr);
+        setUserName(userData.userInfo?.name || userData.name || userData.username || "User");
+        setUserEmail(userData.email || "");
+      }
+
+      if (token) {
+        try {
+          const response = await fetch(`${API_URL}/api/user/profile-picture`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+
+          const data = await response.json();
+          if (data.success && data.data.imageUrl) {
+            const imageUrl = `${API_URL}${data.data.imageUrl}`;
+            setSelectedImage(imageUrl);
           }
+        } catch (error) {
+          console.log('No profile picture found, using default');
         }
       }
     } catch (error) {
@@ -155,27 +137,21 @@ export default function EditProfilePicture() {
           onPress: async () => {
             try {
               setSelectedImage(null);
-              
-              if (isClerkUser) {
-                // For Clerk users, remove from AsyncStorage
-                await AsyncStorage.removeItem(PROFILE_IMAGE_KEY);
-              } else {
-                // For backend users, call delete API
-                const token = await SecureStore.getItemAsync('fitfaat_auth_token');
-                
-                if (token) {
-                  const response = await fetch(`${API_URL}/api/user/delete-profile-picture`, {
-                    method: 'DELETE',
-                    headers: {
-                      'Authorization': `Bearer ${token}`,
-                      'Content-Type': 'application/json',
-                    },
-                  });
 
-                  const data = await response.json();
-                  if (!data.success) {
-                    console.error('Failed to delete from server:', data.message);
-                  }
+              const token = await SecureStore.getItemAsync('fitfaat_auth_token');
+              
+              if (token) {
+                const response = await fetch(`${API_URL}/api/user/delete-profile-picture`, {
+                  method: 'DELETE',
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                  },
+                });
+
+                const data = await response.json();
+                if (!data.success) {
+                  console.error('Failed to delete from server:', data.message);
                 }
               }
               
@@ -198,71 +174,44 @@ export default function EditProfilePicture() {
 
     setIsUploading(true);
     try {
-      if (isClerkUser) {
-        // For Clerk users, save to AsyncStorage only
-        await AsyncStorage.setItem(PROFILE_IMAGE_KEY, selectedImage);
-        
-        if (user) {
-          try {
-            await user.setProfileImage({ file: selectedImage });
-          } catch (clerkError) {
-            console.log('Clerk update not available, image saved locally');
-          }
-        }
-        
+      const token = await SecureStore.getItemAsync('fitfaat_auth_token');
+
+      if (!token) {
+        Alert.alert("Error", "Authentication required. Please log in again.");
+        return;
+      }
+
+      const formData = new FormData();
+      const uriParts = selectedImage.split('.');
+      const fileType = uriParts[uriParts.length - 1];
+
+      formData.append('profileImage', {
+        uri: selectedImage,
+        name: `profile.${fileType}`,
+        type: `image/${fileType}`
+      } as any);
+
+      const response = await fetch(`${API_URL}/api/user/upload-profile-picture`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
         Alert.alert(
           "Success", 
-          "Profile picture saved successfully!",
+          "Profile picture uploaded successfully!",
           [{
             text: "OK",
             onPress: () => loadUserData()
           }]
         );
       } else {
-        // For backend users, upload to server
-        const token = await SecureStore.getItemAsync('fitfaat_auth_token');
-        
-        if (!token) {
-          Alert.alert("Error", "Authentication required. Please log in again.");
-          return;
-        }
-
-        // Create FormData for multipart upload
-        const formData = new FormData();
-        
-        // Get file extension from URI
-        const uriParts = selectedImage.split('.');
-        const fileType = uriParts[uriParts.length - 1];
-        
-        // Add image to form data
-        formData.append('profileImage', {
-          uri: selectedImage,
-          name: `profile.${fileType}`,
-          type: `image/${fileType}`
-        } as any);
-
-        const response = await fetch(`${API_URL}/api/user/upload-profile-picture`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-          body: formData,
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-          Alert.alert(
-            "Success", 
-            "Profile picture uploaded successfully!",
-            [{
-              text: "OK",
-              onPress: () => loadUserData()
-            }]
-          );
-        } else {
-          Alert.alert("Error", data.message || "Failed to upload profile picture");
-        }
+        Alert.alert("Error", data.message || "Failed to upload profile picture");
       }
     } catch (error: any) {
       console.error('Error saving profile picture:', error);
@@ -293,14 +242,14 @@ export default function EditProfilePicture() {
           <ScrollView showsVerticalScrollIndicator={false}>
             {/* Authentication Badge */}
             <View style={styles.authBadgeContainer}>
-              <View style={[styles.authBadge, { backgroundColor: isClerkUser ? colors.primary : colors.secondary }]}>
+              <View style={[styles.authBadge, { backgroundColor: colors.secondary }]}>
                 <Ionicons 
-                  name={isClerkUser ? "logo-google" : "mail"} 
+                  name="mail"
                   size={16} 
                   color="white" 
                 />
                 <Text style={styles.authBadgeText}>
-                  {isClerkUser ? "Clerk User" : "Email User"}
+                  Email User
                 </Text>
               </View>
             </View>

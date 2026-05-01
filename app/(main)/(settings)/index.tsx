@@ -3,37 +3,15 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DrawerActions, useNavigation } from "@react-navigation/native";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { Alert, Linking, ScrollView, StatusBar, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function Settings() {
-  const navigation = useNavigation();
   const router = useRouter();
   const { isDarkMode, toggleDarkMode, colors } = useTheme();
-  const [notifications, setNotifications] = useState(true);
-  const [locationServices, setLocationServices] = useState(true);
-  const [dataSync, setDataSync] = useState(true);
-  const [user, setUser] = useState<any>(null);
-
-  useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const userData = await tokenStorage.getUser();
-        setUser(userData);
-      } catch (error) {
-        console.error('Error loading user:', error);
-      }
-    };
-    loadUser();
-  }, []);
-
-  const openDrawer = () => {
-    navigation.dispatch(DrawerActions.openDrawer());
-  };
 
   const handleSettingPress = (setting: string) => {
     switch (setting) {
@@ -60,46 +38,9 @@ export default function Settings() {
       case "Workout Preferences":
         router.push("/(exercises)/workout");
         break;
-      
-      case "Diet Preferences":
-        Alert.alert(
-          "Diet Preferences",
-          "Set your dietary requirements, allergies, and food preferences for personalized meal plans.",
-          [{ text: "OK" }]
-        );
-        break;
-      
-      case "Health Goals":
-        Alert.alert(
-          "Health Goals",
-          "Set and track your health objectives like weight loss, muscle gain, or general fitness.",
-          [{ text: "OK" }]
-        );
-        break;
-      
-      case "Language":
-        Alert.alert(
-          "Language",
-          "Select your preferred language for the app interface.",
-          [
-            { text: "English", onPress: () => console.log("Set language to English") },
-            { text: "Spanish", onPress: () => console.log("Set language to Spanish") },
-            { text: "French", onPress: () => console.log("Set language to French") },
-            { text: "Cancel", style: "cancel" }
-          ]
-        );
-        break;
-      
-      case "Time Zone":
-        Alert.alert(
-          "Time Zone",
-          "Set your time zone for accurate scheduling and notifications.",
-          [{ text: "OK" }]
-        );
-        break;
-      
+
       case "Help Center":
-        Linking.openURL('https://help.fitfaat.com');
+        Linking.openURL('mailto:asif1465majid@gmail.com?subject=FitFaat%20Help%20Center');
         break;
       
       case "Contact Support":
@@ -110,17 +51,6 @@ export default function Settings() {
             { text: "Email Support", onPress: () => Linking.openURL('mailto:support@fitfaat.com') },
             { text: "Live Chat", onPress: () => console.log("Open live chat") },
             { text: "Cancel", style: "cancel" }
-          ]
-        );
-        break;
-      
-      case "Rate App":
-        Alert.alert(
-          "Rate App",
-          "We'd love to hear your feedback! Please rate our app.",
-          [
-            { text: "Rate Now", onPress: () => console.log("Open app store rating") },
-            { text: "Maybe Later", style: "cancel" }
           ]
         );
         break;
@@ -152,73 +82,13 @@ export default function Settings() {
       case "Licenses":
         Alert.alert(
           "Open Source Licenses",
-          "FITFAAT OPEN SOURCE LICENSES\n\nThis app uses the following open source libraries:\n\n• React Native (MIT License)\n• Expo (MIT License)\n• Clerk Authentication (MIT License)\n• React Navigation (MIT License)\n• AsyncStorage (MIT License)\n• React Native Vector Icons (MIT License)\n• React Native Responsive Screen (MIT License)\n• React Native Reanimated (MIT License)\n• React Native Gesture Handler (MIT License)\n• React Native Safe Area Context (MIT License)\n• React Native Keyboard Aware Scroll View (MIT License)\n• React Native Progress (MIT License)\n• React Native Marquee (MIT License)\n• React Native Heroicons (MIT License)\n• Axios (MIT License)\n• Day.js (MIT License)\n• NativeWind (MIT License)\n• Tailwind CSS (MIT License)\n• Prettier (MIT License)\n• ESLint (MIT License)\n\nAll libraries are used in compliance with their respective licenses. Source code for these libraries is available on GitHub.\n\nFor detailed license information, visit: https://fitfaat.com/licenses",
+          "FITFAAT OPEN SOURCE LICENSES\n\nThis app uses the following open source libraries:\n\n• React Native (MIT License)\n• Expo (MIT License)\n• React Navigation (MIT License)\n• AsyncStorage (MIT License)\n• React Native Vector Icons (MIT License)\n• React Native Responsive Screen (MIT License)\n• React Native Reanimated (MIT License)\n• React Native Gesture Handler (MIT License)\n• React Native Safe Area Context (MIT License)\n• React Native Keyboard Aware Scroll View (MIT License)\n• React Native Progress (MIT License)\n• React Native Marquee (MIT License)\n• React Native Heroicons (MIT License)\n• Axios (MIT License)\n• Day.js (MIT License)\n• NativeWind (MIT License)\n• Tailwind CSS (MIT License)\n• Prettier (MIT License)\n• ESLint (MIT License)\n\nAll libraries are used in compliance with their respective licenses. Source code for these libraries is available on GitHub.\n\nFor detailed license information, visit: https://fitfaat.com/licenses",
           [{ text: "OK" }]
         );
         break;
       
       default:
         Alert.alert(setting, `This will open ${setting} settings`, [{ text: "OK" }]);
-    }
-  };
-
-  const handleClearCache = async () => {
-    try {
-      // Clear various cached data
-      await AsyncStorage.multiRemove([
-        'cached_exercises',
-        'cached_workouts',
-        'temp_data',
-        'image_cache'
-      ]);
-      
-      Alert.alert(
-        "Cache Cleared",
-        "Successfully cleared cached data and freed up storage space.",
-        [{ text: "OK" }]
-      );
-    } catch (error) {
-      Alert.alert(
-        "Error",
-        "Failed to clear cache. Please try again.",
-        [{ text: "OK" }]
-      );
-    }
-  };
-
-  const handleDownloadData = async () => {
-    try {
-      // Get current user data
-      const userData = {
-        profile: {
-          name: user?.username || "User",
-          email: user?.email || "user@example.com",
-          createdAt: user?.createdAt
-        },
-        workouts: await AsyncStorage.getItem('workout_history') || [],
-        favorites: await AsyncStorage.getItem('favoriteExercises') || [],
-        appointments: await AsyncStorage.getItem('appointments') || [],
-        settings: {
-          notifications,
-          darkMode: isDarkMode,
-          locationServices,
-          dataSync
-        }
-      };
-      
-      Alert.alert(
-        "Data Export",
-        "Your data has been prepared for download. You will receive an email with the download link shortly.",
-        [{ text: "OK" }]
-      );
-      
-      console.log("User data prepared for export:", userData);
-    } catch (error) {
-      Alert.alert(
-        "Error",
-        "Failed to prepare data export. Please try again.",
-        [{ text: "OK" }]
-      );
     }
   };
 
@@ -390,18 +260,6 @@ export default function Settings() {
               }
               showArrow={false}
             />
-            <SettingItem
-              icon="language-outline"
-              title="Language"
-              subtitle="English (US)"
-              onPress={() => handleSettingPress("Language")}
-            />
-            <SettingItem
-              icon="time-outline"
-              title="Time Zone"
-              subtitle="Auto (GMT+5:30)"
-              onPress={() => handleSettingPress("Time Zone")}
-            />
           </View>
 
           {/* Health & Fitness Section */}
@@ -413,51 +271,6 @@ export default function Settings() {
               subtitle="Customize your workout experience"
               onPress={() => handleSettingPress("Workout Preferences")}
             />
-            <SettingItem
-              icon="restaurant-outline"
-              title="Diet Preferences"
-              subtitle="Set your dietary requirements"
-              onPress={() => handleSettingPress("Diet Preferences")}
-            />
-            <SettingItem
-              icon="medical-outline"
-              title="Health Goals"
-              subtitle="Track your health objectives"
-              onPress={() => handleSettingPress("Health Goals")}
-            />
-            <SettingItem
-              icon="sync-outline"
-              title="Data Sync"
-              subtitle="Sync your health data across devices"
-              rightComponent={
-                <Switch
-                  value={dataSync}
-                  onValueChange={setDataSync}
-                  trackColor={{ false: colors.textSecondary + '40', true: colors.primary + '40' }}
-                  thumbColor={dataSync ? colors.primary : colors.textSecondary}
-                />
-              }
-              showArrow={false}
-            />
-          </View>
-
-          {/* App Settings Section */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>App Settings</Text>
-            <SettingItem
-              icon="location-outline"
-              title="Location Services"
-              subtitle="Allow location access for better recommendations"
-              rightComponent={
-                <Switch
-                  value={locationServices}
-                  onValueChange={setLocationServices}
-                  trackColor={{ false: colors.textSecondary + '40', true: colors.primary + '40' }}
-                  thumbColor={locationServices ? colors.primary : colors.textSecondary}
-                />
-              }
-              showArrow={false}
-            />
           </View>
 
           {/* Support Section */}
@@ -466,7 +279,7 @@ export default function Settings() {
             <SettingItem
               icon="help-circle-outline"
               title="Help Center"
-              subtitle="Get help and support"
+              subtitle="asif1465majid@gmail.com"
               onPress={() => handleSettingPress("Help Center")}
             />
             <SettingItem
@@ -474,12 +287,6 @@ export default function Settings() {
               title="Contact Support"
               subtitle="Reach out to our support team"
               onPress={() => handleSettingPress("Contact Support")}
-            />
-            <SettingItem
-              icon="star-outline"
-              title="Rate App"
-              subtitle="Share your feedback"
-              onPress={() => handleSettingPress("Rate App")}
             />
             <SettingItem
               icon="information-circle-outline"

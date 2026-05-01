@@ -1,4 +1,3 @@
-console.log("TOP OF FILE")
 import { DrawerSceneWrapper } from "@/components/CustomDrawerLayout";
 import { AppointmentProvider } from "@/contexts/AppointmentContext";
 import { ChatbotStorageProvider } from "@/contexts/ChatbotStorage";
@@ -7,10 +6,8 @@ import { NewsProvider } from "@/contexts/NewsContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { authApi } from "@/utils/auth/authApi";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
-import { useAuth } from "@clerk/clerk-expo";
 import { DrawerContentComponentProps } from "@react-navigation/drawer";
 import { BottomTabBar } from "@/components/BottomTabBar";
-import Constants from "expo-constants";
 import { useRouter } from "expo-router";
 import { Drawer } from "expo-router/drawer";
 import { useEffect, useMemo, useState } from "react";
@@ -26,30 +23,20 @@ type DrawerSceneWrapperProps = DrawerContentComponentProps;
 export default function MainLayout() {
     const { colors } = useTheme();
     const router = useRouter();
-    const { isLoaded: isClerkLoaded, isSignedIn } = useAuth();
     const [isDoctor, setIsDoctor] = useState(false);
     const [doctorName, setDoctorName] = useState("");
     const [isPremium, setIsPremium] = useState(false);
     const [loading, setLoading] = useState(true);
-    console.log('Landed in (main)\\_Layout', { isDoctor, doctorName, isPremium });
+    const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     
     useEffect(() => {
-      if (!isClerkLoaded) return;
-
       let isActive = true;
 
       const checkAuth = async () => {
         try {
           const hasBackendSession = await authApi.isAuthenticated();
-          if (!hasBackendSession && !isSignedIn) {
+          if (!hasBackendSession) {
             router.replace("/(auth)");
-            return;
-          }
-
-          if (isSignedIn) {
-            setIsDoctor(false);
-            setDoctorName("");
-            setIsPremium(false);
             return;
           }
           
@@ -76,7 +63,6 @@ export default function MainLayout() {
           try {
             const token = await tokenStorage.getToken();
             if (token) {
-              const ENV = Constants.expoConfig?.extra;
               const API_URL = getBackendBaseUrl();
               const response = await fetch(`${API_URL}/api/payment/premium-status`, {
                 method: 'GET',
@@ -87,7 +73,12 @@ export default function MainLayout() {
               });
               const premiumStatus = await response.json();
               console.log('Premium Status Response:', premiumStatus);
-              if (premiumStatus.success && premiumStatus.isPremium && premiumStatus.premiumSubscription?.status === 'active') {
+              const isPremiumActive = Boolean(
+                premiumStatus.success &&
+                (premiumStatus.isPremium || premiumStatus.premiumSubscription?.status === 'active')
+              );
+
+              if (isPremiumActive) {
                 setIsPremium(true);
                 console.log('User is premium');
               } else {
@@ -115,7 +106,7 @@ export default function MainLayout() {
       return () => {
         isActive = false;
       };
-    }, [isClerkLoaded, isSignedIn, router]);
+    }, []);
 
     // Memoize drawer options to ensure they update when state changes
     const conferenceOptions = useMemo(() => ({
@@ -131,7 +122,7 @@ export default function MainLayout() {
       title: "Workouts 👑",
     }), []);
 
-    if (loading || !isClerkLoaded) {
+    if (loading) {
       return null; // or a loading screen
     }
     return <GestureHandlerRootView style={{ flex: 1 }}>
@@ -142,7 +133,21 @@ export default function MainLayout() {
   <View style={{ flex: 1, backgroundColor: colors.background }}>
     <Drawer
       detachInactiveScreens={true}
-      drawerContent={(props) => <DrawerSceneWrapper {...props} />}
+      drawerContent={(props) => (
+        <DrawerSceneWrapper
+          {...props}
+          onDrawerStatusChange={setIsDrawerOpen}
+        />
+      )}
+      screenListeners={{
+        state: (event) => {
+          const history = (event.data.state as any)?.history ?? [];
+          const drawerIsOpen = history.some(
+            (entry: any) => entry.type === 'drawer' && entry.status === 'open'
+          );
+          setIsDrawerOpen(drawerIsOpen);
+        },
+      }}
       screenOptions={{
         lazy: true,
         headerShown: false,
@@ -193,7 +198,7 @@ export default function MainLayout() {
         options={doctorPortalOptions}
       />
     </Drawer>
-    <BottomTabBar />
+    {!isDrawerOpen && <BottomTabBar />}
   </View>
   </NewsProvider>
   </ChatbotStorageProvider>

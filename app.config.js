@@ -31,30 +31,6 @@ export default {
         "android.permission.ACCESS_NETWORK_STATE",
         "android.permission.MODIFY_AUDIO_SETTINGS",
       ],
-      intentFilters: [
-        {
-          action: "VIEW",
-          data: [
-            {
-              scheme: "fitfaat",
-              host: "oauth-native-callback",
-            },
-            {
-              scheme: "fitfaat",
-              host: "*",
-            },
-            {
-              scheme: "mobile",
-              host: "oauth-native-callback",
-            },
-            {
-              scheme: "mobile",
-              host: "*",
-            },
-          ],
-          category: ["BROWSABLE", "DEFAULT"],
-        },
-      ],
     },
 
     web: {
@@ -74,7 +50,6 @@ export default {
           backgroundColor: "#ffffff",
         },
       ],
-      "expo-web-browser",
       [
         "expo-camera",
         {
@@ -121,7 +96,6 @@ export default {
       CLARIFAI_API_KEY: process.env.CLARIFAI_API_KEY,
       Email: process.env.Email,
       EmailPassword: process.env.EmailPassword,
-      EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY,
       OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
       ZEGO_APP_ID: process.env.ZEGO_APP_ID,
       ZEGO_APP_SIGN: process.env.ZEGO_APP_SIGN,

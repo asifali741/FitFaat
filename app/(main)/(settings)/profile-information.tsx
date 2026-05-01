@@ -1,6 +1,5 @@
 import AppHeader from "@/components/AppHeader";
 import { useTheme } from "@/contexts/ThemeContext";
-import { useUser } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
 import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from "react";
@@ -24,18 +23,16 @@ const API_URL = getBackendBaseUrl();
 
 export default function ProfileInformation() {
   const { colors } = useTheme();
-  const { user, isLoaded } = useUser();
   
   const [backendUserData, setBackendUserData] = useState<any>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
-  const [isClerkUser, setIsClerkUser] = useState(false);
 
 const [formData, setFormData] = useState({
-  firstName: user?.firstName || "",
-  lastName: user?.lastName || "",
-  email: user?.primaryEmailAddress?.emailAddress || "",
-  phoneNumber: user?.primaryPhoneNumber?.phoneNumber || "",
-  username: user?.username || "",
+  firstName: "",
+  lastName: "",
+  email: "",
+  phoneNumber: "",
+  username: "",
   bio: "",
 });
 
@@ -43,20 +40,8 @@ const [isEditing, setIsEditing] = useState(false);
 const [isSaving, setIsSaving] = useState(false);
 
 useEffect(() => {
-  checkAuthMethod();
   fetchBackendUserData();
 }, []);
-
-const checkAuthMethod = async () => {
-  // Check if user is logged in with Clerk (has Clerk user object)
-  if (user && isLoaded) {
-    setIsClerkUser(true);
-    console.log("User authenticated with Clerk");
-  } else {
-    setIsClerkUser(false);
-    console.log("User authenticated with backend email");
-  }
-};
 
 const fetchBackendUserData = async () => {
   try {
@@ -107,25 +92,6 @@ const fetchBackendUserData = async () => {
     );
   } finally {
     setIsLoadingData(false);
-  }
-};
-
-const handleSave = async () => {
-  setIsSaving(true);
-  try {
-    // Update user profile with Clerk
-    await user?.update({
-      firstName: formData.firstName,
-      lastName: formData.lastName,
-      username: formData.username,
-    });
-
-    setIsEditing(false);
-    Alert.alert("Success", "Profile information updated successfully!");
-  } catch (error: any) {
-    Alert.alert("Error", error.message || "Failed to update profile");
-  } finally {
-    setIsSaving(false);
   }
 };
 
@@ -198,14 +164,14 @@ return (
         <ScrollView showsVerticalScrollIndicator={false}>
           {/* Authentication Method Badge */}
           <View style={styles.authBadgeContainer}>
-            <View style={[styles.authBadge, { backgroundColor: isClerkUser ? colors.primary : colors.secondary }]}>
+            <View style={[styles.authBadge, { backgroundColor: colors.secondary }]}>
               <Ionicons
-                name={isClerkUser ? "logo-google" : "mail"}
+                name="mail"
                 size={16}
                 color="white"
               />
               <Text style={styles.authBadgeText}>
-                {isClerkUser ? "Clerk Authentication" : "Email Authentication"}
+                Email Authentication
               </Text>
             </View>
           </View>
@@ -213,92 +179,24 @@ return (
           {/* Profile Picture Section */}
           <View style={styles.profileSection}>
             <View style={styles.profileImageContainer}>
-              {(isClerkUser && user?.imageUrl) ? (
-                <View style={styles.profileImage}>
-                  <Text style={styles.profileInitials}>
-                    {(user?.firstName?.[0] || "") + (user?.lastName?.[0] || "")}
-                  </Text>
-                </View>
-              ) : (
-                <View style={styles.profileImage}>
-                  <Ionicons name="person" size={50} color={colors.primary} />
-                </View>
-              )}
+              <View style={styles.profileImage}>
+                <Ionicons name="person" size={50} color={colors.primary} />
+              </View>
             </View>
             <Text style={styles.profileName}>
-              {isClerkUser
-                ? (user?.fullName || "User")
-                : (backendUserData?.user?.userInfo?.name || "User")}
+              {backendUserData?.user?.userInfo?.name || backendUserData?.user?.username || "User"}
             </Text>
             <Text style={styles.profileEmail}>
-              {isClerkUser
-                ? (user?.primaryEmailAddress?.emailAddress || "")
-                : (backendUserData?.user?.email || "")}
+              {backendUserData?.user?.email || ""}
             </Text>
-            {!isClerkUser && backendUserData?.user?.username && (
+            {backendUserData?.user?.username && (
               <Text style={styles.profileUsername}>
                 @{backendUserData.user.username}
               </Text>
             )}
-            {isClerkUser && user?.username && (
-              <Text style={styles.profileUsername}>
-                @{user.username}
-              </Text>
-            )}
           </View>
 
-          {/* Edit Button - Only for Clerk users */}
-          {isClerkUser && (
-            <TouchableOpacity
-              style={styles.editButton}
-              onPress={() => isEditing ? handleSave() : setIsEditing(true)}
-              disabled={isSaving}
-            >
-              <Ionicons
-                name={isEditing ? "checkmark-outline" : "create-outline"}
-                size={20}
-                color="white"
-              />
-              <Text style={styles.editButtonText}>
-                {isSaving ? "Saving..." : isEditing ? "Save Changes" : "Edit Profile"}
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Personal Information - Show based on auth method */}
-          {isClerkUser ? (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Personal Information (Clerk)</Text>
-
-              <InfoField
-                label="First Name"
-                value={formData.firstName}
-                field="firstName"
-              />
-
-              <InfoField
-                label="Last Name"
-                value={formData.lastName}
-                field="lastName"
-              />
-
-              <InfoField
-                label="Username (Clerk)"
-                value={formData.username}
-                field="username"
-              />
-
-              <InfoField
-                label="Bio"
-                value={formData.bio}
-                field="bio"
-                multiline={true}
-              />
-            </View>
-          ) : null}
-
-          {/* Backend User Information - Only for email auth */}
-          {!isClerkUser && backendUserData?.user && (
+          {backendUserData?.user && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Account Information</Text>
 
@@ -347,28 +245,6 @@ return (
             </View>
           )}
 
-          {/* Contact Information - Only for Clerk users */}
-          {isClerkUser && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Contact Information</Text>
-
-              <InfoField
-                label="Email"
-                value={formData.email}
-                field="email"
-                editable={false}
-                keyboardType="email-address"
-              />
-
-              <InfoField
-                label="Phone Number"
-                value={formData.phoneNumber}
-                field="phoneNumber"
-                keyboardType="phone-pad"
-              />
-            </View>
-          )}
-
           {/* Backend User Data - Physical Information */}
           {isLoadingData ? (
             <View style={[styles.section, styles.loadingContainer]}>
@@ -407,7 +283,6 @@ return (
                           `API URL: ${API_URL}\n` +
                           `Token exists: ${!!token}\n` +
                           `User exists: ${!!user}\n` +
-                          `Is Clerk User: ${isClerkUser}\n` +
                           `Has Backend Data: ${!!backendUserData}\n` +
                           `Check console for full logs`
                         );
@@ -591,62 +466,6 @@ return (
                 </>
               ) : null}
             </>
-          )}
-
-          {/* Clerk Account Information - Only for Clerk users */}
-          {isClerkUser && user && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Clerk Account Details</Text>
-
-              <View style={styles.infoField}>
-                <Text style={styles.label}>User ID</Text>
-                <Text style={styles.value}>{user?.id || "N/A"}</Text>
-              </View>
-
-              <View style={styles.infoField}>
-                <Text style={styles.label}>Member Since</Text>
-                <Text style={styles.value}>
-                  {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : "N/A"}
-                </Text>
-              </View>
-
-              <View style={styles.infoField}>
-                <Text style={styles.label}>Email Verified</Text>
-                <View style={styles.verifiedBadge}>
-                  <Ionicons
-                    name={user?.primaryEmailAddress?.verification?.status === "verified" ? "checkmark-circle" : "close-circle"}
-                    size={20}
-                    color={user?.primaryEmailAddress?.verification?.status === "verified" ? colors.success : colors.error}
-                  />
-                  <Text style={[
-                    styles.verifiedText,
-                    { color: user?.primaryEmailAddress?.verification?.status === "verified" ? colors.success : colors.error }
-                  ]}>
-                    {user?.primaryEmailAddress?.verification?.status === "verified" ? "Verified" : "Not Verified"}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          )}
-
-          {isEditing && isClerkUser && (
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={() => {
-                setIsEditing(false);
-                // Reset form data
-                setFormData({
-                  firstName: user?.firstName || "",
-                  lastName: user?.lastName || "",
-                  email: user?.primaryEmailAddress?.emailAddress || "",
-                  phoneNumber: user?.primaryPhoneNumber?.phoneNumber || "",
-                  username: user?.username || "",
-                  bio: "",
-                });
-              }}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
           )}
 
           <View style={{ height: hp(4) }} />

@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import "../../global.css";
-import { useSocialAuth } from '../../hooks/useSocialAuth';
 import { useTheme } from '@/contexts/ThemeContext';
 import {
   widthPercentageToDP as wp,
@@ -15,7 +14,6 @@ const FULL_TEXT =
   "Your complete fitness companion with personalized diet plans, AI chatbot support, expert video consultations, and structured workouts - all in one app.";
 
 export default function Index() {
-  const { handleGoogleAuth } = useSocialAuth();
   const router = useRouter();
   const { colors, isDarkMode } = useTheme();
   const [visibleText, setVisibleText] = useState("");
@@ -90,24 +88,6 @@ export default function Index() {
         </View>
         
         <View style={styles.buttonContainer}>
-          <TouchableOpacity 
-            onPress={handleGoogleAuth} 
-            style={styles.googleButton}
-            activeOpacity={0.8}
-          >
-            <Image
-              source={require("../../assets/images/goog.png")}
-              style={styles.googleLogo}
-            />
-            <Text style={styles.googleButtonText}>Continue with Google</Text>
-          </TouchableOpacity>
-
-          <View style={styles.dividerContainer}>
-            <View style={styles.divider} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.divider} />
-          </View>
-
           <TouchableOpacity
             onPress={() => router.push('/email-login')}
             style={styles.emailButton}
