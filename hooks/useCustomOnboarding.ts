@@ -1,8 +1,10 @@
+import { useUser } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { authApi } from '../utils/auth/authApi';
 
 export const useCustomOnboarding = () => {
+  const { user } = useUser();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -20,6 +22,31 @@ export const useCustomOnboarding = () => {
       // Convert height from feet.inches to centimeters
       const heightFeet = parseFloat(userInfo.height);
       const heightInCm = heightFeet * 30.48;
+
+      if (user) {
+        await user.update({
+          unsafeMetadata: {
+            ...user.unsafeMetadata,
+            hasCompletedOnboarding: true,
+            onboarding: {
+              name: userInfo.name.trim(),
+              height: heightInCm,
+              weight: parseFloat(userInfo.weight),
+              gender: userInfo.selectedGender,
+              birthDate: {
+                day: parseInt(userInfo.birthDate.day, 10),
+                month: parseInt(userInfo.birthDate.month, 10),
+                year: parseInt(userInfo.birthDate.year, 10),
+              },
+              age: userInfo.age,
+              fitnessGoal: userInfo.selectedGoal,
+            },
+          },
+        });
+
+        router.replace('/(main)/(dashboard)');
+        return;
+      }
 
       // Convert string values to numbers where needed and send to backend
       await authApi.completeOnboarding({

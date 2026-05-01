@@ -1,19 +1,6 @@
-import Constants from 'expo-constants';
-import { Platform } from 'react-native';
+import { getBackendUrl } from './config';
 
-const ENV = Constants.expoConfig?.extra;
-
-// Get base URL from environment variables
-const getBaseURL = () => {
-  const envUrl = ENV?.EXPO_PUBLIC_BACKEND_API_URL;
-  if (envUrl) {
-    return envUrl;
-  }
-  const defaultHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
-  return `http://${defaultHost}:5001/api`;
-};
-
-const API_BASE_URL = getBaseURL();
+const API_BASE_URL = getBackendUrl();
 
 export const streakApi = {
   /**

@@ -1,5 +1,6 @@
 import BackButton from '@/components/BackButton';
 import { theme } from "@/constants/theme";
+import { useTheme } from '@/contexts/ThemeContext';
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
@@ -9,6 +10,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { getDoctorById } from "./_doctorsData";
 
 export default function BookingConfirmationScreen() {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const router = useRouter();
   const { doctorId, date } = useLocalSearchParams<{ doctorId: string; date: string }>();
   const doctor = getDoctorById(doctorId);
@@ -57,7 +60,7 @@ export default function BookingConfirmationScreen() {
         {/* Doctor Info Card */}
         <View style={styles.infoCard}>
           <View style={styles.avatarContainer}>
-            <Ionicons name="person-circle" size={60} color={theme.colors.primary} />
+            <Ionicons name="person-circle" size={60} color={colors.primary} />
           </View>
           <View style={styles.doctorInfoText}>
             <Text style={styles.doctorName}>{doctor.name}</Text>
@@ -115,7 +118,7 @@ export default function BookingConfirmationScreen() {
               <TextInput
                 style={styles.problemInput}
                 placeholder="Enter your symptoms or concerns..."
-                placeholderTextColor={theme.colors.textLight}
+                placeholderTextColor={colors.textLight}
                 multiline
                 numberOfLines={4}
                 value={problemDescription}
@@ -138,10 +141,10 @@ export default function BookingConfirmationScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
   },
   header: {
     flexDirection: "row",
@@ -156,7 +159,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: hp(2.2),
     fontWeight: "bold",
-    color: theme.colors.textOnPrimary,
+    color: colors.textOnPrimary,
     flex: 1,
     textAlign: "center",
   },
@@ -165,7 +168,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: theme.colors.screenColor,
+    backgroundColor: colors.screenColor,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     paddingTop: hp(3),
@@ -174,11 +177,11 @@ const styles = StyleSheet.create({
   infoCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: theme.colors.white,
+    backgroundColor: colors.white,
     borderRadius: 15,
     padding: wp(4),
     marginBottom: hp(2),
-    shadowColor: theme.colors.primary,
+    shadowColor: colors.primary,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -196,12 +199,12 @@ const styles = StyleSheet.create({
   doctorName: {
     fontSize: hp(2),
     fontWeight: "600",
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: hp(0.5),
   },
   doctorSpecialty: {
     fontSize: hp(1.6),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
   },
   section: {
     marginBottom: hp(2),
@@ -209,14 +212,14 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: hp(2),
     fontWeight: "600",
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: hp(1.5),
   },
   detailBox: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: colors.white,
     borderRadius: 15,
     padding: wp(4),
-    shadowColor: theme.colors.primary,
+    shadowColor: colors.primary,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -231,17 +234,17 @@ const styles = StyleSheet.create({
   detailLabel: {
     fontSize: hp(1.7),
     fontWeight: "600",
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: hp(0.8),
   },
   detailValue: {
     fontSize: hp(1.9),
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     fontWeight: "500",
   },
   divider: {
     height: 1,
-    backgroundColor: theme.colors.gray,
+    backgroundColor: colors.gray,
     marginVertical: hp(1),
   },
   timePickerContainer: {
@@ -250,46 +253,46 @@ const styles = StyleSheet.create({
     gap: wp(2),
   },
   timeSlot: {
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: colors.primarySoft,
     paddingHorizontal: wp(4),
     paddingVertical: hp(1),
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: theme.colors.primarySoft,
+    borderColor: colors.primarySoft,
   },
   timeSlotSelected: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   timeSlotText: {
     fontSize: hp(1.6),
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     fontWeight: "500",
   },
   timeSlotTextSelected: {
-    color: theme.colors.white,
+    color: colors.white,
     fontWeight: "600",
   },
   problemSection: {
     paddingVertical: hp(1),
   },
   problemInput: {
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: colors.primarySoft,
     borderRadius: 12,
     padding: wp(3),
     fontSize: hp(1.7),
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     minHeight: hp(12),
   },
   continueButton: {
-    backgroundColor: theme.colors.black,
+    backgroundColor: colors.black,
     paddingVertical: hp(2),
     paddingHorizontal: wp(6),
     borderRadius: 25,
     alignItems: "center",
     justifyContent: "center",
     marginVertical: hp(3),
-    shadowColor: theme.colors.black,
+    shadowColor: colors.black,
     shadowOffset: {
       width: 0,
       height: 3,
@@ -299,7 +302,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   continueButtonText: {
-    color: theme.colors.white,
+    color: colors.white,
     fontSize: hp(2),
     fontWeight: "600",
   },

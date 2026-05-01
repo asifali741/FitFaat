@@ -52,6 +52,10 @@ export default function Index() {
 
   if (!fontsLoaded) return null;
 
+  const headingLogoSource = isDarkMode
+    ? require("../../assets/images/new_black_logo.jpeg")
+    : require("../../assets/images/logo.png");
+
   return (
     <View style={styles.container}>
       <ScrollView 
@@ -76,8 +80,9 @@ export default function Index() {
           <View style={styles.mainHeading}>
             <Text style={styles.mainHeadingText}>Welcome To</Text>
             <Image
-              source={require("../../assets/images/logo.png")}
+              source={headingLogoSource}
               style={styles.logoStyle}
+              resizeMode={isDarkMode ? "cover" : "contain"}
             />
           </View>
           
@@ -181,10 +186,9 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
     color: colors.textPrimary,
   },
   logoStyle: {
-    width: Math.min(wp(20), 100),
-    height: Math.min(hp(8), 80),
+    width: Math.min(wp(24), 112),
+    height: Math.min(hp(8), 82),
     marginLeft: wp(2),
-    resizeMode: "contain",
   },
   paragraphText: {
     textAlign: "center",

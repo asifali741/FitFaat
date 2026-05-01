@@ -11,7 +11,8 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Days } from "./_Day";
 import { Day, jsonResponse } from "./types";
@@ -197,7 +198,7 @@ export default function DayPlan () {
   };
 
   const loadJson = async ({data, timestamp} : {data:jsonResponse, timestamp: Date}) =>{
-    var entry : keyof jsonResponse
+    let entry : keyof jsonResponse
     let foundActive = false;
     for (const key in data)
     {
@@ -316,7 +317,7 @@ export default function DayPlan () {
       <View style={[styles.content, { backgroundColor: colors.screenColor }]}>
         <ScrollView 
           style={styles.list}
-          contentContainerStyle={{ paddingBottom: 120, paddingTop: 12 }}
+          contentContainerStyle={{ paddingBottom: hp(15), paddingTop: hp(1.5) }}
           showsVerticalScrollIndicator={false} 
           showsHorizontalScrollIndicator={false}
           scrollEventThrottle={16}
@@ -341,13 +342,13 @@ export default function DayPlan () {
           }
         </ScrollView>
 
-        {/* Floating Diet Plan Button */}
         <TouchableOpacity
-          style={[styles.floatingButton, { backgroundColor: colors.primary }]}
+          style={[styles.floatingButton, { backgroundColor: colors.primary, shadowColor: colors.primary }]}
           onPress={() => setShowDietPlanViewer(true)}
-          activeOpacity={0.7}
+          activeOpacity={0.8}
         >
-          <Ionicons name="nutrition" size={24} color={colors.white} />
+          <Ionicons name="fast-food" size={18} color={colors.textOnPrimary} />
+          <Text style={[styles.floatingButtonText, { color: colors.textOnPrimary }]}>VIEW DIET</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -368,21 +369,29 @@ const styles = StyleSheet.create({
   },
   floatingButton: {
     position: 'absolute',
-    bottom: 30,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    bottom: hp(15),
+    right: wp(4),
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.2),
+    borderRadius: hp(4),
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 8,
-    shadowColor: '#000',
+    elevation: 12,
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 6,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+  },
+  floatingButtonText: {
+    fontSize: hp(1.5),
+    fontWeight: '900',
+    marginLeft: wp(2),
+    letterSpacing: 1,
   },
 });
 

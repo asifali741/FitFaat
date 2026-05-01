@@ -1,4 +1,5 @@
 import { theme } from "@/constants/theme";
+import { useTheme } from '@/contexts/ThemeContext';
 import { Ionicons } from "@expo/vector-icons";
 import { DrawerActions, useNavigation } from "@react-navigation/native";
 import { useRouter } from "expo-router";
@@ -8,6 +9,8 @@ import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-nat
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ApplicationStatusScreen() {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const router = useRouter();
   const navigation = useNavigation();
   const [progress, setProgress] = useState(0);
@@ -77,7 +80,7 @@ export default function ApplicationStatusScreen() {
           style={styles.menuButton}
           onPress={openDrawer}
         >
-          <Ionicons name="menu" size={24} color={theme.colors.surface} />
+          <Ionicons name="menu" size={24} color={colors.surface} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Application Status</Text>
         <View style={styles.spacer} />
@@ -92,7 +95,7 @@ export default function ApplicationStatusScreen() {
         {/* Status Icon */}
         <View style={styles.statusContainer}>
           <Animated.View style={[styles.statusIcon, { transform: [{ scale: pulseAnim }] }]}>
-            <Ionicons name="time" size={64} color={theme.colors.warning} />
+            <Ionicons name="time" size={64} color={colors.warning} />
           </Animated.View>
           <Text style={styles.statusTitle}>Application Under Review</Text>
           <Text style={styles.statusSubtitle}>
@@ -123,7 +126,7 @@ export default function ApplicationStatusScreen() {
                 <Ionicons 
                   name={step.completed ? "checkmark" : "time"} 
                   size={20} 
-                  color={step.completed ? theme.colors.surface : theme.colors.textSecondary} 
+                  color={step.completed ? colors.surface : colors.textSecondary} 
                 />
               </View>
               <View style={styles.timelineContent}>
@@ -144,7 +147,7 @@ export default function ApplicationStatusScreen() {
         {/* Information Card */}
         <View style={styles.infoCard}>
           <View style={styles.infoHeader}>
-            <Ionicons name="information-circle" size={24} color={theme.colors.info} />
+            <Ionicons name="information-circle" size={24} color={colors.info} />
             <Text style={styles.infoTitle}>What happens next?</Text>
           </View>
           <Text style={styles.infoText}>
@@ -167,11 +170,11 @@ export default function ApplicationStatusScreen() {
           </Text>
           <View style={styles.contactInfo}>
             <View style={styles.contactItem}>
-              <Ionicons name="mail" size={16} color={theme.colors.primary} />
+              <Ionicons name="mail" size={16} color={colors.primary} />
               <Text style={styles.contactItemText}>support@fitfaat.com</Text>
             </View>
             <View style={styles.contactItem}>
-              <Ionicons name="call" size={16} color={theme.colors.primary} />
+              <Ionicons name="call" size={16} color={colors.primary} />
               <Text style={styles.contactItemText}>+1 (555) 123-4567</Text>
             </View>
           </View>
@@ -183,7 +186,7 @@ export default function ApplicationStatusScreen() {
             style={styles.primaryButton}
             onPress={handleCheckStatus}
           >
-            <Ionicons name="refresh" size={20} color={theme.colors.surface} />
+            <Ionicons name="refresh" size={20} color={colors.surface} />
             <Text style={styles.primaryButtonText}>Check Status</Text>
           </TouchableOpacity>
           
@@ -191,7 +194,7 @@ export default function ApplicationStatusScreen() {
             style={styles.secondaryButton}
             onPress={handleGoHome}
           >
-            <Ionicons name="home" size={20} color={theme.colors.primary} />
+            <Ionicons name="home" size={20} color={colors.primary} />
             <Text style={styles.secondaryButtonText}>Go to Dashboard</Text>
           </TouchableOpacity>
         </View>
@@ -200,10 +203,10 @@ export default function ApplicationStatusScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
   },
   header: {
     flexDirection: "row",
@@ -211,7 +214,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: wp(5),
     paddingVertical: hp(2),
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
   },
   menuButton: {
     padding: 8,
@@ -219,14 +222,14 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: hp(2.5),
     fontWeight: "bold",
-    color: theme.colors.surface,
+    color: colors.surface,
   },
   spacer: {
     width: wp(18),
   },
   content: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: colors.background,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     paddingTop: hp(4),
@@ -240,7 +243,7 @@ const styles = StyleSheet.create({
     width: hp(12),
     height: hp(12),
     borderRadius: hp(6),
-    backgroundColor: theme.colors.warning + "20",
+    backgroundColor: colors.warning + "20",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: hp(2),
@@ -248,13 +251,13 @@ const styles = StyleSheet.create({
   statusTitle: {
     fontSize: Math.min(hp(2.8), wp(7)),
     fontWeight: "bold",
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     textAlign: "center",
     marginBottom: hp(1),
   },
   statusSubtitle: {
     fontSize: Math.min(hp(1.8), wp(4.5)),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: "center",
     lineHeight: Math.min(hp(2.5), wp(6)),
   },
@@ -270,22 +273,22 @@ const styles = StyleSheet.create({
   progressTitle: {
     fontSize: Math.min(hp(1.8), wp(4.5)),
     fontWeight: "600",
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
   },
   progressPercentage: {
     fontSize: Math.min(hp(1.8), wp(4.5)),
     fontWeight: "bold",
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   progressBar: {
     height: hp(0.8),
-    backgroundColor: theme.colors.border,
+    backgroundColor: colors.border,
     borderRadius: hp(0.4),
     overflow: "hidden",
   },
   progressFill: {
     height: "100%",
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     borderRadius: hp(0.4),
   },
   timelineSection: {
@@ -294,7 +297,7 @@ const styles = StyleSheet.create({
   timelineTitle: {
     fontSize: Math.min(hp(2), wp(5)),
     fontWeight: "bold",
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: hp(2),
   },
   timelineItem: {
@@ -312,10 +315,10 @@ const styles = StyleSheet.create({
     marginTop: hp(0.5),
   },
   timelineIconCompleted: {
-    backgroundColor: theme.colors.success,
+    backgroundColor: colors.success,
   },
   timelineIconPending: {
-    backgroundColor: theme.colors.border,
+    backgroundColor: colors.border,
   },
   timelineContent: {
     flex: 1,
@@ -326,23 +329,23 @@ const styles = StyleSheet.create({
     marginBottom: hp(0.5),
   },
   timelineStepTitleCompleted: {
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
   },
   timelineStepTitlePending: {
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
   },
   timelineStepDescription: {
     fontSize: Math.min(hp(1.5), wp(3.8)),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     lineHeight: Math.min(hp(2), wp(5)),
   },
   infoCard: {
-    backgroundColor: theme.colors.primary + "20",
+    backgroundColor: colors.primary + "20",
     borderRadius: 15,
     padding: hp(2.5),
     marginBottom: hp(3),
     borderLeftWidth: 4,
-    borderLeftColor: theme.colors.info,
+    borderLeftColor: colors.info,
   },
   infoHeader: {
     flexDirection: "row",
@@ -352,12 +355,12 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: Math.min(hp(1.8), wp(4.5)),
     fontWeight: "bold",
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginLeft: wp(2),
   },
   infoText: {
     fontSize: Math.min(hp(1.6), wp(4)),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     lineHeight: Math.min(hp(2.2), wp(5.5)),
     marginBottom: hp(1.5),
   },
@@ -366,26 +369,26 @@ const styles = StyleSheet.create({
   },
   infoDetailItem: {
     fontSize: Math.min(hp(1.5), wp(3.8)),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: hp(0.5),
   },
   contactCard: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 15,
     padding: hp(2.5),
     marginBottom: hp(4),
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
   },
   contactTitle: {
     fontSize: Math.min(hp(1.8), wp(4.5)),
     fontWeight: "bold",
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: hp(1),
   },
   contactText: {
     fontSize: Math.min(hp(1.6), wp(4)),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     lineHeight: Math.min(hp(2.2), wp(5.5)),
     marginBottom: hp(2),
   },
@@ -400,7 +403,7 @@ const styles = StyleSheet.create({
   },
   contactItemText: {
     fontSize: Math.min(hp(1.5), wp(3.8)),
-    color: theme.colors.primary,
+    color: colors.primary,
     marginLeft: wp(2),
     fontWeight: "500",
   },
@@ -412,7 +415,7 @@ const styles = StyleSheet.create({
   primaryButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     borderRadius: 25,
     paddingVertical: hp(2),
     paddingHorizontal: wp(6),
@@ -420,7 +423,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   primaryButtonText: {
-    color: theme.colors.surface,
+    color: colors.surface,
     fontSize: Math.min(hp(1.8), wp(4.5)),
     fontWeight: "600",
     marginLeft: wp(2),
@@ -428,17 +431,17 @@ const styles = StyleSheet.create({
   secondaryButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: theme.colors.background,
+    backgroundColor: colors.background,
     borderRadius: 25,
     paddingVertical: hp(2),
     paddingHorizontal: wp(6),
     flex: 0.48,
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: theme.colors.primary,
+    borderColor: colors.primary,
   },
   secondaryButtonText: {
-    color: theme.colors.primary,
+    color: colors.primary,
     fontSize: Math.min(hp(1.8), wp(4.5)),
     fontWeight: "600",
     marginLeft: wp(2),

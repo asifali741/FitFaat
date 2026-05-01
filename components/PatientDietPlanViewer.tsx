@@ -1,13 +1,13 @@
-import { theme } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 import { tokenStorage } from '@/utils/auth/tokenStorage';
+import { getBackendBaseUrl } from '@/utils/config';
 import { Ionicons } from '@expo/vector-icons';
-import Constants from 'expo-constants';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Modal,
-  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -15,9 +15,18 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
 
-const ENV = Constants.expoConfig?.extra;
-const BACKEND_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')).replace(/\/api\/?$/, '');
+const BACKEND_URL = getBackendBaseUrl().replace(/\/api\/?$/, '');
+
+const getApiMessage = (data: any, fallback: string) => {
+  if (typeof data?.message === 'string' && data.message.trim()) return data.message;
+  return fallback;
+};
+
+const isUnauthorizedResponse = (status?: number, message?: string) => {
+  return status === 401 || status === 403 || /not authorized|unauthorized|jwt expired|please login/i.test(message || '');
+};
 
 interface MealFood {
   foodName: string;
@@ -61,6 +70,9 @@ const PatientDietPlanViewer: React.FC<PatientDietPlanViewerProps> = ({
   onClose,
   patientId
 }) => {
+  const router = useRouter();
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const [dietPlans, setDietPlans] = useState<DietPlan[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<DietPlan | null>(null);
@@ -86,8 +98,20 @@ const PatientDietPlanViewer: React.FC<PatientDietPlanViewerProps> = ({
       console.log('Fetching diet plans for userId:', userId);
       console.log('User info:', userInfo);
       
+      if (!token) {
+        setDietPlans([]);
+        setSelectedPlan(null);
+        Alert.alert('Session expired', 'Please sign in again.', [
+          { text: 'OK', onPress: () => {
+            onClose();
+            router.replace('/(auth)');
+          }},
+        ]);
+        return;
+      }
+
       if (!userId) {
-        console.error('No user ID available');
+        console.log('[PatientDietPlanViewer] No user ID available');
         Alert.alert('Error', 'Unable to identify user. Please try logging in again.');
         return;
       }
@@ -99,22 +123,43 @@ const PatientDietPlanViewer: React.FC<PatientDietPlanViewerProps> = ({
         }
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
       console.log('Patient diet plans response:', data);
+      const message = getApiMessage(data, 'Failed to load diet plans');
+
+      if (isUnauthorizedResponse(response.status, message)) {
+        console.log('[PatientDietPlanViewer] Unauthorized diet plan fetch:', message);
+        setDietPlans([]);
+        setSelectedPlan(null);
+        await tokenStorage.clearAll();
+        Alert.alert('Session expired', 'Please sign in again.', [
+          { text: 'OK', onPress: () => {
+            onClose();
+            router.replace('/(auth)');
+          }},
+        ]);
+        return;
+      }
       
-      if (data.success) {
+      if (response.ok && data.success) {
         setDietPlans(data.dietPlans || []);
         if (data.dietPlans && data.dietPlans.length > 0) {
           setSelectedPlan(data.dietPlans[0]); // Select first plan by default
+        } else {
+          setSelectedPlan(null);
         }
       } else {
-        console.error('API returned error:', data.message);
-        if (data.message?.includes('Access denied')) {
+        console.log('[PatientDietPlanViewer] API returned error:', message);
+        setDietPlans([]);
+        setSelectedPlan(null);
+        if (message.includes('Access denied')) {
           Alert.alert('Info', 'No diet plans found. Your doctor will create one during your next appointment.');
+        } else {
+          Alert.alert('Error', message);
         }
       }
     } catch (error) {
-      console.error('Error fetching diet plans:', error);
+      console.log('[PatientDietPlanViewer] Error fetching diet plans:', error);
       Alert.alert('Error', 'Failed to load diet plans. Please check your connection and try again.');
     } finally {
       setLoading(false);
@@ -178,7 +223,7 @@ const PatientDietPlanViewer: React.FC<PatientDietPlanViewerProps> = ({
               mealType === 'dinner' ? 'moon' : 'cafe'
             } 
             size={20} 
-            color={theme.colors.primary} 
+            color={colors.primary} 
           />
           <Text style={styles.mealTitle}>
             {mealType.charAt(0).toUpperCase() + mealType.slice(1)}
@@ -205,7 +250,7 @@ const PatientDietPlanViewer: React.FC<PatientDietPlanViewerProps> = ({
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={theme.colors.primary} />
+              <ActivityIndicator size="large" color={colors.primary} />
               <Text style={styles.loadingText}>Loading your diet plans...</Text>
             </View>
           </View>
@@ -222,13 +267,13 @@ const PatientDietPlanViewer: React.FC<PatientDietPlanViewerProps> = ({
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>My Diet Plans</Text>
             <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color={theme.colors.textPrimary} />
+              <Ionicons name="close" size={24} color={colors.textPrimary} />
             </TouchableOpacity>
           </View>
 
           {dietPlans.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Ionicons name="restaurant-outline" size={64} color={theme.colors.textTertiary} />
+              <Ionicons name="restaurant-outline" size={64} color={colors.textTertiary} />
               <Text style={styles.emptyTitle}>No Diet Plans Yet</Text>
               <Text style={styles.emptyText}>
                 Your doctor hasn't created any diet plans for you yet. 
@@ -242,7 +287,7 @@ const PatientDietPlanViewer: React.FC<PatientDietPlanViewerProps> = ({
                 <RefreshControl
                   refreshing={refreshing}
                   onRefresh={onRefresh}
-                  colors={[theme.colors.primary]}
+                  colors={[colors.primary]}
                 />
               }
             >
@@ -391,29 +436,29 @@ const PatientDietPlanViewer: React.FC<PatientDietPlanViewerProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: theme.colors.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: wp(6),
+    borderTopRightRadius: wp(6),
     height: '90%',
-    padding: 20,
+    padding: wp(5),
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: hp(2),
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: hp(2.5),
     fontWeight: 'bold',
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
   },
   loadingContainer: {
     flex: 1,
@@ -421,135 +466,135 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: theme.colors.textSecondary,
+    marginTop: hp(2),
+    fontSize: hp(2),
+    color: colors.textSecondary,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: wp(10),
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: hp(2.2),
     fontWeight: '600',
-    color: theme.colors.textPrimary,
-    marginTop: 16,
-    marginBottom: 8,
+    color: colors.textPrimary,
+    marginTop: hp(2),
+    marginBottom: hp(1),
   },
   emptyText: {
-    fontSize: 14,
-    color: theme.colors.textSecondary,
+    fontSize: hp(1.8),
+    color: colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: hp(2.5),
   },
   contentContainer: {
     flex: 1,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: hp(2),
     fontWeight: 'bold',
-    color: theme.colors.textPrimary,
-    marginBottom: 12,
+    color: colors.textPrimary,
+    marginBottom: hp(1.5),
   },
   planSelector: {
-    marginBottom: 24,
+    marginBottom: hp(3),
   },
   planCard: {
-    backgroundColor: theme.colors.background,
-    padding: 16,
-    borderRadius: 12,
-    marginRight: 12,
-    minWidth: 200,
+    backgroundColor: colors.background,
+    padding: wp(4),
+    borderRadius: wp(3),
+    marginRight: wp(3),
+    minWidth: wp(50),
     borderWidth: 2,
     borderColor: 'transparent',
   },
   planCardActive: {
-    borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.primary + '10',
+    borderColor: colors.primary,
+    backgroundColor: colors.primary + '10',
   },
   planTitle: {
-    fontSize: 14,
+    fontSize: hp(1.8),
     fontWeight: '600',
-    color: theme.colors.textPrimary,
-    marginBottom: 4,
+    color: colors.textPrimary,
+    marginBottom: hp(0.5),
   },
   planTitleActive: {
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   planDate: {
-    fontSize: 12,
-    color: theme.colors.textSecondary,
-    marginBottom: 4,
+    fontSize: hp(1.5),
+    color: colors.textSecondary,
+    marginBottom: hp(0.5),
   },
   planDateActive: {
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   planCalories: {
-    fontSize: 12,
-    color: theme.colors.textSecondary,
-    marginBottom: 4,
+    fontSize: hp(1.5),
+    color: colors.textSecondary,
+    marginBottom: hp(0.5),
   },
   planCaloriesActive: {
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   planDoctor: {
-    fontSize: 11,
-    color: theme.colors.textTertiary,
+    fontSize: hp(1.3),
+    color: colors.textTertiary,
   },
   planDoctorActive: {
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   notesSection: {
-    backgroundColor: theme.colors.background,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 24,
+    backgroundColor: colors.background,
+    padding: wp(4),
+    borderRadius: wp(3),
+    marginBottom: hp(3),
   },
   notesText: {
-    fontSize: 14,
-    color: theme.colors.textSecondary,
-    lineHeight: 20,
+    fontSize: hp(1.8),
+    color: colors.textSecondary,
+    lineHeight: hp(2.5),
   },
   daySelector: {
-    marginBottom: 24,
+    marginBottom: hp(3),
   },
   dayButton: {
-    padding: 12,
-    marginRight: 12,
-    borderRadius: 12,
-    backgroundColor: theme.colors.background,
+    padding: wp(3),
+    marginRight: wp(3),
+    borderRadius: wp(3),
+    backgroundColor: colors.background,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    minWidth: 60,
+    borderColor: colors.border,
+    minWidth: wp(15),
     alignItems: 'center',
   },
   dayButtonActive: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   dayButtonText: {
-    fontSize: 14,
+    fontSize: hp(1.8),
     fontWeight: '500',
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
   },
   dayButtonTextActive: {
-    color: theme.colors.surface,
+    color: colors.textOnPrimary,
   },
   dayCalories: {
-    fontSize: 10,
-    color: theme.colors.textSecondary,
-    marginTop: 2,
+    fontSize: hp(1.2),
+    color: colors.textSecondary,
+    marginTop: hp(0.2),
   },
   dayCaloriesActive: {
-    color: theme.colors.surface,
+    color: colors.textOnPrimary,
   },
   dailySummary: {
-    backgroundColor: theme.colors.background,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 24,
+    backgroundColor: colors.background,
+    padding: wp(4),
+    borderRadius: wp(3),
+    marginBottom: hp(3),
   },
   summaryRow: {
     flexDirection: 'row',
@@ -559,65 +604,66 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   summaryLabel: {
-    fontSize: 12,
-    color: theme.colors.textSecondary,
-    marginBottom: 4,
+    fontSize: hp(1.5),
+    color: colors.textSecondary,
+    marginBottom: hp(0.5),
   },
   summaryValue: {
-    fontSize: 14,
+    fontSize: hp(1.8),
     fontWeight: '600',
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   mealsContainer: {
-    marginBottom: 32,
+    marginBottom: hp(4),
   },
   mealSection: {
-    backgroundColor: theme.colors.background,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    backgroundColor: colors.background,
+    borderRadius: wp(3),
+    padding: wp(4),
+    marginBottom: hp(2),
   },
   mealHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: hp(1.5),
   },
   mealTitle: {
-    fontSize: 16,
+    fontSize: hp(2),
     fontWeight: '600',
-    color: theme.colors.textPrimary,
-    marginLeft: 8,
+    color: colors.textPrimary,
+    marginLeft: wp(2),
   },
   foodItem: {
-    backgroundColor: theme.colors.surface,
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
+    backgroundColor: colors.surface,
+    padding: wp(3),
+    borderRadius: wp(2),
+    marginBottom: hp(1),
     borderLeftWidth: 3,
-    borderLeftColor: theme.colors.primary,
+    borderLeftColor: colors.primary,
   },
   foodInfo: {
     flex: 1,
   },
   foodName: {
-    fontSize: 14,
+    fontSize: hp(1.8),
     fontWeight: '500',
-    color: theme.colors.textPrimary,
-    marginBottom: 4,
+    color: colors.textPrimary,
+    marginBottom: hp(0.5),
   },
   foodDetails: {
-    fontSize: 12,
-    color: theme.colors.textSecondary,
+    fontSize: hp(1.5),
+    color: colors.textSecondary,
   },
   emptyDay: {
-    padding: 32,
+    padding: hp(4),
     alignItems: 'center',
   },
   emptyDayText: {
-    fontSize: 14,
-    color: theme.colors.textTertiary,
+    fontSize: hp(1.8),
+    color: colors.textTertiary,
     fontStyle: 'italic',
   },
 });
 
 export default PatientDietPlanViewer;
+

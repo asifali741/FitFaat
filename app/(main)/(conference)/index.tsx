@@ -4,12 +4,12 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect } from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ConferenceScreen() {
-  const { colors } = useTheme();
+  const { colors, isDarkMode } = useTheme();
   const router = useRouter();
   const { appointments } = useAppointments();
   const styles = getStyles(colors);
@@ -30,20 +30,23 @@ export default function ConferenceScreen() {
   }, [appointments]);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <AppHeader 
-        title="Video Conference"
-        showStepIndicator={true}
-        currentStep={1}
-        totalSteps={3}
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <StatusBar
+        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+        backgroundColor={colors.screenColor}
       />
+      <View style={styles.container}>
+        <AppHeader 
+          title="Video Conference"
+          showStepIndicator={false}
+        />
 
       {/* Main Content */}
-      <ScrollView 
-        style={styles.content}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+        <ScrollView 
+          style={styles.content}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
         <View style={styles.welcomeSection}>
           <View style={styles.iconContainer}>
             <Ionicons name="videocam" size={hp(8)} color={colors.primary} />
@@ -97,12 +100,17 @@ export default function ConferenceScreen() {
             <Text style={styles.chatButtonText}>My Chats</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
+        </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
 
 const getStyles = (colors: any) => StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.screenColor,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.primary,
@@ -126,8 +134,6 @@ const getStyles = (colors: any) => StyleSheet.create({
   content: {
     flex: 1,
     backgroundColor: colors.screenColor,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
   },
   scrollContent: {
     paddingTop: hp(4),
@@ -171,10 +177,10 @@ const getStyles = (colors: any) => StyleSheet.create({
   featureItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: Math.min(hp(1.8), wp(4)),
+    paddingVertical: hp(2),
     paddingHorizontal: wp(4),
     backgroundColor: colors.primarySoft,
-    borderRadius: 15,
+    borderRadius: wp(4),
     marginBottom: hp(1.2),
     marginHorizontal: wp(1),
   },
@@ -191,9 +197,9 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   scheduleButton: {
     backgroundColor: colors.primary,
-    paddingVertical: Math.min(hp(2.2), wp(5.5)),
+    paddingVertical: hp(2.2),
     paddingHorizontal: wp(6),
-    borderRadius: 25,
+    borderRadius: wp(6),
     alignItems: "center",
     justifyContent: "center",
     shadowColor: colors.primary,
@@ -215,9 +221,9 @@ const getStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.white,
     borderColor: colors.primary,
     borderWidth: 2,
-    paddingVertical: Math.min(hp(2.2), wp(5.5)),
+    paddingVertical: hp(2.2),
     paddingHorizontal: wp(6),
-    borderRadius: 25,
+    borderRadius: wp(6),
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
@@ -242,9 +248,9 @@ const getStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.white,
     borderColor: colors.primary,
     borderWidth: 2,
-    paddingVertical: Math.min(hp(2.2), wp(5.5)),
+    paddingVertical: hp(2.2),
     paddingHorizontal: wp(6),
-    borderRadius: 25,
+    borderRadius: wp(6),
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",

@@ -1,23 +1,8 @@
-import Constants from 'expo-constants';
-import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { tokenStorage } from '@/utils/auth/tokenStorage';
+import { getBackendUrl } from './config';
 
-const ENV = Constants.expoConfig?.extra;
-
-// Get base URL from environment variables
-const getBaseURL = () => {
-  const envUrl = ENV?.EXPO_PUBLIC_BACKEND_API_URL;
-  if (envUrl) {
-    // envUrl already includes /api, so return it directly
-    return envUrl;
-  }
-  // Default: use 10.0.2.2 for Android emulator, localhost for iOS
-  const defaultHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
-  return `http://${defaultHost}:5001/api`;
-};
-
-const API_BASE_URL = getBaseURL();
+const API_BASE_URL = getBackendUrl();
 
 export const dailyLogsApi = {
   // Check and create new cycle if needed (handles expired/completed cycles)
@@ -65,7 +50,7 @@ export const dailyLogsApi = {
         newWeeklyTrackingId: data.newWeeklyTrackingId,
         message: data.message
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error checking/creating cycle:', error);
       throw error;
     }
@@ -92,7 +77,7 @@ export const dailyLogsApi = {
         throw new Error(data.message || 'Failed to create weekly plan');
       }
       return data.data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating weekly plan:', error);
       throw error;
     }
@@ -314,7 +299,7 @@ export const dailyLogsApi = {
       }
       
       return data.data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('💥 Complete Day Error:', error);
       console.error('Error details:', {
         name: error.name,

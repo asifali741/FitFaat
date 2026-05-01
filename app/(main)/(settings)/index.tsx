@@ -6,7 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DrawerActions, useNavigation } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { Alert, Linking, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import { Alert, Linking, ScrollView, StatusBar, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -317,16 +317,21 @@ export default function Settings() {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.primary }]}>
-      <AppHeader 
-        title="Settings"
-        showStepIndicator={false}
-        showMenuButton={true}
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.screenColor }]} edges={['top']}>
+      <StatusBar
+        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+        backgroundColor={colors.screenColor}
       />
+      <View style={[styles.container, { backgroundColor: colors.primary }]}>
+        <AppHeader 
+          title="Settings"
+          showStepIndicator={false}
+          showMenuButton={true}
+        />
 
-      {/* Main Content */}
-      <View style={[styles.content, { backgroundColor: colors.screenColor }]}>
-        <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Main Content */}
+        <View style={[styles.content, { backgroundColor: colors.screenColor }]}>
+          <ScrollView showsVerticalScrollIndicator={false}>
           {/* Account Section */}
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Account</Text>
@@ -525,20 +530,22 @@ export default function Settings() {
         </View>
 
           <View style={{ height: hp(4) }} />
-        </ScrollView>
+          </ScrollView>
+        </View>
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+  },
   container: {
     flex: 1,
   },
   content: {
     flex: 1,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
   },
   section: {
     marginTop: hp(2),

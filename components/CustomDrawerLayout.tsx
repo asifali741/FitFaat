@@ -5,28 +5,57 @@ import {
     DrawerContentComponentProps,
     DrawerItem
 } from "@react-navigation/drawer";
-import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { useEffect, useRef, useState } from "react";
-import { Image, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Animated, {
     useAnimatedStyle,
     useSharedValue,
     withSpring,
 } from "react-native-reanimated";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
+} from "react-native-responsive-screen";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { DrawerFonts } from "../app/(main)/(settings)/_ui_elements";
+import { getBackendBaseUrl } from '@/utils/config';
 type DrawerSceneWrapperProps = DrawerContentComponentProps;
 
-// Helper function to get API URL
 const getAPIURL = () => {
-  const ENV = Constants.expoConfig?.extra;
-  const apiUrl = ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001');
-  return apiUrl.replace(/\/api\/?$/, '');
+  return getBackendBaseUrl();
+};
+
+const AnimatedLogoutLetter = ({
+  letter,
+  isActive,
+  textStyle,
+}: {
+  letter: string;
+  isActive: boolean;
+  textStyle: any;
+}) => {
+  const scale = useSharedValue(1);
+
+  useEffect(() => {
+    scale.value = withSpring(isActive ? 1.5 : 1, {
+      damping: 6,
+      stiffness: 200,
+    });
+  }, [isActive, scale]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <Animated.Text style={[textStyle, animatedStyle]}>{letter}</Animated.Text>
+  );
 };
 
 export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const { user } = useUser(); // Get Clerk user
   const [userName, setUserName] = useState('User');
   const [userEmail, setUserEmail] = useState('user@example.com');
@@ -45,7 +74,7 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
       if (!token) return;
 
       const API_URL = getAPIURL();
-      const baseURL = Platform.OS === 'android' ? API_URL.replace('localhost', '10.0.2.2') : API_URL;
+      const baseURL = API_URL;
 
       const response = await fetch(`${baseURL}/api/doctors/status`, {
         method: 'GET',
@@ -105,8 +134,7 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
       }
 
       const API_URL = getAPIURL();
-      console.log('API_URL from config:', API_URL);
-      const baseURL = Platform.OS === 'android' ? API_URL.replace('localhost', '10.0.2.2') : API_URL;
+      const baseURL = API_URL;
       console.log('Base URL:', baseURL);
       console.log('Fetching from:', `${baseURL}/api/user/profile`);
 
@@ -168,7 +196,22 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
     return currentRoute === '(exercises)/workout' || currentRoute.startsWith('(exercises)');
   };
 
-  const styles = getStyles(colors);
+  const styles = getStyles(colors, insets.bottom);
+  const drawerLabelStyle = {
+    marginLeft: wp(2),
+    fontSize: Math.min(hp(2.2), wp(4.8)),
+    fontFamily: "PoppinsMedium500",
+    color: colors.textOnPrimary,
+  };
+  const drawerItemStyle = (isActive: boolean) => ({
+    marginHorizontal: wp(3.2),
+    marginVertical: hp(0.2),
+    borderRadius: wp(6.5),
+    paddingHorizontal: wp(5),
+    paddingVertical: hp(1),
+    minHeight: hp(5.6),
+    backgroundColor: isActive ? colors.drawerActiveTabColor : 'transparent',
+  });
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.drawerBackground }}>
@@ -197,124 +240,50 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
       </TouchableOpacity>
 
       {/* Drawer Items */}
-      <View style={{ flex: 1, paddingVertical: 10 }}>
+      <ScrollView
+        style={styles.drawerItems}
+        contentContainerStyle={styles.drawerItemsContent}
+        showsVerticalScrollIndicator={false}
+      >
         <DrawerItem
           label="Dashboard"
           onPress={() => props.navigation.navigate('(dashboard)')}
-          labelStyle={{
-            marginLeft: 8,
-            fontSize: 18,
-            fontFamily: "PoppinsMedium500",
-            color: colors.textOnPrimary,
-          }}
-          style={{
-            marginHorizontal: 12,
-            marginVertical: 1,
-            borderRadius: 25,
-            paddingHorizontal: 20,
-            paddingVertical: 8,
-            minHeight: 45,
-            backgroundColor: isRouteActive('(dashboard)') ? colors.drawerActiveTabColor : 'transparent',
-          }}
+          labelStyle={drawerLabelStyle}
+          style={drawerItemStyle(isRouteActive('(dashboard)'))}
         />
         <DrawerItem
           label="Chatbot"
           onPress={() => props.navigation.navigate('(chatbot)')}
-          labelStyle={{
-            marginLeft: 8,
-            fontSize: 18,
-            fontFamily: "PoppinsMedium500",
-            color: colors.textOnPrimary,
-          }}
-          style={{
-            marginHorizontal: 12,
-            marginVertical: 1,
-            borderRadius: 25,
-            paddingHorizontal: 20,
-            paddingVertical: 8,
-            minHeight: 45,
-            backgroundColor: isRouteActive('(chatbot)') ? colors.drawerActiveTabColor : 'transparent',
-          }}
+          labelStyle={drawerLabelStyle}
+          style={drawerItemStyle(isRouteActive('(chatbot)'))}
         />
         {!isDoctor && (
           <DrawerItem
             label="Conference"
             onPress={() => props.navigation.navigate('(conference)')}
-            labelStyle={{
-              marginLeft: 8,
-              fontSize: 18,
-              fontFamily: "PoppinsMedium500",
-              color: colors.textOnPrimary,
-            }}
-            style={{
-              marginHorizontal: 12,
-              marginVertical: 1,
-              borderRadius: 25,
-              paddingHorizontal: 20,
-              paddingVertical: 8,
-              minHeight: 45,
-              backgroundColor: isRouteActive('(conference)') ? colors.drawerActiveTabColor : 'transparent',
-            }}
+            labelStyle={drawerLabelStyle}
+            style={drawerItemStyle(isRouteActive('(conference)'))}
           />
         )}
         <DrawerItem
           label="Workouts 👑"
           onPress={() => props.navigation.navigate('(exercises)/workout')}
-          labelStyle={{
-            marginLeft: 8,
-            fontSize: 18,
-            fontFamily: "PoppinsMedium500",
-            color: colors.textOnPrimary,
-          }}
-          style={{
-            marginHorizontal: 12,
-            marginVertical: 1,
-            borderRadius: 25,
-            paddingHorizontal: 20,
-            paddingVertical: 8,
-            minHeight: 45,
-            backgroundColor: isExercisesActive() ? colors.drawerActiveTabColor : 'transparent',
-          }}
+          labelStyle={drawerLabelStyle}
+          style={drawerItemStyle(isExercisesActive())}
         />
         <DrawerItem
           label={isDoctor && doctorName ? `Dr. ${doctorName} 👨‍⚕️` : "Join as Doctor 👨‍⚕️"}
           onPress={() => props.navigation.navigate('(doctor-portal)')}
-          labelStyle={{
-            marginLeft: 8,
-            fontSize: 18,
-            fontFamily: "PoppinsMedium500",
-            color: colors.textOnPrimary,
-          }}
-          style={{
-            marginHorizontal: 12,
-            marginVertical: 1,
-            borderRadius: 25,
-            paddingHorizontal: 20,
-            paddingVertical: 8,
-            minHeight: 45,
-            backgroundColor: isRouteActive('(doctor-portal)') ? colors.drawerActiveTabColor : 'transparent',
-          }}
+          labelStyle={drawerLabelStyle}
+          style={drawerItemStyle(isRouteActive('(doctor-portal)'))}
         />
         <DrawerItem
           label="Settings"
           onPress={() => props.navigation.navigate('(settings)')}
-          labelStyle={{
-            marginLeft: 8,
-            fontSize: 18,
-            fontFamily: "PoppinsMedium500",
-            color: colors.textOnPrimary,
-          }}
-          style={{
-            marginHorizontal: 12,
-            marginVertical: 1,
-            borderRadius: 25,
-            paddingHorizontal: 20,
-            paddingVertical: 8,
-            minHeight: 45,
-            backgroundColor: isRouteActive('(settings)') ? colors.drawerActiveTabColor : 'transparent',
-          }}
+          labelStyle={drawerLabelStyle}
+          style={drawerItemStyle(isRouteActive('(settings)'))}
         />
-      </View>
+      </ScrollView>
 
       {/* Bottom Part */}
       <Logout_Button/>
@@ -325,27 +294,18 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
 
 const Logout_Button = () => {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const { signOut } = useAuth();
   const { user } = useUser();
   const baseText = "Logout".split(""); // Array of letters
   const [activeIndex, setActiveIndex] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Shared values for each letter
-  const scales = baseText.map(() => useSharedValue(1));
-
-  const animateLetter = (index: number) => {
-    scales.forEach((s, i) => {
-      s.value = withSpring(i === index ? 1.5 : 1, { damping: 6, stiffness: 200 });
-    });
-  };
-
   const handleLongPress = () => {
     if (intervalRef.current) return;
     intervalRef.current = setInterval(() => {
       setActiveIndex((prev) => {
         const next = (prev + 1) % baseText.length;
-        animateLetter(next);
         return next;
       });
     }, 200);
@@ -357,7 +317,6 @@ const Logout_Button = () => {
       intervalRef.current = null;
     }
     setActiveIndex(0);
-    animateLetter(0);
 
     try {
       // Check if user is logged in with Clerk
@@ -381,7 +340,7 @@ const Logout_Button = () => {
     }
   };
 
-  const styles = getStyles(colors);
+  const styles = getStyles(colors, insets.bottom);
 
   return (
     <Pressable
@@ -389,36 +348,33 @@ const Logout_Button = () => {
       onLongPress={handleLongPress}
       onPressOut={handlePressOut}
     >
-      <Ionicons name="log-out" size={24} color={colors.textOnPrimary} />
-      <View style={{ flexDirection: "row", marginLeft: 5 }}>
-        {baseText.map((letter, i) => {
-          const animatedStyle = useAnimatedStyle(() => ({
-            transform: [{ scale: scales[i].value }],
-          }));
-
-          return (
-            <Animated.Text key={i} style={[styles.logoutText, animatedStyle]}>
-              {letter}
-            </Animated.Text>
-          );
-        })}
+      <Ionicons name="log-out" size={Math.min(hp(3), wp(6.4))} color={colors.textOnPrimary} />
+      <View style={styles.logoutTextRow}>
+        {baseText.map((letter, i) => (
+          <AnimatedLogoutLetter
+            key={`${letter}-${i}`}
+            letter={letter}
+            isActive={activeIndex === i}
+            textStyle={styles.logoutText}
+          />
+        ))}
       </View>
     </Pressable>
   );
 };
 
 
-const getStyles = (colors: any) => StyleSheet.create({
+const getStyles = (colors: any, bottomInset = 0) => StyleSheet.create({
   userContainer: {
   flexDirection: "row",
   alignItems: "center",
-  padding: 16,
-  marginHorizontal: 12,
+  padding: wp(4),
+  marginHorizontal: wp(3.2),
   backgroundColor: colors.cardBackground,
   borderBottomWidth: 1,
   borderBottomColor: colors.cardBorder,
-  borderRadius: 25,
-  marginBottom: 20,
+  borderRadius: wp(6.5),
+  marginBottom: hp(2.5),
 },
 
 userInfo: {
@@ -435,32 +391,45 @@ userName: {
 userEmail: {
   fontSize: DrawerFonts.drawerEmail,
   color: colors.textSecondary,
-  marginTop: 2,
+  marginTop: hp(0.25),
 },
 
   userImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginRight: 12,
+    width: Math.min(wp(15), hp(7.4)),
+    height: Math.min(wp(15), hp(7.4)),
+    borderRadius: Math.min(wp(7.5), hp(3.7)),
+    marginRight: wp(3.2),
     borderWidth: 2,
     borderColor: colors.cardBorder,
+  },
+  drawerItems: {
+    flex: 1,
+  },
+  drawerItemsContent: {
+    paddingVertical: hp(1.2),
+    paddingBottom: hp(2),
   },
   logoutButton: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
-    marginHorizontal: 12,
-    marginVertical: 20,
+    paddingVertical: hp(1.7),
+    paddingHorizontal: wp(4),
+    marginHorizontal: wp(3.2),
+    marginTop: hp(1.2),
+    marginBottom: bottomInset + hp(13),
     backgroundColor: colors.error,
-    borderRadius: 25,
+    borderRadius: wp(6.5),
     justifyContent: "center",
     alignSelf: 'stretch',
   },
+  logoutTextRow: {
+    flexDirection: "row",
+    marginLeft: wp(1.5),
+  },
   logoutText: {
     color: colors.white,
-    fontSize: 16,
+    fontSize: Math.min(hp(2), wp(4.3)),
     fontWeight: "600",
-    marginLeft: 8,
+    marginLeft: wp(0.4),
   },
 });

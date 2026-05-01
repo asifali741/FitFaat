@@ -20,6 +20,7 @@ import {
 } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { getBackendBaseUrl } from '@/utils/config';
 
 const ENV = Constants.expoConfig?.extra;
 
@@ -28,8 +29,7 @@ const getAPIURL = () => {
   if (envUrl) {
     return envUrl.replace(/\/api\/?$/, '');
   }
-  const defaultHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
-  return `http://${defaultHost}:5001`;
+  return getBackendBaseUrl();
 };
 
 const API_URL = getAPIURL();

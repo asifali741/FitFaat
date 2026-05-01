@@ -1,4 +1,4 @@
-import { theme } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 import React from 'react';
 import {
     Keyboard,
@@ -31,6 +31,9 @@ export const KeyboardAwareContainer: React.FC<KeyboardAwareContainerProps> = ({
   contentContainerStyle,
   keyboardVerticalOffset = 0,
 }) => {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
+
   const dismissKeyboard = () => {
     Keyboard.dismiss();
   };
@@ -65,10 +68,10 @@ export const KeyboardAwareContainer: React.FC<KeyboardAwareContainerProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: colors.screenColor,
   },
   keyboardView: {
     flex: 1,

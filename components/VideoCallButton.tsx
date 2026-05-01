@@ -2,6 +2,10 @@ import { theme } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { ActivityIndicator, StyleSheet, TouchableOpacity } from 'react-native';
+import {
+  heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
+} from 'react-native-responsive-screen';
 
 interface VideoCallButtonProps {
   onPress: () => void;
@@ -14,7 +18,7 @@ export default function VideoCallButton({
   onPress, 
   disabled = false, 
   loading = false,
-  size = 26 
+  size = Math.min(hp(3.2), wp(6.9))
 }: VideoCallButtonProps) {
   return (
     <TouchableOpacity
@@ -38,9 +42,9 @@ export default function VideoCallButton({
 
 const styles = StyleSheet.create({
   button: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: Math.min(hp(5.4), wp(11.7)),
+    height: Math.min(hp(5.4), wp(11.7)),
+    borderRadius: Math.min(hp(2.7), wp(5.9)),
     backgroundColor: theme.colors.accent,
     justifyContent: 'center',
     alignItems: 'center',

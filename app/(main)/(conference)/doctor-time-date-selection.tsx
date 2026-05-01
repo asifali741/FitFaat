@@ -1,5 +1,6 @@
 import AppHeader from '@/components/AppHeader';
 import { theme } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 import { authApi } from '@/utils/auth/authApi';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -18,6 +19,8 @@ import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-nat
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function DoctorSelectionScreen() {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const router = useRouter();
   const [doctors, setDoctors] = useState<any[]>([]);
   const [isLoadingDoctors, setIsLoadingDoctors] = useState(true);
@@ -206,11 +209,11 @@ export default function DoctorSelectionScreen() {
 
             {isLoadingDoctors ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={theme.colors.primary} />
+                <ActivityIndicator size="large" color={colors.primary} />
               </View>
             ) : doctors.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <Ionicons name="person-remove" size={48} color={theme.colors.textSecondary} />
+                <Ionicons name="person-remove" size={48} color={colors.textSecondary} />
                 <Text style={styles.emptyText}>No doctors available</Text>
               </View>
             ) : (
@@ -226,14 +229,14 @@ export default function DoctorSelectionScreen() {
                   >
                     <View style={styles.doctorContent}>
                       <View style={styles.doctorAvatar}>
-                        <Ionicons name="person" size={32} color={theme.colors.primary} />
+                        <Ionicons name="person" size={32} color={colors.primary} />
                       </View>
                       <View style={styles.doctorInfo}>
                         <Text style={styles.doctorName}>{doctor.name}</Text>
                         <Text style={styles.doctorSpecialty}>{doctor.specialty}</Text>
                         <Text style={styles.doctorExperience}>{doctor.experience}</Text>
                         <View style={styles.ratingContainer}>
-                          <Ionicons name="star" size={14} color={theme.colors.warning} />
+                          <Ionicons name="star" size={14} color={colors.warning} />
                           <Text style={styles.ratingText}>{doctor.rating}</Text>
                         </View>
                       </View>
@@ -244,7 +247,7 @@ export default function DoctorSelectionScreen() {
                     </View>
                     {selectedDoctor?.id === doctor.id && (
                       <View style={styles.checkmark}>
-                        <Ionicons name="checkmark-circle" size={24} color={theme.colors.statusConfirmed} />
+                        <Ionicons name="checkmark-circle" size={24} color={colors.statusConfirmed} />
                       </View>
                     )}
                   </TouchableOpacity>
@@ -278,7 +281,7 @@ export default function DoctorSelectionScreen() {
                       <Text style={styles.dateDisplay}>{dateObj.display}</Text>
                     </View>
                     {selectedDate === dateObj.date && (
-                      <Ionicons name="checkmark-circle" size={24} color={theme.colors.statusConfirmed} />
+                      <Ionicons name="checkmark-circle" size={24} color={colors.statusConfirmed} />
                     )}
                   </View>
                 </TouchableOpacity>
@@ -297,7 +300,7 @@ export default function DoctorSelectionScreen() {
 
             {isLoadingSlots ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={theme.colors.primary} />
+                <ActivityIndicator size="large" color={colors.primary} />
                 <Text style={styles.loadingText}>Loading available slots...</Text>
               </View>
             ) : (
@@ -330,7 +333,7 @@ export default function DoctorSelectionScreen() {
                         <Ionicons 
                           name="close-circle" 
                           size={16} 
-                          color={theme.colors.error} 
+                          color={colors.error} 
                           style={styles.bookedIcon}
                         />
                       )}
@@ -365,16 +368,16 @@ export default function DoctorSelectionScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
   },
   content: {
     flex: 1,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    backgroundColor: theme.colors.background,
+    borderTopLeftRadius: wp(8),
+    borderTopRightRadius: wp(8),
+    backgroundColor: colors.background,
     paddingTop: hp(3),
     paddingHorizontal: wp(5),
   },
@@ -384,12 +387,12 @@ const styles = StyleSheet.create({
   stepTitle: {
     fontSize: hp(2.5),
     fontWeight: theme.typography.fontWeight.bold as any,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: hp(0.5),
   },
   stepSubtitle: {
     fontSize: hp(1.6),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: hp(2),
   },
   loadingContainer: {
@@ -404,25 +407,25 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: hp(1.8),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: hp(1),
   },
   loadingText: {
     fontSize: hp(1.6),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: hp(2),
   },
   doctorCard: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: theme.borderRadius.large,
     padding: wp(4),
     marginBottom: hp(1.5),
     borderWidth: 2,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
   },
   doctorCardSelected: {
-    borderColor: theme.colors.statusConfirmed,
-    backgroundColor: theme.colors.primary + '10',
+    borderColor: colors.statusConfirmed,
+    backgroundColor: colors.primary + '10',
   },
   doctorContent: {
     flexDirection: 'row',
@@ -432,7 +435,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: theme.colors.primary + '20',
+    backgroundColor: colors.primary + '20',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: wp(3),
@@ -443,17 +446,17 @@ const styles = StyleSheet.create({
   doctorName: {
     fontSize: hp(1.8),
     fontWeight: theme.typography.fontWeight.semiBold as any,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: hp(0.3),
   },
   doctorSpecialty: {
     fontSize: hp(1.5),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: hp(0.2),
   },
   doctorExperience: {
     fontSize: hp(1.4),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: hp(0.3),
   },
   ratingContainer: {
@@ -462,7 +465,7 @@ const styles = StyleSheet.create({
   },
   ratingText: {
     fontSize: hp(1.4),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     marginLeft: wp(1),
   },
   feeContainer: {
@@ -470,12 +473,12 @@ const styles = StyleSheet.create({
   },
   feeLabel: {
     fontSize: hp(1.2),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
   },
   feeAmount: {
     fontSize: hp(1.8),
     fontWeight: theme.typography.fontWeight.bold as any,
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   checkmark: {
     position: 'absolute',
@@ -491,33 +494,33 @@ const styles = StyleSheet.create({
   timeSlot: {
     width: '30%',
     aspectRatio: 1,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: theme.borderRadius.medium,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: hp(2),
     borderWidth: 2,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
   },
   timeSlotSelected: {
-    backgroundColor: theme.colors.statusConfirmed,
-    borderColor: theme.colors.statusConfirmed,
+    backgroundColor: colors.statusConfirmed,
+    borderColor: colors.statusConfirmed,
   },
   timeSlotText: {
     fontSize: hp(1.5),
     fontWeight: theme.typography.fontWeight.semiBold as any,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
   },
   timeSlotTextSelected: {
-    color: theme.colors.surface,
+    color: colors.surface,
   },
   timeSlotBooked: {
-    backgroundColor: theme.colors.disabled,
-    borderColor: theme.colors.error,
+    backgroundColor: colors.disabled,
+    borderColor: colors.error,
     opacity: 0.6,
   },
   timeSlotTextBooked: {
-    color: theme.colors.error,
+    color: colors.error,
     textDecorationLine: 'line-through',
   },
   bookedIcon: {
@@ -526,16 +529,16 @@ const styles = StyleSheet.create({
     right: -8,
   },
   dateCard: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: theme.borderRadius.medium,
     padding: wp(4),
     marginBottom: hp(1.5),
     borderWidth: 2,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
   },
   dateCardSelected: {
-    borderColor: theme.colors.statusConfirmed,
-    backgroundColor: theme.colors.primary + '10',
+    borderColor: colors.statusConfirmed,
+    backgroundColor: colors.primary + '10',
   },
   dateContent: {
     flexDirection: 'row',
@@ -548,12 +551,12 @@ const styles = StyleSheet.create({
   dateDay: {
     fontSize: hp(1.5),
     fontWeight: theme.typography.fontWeight.semiBold as any,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
   },
   dateDisplay: {
     fontSize: hp(1.8),
     fontWeight: theme.typography.fontWeight.bold as any,
-    color: theme.colors.primary,
+    color: colors.primary,
     marginTop: hp(0.3),
   },
   buttonContainer: {
@@ -564,7 +567,7 @@ const styles = StyleSheet.create({
   },
   backBtn: {
     flex: 0.45,
-    backgroundColor: theme.colors.border,
+    backgroundColor: colors.border,
     paddingVertical: hp(2),
     borderRadius: theme.borderRadius.medium,
     alignItems: 'center',
@@ -572,25 +575,25 @@ const styles = StyleSheet.create({
   backBtnText: {
     fontSize: hp(1.8),
     fontWeight: theme.typography.fontWeight.semiBold as any,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
   },
   nextBtn: {
     flex: 0.45,
-    backgroundColor: theme.colors.accent,
+    backgroundColor: colors.accent,
     paddingVertical: hp(2),
     borderRadius: theme.borderRadius.medium,
     alignItems: 'center',
   },
   nextBtnDisabled: {
-    backgroundColor: theme.colors.disabled,
+    backgroundColor: colors.disabled,
     opacity: 0.6,
   },
   nextBtnText: {
     fontSize: hp(1.8),
     fontWeight: theme.typography.fontWeight.semiBold as any,
-    color: theme.colors.surface,
+    color: colors.surface,
   },
   nextBtnTextDisabled: {
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
   },
 });

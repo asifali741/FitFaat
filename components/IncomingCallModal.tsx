@@ -9,6 +9,10 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import {
+  heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
+} from 'react-native-responsive-screen';
 
 interface IncomingCallModalProps {
   visible: boolean;
@@ -65,7 +69,7 @@ export default function IncomingCallModal({
           >
             <Ionicons
               name={callerRole === 'doctor' ? 'medical' : 'person'}
-              size={60}
+              size={Math.min(hp(7.4), wp(16))}
               color={theme.colors.surface}
             />
           </Animated.View>
@@ -118,13 +122,13 @@ const styles = StyleSheet.create({
     padding: theme.spacing.xxxl,
     alignItems: 'center',
     width: '85%',
-    maxWidth: 400,
+    maxWidth: wp(92),
     ...theme.shadows.large,
   },
   iconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: Math.min(hp(14.8), wp(32)),
+    height: Math.min(hp(14.8), wp(32)),
+    borderRadius: Math.min(hp(7.4), wp(16)),
     backgroundColor: theme.colors.accent,
     justifyContent: 'center',
     alignItems: 'center',

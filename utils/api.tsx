@@ -1,15 +1,36 @@
 // Utility to call the Gemini model hosted on openrouter.ai
-import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
-import { Platform } from 'react-native';
+import { getConfigValue, getBackendUrl } from './config';
 
-// Get API key from .env via Expo's Constants
-const ENV = Constants.expoConfig?.extra;
+// Get config values via centralized helper (works in Expo Go AND standalone APKs)
+const ENV = {
+  OPENROUTER_API_KEY: getConfigValue('OPENROUTER_API_KEY'),
+  OPENROUTER_BASE_URL: '', // not used, hardcoded below
+};
 
-// Get backend API URL from environment variable
+// Get backend API URL from centralized config
 const getBackendApiUrl = (): string => {
-  const baseUrl = ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001');
-  return baseUrl.replace(/\/api\/?$/, '') + '/api';
+  return getBackendUrl();
+};
+
+const buildDirectChatbotResponse = async (message: string) => {
+  const userTimestamp = new Date().toISOString();
+  const content = await callGemini(message);
+
+  return {
+    userMessage: {
+      role: 'user' as const,
+      content: message,
+      source: 'local_ai',
+      timestamp: userTimestamp,
+    },
+    aiResponse: {
+      role: 'assistant' as const,
+      content,
+      source: 'gemini_ai' as const,
+      timestamp: new Date().toISOString(),
+    },
+  };
 };
 
 // Helper function to check if query is a greeting or thanks/help
@@ -310,7 +331,8 @@ export async function sendChatbotMessage(
     // Get auth token
     const token = await SecureStore.getItemAsync('fitfaat_auth_token');
     if (!token) {
-      throw new Error('Authentication required. Please log in.');
+      console.log('No backend auth token found; using direct AI chatbot fallback.');
+      return buildDirectChatbotResponse(message.trim());
     }
 
     const apiUrl = getBackendApiUrl();
@@ -361,7 +383,7 @@ export async function sendChatbotMessage(
     // Backend returns data in data.data format
     return data.data;
   } catch (error) {
-    console.error('❌ Chatbot API error:', error);
+    console.warn('Chatbot API error:', error);
     
     if (error instanceof Error) {
       throw error;
@@ -386,7 +408,7 @@ export async function getChatHistory(
   try {
     const token = await SecureStore.getItemAsync('fitfaat_auth_token');
     if (!token) {
-      throw new Error('Authentication required');
+      return [];
     }
 
     const apiUrl = getBackendApiUrl();
@@ -411,7 +433,7 @@ export async function getChatHistory(
     const data = await response.json();
     return data.messages || [];
   } catch (error) {
-    console.error('❌ Failed to fetch chat history:', error);
+    console.warn('Failed to fetch chat history:', error);
     return [];
   }
 }

@@ -16,7 +16,7 @@ export interface Appointment {
 
 interface AppointmentContextType {
   appointments: Appointment[];
-  addAppointment: (appointment: Omit<Appointment, 'id' | 'status'>) => void;
+  addAppointment: (appointment: Omit<Appointment, 'status'>) => void;
   updateAppointmentStatus: (id: string, status: Appointment['status']) => void;
   getUpcomingAppointments: () => Appointment[];
   getActiveAppointments: () => Appointment[];
@@ -72,10 +72,10 @@ export const AppointmentProvider: React.FC<AppointmentProviderProps> = ({ childr
     }
   };
 
-  const addAppointment = (appointmentData: Omit<Appointment, 'id' | 'status'>) => {
+  const addAppointment = (appointmentData: Omit<Appointment, 'status'>) => {
     const newAppointment: Appointment = {
       ...appointmentData,
-      id: Date.now().toString(),
+      id: appointmentData.id || Date.now().toString(),
       status: 'scheduled'
     };
     setAppointments(prev => [...prev, newAppointment]);

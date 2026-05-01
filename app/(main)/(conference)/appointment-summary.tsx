@@ -1,4 +1,5 @@
 import { theme } from "@/constants/theme";
+import { useTheme } from '@/contexts/ThemeContext';
 import { useAppointmentBooking } from "@/hooks/useAppointmentBooking";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,8 +9,11 @@ import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { getBackendBaseUrl } from '@/utils/config';
 
 export default function AppointmentSummaryScreen() {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const router = useRouter();
   const params = useLocalSearchParams();
   const { bookAppointment, isLoading, error } = useAppointmentBooking();
@@ -24,7 +28,7 @@ export default function AppointmentSummaryScreen() {
   }>({ success: false, message: '' });
   
   const ENV = Constants.expoConfig?.extra;
-  const API_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === "android" ? "http://10.0.2.2:5001" : "http://localhost:5001")).replace(/\/api\/?$/, '');
+  const API_URL = getBackendBaseUrl();
   
   // Extract parameters from route
   const doctorId = Array.isArray(params.doctorId) ? params.doctorId[0] : params.doctorId;
@@ -36,6 +40,7 @@ export default function AppointmentSummaryScreen() {
   const problem = Array.isArray(params.problem) ? params.problem[0] : params.problem;
 
   const [isCallReady, setIsCallReady] = useState(false);
+  const [bookedAppointmentId, setBookedAppointmentId] = useState<string | null>(null);
 
   // Check appointment limit on mount
   useEffect(() => {
@@ -92,13 +97,19 @@ export default function AppointmentSummaryScreen() {
       });
 
       if (response.success) {
+        // Store the real appointment ID from backend for video call
+        if (response.appointmentId || response.appointment?._id) {
+          setBookedAppointmentId(response.appointmentId || response.appointment?._id);
+          setIsCallReady(true);
+        }
+        
         setBookingResult({
           success: true,
           message: 'Appointment booked successfully!'
         });
         setShowResultModal(true);
         
-        // Auto navigate after 3 seconds
+        // Auto navigate after 10 seconds
         setTimeout(() => {
           setShowResultModal(false);
           router.replace('/(main)/(conference)');
@@ -146,7 +157,7 @@ export default function AppointmentSummaryScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.replace("/(main)/(conference)")} style={styles.backButton}>
-          <Ionicons name="home" size={24} color={theme.colors.surface} />
+          <Ionicons name="home" size={24} color={colors.surface} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Appointment Confirmed</Text>
         <View style={styles.spacer} />
@@ -156,7 +167,7 @@ export default function AppointmentSummaryScreen() {
         {/* Success Icon */}
         <View style={styles.successContainer}>
           <View style={styles.successIconCircle}>
-            <Ionicons name="checkmark-circle" size={80} color={theme.colors.success} />
+            <Ionicons name="checkmark-circle" size={80} color={colors.success} />
           </View>
           <Text style={styles.successTitle}>Please Confirm Your Appointment!</Text>
           <Text style={styles.successSubtitle}>Get a best Consultation Experience</Text>
@@ -168,7 +179,7 @@ export default function AppointmentSummaryScreen() {
 
           <View style={styles.summaryRow}>
             <View style={styles.summaryIconContainer}>
-              <Ionicons name="person" size={20} color={theme.colors.primary} />
+              <Ionicons name="person" size={20} color={colors.primary} />
             </View>
             <View style={styles.summaryTextContainer}>
               <Text style={styles.summaryLabel}>Doctor</Text>
@@ -181,7 +192,7 @@ export default function AppointmentSummaryScreen() {
 
           <View style={styles.summaryRow}>
             <View style={styles.summaryIconContainer}>
-              <Ionicons name="calendar" size={20} color={theme.colors.info} />
+              <Ionicons name="calendar" size={20} color={colors.info} />
             </View>
             <View style={styles.summaryTextContainer}>
               <Text style={styles.summaryLabel}>Date</Text>
@@ -210,7 +221,7 @@ export default function AppointmentSummaryScreen() {
 
           <View style={styles.summaryRow}>
             <View style={styles.summaryIconContainer}>
-              <Ionicons name="time" size={20} color={theme.colors.warning} />
+              <Ionicons name="time" size={20} color={colors.warning} />
             </View>
             <View style={styles.summaryTextContainer}>
               <Text style={styles.summaryLabel}>Time</Text>
@@ -222,7 +233,7 @@ export default function AppointmentSummaryScreen() {
 
           <View style={styles.summaryRow}>
             <View style={styles.summaryIconContainer}>
-              <Ionicons name="document-text" size={20} color={theme.colors.secondary} />
+              <Ionicons name="document-text" size={20} color={colors.secondary} />
             </View>
             <View style={styles.summaryTextContainer}>
               <Text style={styles.summaryLabel}>Your Concern</Text>
@@ -236,15 +247,13 @@ export default function AppointmentSummaryScreen() {
           style={[styles.callButton, !isCallReady && styles.callButtonDisabled]}
           disabled={!isCallReady}
           onPress={() => {
-            if (isCallReady) {
-              const callId = `appointment_${doctorId}_${Date.now()}`;
-              
+            if (isCallReady && bookedAppointmentId) {
               router.push({
                 pathname: "/(main)/(conference)/video-call" as any,
                 params: {
-                  callId: callId,
-                  userName: "Patient",
-                  doctorName: doctorName || "Doctor"
+                  callId: bookedAppointmentId,
+                  appointmentId: bookedAppointmentId,
+                  userName: doctorName || "Doctor",
                 }
               });
             }
@@ -253,10 +262,10 @@ export default function AppointmentSummaryScreen() {
           <Ionicons 
             name="videocam" 
             size={24} 
-            color={isCallReady ? theme.colors.surface : theme.colors.textTertiary} 
+            color={isCallReady ? colors.surface : colors.textTertiary} 
           />
           <Text style={[styles.callButtonText, !isCallReady && styles.callButtonTextDisabled]}>
-            {isCallReady ? "Start Call" : "Start Call (Not Ready)"}
+            {isCallReady ? "Start Video Call" : "Start Call (Not Ready)"}
           </Text>
         </TouchableOpacity>
 
@@ -268,12 +277,12 @@ export default function AppointmentSummaryScreen() {
         >
           {isConfirming || isLoading ? (
             <>
-              <ActivityIndicator color={theme.colors.surface} />
+              <ActivityIndicator color={colors.surface} />
               <Text style={styles.confirmButtonText}>Booking...</Text>
             </>
           ) : (
             <>
-              <Ionicons name="checkmark-circle" size={20} color={theme.colors.surface} />
+              <Ionicons name="checkmark-circle" size={20} color={colors.surface} />
               <Text style={styles.confirmButtonText}>Confirm Appointment</Text>
             </>
           )}
@@ -281,7 +290,7 @@ export default function AppointmentSummaryScreen() {
 
         {error && (
           <View style={styles.errorAlert}>
-            <Ionicons name="alert-circle" size={20} color={theme.colors.error} />
+            <Ionicons name="alert-circle" size={20} color={colors.error} />
             <Text style={styles.errorAlertText}>{error}</Text>
           </View>
         )}
@@ -314,7 +323,7 @@ export default function AppointmentSummaryScreen() {
               <Ionicons 
                 name={bookingResult.success ? "checkmark-circle" : "close-circle"} 
                 size={80} 
-                color={theme.colors.surface} 
+                color={colors.surface} 
               />
             </View>
 
@@ -433,10 +442,10 @@ export default function AppointmentSummaryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
   },
   header: {
     flexDirection: "row",
@@ -451,7 +460,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: hp(2.2),
     fontWeight: theme.typography.fontWeight.bold as any,
-    color: theme.colors.surface,
+    color: colors.surface,
     flex: 1,
     textAlign: "center",
   },
@@ -460,7 +469,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: colors.background,
     borderTopLeftRadius: theme.borderRadius.xl,
     borderTopRightRadius: theme.borderRadius.xl,
     paddingTop: hp(3),
@@ -476,17 +485,17 @@ const styles = StyleSheet.create({
   successTitle: {
     fontSize: hp(2.4),
     fontWeight: theme.typography.fontWeight.bold as any,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: hp(0.5),
     textAlign: "center",
   },
   successSubtitle: {
     fontSize: hp(1.6),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: "center",
   },
   timerCard: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     borderRadius: theme.borderRadius.xl,
     padding: wp(6),
     alignItems: "center",
@@ -495,16 +504,16 @@ const styles = StyleSheet.create({
   },
   timerLabel: {
     fontSize: hp(1.6),
-    color: theme.colors.surface,
+    color: colors.surface,
     marginBottom: hp(1),
   },
   timerValue: {
     fontSize: hp(3.5),
     fontWeight: theme.typography.fontWeight.bold as any,
-    color: theme.colors.surface,
+    color: colors.surface,
   },
   summaryCard: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: theme.borderRadius.xl,
     padding: wp(5),
     marginBottom: hp(2),
@@ -513,7 +522,7 @@ const styles = StyleSheet.create({
   summaryTitle: {
     fontSize: hp(2.2),
     fontWeight: theme.typography.fontWeight.bold as any,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: hp(2),
   },
   summaryRow: {
@@ -524,7 +533,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: theme.colors.primary + '20',
+    backgroundColor: colors.primary + '20',
     alignItems: "center",
     justifyContent: "center",
     marginRight: wp(3),
@@ -534,27 +543,27 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: hp(1.4),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: hp(0.3),
   },
   summaryValue: {
     fontSize: hp(1.8),
     fontWeight: theme.typography.fontWeight.semiBold as any,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
   },
   summarySubValue: {
     fontSize: hp(1.5),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: hp(0.2),
   },
   divider: {
     height: 1,
-    backgroundColor: theme.colors.border,
+    backgroundColor: colors.border,
     marginVertical: hp(1.5),
   },
   callButton: {
     flexDirection: "row",
-    backgroundColor: theme.colors.success,
+    backgroundColor: colors.success,
     paddingVertical: hp(2),
     paddingHorizontal: wp(6),
     borderRadius: theme.borderRadius.xl,
@@ -564,19 +573,19 @@ const styles = StyleSheet.create({
     ...theme.shadows.large,
   },
   callButtonDisabled: {
-    backgroundColor: theme.colors.disabled,
+    backgroundColor: colors.disabled,
   },
   callButtonText: {
-    color: theme.colors.surface,
+    color: colors.surface,
     fontSize: hp(2),
     fontWeight: theme.typography.fontWeight.semiBold as any,
     marginLeft: wp(2),
   },
   callButtonTextDisabled: {
-    color: theme.colors.textTertiary,
+    color: colors.textTertiary,
   },
   homeButton: {
-    backgroundColor: theme.colors.primary + '20',
+    backgroundColor: colors.primary + '20',
     paddingVertical: hp(2),
     paddingHorizontal: wp(6),
     borderRadius: theme.borderRadius.xl,
@@ -585,13 +594,13 @@ const styles = StyleSheet.create({
     marginBottom: hp(3),
   },
   homeButtonText: {
-    color: theme.colors.primary,
+    color: colors.primary,
     fontSize: hp(1.8),
     fontWeight: theme.typography.fontWeight.semiBold as any,
   },
   confirmButton: {
     flexDirection: "row",
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     paddingVertical: hp(2),
     paddingHorizontal: wp(6),
     borderRadius: theme.borderRadius.xl,
@@ -601,11 +610,11 @@ const styles = StyleSheet.create({
     ...theme.shadows.large,
   },
   confirmButtonDisabled: {
-    backgroundColor: theme.colors.disabled,
+    backgroundColor: colors.disabled,
     opacity: 0.6,
   },
   confirmButtonText: {
-    color: theme.colors.surface,
+    color: colors.surface,
     fontSize: hp(1.8),
     fontWeight: theme.typography.fontWeight.semiBold as any,
     marginLeft: wp(2),
@@ -617,20 +626,20 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: hp(1.8),
-    color: theme.colors.error,
+    color: colors.error,
   },
   errorAlert: {
     flexDirection: "row",
-    backgroundColor: theme.colors.error + '20',
+    backgroundColor: colors.error + '20',
     borderRadius: theme.borderRadius.medium,
     padding: wp(4),
     marginTop: hp(2),
     alignItems: "center",
     borderLeftWidth: 4,
-    borderLeftColor: theme.colors.error,
+    borderLeftColor: colors.error,
   },
   errorAlertText: {
-    color: theme.colors.error,
+    color: colors.error,
     fontSize: hp(1.5),
     marginLeft: wp(3),
     flex: 1,
@@ -643,7 +652,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: theme.borderRadius.xl,
     padding: wp(8),
     width: wp(85),
@@ -651,10 +660,10 @@ const styles = StyleSheet.create({
     ...theme.shadows.large,
   },
   modalSuccess: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
   },
   modalError: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
   },
   resultIconContainer: {
     width: hp(12),
@@ -665,21 +674,21 @@ const styles = StyleSheet.create({
     marginBottom: hp(2),
   },
   resultIconSuccess: {
-    backgroundColor: theme.colors.success,
+    backgroundColor: colors.success,
   },
   resultIconError: {
-    backgroundColor: theme.colors.error,
+    backgroundColor: colors.error,
   },
   resultTitle: {
     fontSize: hp(2.5),
     fontWeight: theme.typography.fontWeight.bold as any,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     textAlign: 'center',
     marginBottom: hp(1),
   },
   resultMessage: {
     fontSize: hp(1.6),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: hp(2.5),
     lineHeight: hp(2.4),
@@ -693,19 +702,19 @@ const styles = StyleSheet.create({
     marginTop: hp(1),
   },
   resultButtonSuccess: {
-    backgroundColor: theme.colors.success,
+    backgroundColor: colors.success,
   },
   resultButtonError: {
-    backgroundColor: theme.colors.error,
+    backgroundColor: colors.error,
   },
   resultButtonText: {
-    color: theme.colors.surface,
+    color: colors.surface,
     fontSize: hp(1.8),
     fontWeight: theme.typography.fontWeight.semiBold as any,
   },
   // Appointment Limit Modal Styles
   appointmentModalContent: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: hp(3),
     paddingHorizontal: wp(6),
     paddingVertical: hp(3),
@@ -727,20 +736,20 @@ const styles = StyleSheet.create({
   appointmentModalTitle: {
     fontSize: hp(2.8),
     fontWeight: theme.typography.fontWeight.bold as any,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: hp(0.8),
     textAlign: 'center',
   },
   appointmentModalSubtitle: {
     fontSize: hp(2),
     fontWeight: theme.typography.fontWeight.semiBold as any,
-    color: theme.colors.error,
+    color: colors.error,
     marginBottom: hp(1.5),
     textAlign: 'center',
   },
   appointmentModalDescription: {
     fontSize: hp(1.8),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: hp(2.5),
     lineHeight: hp(2.8),
@@ -757,7 +766,7 @@ const styles = StyleSheet.create({
   },
   appointmentFeatureText: {
     fontSize: hp(1.7),
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginLeft: wp(2.5),
     fontWeight: theme.typography.fontWeight.medium as any,
   },
@@ -768,26 +777,26 @@ const styles = StyleSheet.create({
     marginBottom: hp(2.5),
     paddingVertical: hp(1.5),
     paddingHorizontal: wp(5),
-    backgroundColor: theme.colors.success + '15',
+    backgroundColor: colors.success + '15',
     borderRadius: hp(1.5),
     borderWidth: 1.5,
-    borderColor: theme.colors.success,
+    borderColor: colors.success,
   },
   appointmentPriceAmount: {
     fontSize: hp(3.5),
     fontWeight: theme.typography.fontWeight.bold as any,
-    color: theme.colors.success,
+    color: colors.success,
   },
   appointmentPriceFrequency: {
     fontSize: hp(1.9),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     marginLeft: wp(1),
     fontWeight: theme.typography.fontWeight.semiBold as any,
   },
   appointmentUpgradButton: {
     width: '100%',
     flexDirection: 'row',
-    backgroundColor: theme.colors.success,
+    backgroundColor: colors.success,
     paddingVertical: hp(2),
     borderRadius: hp(1.2),
     justifyContent: 'center',
@@ -798,7 +807,7 @@ const styles = StyleSheet.create({
   appointmentUpgradButtonText: {
     fontSize: hp(2),
     fontWeight: theme.typography.fontWeight.bold as any,
-    color: theme.colors.surface,
+    color: colors.surface,
     marginLeft: wp(2),
     letterSpacing: 0.5,
   },
@@ -809,12 +818,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.background,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
   },
   appointmentLaterButtonText: {
     fontSize: hp(1.9),
     fontWeight: theme.typography.fontWeight.semiBold as any,
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
   },
 });

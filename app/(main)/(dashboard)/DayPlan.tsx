@@ -1,29 +1,13 @@
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
+import { useTheme } from "@/contexts/ThemeContext";
 
 // This component is kept for backward compatibility
 // The actual dashboard is now in index.tsx which uses the API
 export default function DayPlan () {
+  const { colors } = useTheme();
+
   // This component is deprecated - use index.tsx instead
-  return <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-    <ActivityIndicator size="large" />
+  return <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.screenColor }}>
+    <ActivityIndicator size="large" color={colors.primary} />
   </View>;
 }
-
-const styles = StyleSheet.create({
-  list: {
-  flexGrow: 1,
-  width: "95%",
-  alignSelf: "center",
-  marginTop: "5%",
-  marginBottom: "3%",
-  borderRadius: 12,
-  backgroundColor: "#EDCCC2",
-  elevation: 2,
-  shadowColor: '#edccc20c',
-  shadowOpacity: 0.3,
-  shadowRadius: 5,
-},
-
-});
-
-

@@ -1,0 +1,95 @@
+FITFAAT PROJECT AUDIT REPORT
+============================
+Date: 2026-04-28
+Project: FitFaat (Mobile)
+Framework: Expo (SDK 54), React Native 0.81, React 19
+
+1. SECURITY ISSUES
+------------------
+[CRITICAL] Hardcoded Secrets and API Keys
+- Issue: Sensitive API keys (Clerk, Stripe, Clarifai, OpenRouter, Zego) are hardcoded in `utils/config.ts` and `app.config.js`.
+- Risk: These keys are included in the JS bundle and can be extracted by anyone.
+- Priority: Critical
+- Fix: Use a `.env` file and `EXPO_PUBLIC_` environment variables.
+
+[HIGH] Exposed Email Credentials
+- Issue: `Email` and `EmailPassword` are hardcoded in `app.config.js`.
+- Risk: Direct exposure of mail credentials.
+- Priority: Critical
+- Fix: Remove and use a backend proxy.
+
+[MEDIUM] Cleartext Traffic Enabled
+- Issue: `usesCleartextTraffic: true` is enabled for Android.
+- Risk: Vulnerable to man-in-the-middle attacks.
+- Priority: High
+- Fix: Use HTTPS and disable cleartext traffic.
+
+2. CODE QUALITY & STRUCTURE
+---------------------------
+[HIGH] "Mega-Components" (Anti-pattern)
+- Issue: `DetailsDay.tsx` (4,549 lines), `AppointmentChat.tsx` (46KB) are too large.
+- Risk: Maintenance nightmare and performance issues.
+- Priority: High
+- Fix: Decompose into smaller components and custom hooks.
+
+[MEDIUM] Weak Typing and Type Safety
+- Issue: Excessive use of `any` and missing centralized type definitions.
+- Risk: Runtime crashes and poor developer experience.
+- Priority: Medium
+- Fix: Implement centralized interfaces in `types/`.
+
+[MEDIUM] Redundant Auth Logic
+- Issue: Multiple manual auth checks across different layout files.
+- Risk: Flickering UI and inconsistent app state.
+- Priority: Medium
+- Fix: Centralize auth logic in a single provider.
+
+3. FUNCTIONALITY & FEATURES
+---------------------------
+[HIGH] Improper Navigation Params
+- Issue: Large JSON objects are passed as router params.
+- Risk: Performance lag and potential crashes on Android.
+- Priority: High
+- Fix: Pass only IDs and fetch data in the target screen.
+
+[HIGH] Missing Context Providers
+- Issue: Several contexts (Notification, Socket, etc.) are not wrapped in the root layout.
+- Risk: Broken features and "undefined" errors.
+- Priority: High
+- Fix: Wrap all necessary providers in `app/_layout.tsx`.
+
+4. PERFORMANCE OPTIMIZATION
+---------------------------
+[MEDIUM] Inline Large Datasets
+- Issue: Datasets like `pakistaniDishes` are imported directly into UI screens.
+- Risk: Increased bundle size and slow screen load times.
+- Priority: Medium
+- Fix: Move to lazy loading or an external store.
+
+5. DEPENDENCIES & CONFIGURATION
+-------------------------------
+[MEDIUM] Deprecated Libraries
+- Issue: `react-native-snap-carousel` is unmaintained.
+- Priority: Medium
+- Fix: Migrate to `react-native-reanimated-carousel`.
+
+6. UI/UX CONSISTENCY
+--------------------
+[LOW] Inconsistent Styling Units
+- Issue: Mixing theme tokens with `hp/wp` percentage scaling.
+- Priority: Low
+- Fix: Standardize on theme-based tokens for typography and spacing.
+
+7. TESTING & DEBUGGING
+----------------------
+[HIGH] Lack of Automated Tests
+- Issue: Zero tests found in the project.
+- Priority: High
+- Fix: Add Jest and React Native Testing Library.
+
+8. SUMMARY OF PRIORITY LEVELS
+-----------------------------
+- CRITICAL: Hardcoded secrets, Exposed credentials.
+- HIGH: Mega-components, Missing providers, Improper navigation params, Lack of tests.
+- MEDIUM: Redundant auth, Cleartext traffic, Deprecated libraries, Inline datasets, Weak typing.
+- LOW: Console logs, Inconsistent styling, Suppressed warnings.

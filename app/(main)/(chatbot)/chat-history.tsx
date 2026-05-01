@@ -224,8 +224,8 @@ const getStyles = (colors: any) => StyleSheet.create({
   content: {
     flex: 1,
     backgroundColor: colors.screenColor,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
+    borderTopLeftRadius: wp(8),
+    borderTopRightRadius: wp(8),
     paddingTop: hp(3),
     paddingHorizontal: wp(5),
   },
@@ -240,7 +240,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.primarySoft,
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.5),
-    borderRadius: 15,
+    borderRadius: wp(4),
     flex: 0.48,
     justifyContent: "center",
   },
@@ -261,7 +261,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   sessionCard: {
     backgroundColor: colors.cardBackground,
-    borderRadius: 15,
+    borderRadius: wp(4),
     padding: hp(2),
     marginBottom: hp(1.5),
     borderWidth: 1,
@@ -333,7 +333,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.primary,
     paddingHorizontal: wp(6),
     paddingVertical: hp(1.5),
-    borderRadius: 25,
+    borderRadius: wp(6),
   },
   startChatButtonText: {
     color: colors.textOnPrimary,

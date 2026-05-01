@@ -1,5 +1,6 @@
 import BackButton from '@/components/BackButton';
 import { theme } from "@/constants/theme";
+import { useTheme } from '@/contexts/ThemeContext';
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React from "react";
@@ -9,6 +10,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { getDoctorsByDate } from "./_doctorsData";
 
 export default function DoctorsListScreen() {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const router = useRouter();
   const { date } = useLocalSearchParams<{ date: string }>();
   const doctors = getDoctorsByDate(date);
@@ -30,7 +33,7 @@ export default function DoctorsListScreen() {
 
       <View style={styles.content}>
         <View style={styles.dateInfoContainer}>
-          <Ionicons name="calendar" size={20} color={theme.colors.primary} />
+          <Ionicons name="calendar" size={20} color={colors.primary} />
           <Text style={styles.dateInfo}>
             {new Date(date).toLocaleDateString("en-GB", {
               day: "2-digit",
@@ -48,7 +51,7 @@ export default function DoctorsListScreen() {
         >
           {doctors.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Ionicons name="calendar-outline" size={60} color={theme.colors.textSecondary} />
+              <Ionicons name="calendar-outline" size={60} color={colors.textSecondary} />
               <Text style={styles.emptyText}>No consultants available on this date</Text>
               <Text style={styles.emptySubtext}>Please select a different date</Text>
             </View>
@@ -60,13 +63,13 @@ export default function DoctorsListScreen() {
                 onPress={() => handleDoctorSelect(doctor.id)}
               >
                 <View style={styles.avatarContainer}>
-                  <Ionicons name="person-circle" size={50} color={theme.colors.primary} />
+                  <Ionicons name="person-circle" size={50} color={colors.primary} />
                 </View>
                 <View style={styles.doctorInfo}>
                   <Text style={styles.doctorName}>{doctor.name}</Text>
                   <Text style={styles.doctorEmail}>{doctor.email}</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={24} color={theme.colors.textSecondary} />
+                <Ionicons name="chevron-forward" size={24} color={colors.textSecondary} />
               </TouchableOpacity>
             ))
           )}
@@ -76,10 +79,10 @@ export default function DoctorsListScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
   },
   header: {
     flexDirection: "row",
@@ -94,7 +97,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: hp(2.2),
     fontWeight: "bold",
-    color: theme.colors.textOnPrimary,
+    color: colors.textOnPrimary,
     flex: 1,
     textAlign: "center",
   },
@@ -103,7 +106,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: theme.colors.screenColor,
+    backgroundColor: colors.screenColor,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     paddingTop: hp(3),
@@ -112,7 +115,7 @@ const styles = StyleSheet.create({
   dateInfoContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: colors.primarySoft,
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.5),
     borderRadius: 15,
@@ -120,14 +123,14 @@ const styles = StyleSheet.create({
   },
   dateInfo: {
     fontSize: hp(1.8),
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     fontWeight: "600",
     marginLeft: wp(2),
   },
   sectionTitle: {
     fontSize: hp(2),
     fontWeight: "600",
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: hp(2),
   },
   doctorsList: {
@@ -136,11 +139,11 @@ const styles = StyleSheet.create({
   doctorCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: theme.colors.white,
+    backgroundColor: colors.white,
     borderRadius: 15,
     padding: wp(4),
     marginBottom: hp(1.5),
-    shadowColor: theme.colors.primary,
+    shadowColor: colors.primary,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -158,12 +161,12 @@ const styles = StyleSheet.create({
   doctorName: {
     fontSize: hp(2),
     fontWeight: "600",
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: hp(0.5),
   },
   doctorEmail: {
     fontSize: hp(1.6),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
   },
   emptyContainer: {
     alignItems: "center",
@@ -173,12 +176,12 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: hp(2),
     fontWeight: "600",
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginTop: hp(2),
   },
   emptySubtext: {
     fontSize: hp(1.6),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: hp(1),
   },
 });

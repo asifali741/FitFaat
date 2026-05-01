@@ -1,4 +1,5 @@
 import { theme } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 import React from 'react';
 import {
     ActivityIndicator,
@@ -32,6 +33,8 @@ export const ThemedButton: React.FC<ThemedButtonProps> = ({
   style,
   ...props
 }) => {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const buttonStyle: ViewStyle[] = [
     styles.base,
     styles[variant],
@@ -56,7 +59,7 @@ export const ThemedButton: React.FC<ThemedButtonProps> = ({
     >
       {loading ? (
         <ActivityIndicator
-          color={variant === 'outline' ? theme.colors.primary : theme.colors.surface}
+          color={variant === 'outline' ? colors.primary : colors.textOnPrimary}
         />
       ) : (
         <>
@@ -68,7 +71,7 @@ export const ThemedButton: React.FC<ThemedButtonProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   base: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -80,21 +83,21 @@ const styles = StyleSheet.create({
   
   // Variants
   primary: {
-    backgroundColor: theme.colors.accent,
+    backgroundColor: colors.accent,
   },
   secondary: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
   },
   outline: {
     backgroundColor: 'transparent',
     borderWidth: 1.5,
-    borderColor: theme.colors.primary,
+    borderColor: colors.primary,
   },
   ghost: {
     backgroundColor: 'transparent',
   },
   danger: {
-    backgroundColor: theme.colors.error,
+    backgroundColor: colors.error,
   },
   
   // Sizes
@@ -113,7 +116,7 @@ const styles = StyleSheet.create({
   
   // States
   disabled: {
-    backgroundColor: theme.colors.disabled,
+    backgroundColor: colors.disabled,
     opacity: 0.6,
   },
   fullWidth: {
@@ -125,19 +128,19 @@ const styles = StyleSheet.create({
     fontWeight: theme.typography.fontWeight.semiBold,
   },
   text_primary: {
-    color: theme.colors.surface,
+    color: colors.textOnPrimary,
   },
   text_secondary: {
-    color: theme.colors.surface,
+    color: colors.textOnPrimary,
   },
   text_outline: {
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   text_ghost: {
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   text_danger: {
-    color: theme.colors.surface,
+    color: colors.textOnPrimary,
   },
   textSize_small: {
     fontSize: theme.typography.fontSize.sm,
@@ -149,6 +152,6 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.fontSize.lg,
   },
   textDisabled: {
-    color: theme.colors.textTertiary,
+    color: colors.textTertiary,
   },
 });

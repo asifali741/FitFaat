@@ -34,13 +34,18 @@ const lightColors = {
   
   // App Specific Colors
   background: "#0891B2",       // Primary Background
+  surface: "#FFFFFF",
   screenColor: "#FFFFFF",      // Clean White Screen
   cardBackground: "#FFFFFF",   // White Cards
   cardBorder: "#E2E8F0",        // Subtle Border
+  border: "#E2E8F0",
+  divider: "#E2E8F0",
+  disabled: "#CBD5E1",
   
   // Text Colors
   textPrimary: "#0F172A",       // Deep Slate
   textSecondary: "#64748B",     // Slate Gray
+  textTertiary: "#94A3B8",      // Light Slate
   textLight: "#94A3B8",         // Light Slate
   textOnPrimary: "#FFFFFF",     // White on Primary
   textOnCard: "#0F172A",        // Dark on Cards
@@ -58,6 +63,10 @@ const lightColors = {
   drawerTintColor: "#FFFFFF",    // White Tint
   
   // Status Colors
+  statusActive: "#10B981",
+  statusPending: "#F59E0B",
+  statusCancelled: "#EF4444",
+  statusConfirmed: "#10B981",
   activeStatus: "#10B981",      // Active Green
   finishedStatus: "#10B981",    // Finished Green
   lockedStatus: "#94A3B8",      // Locked Gray
@@ -65,6 +74,14 @@ const lightColors = {
   // Progress Colors
   progressBarColor: "#10B981",  // Green Progress
   progressBackground: "#E0F2FE", // Soft Teal Background
+  chartProtein: "#10B981",
+  chartCarbs: "#0891B2",
+  chartFat: "#F59E0B",
+  chartCalories: "#F97316",
+  chatDoctor: "#E0F2FE",
+  chatUser: "#D1FAE5",
+  backgroundHeader: "#F0F9FF",
+  backgroundHighlight: "#F0F9FF",
   
   // Shadow Colors
   shadowLight: "#E8F5E8",
@@ -103,13 +120,18 @@ const darkColors = {
   
   // App Specific Colors
   background: "#0F172A",       // Deep Slate Background
+  surface: "#1E293B",
   screenColor: "#0F172A",     // Dark Slate Screen
   cardBackground: "#1E293B",   // Slate Card Background
   cardBorder: "#334155",       // Slate Border
+  border: "#334155",
+  divider: "#334155",
+  disabled: "#475569",
   
   // Text Colors
   textPrimary: "#F1F5F9",      // Light Slate Text
   textSecondary: "#94A3B8",     // Medium Slate
+  textTertiary: "#64748B",      // Muted Slate
   textLight: "#64748B",         // Dark Slate
   textOnPrimary: "#FFFFFF",     // White on Primary
   textOnCard: "#F1F5F9",        // Light on Cards
@@ -127,6 +149,10 @@ const darkColors = {
   drawerTintColor: "#F1F5F9",    // Light Tint
   
   // Status Colors
+  statusActive: "#10B981",
+  statusPending: "#F59E0B",
+  statusCancelled: "#EF4444",
+  statusConfirmed: "#10B981",
   activeStatus: "#10B981",      // Active Green
   finishedStatus: "#10B981",    // Finished Green
   lockedStatus: "#64748B",      // Locked Slate
@@ -134,6 +160,14 @@ const darkColors = {
   // Progress Colors
   progressBarColor: "#10B981",  // Green Progress
   progressBackground: "#1E293B", // Dark Slate Background
+  chartProtein: "#10B981",
+  chartCarbs: "#06B6D4",
+  chartFat: "#F59E0B",
+  chartCalories: "#FB923C",
+  chatDoctor: "#164E63",
+  chatUser: "#064E3B",
+  backgroundHeader: "#1E293B",
+  backgroundHighlight: "#1E293B",
   
   // Shadow Colors
   shadowLight: "#000000",

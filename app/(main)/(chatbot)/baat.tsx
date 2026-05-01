@@ -3,9 +3,11 @@ import Message from "@/components/Message";
 import { useChatbotStorage } from "@/contexts/ChatbotStorage";
 import { useTheme } from "@/contexts/ThemeContext";
 import Controls from "@/Control/controls";
-import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useRef } from "react";
-import { FlatList, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
+import * as SystemUI from 'expo-system-ui';
+import { useFocusEffect } from "expo-router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { FlatList, Image, Keyboard, KeyboardAvoidingView, Platform, StatusBar, StyleSheet, Text, View } from "react-native";
+import type { KeyboardEvent } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 // type ChatMessage = {
@@ -24,20 +26,23 @@ const WelcomeText: ChatMessage = {
   content:
     "Hello, I am HeaLora, your AI-powered health companion. How can I assist you today?",
 }
+
+const ANDROID_KEYBOARD_EXTRA_LIFT = hp(11);
+
 export default function Baat() {
-  const { colors } = useTheme();
+  const { colors, isDarkMode } = useTheme();
   const insets = useSafeAreaInsets();
-  const { 
-    messages: storedMessages, 
-    addMessage, 
-    createNewSession, 
+  const {
+    messages: storedMessages,
+    addMessage,
+    createNewSession,
     currentSession,
     isLoading,
-    clearAllChats
   } = useChatbotStorage();
-  const router = useRouter();
-  const flatListRef = useRef<FlatList>(null);
-  
+  const flatListRef = useRef<FlatList<ChatMessage>>(null);
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+  const [keyboardLift, setKeyboardLift] = useState(0);
+
   // Keep a stable ref to addMessage even if it changes
   const addMessageRef = useRef(addMessage);
   useEffect(() => {
@@ -52,7 +57,7 @@ export default function Baat() {
   }, [currentSession, isLoading, createNewSession]);
 
   // Convert stored messages to display format
-  const displayMessages: ChatMessage[] = storedMessages.length > 0 
+  const displayMessages: ChatMessage[] = storedMessages.length > 0
     ? storedMessages.map(msg => ({
         role: msg.isUser ? "user" as const : "assistant" as const,
         content: msg.text,
@@ -77,51 +82,111 @@ export default function Baat() {
     }
   }, []); // Empty dependency array since we use ref
 
-  const styles = getStyles(colors, insets);
+  const scrollToBottom = useCallback((animated = true) => {
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated });
+      }, Platform.OS === 'ios' ? 80 : 120);
+    });
+  }, []);
+
+  useEffect(() => {
+    const handleKeyboardShow = (event: KeyboardEvent) => {
+      Keyboard.scheduleLayoutAnimation(event);
+      setKeyboardVisible(true);
+      setKeyboardLift(
+        Platform.OS === 'android'
+          ? Math.max(0, (event.endCoordinates?.height ?? 0) - insets.bottom + ANDROID_KEYBOARD_EXTRA_LIFT)
+          : 0
+      );
+      scrollToBottom();
+    };
+
+    const handleKeyboardHide = (event: KeyboardEvent) => {
+      Keyboard.scheduleLayoutAnimation(event);
+      setKeyboardVisible(false);
+      setKeyboardLift(0);
+    };
+
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSubscription = Keyboard.addListener(showEvent, handleKeyboardShow);
+    const hideSubscription = Keyboard.addListener(hideEvent, handleKeyboardHide);
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [insets.bottom, scrollToBottom]);
+
+  const styles = getStyles(colors, insets, isKeyboardVisible, keyboardLift);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS !== 'android') return;
+
+      SystemUI.setBackgroundColorAsync(colors.primary).catch(() => {});
+
+      return () => {
+        SystemUI.setBackgroundColorAsync(colors.screenColor).catch(() => {});
+      };
+    }, [colors.primary, colors.screenColor])
+  );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.headerContainer}>
-        <AppHeader 
-          title="HeaLora Chat"
-          showStepIndicator={false}
-        />
-      </View>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <StatusBar
+        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+        backgroundColor={colors.screenColor}
+      />
+      <View style={styles.container}>
+        <View style={styles.headerContainer}>
+          <AppHeader
+            title="HeaLora Chat"
+            showStepIndicator={false}
+          />
+        </View>
 
-      {/* Chat Content */}
-      <View style={styles.content}>
-        <View style={styles.aiProfileSection}>
-          <Image
-            source={require("../../../assets/images/jarvis.png")}
-            style={styles.aiAvatar}
-          />
-          <Text style={styles.aiName}>HeaLora</Text>
-          <Text style={styles.aiStatus}>Your AI Health Companion</Text>
-        </View>
-        
-        <View style={styles.chatSection}>
-          <FlatList
-            ref={flatListRef}
-            data={displayMessages}
-            keyExtractor={(_, index) => index.toString()}
-            renderItem={({ item }) => <Message msg={item} />}
-            contentContainerStyle={styles.messageList}
-            showsVerticalScrollIndicator={false}
-            keyboardDismissMode="on-drag"
-            keyboardShouldPersistTaps="handled"
-            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-          />
-        </View>
-        
-        <KeyboardAvoidingView 
+        <KeyboardAvoidingView
+          style={styles.content}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? hp(10) : 0}
+          keyboardVerticalOffset={0}
         >
-          <View style={styles.inputContainer}>
-            <Controls 
-              onAddMessage={handleAddMessage}
-              sessionId={currentSession?.id}
+          <View style={styles.chatShell}>
+            <FlatList
+              ref={flatListRef}
+              data={displayMessages}
+              keyExtractor={(_, index) => index.toString()}
+              renderItem={({ item }) => <Message msg={item} />}
+              ListHeaderComponent={
+                <View style={styles.aiProfileSection}>
+                  <Image
+                    source={require("../../../assets/images/jarvis.png")}
+                    style={styles.aiAvatar}
+                  />
+                  <Text style={styles.aiName}>HeaLora</Text>
+                  <Text style={styles.aiStatus}>Your AI Health Companion</Text>
+                </View>
+              }
+              style={styles.messageListContainer}
+              contentContainerStyle={styles.messageList}
+              showsVerticalScrollIndicator={false}
+              keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+              keyboardShouldPersistTaps="handled"
+              onContentSizeChange={() => scrollToBottom()}
+              onLayout={() => scrollToBottom(false)}
             />
+
+            <View style={styles.inputContainer}>
+              <Controls
+                onAddMessage={handleAddMessage}
+                sessionId={currentSession?.id}
+                onInputFocus={() => scrollToBottom()}
+              />
+            </View>
+            {Platform.OS === 'android' && !isKeyboardVisible && insets.bottom > 0 && (
+              <View style={styles.androidNavigationBarBackground} />
+            )}
           </View>
         </KeyboardAvoidingView>
       </View>
@@ -129,7 +194,11 @@ export default function Baat() {
   );
 }
 
-const getStyles = (colors: any, insets: any) => StyleSheet.create({
+const getStyles = (colors: any, insets: any, isKeyboardVisible: boolean, keyboardLift: number) => StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.screenColor,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.primary,
@@ -145,8 +214,13 @@ const getStyles = (colors: any, insets: any) => StyleSheet.create({
   content: {
     flex: 1,
     backgroundColor: colors.screenColor,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
+  },
+  chatShell: {
+    flex: 1,
+    backgroundColor: colors.screenColor,
+    borderTopLeftRadius: wp(8),
+    borderTopRightRadius: wp(8),
+    overflow: 'hidden',
   },
   aiProfileSection: {
     alignItems: "center",
@@ -154,7 +228,7 @@ const getStyles = (colors: any, insets: any) => StyleSheet.create({
     backgroundColor: colors.primarySoft,
     marginHorizontal: wp(4),
     marginTop: hp(1.5),
-    borderRadius: 15,
+    borderRadius: wp(4),
   },
   aiAvatar: {
     width: Math.min(hp(6), wp(15)),
@@ -172,27 +246,35 @@ const getStyles = (colors: any, insets: any) => StyleSheet.create({
     color: colors.textSecondary,
     marginTop: hp(0.3),
   },
-  chatSection: {
+  messageListContainer: {
     flex: 1,
-    paddingHorizontal: wp(2),
   },
   messageList: {
-    padding: hp(1),
-    paddingBottom: Platform.OS === 'ios' ? hp(20) : hp(18),
     flexGrow: 1,
+    paddingHorizontal: wp(2),
+    padding: hp(1),
+    paddingBottom: hp(1.5),
   },
   inputContainer: {
-    position: 'absolute',
-    bottom: 0,
+    backgroundColor: colors.screenColor,
     left: 0,
     right: 0,
-    backgroundColor: colors.screenColor,
-    paddingBottom: insets.bottom > 0 ? insets.bottom : (Platform.OS === 'ios' ? hp(2) : hp(1)),
+    marginBottom: keyboardLift,
+    paddingTop: hp(0.5),
+    paddingBottom: isKeyboardVisible
+      ? hp(0.6)
+      : Platform.OS === 'android'
+        ? hp(0.6)
+        : Math.max(insets.bottom, hp(2)),
     elevation: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
+  },
+  androidNavigationBarBackground: {
+    height: insets.bottom,
+    backgroundColor: colors.primary,
   },
 });
 

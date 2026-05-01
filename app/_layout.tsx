@@ -1,3 +1,12 @@
+import { LogBox } from "react-native";
+
+// Suppress expo-notifications Expo Go warning (SDK 53 removed push notification support from Expo Go)
+// This only affects development in Expo Go; production builds are unaffected
+LogBox.ignoreLogs([
+  'expo-notifications: Android Push notifications',
+  'expo-notifications` functionality is not fully supported in Expo Go',
+]);
+
 import SafeScreen from "@/components/SafeScreen";
 import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
 import { ClerkProvider, useAuth, useUser } from "@clerk/clerk-expo";
@@ -7,23 +16,13 @@ import { Slot, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, StatusBar, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import Constants from 'expo-constants';
+import { getClerkPublishableKey, getStripePublishableKey } from '@/utils/config';
 
-// Safely get keys from Constants
-const publishableKey = Constants.expoConfig?.extra?.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
+// Get keys via centralized config (works in Expo Go, dev builds, AND standalone APKs)
+const publishableKey = getClerkPublishableKey();
 
 export default function RootLayout() {
-  const stripePublishableKey = Constants.expoConfig?.extra?.EXPO_PUBLIC_STRIPE_PK;
-  
-  // Fail-safe check: If keys are missing, show loader instead of crashing
-  if (!publishableKey || !stripePublishableKey) {
-    console.warn("Keys missing in RootLayout, showing ActivityIndicator");
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: '#000' }}>
-        <ActivityIndicator size="large" color="#fff" />
-      </View>
-    );
-  }
+  const stripePublishableKey = getStripePublishableKey();
   
   return (
     <StripeProvider publishableKey={stripePublishableKey}>
@@ -87,7 +86,7 @@ function AuthGate() {
 
   if (!isLoaded || !userLoaded || isNavigating) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: 'white' }}>
         <ActivityIndicator size="large" />
       </View>
     );

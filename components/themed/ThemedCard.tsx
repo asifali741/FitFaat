@@ -1,4 +1,5 @@
 import { theme } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 import React from 'react';
 import { StyleSheet, View, ViewProps, ViewStyle } from 'react-native';
 
@@ -14,6 +15,8 @@ export const ThemedCard: React.FC<ThemedCardProps> = ({
   style,
   ...props
 }) => {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const cardStyle: ViewStyle[] = [
     styles.card,
     { padding: theme.spacing[padding] },
@@ -27,11 +30,11 @@ export const ThemedCard: React.FC<ThemedCardProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   card: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: theme.borderRadius.medium,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
   },
 });

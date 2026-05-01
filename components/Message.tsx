@@ -1,5 +1,6 @@
 import React from "react";
 import { Text, View } from "react-native";
+import { useTheme } from "@/contexts/ThemeContext";
 import {
     heightPercentageToDP as hp,
     widthPercentageToDP as wp,
@@ -13,6 +14,7 @@ type ChatMessage = {
 };
 
 export default function Message({ msg }: { msg: ChatMessage }) {
+  const { colors } = useTheme();
   const isUser = msg.role === "user";
 
   return (
@@ -26,13 +28,15 @@ export default function Message({ msg }: { msg: ChatMessage }) {
       {/* Bubble */}
       <View
         style={{
-          backgroundColor: isUser ? "#4CAF50" : "#E5E5EA",
+          backgroundColor: isUser ? colors.chatUser : colors.cardBackground,
           paddingVertical: hp(1.2),
           paddingHorizontal: wp(4),
           borderRadius: hp(1.8),
           borderBottomRightRadius: isUser ? 0 : hp(1.8),
           borderBottomLeftRadius: isUser ? hp(1.8) : 0,
-          shadowColor: "#000",
+          borderWidth: isUser ? 0 : 1,
+          borderColor: colors.border,
+          shadowColor: colors.shadowLight,
           shadowOpacity: 0.05,
           shadowRadius: hp(2),
           alignSelf: isUser ? "flex-end" : "flex-start", // 👈 prevents stretching
@@ -42,7 +46,7 @@ export default function Message({ msg }: { msg: ChatMessage }) {
         <Text
           style={{
             fontSize: hp(2),
-            color: isUser ? "#fff" : "#000",
+            color: isUser ? colors.textPrimary : colors.textPrimary,
             flexShrink: 1, // 👈 allows text to wrap
           }}
         >

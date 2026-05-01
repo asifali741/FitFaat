@@ -14,8 +14,11 @@ import {
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { theme } from "@/constants/theme";
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function PrivacySecurity() {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const [privacySettings, setPrivacySettings] = useState({
     profileVisibility: true,
     showActivityStatus: true,
@@ -128,7 +131,7 @@ export default function PrivacySecurity() {
     >
       <View style={styles.settingLeft}>
         <View style={styles.settingIcon}>
-          <Ionicons name={icon as any} size={24} color={theme.colors.primary} />
+          <Ionicons name={icon as any} size={24} color={colors.primary} />
         </View>
         <View style={styles.settingText}>
           <Text style={styles.settingTitle}>{title}</Text>
@@ -139,11 +142,11 @@ export default function PrivacySecurity() {
         <Switch
           value={value}
           onValueChange={onValueChange}
-          trackColor={{ false: theme.colors.textSecondary + '40', true: theme.colors.primary + '40' }}
-          thumbColor={value ? theme.colors.primary : theme.colors.textSecondary}
+          trackColor={{ false: colors.textSecondary + '40', true: colors.primary + '40' }}
+          thumbColor={value ? colors.primary : colors.textSecondary}
         />
       ) : (
-        <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+        <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
       )}
     </TouchableOpacity>
   );
@@ -313,17 +316,17 @@ export default function PrivacySecurity() {
             
             <TouchableOpacity style={styles.legalButton}>
               <Text style={styles.legalButtonText}>Privacy Policy</Text>
-              <Ionicons name="open-outline" size={18} color={theme.colors.primary} />
+              <Ionicons name="open-outline" size={18} color={colors.primary} />
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.legalButton}>
               <Text style={styles.legalButtonText}>Terms of Service</Text>
-              <Ionicons name="open-outline" size={18} color={theme.colors.primary} />
+              <Ionicons name="open-outline" size={18} color={colors.primary} />
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.legalButton}>
               <Text style={styles.legalButtonText}>Cookie Policy</Text>
-              <Ionicons name="open-outline" size={18} color={theme.colors.primary} />
+              <Ionicons name="open-outline" size={18} color={colors.primary} />
             </TouchableOpacity>
           </View>
 
@@ -334,14 +337,14 @@ export default function PrivacySecurity() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
   },
   content: {
     flex: 1,
-    backgroundColor: theme.colors.screenColor,
+    backgroundColor: colors.screenColor,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
   },
@@ -352,7 +355,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: hp(2),
     fontWeight: 'bold',
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: hp(1.5),
     marginLeft: wp(2),
   },
@@ -380,7 +383,7 @@ const styles = StyleSheet.create({
     width: hp(5),
     height: hp(5),
     borderRadius: hp(2.5),
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: wp(4),
@@ -391,12 +394,12 @@ const styles = StyleSheet.create({
   settingTitle: {
     fontSize: hp(1.8),
     fontWeight: '600',
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: hp(0.3),
   },
   settingSubtitle: {
     fontSize: hp(1.4),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
   },
   legalButton: {
     flexDirection: 'row',
@@ -416,6 +419,6 @@ const styles = StyleSheet.create({
   legalButtonText: {
     fontSize: hp(1.8),
     fontWeight: '500',
-    color: theme.colors.primary,
+    color: colors.primary,
   },
 });

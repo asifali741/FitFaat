@@ -1,23 +1,27 @@
 import AppHeader from '@/components/AppHeader';
 import { theme } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 import { authApi } from '@/utils/auth/authApi';
+import { tokenStorage } from '@/utils/auth/tokenStorage';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  FlatList, Platform, RefreshControl, StyleSheet,
+  FlatList, RefreshControl, StyleSheet,
   Text,
   TouchableOpacity,
   View
 } from 'react-native';
-import { widthPercentageToDP as wp } from 'react-native-responsive-screen';
+import {
+  heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
+} from 'react-native-responsive-screen';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { io } from 'socket.io-client';
+import { getBackendBaseUrl } from '@/utils/config';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -43,7 +47,19 @@ const truncateMessage = (text: string | null | undefined, maxLen = 40): string =
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
+const getErrorMessage = (error: any): string => {
+  if (typeof error === 'string') return error;
+  return error?.message || 'Failed to load appointments';
+};
+
+const isUnauthorizedError = (error: any): boolean => {
+  const status = error?.status || error?.response?.status;
+  return status === 401 || /not authorized|unauthorized|jwt expired|please login/i.test(getErrorMessage(error));
+};
+
 export default function AllChatsScreen() {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const router = useRouter();
   const navigation = useNavigation();
   const [appointments, setAppointments] = useState<any[]>([]);
@@ -63,10 +79,9 @@ export default function AllChatsScreen() {
 
   const fetchUnreadMap = async (): Promise<{ [key: string]: number }> => {
     try {
-      const token = await SecureStore.getItemAsync('authToken');
+      const token = await tokenStorage.getToken();
       if (!token) return {};
-      const ENV = Constants.expoConfig?.extra;
-      const API_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')).replace(/\/api\/?$/, '');
+      const API_URL = getBackendBaseUrl();
       const resp = await fetch(`${API_URL}/api/chat/unread-by-appointment`, { method: 'GET', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } });
       if (!resp.ok) { console.log('⚠️ [DoctorChats] unread-by-appointment API failed:', resp.status); return {}; }
       const data = await resp.json();
@@ -122,8 +137,18 @@ export default function AllChatsScreen() {
         setAppointments(confirmedAppointments);
       }
     } catch (error) {
-      console.error('Failed to fetch appointments:', error);
-      Alert.alert('Error', 'Failed to load appointments');
+      const message = getErrorMessage(error);
+      if (isUnauthorizedError(error)) {
+        console.log('[DoctorChats] Unauthorized appointment fetch:', message);
+        setAppointments([]);
+        await tokenStorage.clearAll();
+        Alert.alert('Session expired', 'Please sign in again.', [
+          { text: 'OK', onPress: () => router.replace('/(auth)') },
+        ]);
+      } else {
+        console.log('Failed to fetch appointments:', error);
+        Alert.alert('Error', 'Failed to load appointments');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -145,10 +170,9 @@ export default function AllChatsScreen() {
 
     const initSocket = async () => {
       try {
-        const token = await SecureStore.getItemAsync('authToken');
+        const token = await tokenStorage.getToken();
         if (!token) return;
-        const ENV = Constants.expoConfig?.extra;
-        const API_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')).replace(/\/api\/?$/, '');
+        const API_URL = getBackendBaseUrl();
         socket = io(API_URL, { transports: ['websocket'], auth: { token } });
         socketRef.current = socket;
 
@@ -280,8 +304,8 @@ export default function AllChatsScreen() {
       >
         {/* Avatar */}
         <View style={styles.avatar}>
-          <Ionicons name="person" size={26} color={theme.colors.primary} />
-          <View style={[styles.statusDot, { backgroundColor: theme.colors.statusConfirmed }]} />
+          <Ionicons name="person" size={Math.min(hp(3.2), wp(6.9))} color={colors.primary} />
+          <View style={[styles.statusDot, { backgroundColor: colors.statusConfirmed }]} />
         </View>
 
         {/* Content */}
@@ -312,7 +336,7 @@ export default function AllChatsScreen() {
             ) : (
               lastMsg?.senderRole === 'doctor' && lastMsg?.text ? (
                 <View style={styles.checkContainer}>
-                  <Ionicons name="checkmark-done" size={16} color={theme.colors.info} />
+                  <Ionicons name="checkmark-done" size={Math.min(hp(2), wp(4.3))} color={colors.info} />
                 </View>
               ) : null
             )}
@@ -327,7 +351,7 @@ export default function AllChatsScreen() {
       <SafeAreaView style={styles.container}>
         <AppHeader title="Patient Chats" showBackButton />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading chats...</Text>
         </View>
       </SafeAreaView>
@@ -340,7 +364,7 @@ export default function AllChatsScreen() {
 
       {appointments.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="chatbubbles-outline" size={72} color={theme.colors.border} />
+          <Ionicons name="chatbubbles-outline" size={Math.min(hp(8.9), wp(19.2))} color={colors.border} />
           <Text style={styles.emptyTitle}>No Chats Yet</Text>
           <Text style={styles.emptySubtitle}>Confirmed patient appointments will appear here</Text>
         </View>
@@ -356,8 +380,8 @@ export default function AllChatsScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={theme.colors.primary}
-              colors={[theme.colors.primary]}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
             />
           }
         />
@@ -368,12 +392,12 @@ export default function AllChatsScreen() {
 
 // ── Styles ───────────────────────────────────────────────────────────────────
 
-const AVATAR_SIZE = 56;
+const AVATAR_SIZE = Math.min(hp(6.9), wp(14.9));
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: colors.background,
   },
   loadingContainer: {
     flex: 1,
@@ -383,7 +407,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: theme.spacing.md,
     fontSize: theme.typography.fontSize.base,
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
   },
   emptyContainer: {
     flex: 1,
@@ -394,12 +418,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: theme.typography.fontSize.xl,
     fontWeight: theme.typography.fontWeight.bold as any,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginTop: theme.spacing.lg,
   },
   emptySubtitle: {
     fontSize: theme.typography.fontSize.base,
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     marginTop: theme.spacing.sm,
   },
@@ -411,16 +435,16 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: theme.colors.border,
-    marginLeft: AVATAR_SIZE + 28,
+    backgroundColor: colors.border,
+    marginLeft: AVATAR_SIZE + wp(7.5),
   },
 
   // ── Chat Row (WhatsApp-style) ────────────────
   chatRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: hp(1.5),
+    paddingHorizontal: wp(4.3),
   },
 
   // Avatar
@@ -428,52 +452,52 @@ const styles = StyleSheet.create({
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
     borderRadius: AVATAR_SIZE / 2,
-    backgroundColor: theme.colors.chatUser,
+    backgroundColor: colors.chatUser,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: theme.colors.secondary,
+    borderColor: colors.secondary,
     position: 'relative',
   },
   statusDot: {
     position: 'absolute',
     bottom: 1,
     right: 1,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
+    width: Math.min(hp(1.7), wp(3.7)),
+    height: Math.min(hp(1.7), wp(3.7)),
+    borderRadius: Math.min(hp(0.85), wp(1.85)),
     borderWidth: 2,
-    borderColor: theme.colors.background,
+    borderColor: colors.background,
   },
 
   // Content
   chatContent: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: wp(3.2),
     justifyContent: 'center',
   },
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: hp(0.5),
   },
   chatName: {
     flex: 1,
     fontSize: wp(4.2),
     fontWeight: theme.typography.fontWeight.medium as any,
-    color: theme.colors.textPrimary,
-    marginRight: 8,
+    color: colors.textPrimary,
+    marginRight: wp(2.1),
   },
   chatNameBold: {
     fontWeight: theme.typography.fontWeight.bold as any,
   },
   chatTime: {
     fontSize: wp(3),
-    color: theme.colors.textTertiary,
+    color: colors.textTertiary,
   },
   chatTimeUnread: {
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: theme.typography.fontWeight.semiBold as any,
   },
 
@@ -485,31 +509,31 @@ const styles = StyleSheet.create({
   chatPreview: {
     flex: 1,
     fontSize: wp(3.4),
-    color: theme.colors.textTertiary,
-    marginRight: 8,
+    color: colors.textTertiary,
+    marginRight: wp(2.1),
   },
   chatPreviewUnread: {
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     fontWeight: theme.typography.fontWeight.semiBold as any,
   },
 
   // Badge
   unreadBadge: {
-    backgroundColor: theme.colors.primary,
-    borderRadius: 12,
+    backgroundColor: colors.primary,
+    borderRadius: wp(3.2),
     minWidth: 24,
-    height: 24,
+    height: hp(3),
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 6,
+    paddingHorizontal: wp(1.6),
   },
   unreadBadgeText: {
     color: '#FFF',
-    fontSize: 12,
+    fontSize: Math.min(hp(1.5), wp(3.2)),
     fontWeight: theme.typography.fontWeight.bold as any,
   },
   checkContainer: {
-    width: 24,
+    width: wp(6.4),
     alignItems: 'center',
   },
 });

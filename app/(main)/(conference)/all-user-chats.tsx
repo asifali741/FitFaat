@@ -1,22 +1,26 @@
 import AppHeader from '@/components/AppHeader';
 import { theme } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 import { authApi } from '@/utils/auth/authApi';
+import { tokenStorage } from '@/utils/auth/tokenStorage';
 import { Ionicons } from '@expo/vector-icons';
-import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  FlatList, Platform, RefreshControl, StyleSheet,
+  FlatList, RefreshControl, StyleSheet,
   Text,
   TouchableOpacity,
   View
 } from 'react-native';
-import { widthPercentageToDP as wp } from 'react-native-responsive-screen';
+import {
+  heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
+} from 'react-native-responsive-screen';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { io } from 'socket.io-client';
+import { getBackendBaseUrl } from '@/utils/config';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -53,7 +57,19 @@ const truncateMessage = (text: string | null | undefined, maxLen = 40): string =
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
+const getErrorMessage = (error: any): string => {
+  if (typeof error === 'string') return error;
+  return error?.message || 'Failed to load appointments';
+};
+
+const isUnauthorizedError = (error: any): boolean => {
+  const status = error?.status || error?.response?.status;
+  return status === 401 || /not authorized|unauthorized|jwt expired|please login/i.test(getErrorMessage(error));
+};
+
 export default function AllUserChatsScreen() {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const router = useRouter();
   const [appointments, setAppointments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -71,10 +87,9 @@ export default function AllUserChatsScreen() {
 
   const fetchUnreadMap = async (): Promise<{ [key: string]: number }> => {
     try {
-      const token = await SecureStore.getItemAsync('authToken');
+      const token = await tokenStorage.getToken();
       if (!token) return {};
-      const ENV = Constants.expoConfig?.extra;
-      const API_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')).replace(/\/api\/?$/, '');
+      const API_URL = getBackendBaseUrl();
       const resp = await fetch(`${API_URL}/api/chat/unread-by-appointment`, { method: 'GET', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } });
       if (!resp.ok) { console.log('⚠️ [AllUserChats] unread-by-appointment API failed:', resp.status); return {}; }
       const data = await resp.json();
@@ -120,8 +135,18 @@ export default function AllUserChatsScreen() {
         Alert.alert('Error', 'Failed to load appointments');
       }
     } catch (error) {
-      console.error('Failed to fetch appointments:', error);
-      Alert.alert('Error', 'Failed to load appointments');
+      const message = getErrorMessage(error);
+      if (isUnauthorizedError(error)) {
+        console.log('[AllUserChats] Unauthorized appointment fetch:', message);
+        setAppointments([]);
+        await tokenStorage.clearAll();
+        Alert.alert('Session expired', 'Please sign in again.', [
+          { text: 'OK', onPress: () => router.replace('/(auth)') },
+        ]);
+      } else {
+        console.log('Failed to fetch appointments:', error);
+        Alert.alert('Error', 'Failed to load appointments');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -143,10 +168,9 @@ export default function AllUserChatsScreen() {
 
     const initSocket = async () => {
       try {
-        const token = await SecureStore.getItemAsync('authToken');
+        const token = await tokenStorage.getToken();
         if (!token) return;
-        const ENV = Constants.expoConfig?.extra;
-        const API_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')).replace(/\/api\/?$/, '');
+        const API_URL = getBackendBaseUrl();
         socket = io(API_URL, { transports: ['websocket'], auth: { token } });
         socketRef.current = socket;
 
@@ -230,31 +254,8 @@ export default function AllUserChatsScreen() {
 
         socket.on('message-status-update', () => { fetchUnreadMessages(); });
 
-        // Listen for incoming video calls
-        socket.on('video:incoming-call', (payload: any) => {
-          console.log('📞 [MOBILE] Incoming video call received:', payload);
-          const { roomName, callerId, callerName, receiverId } = payload;
-          Alert.alert(
-            '📹 Incoming Video Call',
-            `${callerName || 'Doctor'} is calling you`,
-            [
-              {
-                text: 'Decline', style: 'cancel',
-                onPress: () => { socket.emit('video:reject-call', { roomName, callerId, reason: 'User declined' }); }
-              },
-              {
-                text: 'Accept',
-                onPress: async () => {
-                  const appointmentId = roomName.replace('appointment_', '');
-                  const currentUserId = receiverId || socket.userId;
-                  socket.emit('video:accept-call', { roomName, callerId, receiverId: currentUserId });
-                  router.push({ pathname: '/(main)/(conference)/video-call', params: { callId: roomName, userName: 'Patient', appointmentId } });
-                }
-              }
-            ],
-            { cancelable: false }
-          );
-        });
+
+
 
       } catch (error) {
         console.log('Error setting up chat socket in AllUserChats:', error);
@@ -302,10 +303,12 @@ export default function AllUserChatsScreen() {
 
     // Status info
     const statusColorMap: { [key: string]: string } = {
-      confirmed: '#4CAF50', completed: theme.colors.textSecondary,
-      cancelled: theme.colors.error, pending: '#F59E0B'
+      confirmed: colors.success,
+      completed: colors.textSecondary,
+      cancelled: colors.error,
+      pending: colors.warning,
     };
-    const statusColor = statusColorMap[item.status] || theme.colors.textSecondary;
+    const statusColor = statusColorMap[item.status] || colors.textSecondary;
 
     return (
       <TouchableOpacity
@@ -315,7 +318,7 @@ export default function AllUserChatsScreen() {
       >
         {/* Avatar */}
         <View style={[styles.avatar, { borderColor: statusColor }]}>
-          <Ionicons name="medical" size={26} color={theme.colors.primary} />
+          <Ionicons name="medical" size={Math.min(hp(3.2), wp(6.9))} color={colors.primary} />
           {/* Status dot */}
           <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
         </View>
@@ -350,7 +353,7 @@ export default function AllUserChatsScreen() {
             ) : (
               lastMsg?.senderRole === 'user' && lastMsg?.text ? (
                 <View style={styles.checkContainer}>
-                  <Ionicons name="checkmark-done" size={16} color={theme.colors.info} />
+                  <Ionicons name="checkmark-done" size={Math.min(hp(2), wp(4.3))} color={colors.info} />
                 </View>
               ) : null
             )}
@@ -362,56 +365,69 @@ export default function AllUserChatsScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.safeArea}>
         <AppHeader title="Chats" showBackButton />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.loadingText}>Loading chats...</Text>
+        <View style={styles.contentSurface}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Loading chats...</Text>
+          </View>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
       <AppHeader title="Chats" showBackButton />
 
-      {appointments.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="chatbubbles-outline" size={72} color={theme.colors.border} />
-          <Text style={styles.emptyTitle}>No Chats Yet</Text>
-          <Text style={styles.emptySubtitle}>Your conversations with doctors will appear here</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={appointments}
-          renderItem={renderAppointment}
-          keyExtractor={(item) => item._id}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={theme.colors.primary}
-              colors={[theme.colors.primary]}
-            />
-          }
-        />
-      )}
+      <View style={styles.contentSurface}>
+        {appointments.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="chatbubbles-outline" size={Math.min(hp(8.9), wp(19.2))} color={colors.border} />
+            <Text style={styles.emptyTitle}>No Chats Yet</Text>
+            <Text style={styles.emptySubtitle}>Your conversations with doctors will appear here</Text>
+          </View>
+        ) : (
+          <FlatList
+            style={styles.chatList}
+            data={appointments}
+            renderItem={renderAppointment}
+            keyExtractor={(item) => item._id}
+            contentContainerStyle={styles.listContainer}
+            showsVerticalScrollIndicator={false}
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={colors.primary}
+                colors={[colors.primary]}
+              />
+            }
+          />
+        )}
+      </View>
     </SafeAreaView>
   );
 }
 
 // ── Styles ───────────────────────────────────────────────────────────────────
 
-const AVATAR_SIZE = 56;
+const AVATAR_SIZE = Math.min(hp(6.9), wp(14.9));
 
-const styles = StyleSheet.create({
-  container: {
+const getStyles = (colors: any) => StyleSheet.create({
+  safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: colors.primary,
+  },
+  contentSurface: {
+    flex: 1,
+    backgroundColor: colors.screenColor,
+  },
+  chatList: {
+    flex: 1,
+    backgroundColor: colors.screenColor,
   },
   loadingContainer: {
     flex: 1,
@@ -421,7 +437,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: theme.spacing.md,
     fontSize: theme.typography.fontSize.base,
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
   },
   emptyContainer: {
     flex: 1,
@@ -432,12 +448,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: theme.typography.fontSize.xl,
     fontWeight: theme.typography.fontWeight.bold as any,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginTop: theme.spacing.lg,
   },
   emptySubtitle: {
     fontSize: theme.typography.fontSize.base,
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     marginTop: theme.spacing.sm,
   },
@@ -449,16 +465,16 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: theme.colors.border,
-    marginLeft: AVATAR_SIZE + 28,
+    backgroundColor: colors.border,
+    marginLeft: AVATAR_SIZE + wp(7.5),
   },
 
   // ── Chat Row (WhatsApp-style) ────────────────
   chatRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: hp(1.5),
+    paddingHorizontal: wp(4.3),
   },
 
   // Avatar
@@ -466,52 +482,52 @@ const styles = StyleSheet.create({
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
     borderRadius: AVATAR_SIZE / 2,
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: colors.primarySoft,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: theme.colors.primary,
+    borderColor: colors.primary,
     position: 'relative',
   },
   statusDot: {
     position: 'absolute',
     bottom: 1,
     right: 1,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
+    width: Math.min(hp(1.7), wp(3.7)),
+    height: Math.min(hp(1.7), wp(3.7)),
+    borderRadius: Math.min(hp(0.85), wp(1.85)),
     borderWidth: 2,
-    borderColor: theme.colors.background,
+    borderColor: colors.screenColor,
   },
 
   // Content
   chatContent: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: wp(3.2),
     justifyContent: 'center',
   },
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: hp(0.5),
   },
   chatName: {
     flex: 1,
     fontSize: wp(4.2),
     fontWeight: theme.typography.fontWeight.medium as any,
-    color: theme.colors.textPrimary,
-    marginRight: 8,
+    color: colors.textPrimary,
+    marginRight: wp(2.1),
   },
   chatNameBold: {
     fontWeight: theme.typography.fontWeight.bold as any,
   },
   chatTime: {
     fontSize: wp(3),
-    color: theme.colors.textTertiary,
+    color: colors.textTertiary,
   },
   chatTimeUnread: {
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: theme.typography.fontWeight.semiBold as any,
   },
 
@@ -523,31 +539,31 @@ const styles = StyleSheet.create({
   chatPreview: {
     flex: 1,
     fontSize: wp(3.4),
-    color: theme.colors.textTertiary,
-    marginRight: 8,
+    color: colors.textTertiary,
+    marginRight: wp(2.1),
   },
   chatPreviewUnread: {
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     fontWeight: theme.typography.fontWeight.semiBold as any,
   },
 
   // Badge
   unreadBadge: {
-    backgroundColor: theme.colors.primary,
-    borderRadius: 12,
+    backgroundColor: colors.primary,
+    borderRadius: wp(3.2),
     minWidth: 24,
-    height: 24,
+    height: hp(3),
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 6,
+    paddingHorizontal: wp(1.6),
   },
   unreadBadgeText: {
-    color: '#FFF',
-    fontSize: 12,
+    color: colors.textOnPrimary,
+    fontSize: Math.min(hp(1.5), wp(3.2)),
     fontWeight: theme.typography.fontWeight.bold as any,
   },
   checkContainer: {
-    width: 24,
+    width: wp(6.4),
     alignItems: 'center',
   },
 });
