@@ -1,15 +1,10 @@
-/**
- * ZegoCloud Video Call Screen
- *
- * This screen is opened from three trigger points:
- * 1. "Start Call" button on Appointment Summary
- * 2. Video camera icon on Chat screen header
- * 3. "Start Call"/"Join Call" on Appointment Details
- *
- * All three use the same appointmentId as the room/call ID,
- * so both doctor and patient join the same ZegoCloud room.
- */
-import { tokenStorage } from "@/utils/auth/tokenStorage";
+import { tokenStorage } from '@/utils/auth/tokenStorage';
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { ONE_ON_ONE_VIDEO_CALL_CONFIG, ZegoUIKitPrebuiltCall } from '@zegocloud/zego-uikit-prebuilt-call-rn';
+import Constants from 'expo-constants';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
     getCallID,
     getZegoUserID,
@@ -571,5 +566,43 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: Math.min(hp(1.8), wp(3.8)),
     fontWeight: "600",
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 40,
+  },
+  errorTitle: {
+    color: '#FF6B6B',
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginTop: 20,
+    marginBottom: 16,
+  },
+  errorMessage: {
+    color: '#ccc',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 24,
+  },
+  errorSubText: {
+    color: '#999',
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  commandCode: {
+    color: '#4CAF50',
+    fontSize: 13,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    marginVertical: 6,
+    overflow: 'hidden',
   },
 });
