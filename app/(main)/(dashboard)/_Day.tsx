@@ -8,6 +8,7 @@ import Animated, {
   useSharedValue,
   withSpring
 } from "react-native-reanimated";
+import { widthPercentageToDP as wp } from "react-native-responsive-screen";
 import Svg, { Circle, Defs, LinearGradient, Stop, Text as SvgText } from "react-native-svg";
 import { DashFonts, rs } from "../(settings)/_ui_elements";
 import { Day } from "./types";
@@ -72,19 +73,29 @@ const ActiveDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}) 
       {/* Progress Status */}
       <View style={styles.modernStatusSection}>
         <View style={styles.modernStatusItem}>
-          <Ionicons name="flame" size={16} color="#FF6B35" />
-          <Text style={styles.modernStatusText}>Calories: {info.achievedCalories}</Text>
+          <View style={styles.calorieIconBox}>
+            <Ionicons name="flame" size={18} color="#FFFFFF" />
+          </View>
+          <View style={styles.statusContent}>
+            <Text style={styles.statusLabel}>Calories</Text>
+            <Text style={styles.statusValue}>{info.achievedCalories} kcal</Text>
+          </View>
         </View>
-        <View style={styles.modernStatusItem}>
-          <Ionicons name="water" size={16} color="#4A90E2" />
-          <Text style={styles.modernStatusText}>Hydration: {info.achieviedHydration}</Text>
+        <View style={[styles.modernStatusItem, { borderLeftWidth: 1, borderLeftColor: '#E5E7EB', paddingLeft: rs(12) }]}>
+          <View style={styles.hydrationIconBox}>
+            <Ionicons name="water" size={18} color="#FFFFFF" />
+          </View>
+          <View style={styles.statusContent}>
+            <Text style={styles.statusLabel}>Hydration</Text>
+            <Text style={styles.statusValue}>{info.achieviedHydration} L</Text>
+          </View>
         </View>
       </View>
 
       {/* Remarks */}
       {info.remarks && (
         <View style={styles.modernRemarksSection}>
-          <Ionicons name="chatbubble-ellipses" size={14} color="#666" />
+          <Ionicons name="chatbubble-ellipses" size={14} color={colors.primary} />
           <Text style={styles.modernRemarksText}>{info.remarks}</Text>
         </View>
       )}
@@ -98,7 +109,7 @@ const ActiveDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}) 
           style={styles.modernViewButton}
         >
           <Text style={styles.modernViewButtonText}>View Details</Text>
-          <Ionicons name="arrow-forward" size={16} color="#fff" />
+          <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
         </Pressable>
       </View>
     </Animated.View>
@@ -123,7 +134,7 @@ const FinishedDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}
     <Animated.View style={[styles.modernFinishedItem, animatedStyle]}>
       <View style={styles.modernFinishedHeader}>
         <View style={styles.modernSuccessIcon}>
-          <Ionicons name="checkmark-circle" size={50} color="#4CAF50" />
+          <Ionicons name="checkmark-circle" size={50} color={colors.success} />
         </View>
         
         <View style={styles.modernFinishedInfo}>
@@ -143,7 +154,7 @@ const FinishedDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}
         style={styles.modernFinishedButton}
       >
         <Text style={styles.modernFinishedButtonText}>View Results</Text>
-        <Ionicons name="trophy" size={16} color="#fff" />
+        <Ionicons name="trophy" size={16} color="#FFFFFF" />
       </Pressable>
     </Animated.View>
   );
@@ -156,7 +167,7 @@ const LockedDay = ({info} : {info: Day}) => {
     <View style={styles.modernLockedItem}>
       <View style={styles.modernLockedHeader}>
         <View style={styles.modernLockedIcon}>
-          <Ionicons name="lock-closed" size={40} color="#95A5A6" />
+          <Ionicons name="lock-closed" size={40} color={colors.gray || '#D1D5DB'} />
         </View>
         
         <View style={styles.modernLockedInfo}>
@@ -201,7 +212,7 @@ const ProgressCircle = React.memo(({finalProgress}: {finalProgress: number})=>{
                 <Stop offset="100%" stopColor={getProgressColor()} stopOpacity="0.7" />
               </LinearGradient>
             </Defs>
-            <Circle cx="35" cy="35" r="30" stroke="#E0E0E0" strokeWidth="6" fill="none" />
+            <Circle cx="35" cy="35" r="30" stroke="#E5E7EB" strokeWidth="6" fill="none" />
             <AnimatedCircle
               cx="35" cy="35" r="30"
               stroke="url(#progressGrad)"
@@ -268,7 +279,7 @@ const InfoTray = React.memo(({ duration }: { duration: number }) => {
 
   return (
     <View style={styles.modernNextMeal}>
-          <Ionicons name="time" size={16} color="#9C27B0" />
+          <Ionicons name="time" size={16} color={colors.primary} />
           <Text style={styles.modernNextMealText}>Time left: {timeRemaining}</Text>
     </View>
     
@@ -425,24 +436,30 @@ const getStyles = (colors: any) => StyleSheet.create({
   // Modern Active Day Styles
   modernActiveItem: {
     margin: rs(8),
+    marginHorizontal: wp(3),
     backgroundColor: colors.cardBackground,
     borderRadius: rs(20),
-    padding: rs(16),
-    marginBottom: rs(12),
-    shadowColor: colors.shadowMedium,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    padding: rs(18),
+    marginBottom: rs(16),
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
     shadowRadius: rs(12),
     elevation: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.activeStatus,
+    borderLeftWidth: 5,
+    borderLeftColor: colors.primary,
+    borderWidth: 1,
+    borderColor: '#000000',
   },
   
   modernTopHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: rs(12),
+    marginBottom: rs(16),
+    paddingBottom: rs(14),
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
   
   modernDayInfo: {
@@ -452,16 +469,21 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   
   modernDayNumber: {
-    fontSize: rs(32),
+    fontSize: rs(38),
     fontWeight: '800',
-    color: colors.textPrimary,
-    marginRight: rs(12),
+    color: colors.primary,
+    marginRight: rs(16),
     backgroundColor: colors.primarySoft,
-    borderRadius: rs(12),
-    paddingHorizontal: rs(12),
-    paddingVertical: rs(6),
+    borderRadius: rs(14),
+    paddingHorizontal: rs(16),
+    paddingVertical: rs(10),
     textAlign: 'center',
-    minWidth: rs(60),
+    minWidth: rs(75),
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.22,
+    shadowRadius: rs(5),
+    elevation: 4,
   },
   
   modernDayDetails: {
@@ -469,16 +491,18 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   
   modernDayText: {
-    fontSize: rs(18),
-    fontWeight: '600',
+    fontSize: rs(22),
+    fontWeight: '800',
     color: colors.textPrimary,
-    marginBottom: rs(2),
+    marginBottom: rs(4),
+    letterSpacing: 0.5,
   },
   
   modernDateText: {
     fontSize: rs(14),
     color: colors.textSecondary,
     fontWeight: '500',
+    letterSpacing: 0.2,
   },
   
   modernProgressWrapper: {
@@ -489,108 +513,181 @@ const getStyles = (colors: any) => StyleSheet.create({
   modernStatusSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: rs(12),
+    marginBottom: rs(16),
     backgroundColor: colors.offWhite,
-    borderRadius: rs(12),
-    padding: rs(12),
+    borderRadius: rs(14),
+    padding: rs(14),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: rs(3),
   },
   
   modernStatusItem: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    paddingVertical: rs(4),
+  },
+  
+  calorieIconBox: {
+    width: rs(42),
+    height: rs(42),
+    borderRadius: rs(11),
+    backgroundColor: '#F97316',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#F97316',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.28,
+    shadowRadius: rs(5),
+    elevation: 4,
+  },
+  
+  hydrationIconBox: {
+    width: rs(42),
+    height: rs(42),
+    borderRadius: rs(11),
+    backgroundColor: '#2E86AB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#2E86AB',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.28,
+    shadowRadius: rs(5),
+    elevation: 4,
+  },
+  
+  statusContent: {
+    marginLeft: rs(10),
+    flex: 1,
+  },
+  
+  statusLabel: {
+    fontSize: rs(11),
+    color: colors.textSecondary,
+    fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  
+  statusValue: {
+    fontSize: rs(15),
+    color: colors.textPrimary,
+    fontWeight: '700',
+    marginTop: rs(2),
   },
   
   modernStatusText: {
-    fontSize: rs(13),
+    fontSize: rs(14),
     color: colors.textPrimary,
-    fontWeight: '500',
-    marginLeft: rs(6),
+    fontWeight: '600',
+    marginLeft: rs(8),
   },
   
   modernRemarksSection: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     backgroundColor: colors.primarySoft,
-    borderRadius: rs(10),
-    padding: rs(10),
-    marginBottom: rs(12),
+    borderRadius: rs(12),
+    padding: rs(12),
+    marginBottom: rs(14),
+    borderLeftWidth: 4,
+    borderLeftColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: rs(3),
   },
   
   modernRemarksText: {
-    fontSize: rs(13),
-    color: colors.secondary,
+    fontSize: rs(14),
+    color: colors.primary,
     fontStyle: 'italic',
-    marginLeft: rs(6),
+    marginLeft: rs(10),
     flex: 1,
+    fontWeight: '500',
+    lineHeight: rs(20),
   },
   
   modernActionSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: rs(10),
   },
   
   modernNextMeal: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3E5F5',
-    borderRadius: rs(8),
-    paddingHorizontal: rs(10),
-    paddingVertical: rs(6),
+    backgroundColor: colors.primarySoft,
+    borderRadius: rs(12),
+    paddingHorizontal: rs(14),
+    paddingVertical: rs(10),
     flex: 1,
-    marginRight: rs(12),
+    borderWidth: 1.5,
+    borderColor: colors.primary + '30',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: rs(5),
+    elevation: 3,
   },
   
   modernNextMealText: {
-    fontSize: rs(12),
-    color: '#7B1FA2',
-    fontWeight: '600',
-    marginLeft: rs(4),
+    fontSize: rs(13),
+    color: colors.primary,
+    fontWeight: '700',
+    marginLeft: rs(8),
+    letterSpacing: 0.3,
   },
   
   modernViewButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.buttonPrimary,
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
     borderRadius: rs(12),
     paddingHorizontal: rs(16),
-    paddingVertical: rs(10),
-    shadowColor: colors.shadowMedium,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
+    paddingVertical: rs(12),
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: rs(8),
+    elevation: 6,
   },
   
   modernViewButtonText: {
-    color: colors.buttonText,
-    fontSize: rs(13),
-    fontWeight: '600',
-    marginRight: rs(4),
+    color: '#FFFFFF',
+    fontSize: rs(14),
+    fontWeight: '700',
+    letterSpacing: 0.4,
   },
   
   // Modern Finished Day Styles
   modernFinishedItem: {
     margin: rs(8),
+    marginHorizontal: wp(3),
     backgroundColor: colors.cardBackground,
-    borderRadius: rs(16),
-    padding: rs(16),
-    marginBottom: rs(12),
-    shadowColor: colors.finishedStatus,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: rs(8),
-    elevation: 6,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.finishedStatus,
+    borderRadius: rs(20),
+    padding: rs(18),
+    marginBottom: rs(16),
+    shadowColor: colors.success,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.16,
+    shadowRadius: rs(10),
+    elevation: 8,
+    borderLeftWidth: 5,
+    borderLeftColor: colors.success,
+    borderWidth: 1,
+    borderColor: '#000000',
   },
   
   modernFinishedHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: rs(12),
+    marginBottom: rs(14),
   },
   
   modernSuccessIcon: {
@@ -602,93 +699,108 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   
   modernFinishedDayNumber: {
-    fontSize: rs(24),
+    fontSize: rs(30),
     fontWeight: '800',
-    color: colors.finishedStatus,
+    color: colors.success,
     backgroundColor: colors.primarySoft,
-    borderRadius: rs(8),
-    paddingHorizontal: rs(8),
-    paddingVertical: rs(4),
+    borderRadius: rs(10),
+    paddingHorizontal: rs(12),
+    paddingVertical: rs(8),
     textAlign: 'center',
     alignSelf: 'flex-start',
-    marginBottom: rs(4),
+    marginBottom: rs(8),
+    shadowColor: colors.success,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: rs(4),
+    elevation: 2,
   },
   
   modernFinishedDayText: {
-    fontSize: rs(16),
-    fontWeight: '600',
+    fontSize: rs(20),
+    fontWeight: '800',
     color: colors.textPrimary,
-    marginBottom: rs(2),
+    marginBottom: rs(4),
+    letterSpacing: 0.4,
   },
   
   modernFinishedDateText: {
-    fontSize: rs(13),
+    fontSize: rs(14),
     color: colors.textSecondary,
     fontWeight: '500',
+    letterSpacing: 0.2,
   },
   
   modernFinishedProgress: {
     alignItems: 'center',
+    paddingVertical: rs(10),
+    paddingHorizontal: rs(12),
+    backgroundColor: colors.primarySoft,
+    borderRadius: rs(10),
   },
   
   modernFinishedPercentage: {
-    fontSize: rs(20),
+    fontSize: rs(28),
     fontWeight: '800',
-    color: colors.finishedStatus,
-
-    marginBottom: rs(2),
+    color: colors.success,
+    marginBottom: rs(4),
+    letterSpacing: 0.3,
   },
   
   modernFinishedLabel: {
-    fontSize: rs(11),
-    color: colors.finishedStatus,
-    fontWeight: '600',
+    fontSize: rs(12),
+    color: colors.success,
+    fontWeight: '700',
     textTransform: 'uppercase',
+    letterSpacing: 1.2,
   },
   
   modernFinishedButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.buttonSuccess,
+    backgroundColor: colors.success,
     borderRadius: rs(12),
-    paddingHorizontal: rs(16),
-    paddingVertical: rs(10),
-    shadowColor: colors.buttonSuccess,
-    shadowOffset: { width: 0, height: 2 },
+    paddingHorizontal: rs(20),
+    paddingVertical: rs(12),
+    shadowColor: colors.success,
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowRadius: rs(6),
+    elevation: 5,
+    marginTop: rs(12),
   },
   
   modernFinishedButtonText: {
     color: colors.buttonText,
     fontSize: rs(14),
-    fontWeight: '600',
-    marginRight: rs(6),
+    fontWeight: '700',
+    letterSpacing: 0.4,
   },
   
   // Modern Locked Day Styles
   modernLockedItem: {
     margin: rs(8),
+    marginHorizontal: wp(3),
     backgroundColor: colors.cardBackground,
-    borderRadius: rs(16),
-    padding: rs(16),
-    marginBottom: rs(12),
-    shadowColor: colors.textLight,
+    borderRadius: rs(20),
+    padding: rs(18),
+    marginBottom: rs(16),
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.06,
     shadowRadius: rs(4),
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: colors.gray,
-    opacity: 0.8,
+    elevation: 2,
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    opacity: 0.75,
   },
   
   modernLockedHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: rs(12),
   },
   
   modernLockedIcon: {
@@ -701,48 +813,51 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   
   modernLockedDayNumber: {
-    fontSize: rs(20),
+    fontSize: rs(24),
     fontWeight: '700',
     color: colors.lockedStatus,
     backgroundColor: colors.lightGray,
-    borderRadius: rs(8),
-    paddingHorizontal: rs(8),
-    paddingVertical: rs(4),
+    borderRadius: rs(10),
+    paddingHorizontal: rs(10),
+    paddingVertical: rs(6),
     textAlign: 'center',
     alignSelf: 'flex-start',
-    marginBottom: rs(4),
+    marginBottom: rs(6),
   },
   
   modernLockedDayText: {
-    fontSize: rs(16),
+    fontSize: rs(18),
     fontWeight: '600',
     color: colors.textSecondary,
-    marginBottom: rs(2),
+    marginBottom: rs(3),
+    letterSpacing: 0.2,
   },
   
   modernLockedDateText: {
-    fontSize: rs(13),
+    fontSize: rs(14),
     color: colors.lockedStatus,
-
     fontWeight: '500',
   },
   
   modernLockedStatus: {
     alignItems: 'center',
+    paddingVertical: rs(8),
   },
   
   modernLockedStatusText: {
-    fontSize: rs(14),
-    fontWeight: '600',
+    fontSize: rs(15),
+    fontWeight: '700',
     color: colors.lockedStatus,
     textTransform: 'uppercase',
-    marginBottom: rs(2),
+    marginBottom: rs(3),
+    letterSpacing: 0.5,
   },
   
   modernLockedSubText: {
-    fontSize: rs(10),
+    fontSize: rs(11),
     color: colors.textLight,
     textAlign: 'center',
     fontStyle: 'italic',
+    fontWeight: '500',
   },
 });

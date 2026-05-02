@@ -1,29 +1,309 @@
 import { StyleSheet } from "react-native";
 import {
-  widthPercentageToDP as wp,
-  heightPercentageToDP as hp,
+    heightPercentageToDP as hp,
+    widthPercentageToDP as wp,
 } from "react-native-responsive-screen";
 
 export const getStarted = StyleSheet.create({
+  // Main Container
   container: {
     flex: 1,
-    backgroundColor: "white",
+    backgroundColor: "#FAFBFC",
   },
+  scrollContent: {
+    paddingBottom: hp(4),
+  },
+
+  // Decorative Header
+  decorativeHeader: {
+    height: hp(15),
+    position: "relative",
+    overflow: "hidden",
+  },
+  gradientCircle: {
+    position: "absolute",
+    borderRadius: 999,
+    opacity: 0.08,
+  },
+  circle1: {
+    width: hp(25),
+    height: hp(25),
+    backgroundColor: "#4ECDC4",
+    top: -hp(10),
+    right: -hp(5),
+  },
+  circle2: {
+    width: hp(20),
+    height: hp(20),
+    backgroundColor: "#FF6B6B",
+    top: hp(5),
+    left: -hp(8),
+  },
+
+  // Logo Section
+  logoSection: {
+    alignItems: "center",
+    marginTop: hp(3),
+    marginBottom: hp(3),
+  },
+  logoBadge: {
+    width: hp(10),
+    height: hp(10),
+    borderRadius: hp(5),
+    backgroundColor: "#26867C",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: hp(2),
+    shadowColor: "#26867C",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  logoSize: {
+    height: hp(8),
+    width: hp(8),
+    resizeMode: "contain",
+  },
+  mainHeading: {
+    fontFamily: "LoraRegular",
+    fontSize: hp(3.8),
+    fontWeight: "800",
+    color: "#1A1A1A",
+    marginBottom: hp(1),
+    letterSpacing: 0.5,
+  },
+  taglineSmall: {
+    fontFamily: "LoraRegular",
+    fontSize: hp(1.8),
+    color: "#26867C",
+    fontWeight: "600",
+    textAlign: "center",
+  },
+
+  // Instruction Card
+  instructionCard: {
+    marginHorizontal: wp(5),
+    marginVertical: hp(2),
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: hp(2.5),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: hp(2),
+  },
+  instructionTitle: {
+    fontFamily: "LoraRegular",
+    fontSize: hp(2.2),
+    fontWeight: "700",
+    color: "#1A1A1A",
+    marginLeft: wp(2),
+  },
+  missionTitle: {
+    fontFamily: "LoraRegular",
+    fontSize: hp(2.2),
+    fontWeight: "700",
+    color: "#1A1A1A",
+    marginLeft: wp(2),
+  },
+
+  // Steps List
+  stepsList: {
+    gap: hp(1.5),
+  },
+  stepItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: hp(1.2),
+    paddingHorizontal: wp(2),
+    backgroundColor: "#F8FFFE",
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: "#4ECDC4",
+  },
+  stepNumberBadge: {
+    width: hp(4),
+    height: hp(4),
+    borderRadius: hp(2),
+    backgroundColor: "#26867C",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: wp(3),
+  },
+  stepNumber: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: hp(1.8),
+    fontFamily: "LoraRegular",
+  },
+  stepText: {
+    fontFamily: "LoraRegular",
+    fontSize: hp(1.6),
+    color: "#2C3E50",
+    fontWeight: "600",
+    flex: 1,
+  },
+
+  // Mission Container
+  missionContainer: {
+    marginHorizontal: wp(5),
+    marginVertical: hp(2.5),
+  },
+
+  // Goals Grid
+  goalsGrid: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: wp(3),
+    marginTop: hp(2),
+  },
+  goalCard: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: wp(4),
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+    borderTopWidth: 3,
+  },
+  goalIconContainer: {
+    width: hp(6),
+    height: hp(6),
+    borderRadius: hp(3),
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: hp(1.2),
+  },
+  goalName: {
+    fontFamily: "LoraRegular",
+    fontSize: hp(1.6),
+    fontWeight: "700",
+    color: "#1A1A1A",
+    marginBottom: hp(0.8),
+    textAlign: "center",
+  },
+  goalDescription: {
+    fontFamily: "LoraRegular",
+    fontSize: hp(1.3),
+    color: "#666",
+    textAlign: "center",
+    lineHeight: hp(1.9),
+  },
+
+  // Benefits Container
+  benefitsContainer: {
+    marginHorizontal: wp(5),
+    marginVertical: hp(2.5),
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: hp(2.5),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  benefitsTitle: {
+    fontFamily: "LoraRegular",
+    fontSize: hp(2.2),
+    fontWeight: "700",
+    color: "#1A1A1A",
+    marginBottom: hp(2),
+    textAlign: "center",
+  },
+  benefitItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: hp(1.2),
+    paddingHorizontal: wp(2),
+  },
+  benefitText: {
+    fontFamily: "LoraRegular",
+    fontSize: hp(1.5),
+    color: "#2C3E50",
+    fontWeight: "600",
+    marginLeft: wp(3),
+    flex: 1,
+  },
+
+  // CTA Section
+  ctaSection: {
+    marginHorizontal: wp(5),
+    marginVertical: hp(3),
+    alignItems: "center",
+  },
+  ctaDescription: {
+    fontFamily: "LoraRegular",
+    fontSize: hp(2),
+    fontWeight: "600",
+    color: "#1A1A1A",
+    textAlign: "center",
+    marginBottom: hp(2.5),
+  },
+  getStartedButton: {
+    backgroundColor: "#26867C",
+    flexDirection: "row",
+    paddingVertical: hp(2),
+    paddingHorizontal: wp(8),
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: wp(2),
+    shadowColor: "#26867C",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
+    width: "100%",
+  },
+  getStartedButtonText: {
+    color: "#FFFFFF",
+    fontSize: hp(1.8),
+    fontWeight: "700",
+    fontFamily: "LoraRegular",
+    letterSpacing: 0.3,
+  },
+
+  // Footer Section
+  footerSection: {
+    alignItems: "center",
+    marginTop: hp(4),
+    marginBottom: hp(2),
+    paddingHorizontal: wp(5),
+  },
+  copyRightText: {
+    textAlign: "center",
+    fontFamily: "LoraRegular",
+    fontSize: hp(1.3),
+    color: "#999",
+    fontWeight: "500",
+    marginBottom: hp(0.8),
+  },
+  footerTagline: {
+    textAlign: "center",
+    fontFamily: "LoraRegular",
+    fontSize: hp(1.3),
+    color: "#26867C",
+    fontWeight: "600",
+  },
+
+  // Backward Compatibility
   logoText: {
     display: "flex",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-  },
-  logoSize: {
-    height: hp(8),
-    width: hp(8),
-  },
-  mainHeading: {
-    textAlign: "center",
-    marginTop: hp(1.5),
-    fontSize: hp(3.6),
-    fontFamily: "LoraRegular",
   },
   instructionBox: {
     paddingLeft: hp(2),
@@ -79,10 +359,5 @@ export const getStarted = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 3,
-  },
-  copyRightText: {
-    textAlign: "center",
-    fontFamily: "LoraRegular",
-    fontSize: hp(1.8),
   },
 });

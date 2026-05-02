@@ -36,8 +36,8 @@ export const useCustomOnboarding = () => {
         fitnessGoal: userInfo.selectedGoal
       });
 
-      // Navigate to main app after successful onboarding
-      router.replace('/(main)');
+      // Navigate to dashboard after successful onboarding
+      router.replace('/(main)/(dashboard)');
     } catch (error: any) {
       console.error('Onboarding error:', error);
       throw error;

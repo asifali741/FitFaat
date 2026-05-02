@@ -4,7 +4,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -23,7 +23,7 @@ export default function ConferenceScreen() {
     // If there are active/scheduled appointments, redirect to the first one
     if (activeOrScheduled.length > 0) {
       router.replace({
-        pathname: '/(main)/(conference)/appointment-details',
+        pathname: '/(main)/(conference)/appointment-details' as any,
         params: { appointmentId: activeOrScheduled[0].id }
       });
     }
@@ -39,7 +39,11 @@ export default function ConferenceScreen() {
       />
 
       {/* Main Content */}
-      <View style={styles.content}>
+      <ScrollView 
+        style={styles.content}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.welcomeSection}>
           <View style={styles.iconContainer}>
             <Ionicons name="videocam" size={hp(8)} color={colors.primary} />
@@ -68,7 +72,7 @@ export default function ConferenceScreen() {
           </View>
         </View>
 
-        {/* Action Button */}
+        {/* Action Buttons */}
         <View style={styles.buttonContainer}>
           <TouchableOpacity 
             style={styles.scheduleButton}
@@ -84,8 +88,16 @@ export default function ConferenceScreen() {
             <Ionicons name="list" size={24} color={colors.primary} />
             <Text style={styles.viewAppointmentsButtonText}>View My Appointments</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.chatButton}
+            onPress={() => router.push('/(main)/(conference)/all-user-chats')}
+          >
+            <Ionicons name="chatbubbles" size={24} color={colors.primary} />
+            <Text style={styles.chatButtonText}>My Chats</Text>
+          </TouchableOpacity>
         </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -116,8 +128,11 @@ const getStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.screenColor,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
+  },
+  scrollContent: {
     paddingTop: hp(4),
     paddingHorizontal: wp(6),
+    paddingBottom: hp(12),
   },
   welcomeSection: {
     alignItems: "center",
@@ -171,10 +186,8 @@ const getStyles = (colors: any) => StyleSheet.create({
     flex: 1,
   },
   buttonContainer: {
-    flex: 1,
-    justifyContent: "center",
+    marginTop: hp(2),
     paddingHorizontal: wp(4),
-    paddingBottom: hp(3),
   },
   scheduleButton: {
     backgroundColor: colors.primary,
@@ -223,6 +236,32 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontSize: Math.min(hp(2.1), wp(5.2)),
     fontWeight: "600",
     letterSpacing: 0.3,
+    marginLeft: wp(2),
+  },
+  chatButton: {
+    backgroundColor: colors.white,
+    borderColor: colors.primary,
+    borderWidth: 2,
+    paddingVertical: Math.min(hp(2.2), wp(5.5)),
+    paddingHorizontal: wp(6),
+    borderRadius: 25,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    marginTop: hp(2),
+    shadowColor: colors.primary,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  chatButtonText: {
+    color: colors.primary,
+    fontSize: Math.min(hp(2.1), wp(5.2)),
+    fontWeight: "600",
     marginLeft: wp(2),
   },
   spacer: {

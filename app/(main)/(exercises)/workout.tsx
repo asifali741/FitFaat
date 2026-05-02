@@ -1,21 +1,95 @@
 import AppHeader from "@/components/AppHeader";
 import { ScreenSceneWrapper } from "@/components/common/ScreenTiltAnimation";
+import { useTheme } from "@/contexts/ThemeContext";
+import { tokenStorage } from "@/utils/auth/tokenStorage";
+import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
+import Constants from 'expo-constants';
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useState } from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useState, useMemo } from "react";
+import { Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import {
-    heightPercentageToDP as hp,
-    widthPercentageToDP as wp,
+  heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
 } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useTheme } from "@/contexts/ThemeContext";
 import { MainImages } from "../../../constants/list";
 
 export default function WorkoutScreen() {
   const { colors } = useTheme();
   const router = useRouter();
+  const navigation = useNavigation();
   const [favoritesCount, setFavoritesCount] = useState(0);
+  const [isPremium, setIsPremium] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  console.log('🎬 WorkoutScreen rendered. Loading:', loading, 'isPremium:', isPremium);
+
+  // Check premium status on mount
+  useEffect(() => {
+    const checkPremiumAccess = async () => {
+      try {
+        const token = await tokenStorage.getToken();
+        console.log('🔍 Token retrieved:', !!token);
+        if (!token) {
+          console.log('❌ No token found, showing modal (no premium without token)');
+          setIsPremium(false);
+          setLoading(false);
+          return;
+        }
+
+        const ENV = Constants.expoConfig?.extra;
+        const API_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')).replace(/\/api\/?$/, '');
+        console.log('🌐 Checking premium status at:', API_URL + '/api/payment/premium-status');
+        
+        // Add timeout to fetch
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        
+        const response = await fetch(`${API_URL}/api/payment/premium-status`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+        console.log('📡 Response status:', response.status);
+        
+        if (!response.ok) {
+          console.log('❌ Response not ok (status ' + response.status + '), treating as non-premium');
+          setIsPremium(false);
+          setLoading(false);
+          return;
+        }
+
+        const premiumStatus = await response.json();
+        console.log('✅ Premium status response:', JSON.stringify(premiumStatus, null, 2));
+        
+        if (premiumStatus.success === true && premiumStatus.isPremium === true && premiumStatus.premiumSubscription?.status === 'active') {
+          console.log('✨ User IS premium');
+          setIsPremium(true);
+        } else {
+          console.log('🔒 User is NOT premium');
+          setIsPremium(false);
+        }
+      } catch (error) {
+        console.error('💥 Premium check error:', (error as any)?.message || String(error));
+        console.log('😕 Setting to non-premium due to error');
+        setIsPremium(false);
+      } finally {
+        console.log('✋ Setting loading to false');
+        setLoading(false);
+      }
+    };
+
+    checkPremiumAccess();
+  }, []);
 
   // Update favorites count when screen comes into focus
   useFocusEffect(
@@ -39,6 +113,19 @@ export default function WorkoutScreen() {
     }
   };
 
+  // Filter body parts based on search query
+  const filteredBodyParts = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return MainImages;
+    }
+    
+    const query = searchQuery.toLowerCase().trim();
+    return MainImages.filter(item => 
+      item.name.toLowerCase().includes(query) ||
+      (item.description && item.description.toLowerCase().includes(query))
+    );
+  }, [searchQuery]);
+
   const handleFavoritesPress = () => {
     console.log('Opening favorites list');
     router.push('/(main)/(exercises)/favorites');
@@ -53,6 +140,100 @@ export default function WorkoutScreen() {
   };
 
   const styles = getStyles(colors);
+
+  // Show loading or block non-premium access
+  console.log('🔄 Render check - loading:', loading, 'isPremium:', isPremium);
+  
+  if (loading) {
+    console.log('⏳ Still loading, returning null');
+    return null;
+  }
+
+  // Show premium modal only for non-premium users
+  console.log('🎯 Checking premium modal condition');
+
+  if (!isPremium) {
+    console.log('🚫 Showing premium modal (User is not premium)');
+    return (
+      <View style={{ flex: 1 }}>
+        <Modal
+          visible={true}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => {
+            console.log('Modal close button pressed');
+            try { if ((navigation as any).canGoBack && (navigation as any).canGoBack()) { (navigation as any).goBack(); return; } } catch(e) {}
+            router.back();
+          }}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => {
+                  try { if ((navigation as any).canGoBack && (navigation as any).canGoBack()) { (navigation as any).goBack(); return; } } catch(e) {}
+                  router.back();
+                }}
+              >
+                <Ionicons name="close-circle" size={30} color="#999" />
+              </TouchableOpacity>
+
+              <View style={styles.iconContainer}>
+                <Ionicons name="star" size={60} color="#FFD700" />
+              </View>
+
+              <Text style={styles.modalTitle}>Premium Feature</Text>
+              <Text style={styles.modalSubtitle}>Unlock Advanced Workouts</Text>
+
+              <Text style={styles.modalDescription}>
+                Get access to personalized workout plans, advanced tracking, and exclusive training programs designed by fitness experts.
+              </Text>
+
+              <View style={styles.featuresList}>
+                <View style={styles.featureItem}>
+                  <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                  <Text style={styles.featureText}>Personalized workout plans</Text>
+                </View>
+                <View style={styles.featureItem}>
+                  <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                  <Text style={styles.featureText}>Advanced progress tracking</Text>
+                </View>
+                <View style={styles.featureItem}>
+                  <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                  <Text style={styles.featureText}>Exclusive training programs</Text>
+                </View>
+              </View>
+
+              <View style={styles.priceTag}>
+                <Text style={styles.priceAmount}>$10</Text>
+                <Text style={styles.priceFrequency}>/month</Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.upgradButton}
+                onPress={() => {
+                  router.push("/(main)/(settings)/premium");
+                }}
+              >
+                <Ionicons name="star" size={20} color="#fff" />
+                <Text style={styles.upgradButtonText}>Upgrade to Premium</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.laterButton}
+                onPress={() => {
+                  try { if ((navigation as any).canGoBack && (navigation as any).canGoBack()) { (navigation as any).goBack(); return; } } catch(e) {}
+                  router.back();
+                }}
+              >
+                <Text style={styles.laterButtonText}>Maybe Later</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      </View>
+    );
+  }
   
   return (
     <ScreenSceneWrapper>
@@ -97,25 +278,53 @@ export default function WorkoutScreen() {
               Choose Your Focus
             </Text>
 
-            <View style={styles.bodyPartsGrid}>
-              {MainImages.map((item, index) => (
-                <TouchableOpacity
-                  key={index}
-                  onPress={() => handleBodyPartPress(item)}
-                  style={styles.bodyPartCard}
-                >
-                  <Text style={styles.bodyPartEmoji}>
-                    {item.emoji}
-                  </Text>
-                  <Text style={styles.bodyPartName}>
-                    {item?.name}
-                  </Text>
-                  <Text style={styles.bodyPartDescription}>
-                    {item?.description}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+            {/* Search Bar */}
+            <View style={{ paddingHorizontal: wp(4), marginVertical: hp(2) }}>
+              <View style={[styles.searchContainer, { backgroundColor: colors.cardBackground }]}>
+                <Ionicons name="search" size={20} color={colors.textSecondary} style={{ marginRight: wp(2) }} />
+                <TextInput
+                  style={[styles.searchInput, { color: colors.textPrimary }]}
+                  placeholder="Search body parts..."
+                  placeholderTextColor={colors.textSecondary}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+                {searchQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => setSearchQuery('')}>
+                    <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
+
+            {/* Body Parts Grid */}
+            {filteredBodyParts.length === 0 ? (
+              <View style={styles.noResultsContainer}>
+                <Ionicons name="body" size={48} color={colors.textSecondary} style={{ marginBottom: hp(2) }} />
+                <Text style={styles.noResultsText}>No body parts found</Text>
+                <Text style={styles.noResultsSubtext}>Try different keywords</Text>
+              </View>
+            ) : (
+              <View style={styles.bodyPartsGrid}>
+                {filteredBodyParts.map((item, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    onPress={() => handleBodyPartPress(item)}
+                    style={styles.bodyPartCard}
+                  >
+                    <Text style={styles.bodyPartEmoji}>
+                      {item.emoji}
+                    </Text>
+                    <Text style={styles.bodyPartName}>
+                      {item?.name}
+                    </Text>
+                    <Text style={styles.bodyPartDescription}>
+                      {item?.description}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </View>
 
           {/* Premium Features */}
@@ -307,5 +516,171 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   premiumText: {
     fontSize: hp(2.2),
+  },
+  // Premium Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: wp(5),
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: hp(3),
+    paddingHorizontal: wp(6),
+    paddingVertical: hp(3),
+    width: '100%',
+    maxWidth: wp(90),
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: hp(1.5),
+    right: wp(3),
+    zIndex: 10,
+  },
+  iconContainer: {
+    marginTop: hp(1),
+    marginBottom: hp(2),
+  },
+  modalTitle: {
+    fontSize: hp(2.8),
+    fontWeight: '800',
+    color: '#1a1a1a',
+    marginBottom: hp(0.8),
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    fontSize: hp(2),
+    fontWeight: '600',
+    color: '#FF6B6B',
+    marginBottom: hp(1.5),
+    textAlign: 'center',
+  },
+  modalDescription: {
+    fontSize: hp(1.8),
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: hp(2.5),
+    lineHeight: hp(2.8),
+  },
+  featuresList: {
+    width: '100%',
+    marginBottom: hp(2.5),
+    paddingHorizontal: wp(2),
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: hp(1.2),
+  },
+  featureText: {
+    fontSize: hp(1.7),
+    color: '#333',
+    marginLeft: wp(2.5),
+    fontWeight: '500',
+  },
+  priceTag: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'baseline',
+    marginBottom: hp(2.5),
+    paddingVertical: hp(1.5),
+    paddingHorizontal: wp(5),
+    backgroundColor: '#F0F7FF',
+    borderRadius: hp(1.5),
+    borderWidth: 1.5,
+    borderColor: '#4CAF50',
+  },
+  priceAmount: {
+    fontSize: hp(3.5),
+    fontWeight: '800',
+    color: '#4CAF50',
+  },
+  priceFrequency: {
+    fontSize: hp(1.9),
+    color: '#666',
+    marginLeft: wp(1),
+    fontWeight: '600',
+  },
+  upgradButton: {
+    width: '100%',
+    flexDirection: 'row',
+    backgroundColor: '#4CAF50',
+    paddingVertical: hp(2),
+    borderRadius: hp(1.2),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: hp(1),
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  upgradButtonText: {
+    fontSize: hp(2),
+    fontWeight: '700',
+    color: '#fff',
+    marginLeft: wp(2),
+    letterSpacing: 0.5,
+  },
+  laterButton: {
+    width: '100%',
+    paddingVertical: hp(1.5),
+    borderRadius: hp(1),
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#ddd',
+    backgroundColor: '#fafafa',
+  },
+  laterButtonText: {
+    fontSize: hp(1.9),
+    fontWeight: '600',
+    color: '#666',
+  },
+  // Search Bar Styles
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: hp(2.5),
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: Math.min(hp(1.8), wp(4.5)),
+    marginLeft: wp(2),
+    paddingVertical: hp(0.8),
+  },
+  noResultsContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: hp(8),
+    paddingHorizontal: wp(5),
+  },
+  noResultsText: {
+    fontSize: Math.min(hp(2.2), wp(5.5)),
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: hp(1),
+  },
+  noResultsSubtext: {
+    fontSize: Math.min(hp(1.6), wp(4)),
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
 });

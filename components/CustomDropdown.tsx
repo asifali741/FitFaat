@@ -1,4 +1,4 @@
-import { colorsSheet } from '@/app/(main)/(settings)/_ui_elements';
+import { useTheme } from '@/contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { FlatList, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -26,7 +26,9 @@ export default function CustomDropdown({
   label,
   required = false,
 }: CustomDropdownProps) {
+  const { colors } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
+  const styles = createStyles(colors);
 
   const handleSelect = (value: string) => {
     onSelect(value);
@@ -56,7 +58,7 @@ export default function CustomDropdown({
         <Ionicons
           name={isOpen ? "chevron-up" : "chevron-down"}
           size={20}
-          color={colorsSheet.textSecondary}
+          color={colors.textSecondary}
         />
       </TouchableOpacity>
 
@@ -78,7 +80,7 @@ export default function CustomDropdown({
                 style={styles.closeButton}
                 onPress={() => setIsOpen(false)}
               >
-                <Ionicons name="close" size={24} color={colorsSheet.textSecondary} />
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
             
@@ -100,7 +102,7 @@ export default function CustomDropdown({
                     {item.label}
                   </Text>
                   {selectedValue === item.value && (
-                    <Ionicons name="checkmark" size={20} color={colorsSheet.primary} />
+                    <Ionicons name="checkmark" size={20} color={colors.primary} />
                   )}
                 </TouchableOpacity>
               )}
@@ -113,42 +115,42 @@ export default function CustomDropdown({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     marginBottom: hp(2),
   },
   label: {
     fontSize: Math.min(hp(1.8), wp(4.5)),
     fontWeight: '600',
-    color: colorsSheet.textPrimary,
+    color: colors.textPrimary,
     marginBottom: hp(1),
   },
   required: {
-    color: colorsSheet.error,
+    color: colors.error,
   },
   dropdown: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colorsSheet.screenColor,
+    backgroundColor: colors.screenColor,
     borderWidth: 1,
-    borderColor: colorsSheet.lightGray,
+    borderColor: colors.gray + '40',
     borderRadius: 10,
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.8),
     minHeight: hp(6),
   },
   dropdownOpen: {
-    borderColor: colorsSheet.primary,
+    borderColor: colors.primary,
     borderWidth: 2,
   },
   dropdownText: {
     fontSize: Math.min(hp(1.8), wp(4.5)),
-    color: colorsSheet.textPrimary,
+    color: colors.textPrimary,
     flex: 1,
   },
   placeholderText: {
-    color: colorsSheet.textSecondary,
+    color: colors.textSecondary,
   },
   modalOverlay: {
     flex: 1,
@@ -158,7 +160,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(5),
   },
   modalContent: {
-    backgroundColor: colorsSheet.screenColor,
+    backgroundColor: colors.screenColor,
     borderRadius: 15,
     width: '100%',
     maxHeight: hp(60),
@@ -178,12 +180,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(4),
     paddingVertical: hp(2),
     borderBottomWidth: 1,
-    borderBottomColor: colorsSheet.lightGray,
+    borderBottomColor: colors.gray + '40',
   },
   modalTitle: {
     fontSize: Math.min(hp(2), wp(5)),
     fontWeight: 'bold',
-    color: colorsSheet.textPrimary,
+    color: colors.textPrimary,
   },
   closeButton: {
     padding: wp(1),
@@ -195,18 +197,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.8),
     borderBottomWidth: 1,
-    borderBottomColor: colorsSheet.lightGray + '50',
+    borderBottomColor: colors.gray + '20',
   },
   selectedOption: {
-    backgroundColor: colorsSheet.primarySoft,
+    backgroundColor: colors.primary + '10',
   },
   optionText: {
     fontSize: Math.min(hp(1.8), wp(4.5)),
-    color: colorsSheet.textPrimary,
+    color: colors.textPrimary,
     flex: 1,
   },
   selectedOptionText: {
-    color: colorsSheet.primary,
+    color: colors.primary,
     fontWeight: '600',
   },
 });

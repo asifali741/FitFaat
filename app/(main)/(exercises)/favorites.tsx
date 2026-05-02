@@ -1,16 +1,16 @@
-import { View, Text, FlatList, TouchableOpacity, Alert, StyleSheet } from "react-native";
-import React, { useState, useEffect } from "react";
-import { useRouter, useFocusEffect } from "expo-router";
-import { TrashIcon } from "react-native-heroicons/outline";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import {
-  widthPercentageToDP as wp,
-  heightPercentageToDP as hp,
-} from "react-native-responsive-screen";
-import { Image } from "expo-image";
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from "@/contexts/ThemeContext";
+import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Image } from "expo-image";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useState } from "react";
+import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { TrashIcon } from "react-native-heroicons/outline";
+import {
+    heightPercentageToDP as hp,
+    widthPercentageToDP as wp,
+} from "react-native-responsive-screen";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function FavoritesScreen() {
   const { colors } = useTheme();
@@ -18,8 +18,16 @@ export default function FavoritesScreen() {
   const [favorites, setFavorites] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const navigation = require('@react-navigation/native').useNavigation();
+
   const handleBackPress = () => {
-    // Navigate back to workout screen explicitly
+    try {
+      if (navigation && (navigation as any).canGoBack && (navigation as any).canGoBack()) {
+        (navigation as any).goBack();
+        return;
+      }
+    } catch (e) {}
+
     router.push('/(main)/(exercises)/workout');
   };
 

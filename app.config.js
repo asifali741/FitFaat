@@ -7,9 +7,9 @@ export default {
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
-    scheme: "mobile", // 👈 crucial for Clerk redirect
+    scheme: "mobile", 
     userInterfaceStyle: "automatic",
-    newArchEnabled: true,
+    newArchEnabled: true, // 👈 MUST be true for Reanimated/Worklets to build
 
     ios: {
       supportsTablet: true,
@@ -22,14 +22,13 @@ export default {
       },
       edgeToEdgeEnabled: true,
       package: "com.shayan.fitfaat",
-
       intentFilters: [
         {
           action: "VIEW",
           data: [
             {
               scheme: "mobile",
-              host: "oauth-native-callback", // 👈 change * to specific host
+              host: "oauth-native-callback",
             },
           ],
           category: ["BROWSABLE", "DEFAULT"],
@@ -62,9 +61,16 @@ export default {
     },
 
     extra: {
+      eas: {
+        projectId: "0dcfb6cf-6803-4ec4-bda1-a6c442b19fb1"
+      },
+      EXPO_PUBLIC_BACKEND_API_URL: process.env.EXPO_PUBLIC_BACKEND_API_URL, 
+      EXPO_PUBLIC_STRIPE_PK: process.env.EXPO_PUBLIC_STRIPE_PK,
+      CLARIFAI_API_KEY: process.env.CLARIFAI_API_KEY,
+      Email: process.env.Email,
+      EmailPassword: process.env.EmailPassword,
+      EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY,
       OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
-      EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY, // 👈 optional but helpful
-      EXPO_PUBLIC_BACKEND_API_URL: process.env.EXPO_PUBLIC_BACKEND_API_URL || 'http://10.0.2.2:5001/api',
     },
   },
 };

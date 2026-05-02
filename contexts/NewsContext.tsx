@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import Constants from 'expo-constants';
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 
@@ -42,6 +43,10 @@ export const NewsProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Get the correct API URL based on platform
   const getApiUrl = () => {
+    const ENV = Constants.expoConfig?.extra;
+    if (ENV?.EXPO_PUBLIC_BACKEND_API_URL) {
+      return ENV.EXPO_PUBLIC_BACKEND_API_URL.replace(/\/api\/?$/, '');
+    }
     if (Platform.OS === 'android') {
       return 'http://10.0.2.2:5001';
     }

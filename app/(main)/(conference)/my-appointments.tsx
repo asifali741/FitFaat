@@ -1,32 +1,30 @@
 import AppHeader from '@/components/AppHeader';
-import { useTheme } from '@/contexts/ThemeContext';
+import ChatButton from '@/components/ChatButton';
+import { theme } from '@/constants/theme';
 import { authApi } from '@/utils/auth/authApi';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function MyAppointmentsScreen() {
   const router = useRouter();
-  const { colors } = useTheme();
   const [appointments, setAppointments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
   const [showModal, setShowModal] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
-
-  const styles = useMemo(() => getStyles(colors), [colors]);
 
   // Fetch user's appointments
   useEffect(() => {
@@ -78,15 +76,15 @@ export default function MyAppointmentsScreen() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending':
-        return colors.warning;
+        return theme.colors.statusPending;
       case 'confirmed':
-        return colors.success;
+        return theme.colors.statusConfirmed;
       case 'cancelled':
-        return colors.error;
+        return theme.colors.statusCancelled;
       case 'completed':
-        return colors.info;
+        return theme.colors.success;
       default:
-        return colors.textSecondary;
+        return theme.colors.textSecondary;
     }
   };
 
@@ -119,20 +117,20 @@ export default function MyAppointmentsScreen() {
   const renderStatusHeader = (status: string) => {
     let icon = '';
     let label = '';
-    let color = colors.textSecondary;
+    let color = theme.colors.textSecondary;
 
     if (status === 'confirmed' || status === 'completed') {
       icon = 'checkmark-circle';
       label = 'Confirmed Appointments';
-      color = colors.success;
+      color = theme.colors.statusConfirmed;
     } else if (status === 'pending') {
       icon = 'hourglass';
       label = 'Pending Appointments';
-      color = colors.warning;
+      color = theme.colors.statusPending;
     } else if (status === 'cancelled') {
       icon = 'close-circle';
       label = 'Cancelled Appointments';
-      color = colors.error;
+      color = theme.colors.statusCancelled;
     }
 
     return (
@@ -222,7 +220,7 @@ export default function MyAppointmentsScreen() {
             <View
               style={[
                 styles.dateBox,
-                { backgroundColor: colors.primarySoft },
+                { backgroundColor: theme.colors.primary + '20' },
               ]}
             >
               <Text style={styles.dateBoxDay}>
@@ -242,7 +240,7 @@ export default function MyAppointmentsScreen() {
               {item.doctorId?.professionalInfo?.specialization || 'Specialist'}
             </Text>
             <View style={styles.timeRow}>
-              <Ionicons name="time" size={14} color={colors.textSecondary} />
+              <Ionicons name="time" size={14} color={theme.colors.textSecondary} />
               <Text style={styles.timeText}>{item.time}</Text>
             </View>
           </View>
@@ -268,7 +266,7 @@ export default function MyAppointmentsScreen() {
 
         {isUpcoming && (
           <View style={styles.upcomingBadge}>
-            <Ionicons name="alert-circle" size={14} color={colors.success} />
+            <Ionicons name="alert-circle" size={14} color={theme.colors.success} />
             <Text style={styles.upcomingText}>Upcoming</Text>
           </View>
         )}
@@ -284,7 +282,7 @@ export default function MyAppointmentsScreen() {
           showStepIndicator={false}
         />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
       </SafeAreaView>
     );
@@ -297,10 +295,10 @@ export default function MyAppointmentsScreen() {
         showStepIndicator={false}
       />
 
-      <View style={[styles.content, { backgroundColor: colors.screenColor }]}>
+      <View style={[styles.content, { backgroundColor: theme.colors.background }]}>
         {appointments.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Ionicons name="calendar-outline" size={64} color={colors.textSecondary} />
+            <Ionicons name="calendar-outline" size={64} color={theme.colors.textSecondary} />
             <Text style={styles.emptyTitle}>No Appointments</Text>
             <Text style={styles.emptySubtitle}>
               You don't have any appointments yet
@@ -330,7 +328,7 @@ export default function MyAppointmentsScreen() {
               onPress={() => setShowModal(false)}
               style={styles.closeButton}
             >
-              <Ionicons name="close" size={28} color={colors.textPrimary} />
+              <Ionicons name="close" size={28} color={theme.colors.textPrimary} />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>Appointment Details</Text>
             <View style={styles.headerSpacer} />
@@ -344,7 +342,7 @@ export default function MyAppointmentsScreen() {
                   <Text style={styles.sectionTitle}>Doctor</Text>
                   <View style={styles.doctorInfoCard}>
                     <View style={styles.doctorAvatar}>
-                      <Ionicons name="person" size={40} color={colors.primary} />
+                      <Ionicons name="person" size={40} color={theme.colors.primary} />
                     </View>
                     <View style={styles.doctorDetails}>
                       <Text style={styles.doctorNameLarge}>
@@ -365,7 +363,7 @@ export default function MyAppointmentsScreen() {
                   <Text style={styles.sectionTitle}>Appointment Details</Text>
 
                   <View style={styles.detailRow}>
-                    <Ionicons name="calendar" size={20} color={colors.info} />
+                    <Ionicons name="calendar" size={20} color={theme.colors.info} />
                     <View style={styles.detailContent}>
                       <Text style={styles.detailLabel}>Date</Text>
                       <Text style={styles.detailValue}>
@@ -379,7 +377,7 @@ export default function MyAppointmentsScreen() {
                   </View>
 
                   <View style={styles.detailRow}>
-                    <Ionicons name="time" size={20} color={colors.warning} />
+                    <Ionicons name="time" size={20} color={theme.colors.warning} />
                     <View style={styles.detailContent}>
                       <Text style={styles.detailLabel}>Time</Text>
                       <Text style={styles.detailValue}>{selectedAppointment.time}</Text>
@@ -387,7 +385,7 @@ export default function MyAppointmentsScreen() {
                   </View>
 
                   <View style={styles.detailRow}>
-                    <Ionicons name="cash" size={20} color={colors.success} />
+                    <Ionicons name="cash" size={20} color={theme.colors.success} />
                     <View style={styles.detailContent}>
                       <Text style={styles.detailLabel}>Consultation Fee</Text>
                       <Text style={styles.detailValue}>Rs {selectedAppointment.price}</Text>
@@ -432,6 +430,17 @@ export default function MyAppointmentsScreen() {
 
                 {/* Action Buttons */}
                 <View style={styles.section}>
+                  {/* Chat Button - Shows only for confirmed appointments */}
+                  {selectedAppointment.status === 'confirmed' && (
+                    <View style={styles.chatButtonContainer}>
+                      <ChatButton 
+                        appointmentId={selectedAppointment._id} 
+                        size="large"
+                        style={styles.chatButton}
+                      />
+                    </View>
+                  )}
+
                   {selectedAppointment.status !== 'cancelled' &&
                     selectedAppointment.status !== 'completed' && (
                       <>
@@ -444,7 +453,7 @@ export default function MyAppointmentsScreen() {
                             Alert.alert('Update', 'Update functionality coming soon!');
                           }}
                         >
-                          <Ionicons name="create" size={20} color={colors.white} />
+                          <Ionicons name="create" size={20} color={theme.colors.surface} />
                           <Text style={styles.actionButtonText}>Update Appointment</Text>
                         </TouchableOpacity>
 
@@ -472,12 +481,12 @@ export default function MyAppointmentsScreen() {
                         >
                           {isCancelling ? (
                             <>
-                              <ActivityIndicator color={colors.white} />
+                              <ActivityIndicator color={theme.colors.surface} />
                               <Text style={styles.actionButtonText}>Cancelling...</Text>
                             </>
                           ) : (
                             <>
-                              <Ionicons name="trash" size={20} color={colors.white} />
+                              <Ionicons name="trash" size={20} color={theme.colors.surface} />
                               <Text style={styles.actionButtonText}>Cancel Appointment</Text>
                             </>
                           )}
@@ -501,306 +510,308 @@ export default function MyAppointmentsScreen() {
   );
 }
 
-const getStyles = (colors: any) =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.primary,
-    },
-    content: {
-      flex: 1,
-      borderTopLeftRadius: 30,
-      borderTopRightRadius: 30,
-      paddingTop: hp(2),
-    },
-    loadingContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    emptyContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingHorizontal: wp(6),
-    },
-    emptyTitle: {
-      fontSize: hp(2.5),
-      fontWeight: 'bold',
-      color: colors.textPrimary,
-      marginTop: hp(2),
-      marginBottom: hp(0.5),
-    },
-    emptySubtitle: {
-      fontSize: hp(1.6),
-      color: colors.textSecondary,
-      textAlign: 'center',
-      marginBottom: hp(3),
-    },
-    scheduleButton: {
-      backgroundColor: colors.primary,
-      paddingVertical: hp(1.8),
-      paddingHorizontal: wp(6),
-      borderRadius: 20,
-      alignItems: 'center',
-    },
-    scheduleButtonText: {
-      color: colors.white,
-      fontSize: hp(1.8),
-      fontWeight: '600',
-    },
-    listContainer: {
-      paddingHorizontal: wp(4),
-      paddingVertical: hp(2),
-      paddingBottom: hp(3),
-    },
-    listScroll: {
-      flex: 1,
-    },
-    sectionHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: hp(1.5),
-      paddingHorizontal: wp(2),
-      marginTop: hp(1),
-      marginBottom: hp(1),
-    },
-    sectionHeaderText: {
-      fontSize: hp(1.8),
-      fontWeight: '700',
-      marginLeft: wp(2),
-    },
-    appointmentCard: {
-      backgroundColor: colors.white,
-      borderRadius: 15,
-      padding: wp(4),
-      marginBottom: hp(2),
-      borderLeftWidth: 4,
-      borderLeftColor: colors.primary,
-      shadowColor: colors.primary,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
-    },
-    appointmentCardCancelled: {
-      opacity: 0.6,
-      borderLeftColor: colors.error,
-    },
-    appointmentContent: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    appointmentLeft: {
-      marginRight: wp(3),
-    },
-    dateBox: {
-      width: wp(14),
-      paddingVertical: hp(1),
-      borderRadius: 10,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    dateBoxDay: {
-      fontSize: hp(2),
-      fontWeight: 'bold',
-      color: colors.textPrimary,
-    },
-    dateBoxMonth: {
-      fontSize: hp(1.2),
-      color: colors.textSecondary,
-      marginTop: hp(0.2),
-    },
-    appointmentMiddle: {
-      flex: 1,
-    },
-    doctorName: {
-      fontSize: hp(1.8),
-      fontWeight: '600',
-      color: colors.textPrimary,
-      marginBottom: hp(0.3),
-    },
-    doctorSpecialty: {
-      fontSize: hp(1.4),
-      color: colors.textSecondary,
-      marginBottom: hp(0.5),
-    },
-    timeRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    timeText: {
-      fontSize: hp(1.4),
-      color: colors.textSecondary,
-      marginLeft: wp(1),
-    },
-    appointmentRight: {
-      marginLeft: wp(2),
-    },
-    statusBadge: {
-      flexDirection: 'row',
-      paddingVertical: hp(0.6),
-      paddingHorizontal: wp(2),
-      borderRadius: 8,
-      alignItems: 'center',
-    },
-    statusText: {
-      fontSize: hp(1.2),
-      fontWeight: '500',
-      marginLeft: wp(1),
-    },
-    upcomingBadge: {
-      flexDirection: 'row',
-      marginTop: hp(1),
-      paddingTop: hp(1),
-      borderTopWidth: 1,
-      borderTopColor: colors.gray,
-      alignItems: 'center',
-    },
-    upcomingText: {
-      fontSize: hp(1.3),
-      color: colors.success,
-      fontWeight: '500',
-      marginLeft: wp(1),
-    },
-    // Modal Styles
-    modalContainer: {
-      flex: 1,
-      backgroundColor: colors.screenColor,
-    },
-    modalHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: wp(4),
-      paddingVertical: hp(2),
-      backgroundColor: colors.primary,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.gray,
-    },
-    closeButton: {
-      padding: hp(0.5),
-    },
-    modalTitle: {
-      fontSize: hp(2.2),
-      fontWeight: 'bold',
-      color: colors.white,
-    },
-    headerSpacer: {
-      width: hp(3),
-    },
-    modalContent: {
-      flex: 1,
-      paddingHorizontal: wp(4),
-      paddingVertical: hp(2),
-    },
-    section: {
-      marginBottom: hp(2.5),
-    },
-    sectionTitle: {
-      fontSize: hp(2),
-      fontWeight: 'bold',
-      color: colors.textPrimary,
-      marginBottom: hp(1),
-    },
-    doctorInfoCard: {
-      flexDirection: 'row',
-      backgroundColor: colors.white,
-      borderRadius: 15,
-      padding: wp(4),
-      alignItems: 'center',
-    },
-    doctorAvatar: {
-      width: wp(16),
-      height: wp(16),
-      borderRadius: wp(8),
-      backgroundColor: colors.primarySoft,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: wp(3),
-    },
-    doctorDetails: {
-      flex: 1,
-    },
-    doctorNameLarge: {
-      fontSize: hp(1.9),
-      fontWeight: '600',
-      color: colors.textPrimary,
-      marginBottom: hp(0.3),
-    },
-    doctorSpecialtyLarge: {
-      fontSize: hp(1.5),
-      color: colors.primary,
-      marginBottom: hp(0.3),
-    },
-    doctorExperience: {
-      fontSize: hp(1.4),
-      color: colors.textSecondary,
-    },
-    detailRow: {
-      flexDirection: 'row',
-      backgroundColor: colors.white,
-      borderRadius: 12,
-      padding: wp(4),
-      marginBottom: hp(1),
-      alignItems: 'flex-start',
-    },
-    detailContent: {
-      flex: 1,
-      marginLeft: wp(3),
-    },
-    detailLabel: {
-      fontSize: hp(1.3),
-      color: colors.textSecondary,
-      marginBottom: hp(0.3),
-    },
-    detailValue: {
-      fontSize: hp(1.7),
-      fontWeight: '600',
-      color: colors.textPrimary,
-    },
-    descriptionBox: {
-      backgroundColor: colors.white,
-      borderRadius: 12,
-      padding: wp(4),
-      borderLeftWidth: 3,
-      borderLeftColor: colors.primary,
-    },
-    descriptionText: {
-      fontSize: hp(1.6),
-      color: colors.textPrimary,
-      lineHeight: hp(2.4),
-    },
-    actionButton: {
-      flexDirection: 'row',
-      paddingVertical: hp(1.8),
-      paddingHorizontal: wp(6),
-      borderRadius: 15,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: hp(1.2),
-    },
-    updateButton: {
-      backgroundColor: colors.info,
-    },
-    cancelButton: {
-      backgroundColor: colors.error,
-    },
-    cancelButtonDisabled: {
-      opacity: 0.6,
-    },
-    actionButtonText: {
-      color: colors.white,
-      fontSize: hp(1.7),
-      fontWeight: '600',
-      marginLeft: wp(2),
-    },
-    closeModalButton: {
-      backgroundColor: colors.gray,
-    },
-    closeModalButtonText: {
-      color: colors.textPrimary,
-      fontSize: hp(1.7),
-      fontWeight: '600',
-    },
-  });
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.primary,
+  },
+  content: {
+    flex: 1,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingTop: hp(2),
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: wp(6),
+  },
+  emptyTitle: {
+    fontSize: hp(2.5),
+    fontWeight: theme.typography.fontWeight.bold as any,
+    color: theme.colors.textPrimary,
+    marginTop: hp(2),
+    marginBottom: hp(0.5),
+  },
+  emptySubtitle: {
+    fontSize: hp(1.6),
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: hp(3),
+  },
+  scheduleButton: {
+    backgroundColor: theme.colors.primary,
+    paddingVertical: hp(1.8),
+    paddingHorizontal: wp(6),
+    borderRadius: theme.borderRadius.large,
+    alignItems: 'center',
+  },
+  scheduleButtonText: {
+    color: theme.colors.surface,
+    fontSize: hp(1.8),
+    fontWeight: theme.typography.fontWeight.semiBold as any,
+  },
+  listContainer: {
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(2),
+    paddingBottom: hp(3),
+  },
+  listScroll: {
+    flex: 1,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: hp(1.5),
+    paddingHorizontal: wp(2),
+    marginTop: hp(1),
+    marginBottom: hp(1),
+  },
+  sectionHeaderText: {
+    fontSize: hp(1.8),
+    fontWeight: theme.typography.fontWeight.bold as any,
+    marginLeft: wp(2),
+  },
+  appointmentCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.large,
+    padding: wp(4),
+    marginBottom: hp(2),
+    borderLeftWidth: 4,
+    borderLeftColor: theme.colors.primary,
+    ...theme.shadows.medium,
+  },
+  appointmentCardCancelled: {
+    opacity: 0.6,
+    borderLeftColor: theme.colors.statusCancelled,
+  },
+  appointmentContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  appointmentLeft: {
+    marginRight: wp(3),
+  },
+  dateBox: {
+    width: wp(14),
+    paddingVertical: hp(1),
+    borderRadius: theme.borderRadius.medium,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dateBoxDay: {
+    fontSize: hp(2),
+    fontWeight: theme.typography.fontWeight.bold as any,
+    color: theme.colors.textPrimary,
+  },
+  dateBoxMonth: {
+    fontSize: hp(1.2),
+    color: theme.colors.textSecondary,
+    marginTop: hp(0.2),
+  },
+  appointmentMiddle: {
+    flex: 1,
+  },
+  doctorName: {
+    fontSize: hp(1.8),
+    fontWeight: theme.typography.fontWeight.semiBold as any,
+    color: theme.colors.textPrimary,
+    marginBottom: hp(0.3),
+  },
+  doctorSpecialty: {
+    fontSize: hp(1.4),
+    color: theme.colors.textSecondary,
+    marginBottom: hp(0.5),
+  },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  timeText: {
+    fontSize: hp(1.4),
+    color: theme.colors.textSecondary,
+    marginLeft: wp(1),
+  },
+  appointmentRight: {
+    marginLeft: wp(2),
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    paddingVertical: hp(0.6),
+    paddingHorizontal: wp(2),
+    borderRadius: theme.borderRadius.small,
+    alignItems: 'center',
+  },
+  statusText: {
+    fontSize: hp(1.2),
+    fontWeight: theme.typography.fontWeight.medium as any,
+    marginLeft: wp(1),
+  },
+  upcomingBadge: {
+    flexDirection: 'row',
+    marginTop: hp(1),
+    paddingTop: hp(1),
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+    alignItems: 'center',
+  },
+  upcomingText: {
+    fontSize: hp(1.3),
+    color: theme.colors.success,
+    fontWeight: theme.typography.fontWeight.medium as any,
+    marginLeft: wp(1),
+  },
+  // Modal Styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(2),
+    backgroundColor: theme.colors.primary,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  closeButton: {
+    padding: hp(0.5),
+  },
+  modalTitle: {
+    fontSize: hp(2.2),
+    fontWeight: theme.typography.fontWeight.bold as any,
+    color: theme.colors.surface,
+  },
+  headerSpacer: {
+    width: hp(3),
+  },
+  modalContent: {
+    flex: 1,
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(2),
+  },
+  section: {
+    marginBottom: hp(2.5),
+  },
+  sectionTitle: {
+    fontSize: hp(2),
+    fontWeight: theme.typography.fontWeight.bold as any,
+    color: theme.colors.textPrimary,
+    marginBottom: hp(1),
+  },
+  doctorInfoCard: {
+    flexDirection: 'row',
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.large,
+    padding: wp(4),
+    alignItems: 'center',
+  },
+  doctorAvatar: {
+    width: wp(16),
+    height: wp(16),
+    borderRadius: wp(8),
+    backgroundColor: theme.colors.primary + '20',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: wp(3),
+  },
+  doctorDetails: {
+    flex: 1,
+  },
+  doctorNameLarge: {
+    fontSize: hp(1.9),
+    fontWeight: theme.typography.fontWeight.semiBold as any,
+    color: theme.colors.textPrimary,
+    marginBottom: hp(0.3),
+  },
+  doctorSpecialtyLarge: {
+    fontSize: hp(1.5),
+    color: theme.colors.primary,
+    marginBottom: hp(0.3),
+  },
+  doctorExperience: {
+    fontSize: hp(1.4),
+    color: theme.colors.textSecondary,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.medium,
+    padding: wp(4),
+    marginBottom: hp(1),
+    alignItems: 'flex-start',
+  },
+  detailContent: {
+    flex: 1,
+    marginLeft: wp(3),
+  },
+  detailLabel: {
+    fontSize: hp(1.3),
+    color: theme.colors.textSecondary,
+    marginBottom: hp(0.3),
+  },
+  detailValue: {
+    fontSize: hp(1.7),
+    fontWeight: theme.typography.fontWeight.semiBold as any,
+    color: theme.colors.textPrimary,
+  },
+  descriptionBox: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.medium,
+    padding: wp(4),
+    borderLeftWidth: 3,
+    borderLeftColor: theme.colors.primary,
+  },
+  descriptionText: {
+    fontSize: hp(1.6),
+    color: theme.colors.textPrimary,
+    lineHeight: hp(2.4),
+  },
+  chatButtonContainer: {
+    marginBottom: hp(2),
+    alignItems: 'center',
+  },
+  chatButton: {
+    width: '100%',
+  },
+  actionButton: {
+    flexDirection: 'row',
+    paddingVertical: hp(1.8),
+    paddingHorizontal: wp(6),
+    borderRadius: theme.borderRadius.large,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: hp(1.2),
+  },
+  updateButton: {
+    backgroundColor: theme.colors.info,
+  },
+  cancelButton: {
+    backgroundColor: theme.colors.error,
+  },
+  cancelButtonDisabled: {
+    opacity: 0.6,
+  },
+  actionButtonText: {
+    color: theme.colors.surface,
+    fontSize: hp(1.7),
+    fontWeight: theme.typography.fontWeight.semiBold as any,
+    marginLeft: wp(2),
+  },
+  closeModalButton: {
+    backgroundColor: theme.colors.border,
+  },
+  closeModalButtonText: {
+    color: theme.colors.textPrimary,
+    fontSize: hp(1.7),
+    fontWeight: theme.typography.fontWeight.semiBold as any,
+  },
+});

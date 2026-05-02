@@ -1,5 +1,5 @@
-import Signup from '../../components/authentication/Signup';
+import SignupThemed from '../../components/authentication/SignupThemed';
 
 export default function EmailSignupScreen() {
-  return <Signup />;
+  return <SignupThemed />;
 }

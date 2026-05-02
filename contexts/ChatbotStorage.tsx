@@ -66,15 +66,6 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
     loadSessions();
   }, []);
 
-  // Update messages when current session changes
-  useEffect(() => {
-    if (currentSession) {
-      setMessages(currentSession.messages);
-    } else {
-      setMessages([]);
-    }
-  }, [currentSession]);
-
   // Save sessions to AsyncStorage whenever sessions change
   useEffect(() => {
     if (!isLoading) {
@@ -104,6 +95,7 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
             b.lastMessageAt.getTime() - a.lastMessageAt.getTime()
           )[0];
           setCurrentSession(mostRecent);
+          setMessages(mostRecent.messages);
         }
       }
     } catch (error) {
@@ -157,40 +149,58 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
   };
 
   const addMessage = (text: string, isUser: boolean) => {
-    // If no current session, create one first
-    if (!currentSession) {
-      const sessionId = createNewSession();
-      // Use setTimeout to ensure state is updated before adding message
-      setTimeout(() => {
-        addMessage(text, isUser);
-      }, 100);
-      return;
+    // If no session exists, we still need to add the message to a new session
+    let sessionToUse = currentSession;
+    if (!sessionToUse) {
+      // We'll handle this by creating message and letting sessions/currentSession updates handle it
     }
 
     const message: ChatMessage = {
-      id: Date.now().toString() + Math.random().toString(), // Ensure unique ID
+      id: Date.now().toString() + Math.random().toString(),
       text,
       isUser,
       timestamp: new Date(),
-      sessionId: currentSession.id
+      sessionId: sessionToUse?.id || Date.now().toString()
     };
+
+    // Create or update session
+    if (!sessionToUse) {
+      const newSessionId = Date.now().toString();
+      sessionToUse = {
+        id: newSessionId,
+        title: text.length > 30 ? text.substring(0, 30) + '...' : text,
+        createdAt: new Date(),
+        lastMessageAt: new Date(),
+        messageCount: 1,
+        messages: [message]
+      };
+      setSessions(prev => [sessionToUse, ...prev]);
+      setCurrentSession(sessionToUse);
+      setMessages([message]);
+      return;
+    }
 
     const updatedSession: ChatSession = {
-      ...currentSession,
-      messages: [...currentSession.messages, message],
+      ...sessionToUse,
+      messages: [...sessionToUse.messages, message],
       lastMessageAt: new Date(),
-      messageCount: currentSession.messageCount + 1,
-      title: currentSession.messageCount === 0 ? 
+      messageCount: sessionToUse.messageCount + 1,
+      title: sessionToUse.messageCount === 0 ? 
         (text.length > 30 ? text.substring(0, 30) + '...' : text) : 
-        currentSession.title
+        sessionToUse.title
     };
 
-    // Update both sessions array and current session atomically
     setSessions(prev => {
-      const updated = prev.map(s => s.id === currentSession.id ? updatedSession : s);
-      return updated;
+      const existingIndex = prev.findIndex(s => s.id === sessionToUse.id);
+      if (existingIndex >= 0) {
+        return prev.map(s => s.id === sessionToUse.id ? updatedSession : s);
+      } else {
+        return [updatedSession, ...prev];
+      }
     });
+    
     setCurrentSession(updatedSession);
+    setMessages(updatedSession.messages);
   };
 
   const clearCurrentSession = () => {

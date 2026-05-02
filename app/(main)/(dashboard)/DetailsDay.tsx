@@ -1,18 +1,25 @@
-import { HEADER_PADDING_HORIZONTAL, HEADER_PADDING_VERTICAL } from '@/constants/ui';
+import { pakistaniDishes } from '@/app/Dataset/dataSet';
+import { drinksDataSet } from '@/app/Dataset/waterDataSet';
+import BackButton from '@/components/BackButton';
+import PatientDietPlanViewer from '@/components/PatientDietPlanViewer';
+import { goalBasedSuggestions, waterIntakeDatabase } from '@/constants/foodDatabase';
+import { HEADER_PADDING_HORIZONTAL } from '@/constants/ui';
 import { useTheme } from "@/contexts/ThemeContext";
+import { dailyLogsApi } from '@/utils/dailyLogsApi';
+import { customRecipesApi, CustomRecipeData } from '@/utils/customRecipesApi';
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { Audio } from 'expo-av';
+import Constants from 'expo-constants';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Modal } from "react-native";
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import Animated, { Easing, runOnJS, useAnimatedProps, useSharedValue, withTiming } from "react-native-reanimated";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
-import { colorsSheet } from "../(settings)/_ui_elements";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Day as typeDay } from "./types";
 interface ProgressCircleProps {
   achievedCalories: number;
@@ -27,16 +34,147 @@ export default function DetailsDay () {
     const { selectedDay  } = useLocalSearchParams<{ selectedDay : string }>();
     const router = useRouter();
     const props: typeDay = JSON.parse(selectedDay )
-    function getDate(){
-        var currentTime = Date.now()
-        const oldTime = new Date(props.duration*1000).getTime()
-        currentTime = currentTime + oldTime;
-        const date = new Date(currentTime);
-        return date.toISOString().slice(11, 19); // "HH:MM:SS"
+    
+    // State for fetched day data from backend
+    const [dayData, setDayData] = useState<any>(props);
+    const [isLoading, setIsLoading] = useState(false);
+    const [isCompletingDay, setIsCompletingDay] = useState(false);
+    
+    // Completion popup states
+    const [showCompletionModal, setShowCompletionModal] = useState(false);
+    const [completionModalType, setCompletionModalType] = useState<'confirm' | 'success' | 'weekComplete' | 'error'>('confirm');
+    const [completionModalData, setCompletionModalData] = useState<any>({});
+    
+    // Calculate time remaining in the day (from current time to 11:59:59 PM)
+    function getRemainingTime(){
+        const now = new Date();
+        const endOfDay = new Date();
+        endOfDay.setHours(23, 59, 59, 999); // Set to 11:59:59 PM
+        
+        const diff = endOfDay.getTime() - now.getTime();
+        
+        if (diff <= 0) return "00:00:00"; // Day is over
+        
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     }
+    
+    // Fetch complete day data from backend
+    useEffect(() => {
+      const fetchDayData = async () => {
+        try {
+          setIsLoading(false);
+          console.log('Day data loaded from props:', props.dayNo);
+          
+          // Use the props data directly since it comes from the weekly API
+          // which already has all the updated calorie and hydration values
+          setDayData({
+            ...props,
+            achievedCalories: props.achievedCalories || 0,
+            achieviedHydration: props.achieviedHydration || 0,
+            targetCalories: props.targetCalories,
+            targetHydration: props.targetHydration,
+            meals: (props as any).meals || [],
+            remarks: props.remarks,
+            status: props.status,
+            isCompleted: (props as any).isCompleted || false,
+            completionPercentage: (props as any).completionPercentage || 0,
+          });
+        } catch (error) {
+          console.error('Error loading day data:', error);
+          setDayData(props);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      fetchDayData();
+    }, [props.dayNo]);
+    
+    // Helper function to safely calculate percentage
+    const calculatePercentage = (achieved: number, target: number): number => {
+      if (!target || target === 0) return 0;
+      if (!achieved || achieved < 0) return 0;
+      const percent = (achieved / target) * 100;
+      return Math.min(Math.round(percent * 10) / 10, 100); // Round to 1 decimal place, cap at 100
+    };
+
     //states to track changes
     const [updateInput, setUpdateInput] = useState<string>('');
-    const [timer, setTimer] = useState<string>(getDate())
+    const [timer, setTimer] = useState<string>(getRemainingTime())
+    
+    // Update timer every second
+    useEffect(() => {
+      const timerInterval = setInterval(() => {
+        setTimer(getRemainingTime());
+      }, 1000);
+      
+      return () => clearInterval(timerInterval);
+    }, []);
+
+    // Complete Day functionality
+    const handleCompleteDay = async () => {
+      setCompletionModalType('confirm');
+      setCompletionModalData({
+        dayNumber: dayData.dayNo,
+        onConfirm: async () => {
+          setShowCompletionModal(false);
+          
+          try {
+            setIsCompletingDay(true);
+            
+            // Get weekly tracking ID from storage
+            const weeklyTrackingId = await AsyncStorage.getItem('weeklyTrackingId');
+            if (!weeklyTrackingId) {
+              setCompletionModalType('error');
+              setCompletionModalData({ message: 'Weekly tracking ID not found. Please restart the app.' });
+              setShowCompletionModal(true);
+              return;
+            }
+
+            console.log(`🚀 Completing Day ${dayData.dayNo}...`);
+            const result = await dailyLogsApi.completeDay(weeklyTrackingId, dayData.dayNo);
+            
+            if (result.cycleRestarted) {
+              setCompletionModalType('weekComplete');
+              setCompletionModalData({
+                dayNumber: dayData.dayNo,
+                onContinue: () => {
+                  setShowCompletionModal(false);
+                  router.back();
+                }
+              });
+            } else {
+              setCompletionModalType('success');
+              setCompletionModalData({
+                dayNumber: dayData.dayNo,
+                onContinue: () => {
+                  setShowCompletionModal(false);
+                  router.back();
+                }
+              });
+            }
+            setShowCompletionModal(true);
+            
+          } catch (error) {
+            console.error('Error completing day:', error);
+            setCompletionModalType('error');
+            setCompletionModalData({ 
+              message: error instanceof Error ? error.message : 'Failed to complete day. Please try again.' 
+            });
+            setShowCompletionModal(true);
+          } finally {
+            setIsCompletingDay(false);
+          }
+        },
+        onCancel: () => setShowCompletionModal(false)
+      });
+      setShowCompletionModal(true);
+    };
+    
     const [showMenu, setShowMenu] = useState<Boolean>(false)
     const [timeInput, setTimeInput] = useState<string>('');
     const [selectedTime, setSelectedTime] = useState<Date>(new Date());
@@ -48,6 +186,260 @@ export default function DetailsDay () {
     const [audioUri, setAudioUri] = useState<string | null>(null);
     const [isRecording, setIsRecording] = useState(false);
     const [inputMethod, setInputMethod] = useState<'text' | 'audio' | 'photo'>('text');
+    const [calorieInput, setCalorieInput] = useState<string>('');
+    const [selectedFoodItem, setSelectedFoodItem] = useState<any>(null);
+    const [foodSearch, setFoodSearch] = useState<string>('');
+    const [filteredFoods, setFilteredFoods] = useState<any[]>([]);
+    const [showFoodSearch, setShowFoodSearch] = useState(false);
+    const [suggestedFoods, setSuggestedFoods] = useState<any[]>([]);
+    const [mealQuantity, setMealQuantity] = useState<string>('1');
+    const [waterInput, setWaterInput] = useState<string>('0'); // Default to 0
+    const [showWaterTab, setShowWaterTab] = useState(false);
+    const [trackingMode, setTrackingMode] = useState<'meal' | 'hydration'>('meal');
+    
+    // Drink search states
+    const [drinkSearch, setDrinkSearch] = useState<string>('');
+    const [filteredDrinks, setFilteredDrinks] = useState<any[]>([]);
+    const [showDrinkSearch, setShowDrinkSearch] = useState(false);
+    const [selectedDrink, setSelectedDrink] = useState<any>(null);
+    const [drinkQuantity, setDrinkQuantity] = useState<string>('1');
+    
+    // Image detection states
+    const [isDetectingDish, setIsDetectingDish] = useState(false);
+    const [detectedDishName, setDetectedDishName] = useState<string>('');
+    
+    // Diet plan viewer state
+    const [showDietPlanViewer, setShowDietPlanViewer] = useState(false);
+    
+    // Custom recipes list
+    const [userCustomRecipes, setUserCustomRecipes] = useState<CustomRecipeData[]>([]);
+    
+    // Custom recipe states
+    const [showCustomRecipeModal, setShowCustomRecipeModal] = useState(false);
+    const [customRecipeName, setCustomRecipeName] = useState<string>('');
+    const [customRecipeIngredients, setCustomRecipeIngredients] = useState<Array<{
+      name: string;
+      protein_g: number;
+      carbs_g: number;
+      fat_g: number;
+    }>>([]);
+    const [customRecipeServingSize, setCustomRecipeServingSize] = useState<string>('1 serving');
+    const [customRecipeCalories, setCustomRecipeCalories] = useState<string>('');
+    const [customRecipeProtein, setCustomRecipeProtein] = useState<string>('');
+    const [customRecipeCarbs, setCustomRecipeCarbs] = useState<string>('');
+    const [customRecipeFat, setCustomRecipeFat] = useState<string>('');
+    const [useCollectiveValues, setUseCollectiveValues] = useState<boolean>(true);
+    const [currentIngredient, setCurrentIngredient] = useState({
+      name: '',
+      protein_g: '',
+      carbs_g: '',
+      fat_g: ''
+    });
+    
+    // Fetch user's custom recipes on mount
+    useEffect(() => {
+      const fetchCustomRecipes = async () => {
+        try {
+          const recipes = await customRecipesApi.getUserRecipes();
+          setUserCustomRecipes(recipes);
+          console.log('✅ Custom recipes loaded:', recipes.length);
+        } catch (error) {
+          console.error('Error loading custom recipes:', error);
+        }
+      };
+      fetchCustomRecipes();
+    }, []);
+    
+    // Extract userGoal to avoid infinite loop with props dependency
+    const userGoal = (props as any).userGoal || 3;
+    
+    // Memoize suggested foods to prevent infinite re-renders
+    const combinedSuggestedFoods = useMemo(() => {
+      const suggestions = goalBasedSuggestions[userGoal as keyof typeof goalBasedSuggestions];
+      
+      // Convert custom recipes to food format
+      const customRecipesAsFoods = userCustomRecipes.map(recipe => ({
+        food_name: recipe.recipeName,
+        serving_size: recipe.servingSize,
+        calories_kcal: recipe.calories_kcal,
+        calories: recipe.calories_kcal,
+        protein_g: recipe.protein_g,
+        carbs_g: recipe.carbs_g,
+        fat_g: recipe.fat_g,
+        category: 'Custom Recipe',
+        isCustomRecipe: true,
+        _id: recipe._id
+      }));
+      
+      // Custom recipes first, then goal-based suggestions
+      return [...customRecipesAsFoods, ...(suggestions?.foods || [])];
+    }, [userGoal, userCustomRecipes]);
+    
+    // Update suggested foods when combined suggestions change
+    useEffect(() => {
+      setSuggestedFoods(combinedSuggestedFoods);
+    }, [combinedSuggestedFoods]);
+    
+    // Handle food search with custom recipes and Pakistani dishes dataset
+    useEffect(() => {
+      if (foodSearch.trim().length > 1) {
+        const query = foodSearch.toLowerCase();
+        
+        // Search custom recipes first
+        const customRecipeMatches = userCustomRecipes
+          .filter(recipe => recipe.recipeName.toLowerCase().includes(query))
+          .map(recipe => ({
+            food_name: recipe.recipeName,
+            serving_size: recipe.servingSize,
+            calories_kcal: recipe.calories_kcal,
+            calories: recipe.calories_kcal,
+            protein_g: recipe.protein_g,
+            carbs_g: recipe.carbs_g,
+            fat_g: recipe.fat_g,
+            category: '⭐ My Recipe',
+            isCustomRecipe: true,
+            _id: recipe._id
+          }));
+        
+        // Search Pakistani dishes
+        const dishMatches = pakistaniDishes.filter((dish: any) => {
+          const name = dish.food_name || dish.name || '';
+          const category = dish.category || '';
+          return name.toLowerCase().includes(query) || category.toLowerCase().includes(query);
+        }).slice(0, 10);
+        
+        // Combine: custom recipes first, then database dishes
+        const results = [...customRecipeMatches, ...dishMatches].slice(0, 15);
+        setFilteredFoods(results);
+        setShowFoodSearch(true);
+      } else {
+        setShowFoodSearch(false);
+        setFilteredFoods([]);
+      }
+    }, [foodSearch, userCustomRecipes]);
+
+    // Handle drink search with drinks dataset
+    useEffect(() => {
+      if (drinkSearch.trim().length > 1) {
+        const query = drinkSearch.toLowerCase();
+        const results = drinksDataSet.filter((drink: any) => {
+          const name = drink.drink_name || drink.food_name || '';
+          return name.toLowerCase().includes(query);
+        }).slice(0, 15);
+        setFilteredDrinks(results);
+        setShowDrinkSearch(true);
+      } else {
+        setShowDrinkSearch(false);
+        setFilteredDrinks([]);
+      }
+    }, [drinkSearch]);
+
+    // Detect dish from image using Google Vision API
+    const detectDishFromImage = async () => {
+      try {
+        // Request permission
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission Required', 'Please allow access to your photos to use this feature.');
+          return;
+        }
+
+        // Pick image
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [4, 3],
+          quality: 0.8,
+        });
+
+        if (result.canceled || !result.assets || result.assets.length === 0) {
+          return;
+        }
+
+        setIsDetectingDish(true);
+        const imageUri = result.assets[0].uri;
+
+        // Prepare FormData
+        const formData = new FormData();
+        const filename = imageUri.split('/').pop() || 'image.jpg';
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+        formData.append('image', {
+          uri: imageUri,
+          name: filename,
+          type: type,
+        } as any);
+
+        // Get backend URL
+        const ENV = Constants.expoConfig?.extra;
+        const baseUrl = ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001');
+        const apiUrl = baseUrl.replace(/\/api\/?$/, '') + '/api/food-detect/upload';
+
+        // Upload to backend (Clarifai food detection)
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+
+        const data = await response.json();
+
+        if (data.success && data.foodName) {
+          const dishName = data.foodName;
+          setDetectedDishName(dishName);
+          
+          // Auto-search in the food database
+          setFoodSearch(dishName);
+          
+          // Try to find exact or partial match
+          const query = dishName.toLowerCase();
+          const matches = pakistaniDishes.filter((dish: any) => {
+            const name = (dish.food_name || dish.name || '').toLowerCase();
+            return name.includes(query) || query.includes(name);
+          });
+
+          if (matches.length > 0) {
+            // Auto-select the best match
+            const bestMatch = matches[0];
+            setSelectedFoodItem(bestMatch);
+            const calories = bestMatch.calories_kcal || 0;
+            setCalorieInput(String(Math.round(calories * parseFloat(mealQuantity || '1'))));
+            setShowFoodSearch(false);
+            
+            Alert.alert(
+              'Food Detected! 🎯',
+              `Found: ${bestMatch.food_name || bestMatch.name}\nCalories: ${calories} kcal\nConfidence: ${Math.round(data.confidence * 100)}%\n\nYou can adjust the quantity and add the meal.`,
+              [{ text: 'OK' }]
+            );
+          } else {
+            // Show search results if no exact match
+            setShowFoodSearch(true);
+            Alert.alert(
+              'Food Detected',
+              `Detected: ${dishName}\nConfidence: ${Math.round(data.confidence * 100)}%\n\nPlease select from the search results or enter details manually.`,
+              [{ text: 'OK' }]
+            );
+          }
+        } else {
+          Alert.alert('Detection Failed', data.message || 'Could not detect a dish in the image. Please try another image or enter manually.');
+        }
+      } catch (error) {
+        console.error('Image detection error:', error);
+        Alert.alert('Error', 'Failed to process the image. Please try again.');
+      } finally {
+        setIsDetectingDish(false);
+      }
+    };
+
+    // Ensure UI updates when dayData changes
+    useEffect(() => {
+      // This empty effect serves to notify React that dayData has changed
+      // triggering a full component re-render
+    }, [dayData.achieviedHydration, dayData.achievedCalories]);
+
     const fade = useSharedValue(1);
     const insets = useSafeAreaInsets();
     // trigger fade-out + menu
@@ -167,16 +559,14 @@ export default function DetailsDay () {
     const styles = useMemo(() => getStyles(colors), [colors]);
     //output
     return (
-  <View style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom, backgroundColor: colors.screenColor }}>
+  <View style={{ flex: 1, paddingTop: insets.top, backgroundColor: colors.screenColor }}>
     {!showMenu ? (
       <Animated.View
         style={{ flex: 1, opacity: fade, backgroundColor: colors.screenColor, paddingHorizontal: 10 }}
       >
         <View style={styles.heading}>
           <View style={styles.headerContent}>
-            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-              <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
-            </TouchableOpacity>
+            <BackButton style={styles.backButton} testID="detailsday-back" />
             <View style={styles.dayDateWrapper}>
               <View style={styles.dayBadge}>
                 <Text style={styles.dayNumber}>0{props.dayNo}</Text>
@@ -203,23 +593,23 @@ export default function DetailsDay () {
                 android_ripple={{ color: "rgba(0,0,0,0.06)" }}
               >
                 <ProgressCircle
-                  achievedCalories={props.achievedCalories}
-                  achieviedHydration={props.achieviedHydration}
-                  targetCalories={props.targetCalories}
-                  targetHydration={props.targetHydration}
+                  achievedCalories={dayData.achievedCalories}
+                  achieviedHydration={dayData.achieviedHydration}
+                  targetCalories={dayData.targetCalories}
+                  targetHydration={dayData.targetHydration}
                 />
               </Pressable>
             </View>
 
-            {props.remarks && (
+            {dayData.remarks && (
               <View style={styles.remarksContainer}>
-                <Text style={styles.remarksText}>{String(props.remarks)}</Text>
+                <Text style={styles.remarksText}>{String(dayData.remarks)}</Text>
               </View>
             )}
           </View>
 
           {/**Determine whether to display Update Button or not */}
-          {props.status === "active" ? (
+          {dayData.status === "active" ? (
             <>
               <View style={styles.infoOuterBox}>
                 <View style={styles.statsGrid}>
@@ -230,12 +620,12 @@ export default function DetailsDay () {
                     </View>
                     <View style={styles.goalRowContainer}>
                       <View style={styles.goalItem}>
-                        <Text style={styles.statValue}>{props.targetCalories}</Text>
+                        <Text style={styles.statValue}>{dayData.targetCalories}</Text>
                         <Text style={styles.statUnit}>cals</Text>
                       </View>
                       <View style={styles.goalDivider} />
                       <View style={styles.goalItem}>
-                        <Text style={styles.statValue}>{props.targetHydration}</Text>
+                        <Text style={styles.statValue}>{dayData.targetHydration}</Text>
                         <Text style={styles.statUnit}>liters</Text>
                       </View>
                     </View>
@@ -243,25 +633,25 @@ export default function DetailsDay () {
 
                   <View style={styles.statCard}>
                     <View style={styles.statCardContent}>
-                      <Ionicons name="flame" size={Math.min(hp(2.2), wp(5.5))} color="#FF6B6B" />
+                      <Ionicons name="flame" size={Math.min(hp(2.2), wp(5.5))} color="#F97316" />
                       <Text style={styles.statLabel}>Calories</Text>
                     </View>
-                    <Text style={styles.statValue}>{props.achievedCalories}</Text>
+                    <Text style={styles.statValue}>{dayData.achievedCalories}</Text>
                     <Text style={styles.statUnit}>cals</Text>
                   </View>
 
                   <View style={styles.statCard}>
                     <View style={styles.statCardContent}>
-                      <Ionicons name="water" size={Math.min(hp(2.2), wp(5.5))} color="#4ECDC4" />
+                      <Ionicons name="water" size={Math.min(hp(2.2), wp(5.5))} color="#2E86AB" />
                       <Text style={styles.statLabel}>Hydration</Text>
                     </View>
-                    <Text style={styles.statValue}>{props.achieviedHydration}</Text>
+                    <Text style={styles.statValue}>{dayData.achieviedHydration}</Text>
                     <Text style={styles.statUnit}>liters</Text>
                   </View>
 
                   <View style={styles.statCard}>
                     <View style={styles.statCardContent}>
-                      <Ionicons name="timer" size={Math.min(hp(2.2), wp(5.5))} color="#FFB347" />
+                      <Ionicons name="timer" size={Math.min(hp(2.2), wp(5.5))} color="#FFA500" />
                       <Text style={styles.statLabel}>Timer</Text>
                     </View>
                     <Text style={styles.statValueLarge}>{timer}</Text>
@@ -272,43 +662,45 @@ export default function DetailsDay () {
                 <View style={styles.progressSection}>
                   <View style={styles.progressItem}>
                     <View style={styles.progressHeader}>
-                      <Ionicons name="flame-outline" size={16} color="#FF6B6B" />
+                      <Ionicons name="flame-outline" size={16} color="#F97316" />
                       <Text style={styles.progressLabel}>Calories Progress</Text>
                     </View>
                     <View style={styles.progressBarContainer}>
                       <View 
+                        key={`cal-active-${dayData.achievedCalories}`}
                         style={[
                           styles.progressBar, 
                           { 
-                            width: `${Math.min((props.achievedCalories / props.targetCalories) * 100, 100)}%`,
-                            backgroundColor: '#FF6B6B'
+                            width: `${Math.min((dayData.achievedCalories / dayData.targetCalories) * 100, 100)}%`,
+                            backgroundColor: '#F97316'
                           }
                         ]} 
                       />
                     </View>
                     <Text style={styles.progressPercentage}>
-                      {Math.round((props.achievedCalories / props.targetCalories) * 100)}%
+                      {calculatePercentage(dayData.achievedCalories, dayData.targetCalories)}%
                     </Text>
                   </View>
                   
                   <View style={styles.progressItem}>
                     <View style={styles.progressHeader}>
-                      <Ionicons name="water-outline" size={16} color="#4ECDC4" />
+                      <Ionicons name="water-outline" size={16} color="#2E86AB" />
                       <Text style={styles.progressLabel}>Hydration Progress</Text>
                     </View>
                     <View style={styles.progressBarContainer}>
                       <View 
+                        key={`hydration-active-${dayData.achieviedHydration}`}
                         style={[
                           styles.progressBar, 
                           { 
-                            width: `${Math.min((props.achieviedHydration / props.targetHydration) * 100, 100)}%`,
-                            backgroundColor: '#4ECDC4'
+                            width: `${Math.min((dayData.achieviedHydration / dayData.targetHydration) * 100, 100)}%`,
+                            backgroundColor: '#2E86AB'
                           }
                         ]} 
                       />
                     </View>
                     <Text style={styles.progressPercentage}>
-                      {Math.round((props.achieviedHydration / props.targetHydration) * 100)}%
+                      {calculatePercentage(dayData.achieviedHydration, dayData.targetHydration)}%
                     </Text>
                   </View>
                 </View>
@@ -321,6 +713,25 @@ export default function DetailsDay () {
                 <Ionicons name="add-circle" size={20} color="white" />
                 <Text style={styles.trayButtonText}>Track Meal</Text>
               </TouchableOpacity>
+              
+              {/* Complete Day Button */}
+              {/* <TouchableOpacity
+                style={[styles.completeDayButton, {
+                  backgroundColor: isCompletingDay ? colors.gray : colors.success,
+                  opacity: isCompletingDay ? 0.6 : 1
+                }]}
+                onPress={handleCompleteDay}
+                disabled={isCompletingDay}
+              >
+                <Ionicons 
+                  name={isCompletingDay ? "hourglass" : "checkmark-circle"} 
+                  size={20} 
+                  color="white" 
+                />
+                <Text style={styles.completeDayButtonText}>
+                  {isCompletingDay ? 'Completing...' : 'Complete Day'}
+                </Text>
+              </TouchableOpacity> */}
             </>
           ) : (
             <>
@@ -333,12 +744,12 @@ export default function DetailsDay () {
                     </View>
                     <View style={styles.goalRowContainer}>
                       <View style={styles.goalItem}>
-                        <Text style={styles.statValue}>{props.targetCalories}</Text>
+                        <Text style={styles.statValue}>{dayData.targetCalories}</Text>
                         <Text style={styles.statUnit}>cals</Text>
                       </View>
                       <View style={styles.goalDivider} />
                       <View style={styles.goalItem}>
-                        <Text style={styles.statValue}>{props.targetHydration}</Text>
+                        <Text style={styles.statValue}>{dayData.targetHydration}</Text>
                         <Text style={styles.statUnit}>liters</Text>
                       </View>
                     </View>
@@ -346,25 +757,25 @@ export default function DetailsDay () {
 
                   <View style={styles.statCard}>
                     <View style={styles.statCardContent}>
-                      <Ionicons name="flame" size={Math.min(hp(2.2), wp(5.5))} color="#FF6B6B" />
+                      <Ionicons name="flame" size={Math.min(hp(2.2), wp(5.5))} color="#F97316" />
                       <Text style={styles.statLabel}>Calories</Text>
                     </View>
-                    <Text style={styles.statValue}>{props.achievedCalories}</Text>
+                    <Text style={styles.statValue}>{dayData.achievedCalories}</Text>
                     <Text style={styles.statUnit}>cals</Text>
                   </View>
 
                   <View style={styles.statCard}>
                     <View style={styles.statCardContent}>
-                      <Ionicons name="water" size={Math.min(hp(2.2), wp(5.5))} color="#4ECDC4" />
+                      <Ionicons name="water" size={Math.min(hp(2.2), wp(5.5))} color="#2E86AB" />
                       <Text style={styles.statLabel}>Hydration</Text>
                     </View>
-                    <Text style={styles.statValue}>{props.achieviedHydration}</Text>
+                    <Text style={styles.statValue}>{dayData.achieviedHydration}</Text>
                     <Text style={styles.statUnit}>liters</Text>
                   </View>
 
                   <View style={styles.statCard}>
                     <View style={styles.statCardContent}>
-                      <Ionicons name="timer" size={Math.min(hp(2.2), wp(5.5))} color="#FFB347" />
+                      <Ionicons name="timer" size={Math.min(hp(2.2), wp(5.5))} color="#FFA500" />
                       <Text style={styles.statLabel}>Timer</Text>
                     </View>
                     <Text style={styles.statValueLarge}>{timer}</Text>
@@ -375,53 +786,55 @@ export default function DetailsDay () {
                 <View style={styles.progressSection}>
                   <View style={styles.progressItem}>
                     <View style={styles.progressHeader}>
-                      <Ionicons name="flame-outline" size={16} color="#FF6B6B" />
+                      <Ionicons name="flame-outline" size={16} color="#F97316" />
                       <Text style={styles.progressLabel}>Calories Progress</Text>
                     </View>
                     <View style={styles.progressBarContainer}>
                       <View 
+                        key={`cal-inactive-${dayData.achievedCalories}`}
                         style={[
                           styles.progressBar, 
                           { 
-                            width: `${Math.min((props.achievedCalories / props.targetCalories) * 100, 100)}%`,
-                            backgroundColor: '#FF6B6B'
+                            width: `${Math.min((dayData.achievedCalories / dayData.targetCalories) * 100, 100)}%`,
+                            backgroundColor: '#F97316'
                           }
                         ]} 
                       />
                     </View>
                     <Text style={styles.progressPercentage}>
-                      {Math.round((props.achievedCalories / props.targetCalories) * 100)}%
+                      {calculatePercentage(dayData.achievedCalories, dayData.targetCalories)}%
                     </Text>
                   </View>
                   
                   <View style={styles.progressItem}>
                     <View style={styles.progressHeader}>
-                      <Ionicons name="water-outline" size={16} color="#4ECDC4" />
+                      <Ionicons name="water-outline" size={16} color="#2E86AB" />
                       <Text style={styles.progressLabel}>Hydration Progress</Text>
                     </View>
                     <View style={styles.progressBarContainer}>
                       <View 
+                        key={`hydration-inactive-${dayData.achieviedHydration}`}
                         style={[
                           styles.progressBar, 
                           { 
-                            width: `${Math.min((props.achieviedHydration / props.targetHydration) * 100, 100)}%`,
-                            backgroundColor: '#4ECDC4'
+                            width: `${Math.min((dayData.achieviedHydration / dayData.targetHydration) * 100, 100)}%`,
+                            backgroundColor: '#2E86AB'
                           }
                         ]} 
                       />
                     </View>
                     <Text style={styles.progressPercentage}>
-                      {Math.round((props.achieviedHydration / props.targetHydration) * 100)}%
+                      {calculatePercentage(dayData.achieviedHydration, dayData.targetHydration)}%
                     </Text>
                   </View>
                 </View>
               </View>
 
               {/* Congratulations Message for 100% Completion */}
-              {props.achievedCalories >= props.targetCalories && 
-               props.achieviedHydration >= props.targetHydration && (
+              {dayData.achievedCalories >= dayData.targetCalories && 
+               dayData.achieviedHydration >= dayData.targetHydration && (
                 <View style={styles.congratsContainer}>
-                  <Ionicons name="trophy" size={Math.min(hp(4), wp(10))} color="#FFD700" />
+                  <Ionicons name="trophy" size={Math.min(hp(4), wp(10))} color="#FFA500" />
                   <Text style={styles.congratsTitle}>Congratulations! 🎉</Text>
                   <Text style={styles.congratsText}>
                     You've achieved your daily goals! Keep up the great work!
@@ -443,275 +856,612 @@ export default function DetailsDay () {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.menuHeader}>
-          <Ionicons name="restaurant" size={Math.min(hp(3.5), wp(8))} color={colors.primary} />
+          <Ionicons name="nutrition" size={Math.min(hp(3.5), wp(8))} color={colors.primary} />
           <Text style={styles.menuTitle}>
-            Track Your Meal
+            Track Your Progress
           </Text>
           <Text style={styles.menuSubtitle}>
-            Choose how you'd like to log your meal
+            Choose what you'd like to log
           </Text>
         </View>
 
-        <View style={styles.menuContent}>
-
-          {/* Time Selection */}
-          <View style={styles.inputGroup}>
-            <View style={styles.labelRow}>
-              <Ionicons name="time-outline" size={20} color={colors.primary} />
-              <Text style={styles.label}>When did you eat?</Text>
-            </View>
+        {/* Tracking Mode Selector - Professional Toggle */}
+        <View style={styles.trackingModeSection}>
+          <Text style={styles.trackingModeTitle}>What would you like to track today?</Text>
+          <View style={styles.modeToggleContainer}>
             <TouchableOpacity 
-              style={[styles.input, styles.timePickerButton]}
-              onPress={() => setShowTimePicker(true)}
+              style={[styles.modeButton, trackingMode === 'meal' && styles.modeButtonActive]}
+              onPress={() => setTrackingMode('meal')}
             >
-              <Text style={styles.timePickerText}>
-                {selectedTime.toLocaleTimeString('en-US', { 
-                  hour: '2-digit', 
-                  minute: '2-digit',
-                  hour12: true 
-                })}
-              </Text>
-              <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+              <Ionicons name="fast-food-outline" size={22} color={trackingMode === 'meal' ? '#FFFFFF' : colors.textSecondary} />
+              <Text style={[styles.modeButtonText, trackingMode === 'meal' && styles.modeButtonTextActive]}>Meal</Text>
             </TouchableOpacity>
-            
-            {showTimePicker && (
-              <DateTimePicker
-                value={selectedTime}
-                mode="time"
-                is24Hour={false}
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={(event, selectedDate) => {
-                  setShowTimePicker(Platform.OS === 'ios');
-                  if (selectedDate) {
-                    setSelectedTime(selectedDate);
-                  }
-                }}
-              />
-            )}
-            
-            {Platform.OS === 'ios' && showTimePicker && (
-              <TouchableOpacity
-                style={styles.timeDoneButton}
-                onPress={() => setShowTimePicker(false)}
-              >
-                <Text style={styles.timeDoneText}>Done</Text>
-              </TouchableOpacity>
-            )}
+            <View style={styles.modeButtonDivider} />
+            <TouchableOpacity 
+              style={[styles.modeButton, trackingMode === 'hydration' && styles.modeButtonActive]}
+              onPress={() => setTrackingMode('hydration')}
+            >
+              <Ionicons name="water-outline" size={22} color={trackingMode === 'hydration' ? '#FFFFFF' : colors.textSecondary} />
+              <Text style={[styles.modeButtonText, trackingMode === 'hydration' && styles.modeButtonTextActive]}>Hydration</Text>
+            </TouchableOpacity>
           </View>
+        </View>
 
-          {/* Input Method Selection */}
-          <View style={styles.inputMethodSection}>
-            <Text style={styles.sectionTitle}>How would you like to add your meal?</Text>
-            <View style={styles.inputMethodButtons}>
-              <TouchableOpacity
-                style={[
-                  styles.inputMethodButton,
-                  inputMethod === 'text' && styles.inputMethodButtonActive
-                ]}
-                onPress={() => setInputMethod('text')}
-              >
-                <Ionicons 
-                  name="create-outline" 
-                  size={24} 
-                  color={inputMethod === 'text' ? 'white' : colors.primary} 
-                />
-                <Text style={[
-                  styles.inputMethodText,
-                  inputMethod === 'text' && styles.inputMethodTextActive
-                ]}>
-                  Type
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.inputMethodButton,
-                  inputMethod === 'audio' && styles.inputMethodButtonActive
-                ]}
-                onPress={() => setInputMethod('audio')}
-              >
-                <Ionicons 
-                  name="mic-outline" 
-                  size={24} 
-                  color={inputMethod === 'audio' ? 'white' : colors.primary} 
-                />
-                <Text style={[
-                  styles.inputMethodText,
-                  inputMethod === 'audio' && styles.inputMethodTextActive
-                ]}>
-                  Voice
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.inputMethodButton,
-                  inputMethod === 'photo' && styles.inputMethodButtonActive
-                ]}
-                onPress={() => setInputMethod('photo')}
-              >
-                <Ionicons 
-                  name="camera-outline" 
-                  size={24} 
-                  color={inputMethod === 'photo' ? 'white' : colors.primary} 
-                />
-                <Text style={[
-                  styles.inputMethodText,
-                  inputMethod === 'photo' && styles.inputMethodTextActive
-                ]}>
-                  Photo
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Dynamic Input Based on Selection */}
-          <View style={styles.dynamicInputSection}>
-            {inputMethod === 'text' && (
-              <>
-                <View style={styles.inputGroup}>
-                  <View style={styles.labelRow}>
-                    <Ionicons name="fast-food-outline" size={20} color={colors.primary} />
-                    <Text style={styles.label}>What did you eat?</Text>
-                  </View>
-                  <TextInput 
-                    style={styles.input} 
-                    placeholder="e.g. Grilled chicken with vegetables"
-                    placeholderTextColor={colors.textSecondary}
-                    value={foodNameInput}
-                    onChangeText={setFoodNameInput}
-                  />
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <View style={styles.labelRow}>
-                    <MaterialIcons name="description" size={20} color={colors.primary} />
-                    <Text style={styles.label}>Add Details</Text>
-                  </View>
-                  <TextInput
-                    style={[styles.input, styles.textArea]}
-                    placeholder="Portion size, ingredients, cooking method..."
-                    placeholderTextColor={colors.textSecondary}
-                    multiline
-                    numberOfLines={6}
-                    textAlignVertical="top"
-                    value={descriptionInput}
-                    onChangeText={setDescriptionInput}
-                  />
-                </View>
-              </>
-            )}
-
-            {inputMethod === 'audio' && (
-              <View style={styles.audioSection}>
-                <Text style={styles.audioInstructions}>
-                  {isRecording 
-                    ? "Recording... Describe your meal" 
-                    : audioUri 
-                    ? "Voice note recorded! You can re-record if needed."
-                    : "Tap the microphone to start recording"}
-                </Text>
-                
-                <View style={styles.audioRecordContainer}>
-                  <TouchableOpacity
-                    style={[
-                      styles.audioRecordButton,
-                      isRecording && styles.audioRecordButtonActive
-                    ]}
-                    onPress={isRecording ? stopRecording : startRecording}
-                    activeOpacity={0.7}
-                  >
-                    {isRecording ? (
-                      <View style={styles.stopIconContainer}>
-                        <View style={styles.stopIcon} />
+        <View style={styles.menuContent}>
+          {/* MEAL TRACKING MODE */}
+          {trackingMode === 'meal' && (
+            <>
+              {/* Quick Pick Suggestions */}
+              <View style={styles.sectionContainer}>
+                <Text style={styles.sectionLabel}>Quick Pick Favorites</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickPickScroll}>
+                  {suggestedFoods.slice(0, 6).map((food, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.quickPickItem}
+                      onPress={() => {
+                        setSelectedFoodItem(food);
+                        setCalorieInput(String(food.calories_kcal || food.calories));
+                        setFoodSearch('');
+                        setShowFoodSearch(false);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.quickPickIcon}>
+                        <Ionicons name="restaurant" size={20} color={colors.primary} />
                       </View>
-                    ) : (
-                      <Ionicons 
-                        name="mic" 
-                        size={Math.min(hp(4), wp(9))} 
-                        color="white" 
-                      />
+                      <Text style={styles.quickPickName} numberOfLines={2}>{food.food_name || food.name}</Text>
+                      <View style={styles.quickPickCalories}>
+                        <Ionicons name="flame" size={12} color="#F97316" />
+                        <Text style={styles.quickPickCalText}>{food.calories_kcal || food.calories}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              {/* View Diet Plan Button */}
+              <View style={styles.sectionContainer}>
+                <TouchableOpacity
+                  style={styles.dietPlanButton}
+                  onPress={() => setShowDietPlanViewer(true)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.dietPlanIconContainer}>
+                    <Ionicons name="nutrition-outline" size={24} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.dietPlanTextContainer}>
+                    <Text style={styles.dietPlanTitle}>View My Diet Plans</Text>
+                    <Text style={styles.dietPlanSubtitle}>See doctor-assigned meal plans</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Create Custom Recipe Button */}
+              <View style={styles.sectionContainer}>
+                <TouchableOpacity
+                  style={styles.customRecipeButton}
+                  onPress={() => setShowCustomRecipeModal(true)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.customRecipeIconContainer}>
+                    <Ionicons name="create-outline" size={24} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.customRecipeTextContainer}>
+                    <Text style={styles.customRecipeTitle}>Create Your Own Recipe</Text>
+                    <Text style={styles.customRecipeSubtitle}>Build a custom meal with ingredients</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Image Upload Button */}
+              <View style={styles.fieldContainer}>
+                <TouchableOpacity
+                  style={styles.imageUploadButton}
+                  onPress={detectDishFromImage}
+                  disabled={isDetectingDish}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.imageUploadIconContainer}>
+                    <Ionicons 
+                      name={isDetectingDish ? "hourglass-outline" : "camera-outline"} 
+                      size={24} 
+                      color="#FFFFFF" 
+                    />
+                  </View>
+                  <View style={styles.imageUploadTextContainer}>
+                    <Text style={styles.imageUploadTitle}>
+                      {isDetectingDish ? 'Detecting Dish...' : '📸 Upload Image For Dish'}
+                    </Text>
+                    <Text style={styles.imageUploadSubtitle}>
+                      {isDetectingDish ? 'Processing with AI...' : 'Auto-detect food & calories'}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Search Food Field */}
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>
+                  <Ionicons name="search" size={16} color={colors.primary} /> Search Food
+                </Text>
+                <View style={styles.searchInputContainer}>
+                  <Ionicons name="search-outline" size={20} color={colors.textSecondary} style={styles.searchIconLeft} />
+                  <TextInput 
+                    style={styles.searchInputField}
+                    placeholder="Search Pakistani dishes, rice, chicken..."
+                    placeholderTextColor={colors.textSecondary}
+                    value={foodSearch}
+                    onChangeText={setFoodSearch}
+                  />
+                  {foodSearch.length > 0 && (
+                    <TouchableOpacity onPress={() => { setFoodSearch(''); setShowFoodSearch(false); }} style={styles.searchClearButton}>
+                      <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
+              {/* Search Results with Better Spacing */}
+              {showFoodSearch && filteredFoods.length > 0 && (
+                <View style={styles.searchResultsContainer}>
+                  <Text style={styles.searchResultsHeader}>
+                    Found {filteredFoods.length} items - Select one
+                  </Text>
+                  <ScrollView style={styles.searchResultsScroll} nestedScrollEnabled showsVerticalScrollIndicator={true}>
+                    {filteredFoods.slice(0, 10).map((food, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={styles.searchResultCard}
+                        onPress={() => {
+                          setSelectedFoodItem(food);
+                          const calories = food.calories_kcal || food.calories || 0;
+                          setCalorieInput(String(Math.round(calories * parseFloat(mealQuantity || '1'))));
+                          setFoodSearch('');
+                          setShowFoodSearch(false);
+                        }}
+                        activeOpacity={0.6}
+                      >
+                        <View style={styles.searchResultLeft}>
+                          <View style={styles.searchResultIconBg}>
+                            <Ionicons name="fast-food" size={18} color={colors.primary} />
+                          </View>
+                          <View style={styles.searchResultInfo}>
+                            <Text style={styles.searchResultTitle}>{food.food_name || food.name}</Text>
+                            <Text style={styles.searchResultMeta}>
+                              {food.serving_size || food.category || '100g'}
+                            </Text>
+                          </View>
+                        </View>
+                        <View style={styles.searchResultRight}>
+                          <Text style={styles.searchResultCalValue}>{food.calories_kcal || food.calories}</Text>
+                          <Text style={styles.searchResultCalLabel}>cal</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+            </>
+          )}
+
+          {/* HYDRATION TRACKING MODE */}
+          {trackingMode === 'hydration' && (
+            <>
+              {/* Search Drinks */}
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>
+                  <Ionicons name="search" size={16} color="#2E86AB" /> Search Drinks
+                </Text>
+                <View style={styles.searchInputContainer}>
+                  <Ionicons name="search-outline" size={20} color={colors.textSecondary} style={styles.searchIconLeft} />
+                  <TextInput 
+                    style={styles.searchInputField}
+                    placeholder="Search juice, milkshake, tea, coffee..."
+                    placeholderTextColor={colors.textSecondary}
+                    value={drinkSearch}
+                    onChangeText={setDrinkSearch}
+                  />
+                  {drinkSearch.length > 0 && (
+                    <TouchableOpacity onPress={() => { setDrinkSearch(''); setShowDrinkSearch(false); }} style={styles.searchClearButton}>
+                      <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
+              {/* Drink Search Results */}
+              {showDrinkSearch && filteredDrinks.length > 0 && (
+                <View style={styles.searchResultsContainer}>
+                  <Text style={styles.searchResultsHeader}>
+                    Found {filteredDrinks.length} drinks - Select one
+                  </Text>
+                  <ScrollView style={styles.searchResultsScroll} nestedScrollEnabled showsVerticalScrollIndicator={true}>
+                    {filteredDrinks.map((drink, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={styles.drinkResultCard}
+                        onPress={() => {
+                          setSelectedDrink(drink);
+                          const hydrationValue = ((drink.hydration_percent || 100) / 100) * 0.25; // Convert to liters
+                          setWaterInput(hydrationValue.toFixed(2));
+                          setDrinkSearch('');
+                          setShowDrinkSearch(false);
+                        }}
+                        activeOpacity={0.6}
+                      >
+                        <View style={styles.searchResultLeft}>
+                          <View style={styles.drinkResultIconBg}>
+                            <Ionicons name="cafe" size={18} color="#2E86AB" />
+                          </View>
+                          <View style={styles.searchResultInfo}>
+                            <Text style={styles.searchResultTitle}>{drink.drink_name || drink.food_name}</Text>
+                            <View style={styles.drinkMetaRow}>
+                              <Text style={styles.searchResultMeta}>{drink.serving_size}</Text>
+                              <View style={styles.hydrationBadge}>
+                                <Ionicons name="water" size={12} color="#2E86AB" />
+                                <Text style={styles.hydrationText}>{drink.hydration_percent}%</Text>
+                              </View>
+                            </View>
+                          </View>
+                        </View>
+                        <View style={styles.searchResultRight}>
+                          <Text style={styles.drinkCalValue}>{drink.calories_kcal}</Text>
+                          <Text style={styles.searchResultCalLabel}>cal</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
+              {/* Selected Drink Display */}
+              {selectedDrink && (
+                <View style={styles.selectedDrinkCard}>
+                  <View style={styles.selectedDrinkHeader}>
+                    <View style={styles.drinkIconLarge}>
+                      <Ionicons name="checkmark-circle" size={24} color="#2E86AB" />
+                    </View>
+                    <View style={styles.selectedDrinkInfo}>
+                      <Text style={styles.selectedDrinkName}>{selectedDrink.drink_name || selectedDrink.food_name}</Text>
+                      <Text style={styles.selectedDrinkServing}>{selectedDrink.serving_size}</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => setSelectedDrink(null)} style={styles.removeDrinkBtn}>
+                      <Ionicons name="close" size={20} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Drink Nutrition Grid */}
+                  <View style={styles.drinkNutritionGrid}>
+                    <View style={styles.drinkNutritionItem}>
+                      <Ionicons name="water" size={16} color="#2E86AB" />
+                      <Text style={styles.drinkNutritionValue}>{selectedDrink.hydration_percent}%</Text>
+                      <Text style={styles.drinkNutritionLabel}>hydration</Text>
+                    </View>
+                    <View style={styles.drinkNutritionItem}>
+                      <Ionicons name="flame" size={16} color="#F97316" />
+                      <Text style={styles.drinkNutritionValue}>{Math.round(selectedDrink.calories_kcal * parseFloat(drinkQuantity || '1'))}</Text>
+                      <Text style={styles.drinkNutritionLabel}>cal</Text>
+                    </View>
+                    {selectedDrink.protein_g > 0 && (
+                      <View style={styles.drinkNutritionItem}>
+                        <Ionicons name="fitness" size={16} color="#2E86AB" />
+                        <Text style={styles.drinkNutritionValue}>{Math.round(selectedDrink.protein_g * parseFloat(drinkQuantity || '1'))}</Text>
+                        <Text style={styles.drinkNutritionLabel}>protein</Text>
+                      </View>
                     )}
+                    {selectedDrink.carbs_g > 0 && (
+                      <View style={styles.drinkNutritionItem}>
+                        <Ionicons name="leaf" size={16} color="#FFA500" />
+                        <Text style={styles.drinkNutritionValue}>{Math.round(selectedDrink.carbs_g * parseFloat(drinkQuantity || '1'))}</Text>
+                        <Text style={styles.drinkNutritionLabel}>carbs</Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Drink Quantity Controls */}
+                  <View style={styles.quantityControlSection}>
+                    <Text style={styles.quantityControlLabel}>Servings</Text>
+                    <View style={styles.quantityControls}>
+                      <TouchableOpacity 
+                        style={styles.quantityControlBtn}
+                        onPress={() => {
+                          const q = Math.max(0.5, parseFloat(drinkQuantity || '1') - 0.5);
+                          setDrinkQuantity(String(q));
+                          const hydrationValue = ((selectedDrink.hydration_percent || 100) / 100) * 0.25 * q;
+                          setWaterInput(hydrationValue.toFixed(2));
+                        }}
+                      >
+                        <Ionicons name="remove" size={18} color="#2E86AB" />
+                      </TouchableOpacity>
+                      <View style={styles.quantityDisplay}>
+                        <TextInput
+                          style={styles.quantityDisplayInput}
+                          value={drinkQuantity}
+                          onChangeText={(text) => {
+                            setDrinkQuantity(text);
+                            if (text && !isNaN(parseFloat(text))) {
+                              const hydrationValue = ((selectedDrink.hydration_percent || 100) / 100) * 0.25 * parseFloat(text);
+                              setWaterInput(hydrationValue.toFixed(2));
+                            }
+                          }}
+                          keyboardType="decimal-pad"
+                        />
+                        <Text style={styles.quantityDisplayUnit}>servings</Text>
+                      </View>
+                      <TouchableOpacity 
+                        style={styles.quantityControlBtn}
+                        onPress={() => {
+                          const q = parseFloat(drinkQuantity || '1') + 0.5;
+                          setDrinkQuantity(String(q));
+                          const hydrationValue = ((selectedDrink.hydration_percent || 100) / 100) * 0.25 * q;
+                          setWaterInput(hydrationValue.toFixed(2));
+                        }}
+                      >
+                        <Ionicons name="add" size={18} color="#2E86AB" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* Quick Water Amounts */}
+              <View style={styles.sectionContainer}>
+                <Text style={styles.sectionLabel}>
+                  <Ionicons name="water-outline" size={18} color="#2E86AB" /> Quick Add Plain Water
+                </Text>
+                <View style={styles.waterQuickGrid}>
+                  {waterIntakeDatabase.options.map((option) => (
+                    <TouchableOpacity
+                      key={option.name}
+                      style={styles.waterQuickOption}
+                      onPress={() => {
+                        setWaterInput(option.amount.toString());
+                        setSelectedDrink(null);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.waterQuickIconBg}>
+                        <Ionicons name="water" size={24} color="#2E86AB" />
+                      </View>
+                      <Text style={styles.waterQuickLabel}>{option.name}</Text>
+                      <Text style={styles.waterQuickAmount}>{option.amount}L</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Water Amount Input */}
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>
+                  <Ionicons name="water" size={16} color="#2E86AB" /> Hydration Amount
+                </Text>
+                <View style={styles.waterAmountSelector}>
+                  <TouchableOpacity 
+                    style={styles.waterAdjustButton}
+                    onPress={() => {
+                      const current = parseFloat(waterInput) || 0;
+                      setWaterInput(Math.max(0, current - 0.25).toFixed(2));
+                    }}
+                  >
+                    <Ionicons name="remove-circle" size={36} color="#2E86AB" />
                   </TouchableOpacity>
                   
-                  {isRecording && (
-                    <View style={styles.recordingIndicator}>
-                      <View style={styles.recordingDot} />
-                      <Text style={styles.recordingText}>Recording...</Text>
+                  <View style={styles.waterDisplayBox}>
+                    <TextInput
+                      style={styles.waterValueInput}
+                      value={waterInput}
+                      onChangeText={setWaterInput}
+                      keyboardType="decimal-pad"
+                      placeholder="0.00"
+                      placeholderTextColor={colors.textSecondary}
+                    />
+                    <Text style={styles.waterUnit}>Liters</Text>
+                    <Text style={styles.waterGlasses}>
+                      ≈ {Math.round((parseFloat(waterInput || '0') / 0.25) * 10) / 10} glasses
+                    </Text>
+                  </View>
+                  
+                  <TouchableOpacity 
+                    style={styles.waterAdjustButton}
+                    onPress={() => {
+                      const current = parseFloat(waterInput) || 0;
+                      setWaterInput((current + 0.25).toFixed(2));
+                    }}
+                  >
+                    <Ionicons name="add-circle" size={36} color="#2E86AB" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Hydration Progress */}
+              <View style={styles.progressContainer}>
+                <View style={styles.hydProgressHeader}>
+                  <Text style={styles.progressTitle}>Today's Progress</Text>
+                  <Text style={styles.progressPercent}>
+                    {calculatePercentage(dayData.achieviedHydration + parseFloat(waterInput || '0'), dayData.targetHydration)}%
+                  </Text>
+                </View>
+                <View style={styles.progressBarBg}>
+                  <View
+                    style={[
+                      styles.progressBarFg,
+                      {
+                        width: `${Math.min(((dayData.achieviedHydration + parseFloat(waterInput || '0')) / dayData.targetHydration) * 100, 100)}%`,
+                        backgroundColor: '#2E86AB'
+                      }
+                    ]}
+                  />
+                </View>
+                <View style={styles.progressStats}>
+                  <Text style={styles.progressCurrent}>
+                    {(dayData.achieviedHydration + parseFloat(waterInput || '0')).toFixed(2)}L of {dayData.targetHydration}L
+                  </Text>
+                </View>
+              </View>
+            </>
+          )}
+
+
+
+          {/* Selected Food Display - Only for Meal Mode */}
+          {trackingMode === 'meal' && selectedFoodItem && (
+            <View style={styles.selectedFoodContainer}>
+              <View style={styles.selectedFoodHeader}>
+                <Ionicons name="checkmark-circle" size={24} color={colors.success} />
+                <View style={styles.selectedFoodInfo}>
+                  <Text style={styles.selectedFoodName}>{selectedFoodItem.food_name || selectedFoodItem.name}</Text>
+                  <Text style={styles.selectedFoodServing}>
+                    {selectedFoodItem.serving_size || '100g'}
+                  </Text>
+                  <Text style={styles.selectedFoodCalories}>
+                    {Math.round((selectedFoodItem.calories_kcal || selectedFoodItem.calories || 0) * parseFloat(mealQuantity || '1'))} calories
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => setSelectedFoodItem(null)}>
+                  <Ionicons name="trash-outline" size={20} color={colors.error} />
+                </TouchableOpacity>
+              </View>
+              
+              {/* Nutrition Breakdown */}
+              {(selectedFoodItem.protein_g || selectedFoodItem.carbs_g || selectedFoodItem.carbohydrates_g || selectedFoodItem.fat_g) && (
+                <View style={styles.nutritionBreakdown}>
+                  {selectedFoodItem.protein_g && (
+                    <View style={styles.nutritionItem}>
+                      <Text style={styles.nutritionLabel}>Protein</Text>
+                      <Text style={styles.nutritionValue}>{Math.round((selectedFoodItem.protein_g || 0) * parseFloat(mealQuantity || '1'))}g</Text>
+                    </View>
+                  )}
+                  {(selectedFoodItem.carbs_g || selectedFoodItem.carbohydrates_g) && (
+                    <View style={styles.nutritionItem}>
+                      <Text style={styles.nutritionLabel}>Carbs</Text>
+                      <Text style={styles.nutritionValue}>{Math.round((selectedFoodItem.carbs_g || selectedFoodItem.carbohydrates_g || 0) * parseFloat(mealQuantity || '1'))}g</Text>
+                    </View>
+                  )}
+                  {selectedFoodItem.fat_g && (
+                    <View style={styles.nutritionItem}>
+                      <Text style={styles.nutritionLabel}>Fat</Text>
+                      <Text style={styles.nutritionValue}>{Math.round((selectedFoodItem.fat_g || 0) * parseFloat(mealQuantity || '1'))}g</Text>
                     </View>
                   )}
                 </View>
-
-                {audioUri && (
-                  <View style={styles.audioPreview}>
-                    <View style={styles.audioPreviewLeft}>
-                      <Ionicons name="checkmark-circle" size={24} color={colors.success} />
-                      <Text style={styles.audioPreviewText}>Voice note saved</Text>
-                    </View>
-                    <TouchableOpacity 
-                      style={styles.clearButton}
-                      onPress={() => setAudioUri(null)}
-                    >
-                      <Ionicons name="trash-outline" size={18} color={colors.error} />
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            )}
-
-            {inputMethod === 'photo' && (
-              <View style={styles.photoSection}>
-                <Text style={styles.photoInstructions}>
-                  {selectedImage 
-                    ? "Photo selected! You can change it if needed."
-                    : "Take a photo or select from gallery"}
-                </Text>
-                
-                <View style={styles.photoButtons}>
-                  <TouchableOpacity
-                    style={styles.photoButton}
-                    onPress={takePhoto}
+              )}
+              
+              {/* Quantity Adjuster */}
+              <View style={styles.quantitySection}>
+                <Text style={styles.quantityLabel}>Quantity (portions):</Text>
+                <View style={styles.quantityInputRow}>
+                  <TouchableOpacity 
+                    style={styles.quantityBtn}
+                    onPress={() => {
+                      const q = Math.max(0.5, parseFloat(mealQuantity || '1') - 0.5);
+                      setMealQuantity(String(q));
+                      const calories = selectedFoodItem.calories_kcal || selectedFoodItem.calories || 0;
+                      setCalorieInput(String(Math.round(calories * q)));
+                    }}
                   >
-                    <Ionicons name="camera" size={32} color={colors.primary} />
-                    <Text style={styles.photoButtonText}>Take Photo</Text>
+                    <Text style={styles.quantityBtnText}>−</Text>
                   </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.photoButton}
-                    onPress={pickImage}
+                  <TextInput
+                    style={styles.quantityInput}
+                    value={mealQuantity}
+                    onChangeText={(text) => {
+                      setMealQuantity(text);
+                      if (text && !isNaN(parseFloat(text))) {
+                        const calories = selectedFoodItem.calories_kcal || selectedFoodItem.calories || 0;
+                        setCalorieInput(String(Math.round(calories * parseFloat(text))));
+                      }
+                    }}
+                    keyboardType="decimal-pad"
+                  />
+                  <TouchableOpacity 
+                    style={styles.quantityBtn}
+                    onPress={() => {
+                      const q = parseFloat(mealQuantity || '1') + 0.5;
+                      setMealQuantity(String(q));
+                      const calories = selectedFoodItem.calories_kcal || selectedFoodItem.calories || 0;
+                      setCalorieInput(String(Math.round(calories * q)));
+                    }}
                   >
-                    <Ionicons name="images" size={32} color={colors.primary} />
-                    <Text style={styles.photoButtonText}>From Gallery</Text>
+                    <Text style={styles.quantityBtnText}>+</Text>
                   </TouchableOpacity>
                 </View>
+              </View>
+            </View>
+          )}
 
-                {selectedImage && (
-                  <View style={styles.photoPreview}>
-                    <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-                    <Text style={styles.photoPreviewText}>Photo attached</Text>
-                    <TouchableOpacity onPress={() => setSelectedImage(null)}>
-                      <Text>Remove</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                {/* Text field for photo description */}
-                {selectedImage && (
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.optionalLabel}>Describe your meal</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="What is this meal? Include portion size and ingredients"
-                      placeholderTextColor={colors.textSecondary}
-                      value={descriptionInput}
-                      onChangeText={setDescriptionInput}
+          {/* Manual Calorie Input - Only for Meal Mode */}
+          {trackingMode === 'meal' && (
+          <View style={styles.fieldContainer}>
+            <Text style={styles.fieldLabel}>
+              <Ionicons name="flame-outline" size={16} color="#F97316" /> Calories
+            </Text>
+            <View style={styles.calorieInputContainer}>
+              <TextInput 
+                style={styles.input} 
+                placeholder="Enter calories (e.g. 450)"
+                placeholderTextColor={colors.textSecondary}
+                value={calorieInput}
+                onChangeText={setCalorieInput}
+                keyboardType="number-pad"
+              />
+              {calorieInput && (
+                <View style={styles.calorieInfo}>
+                  <Text style={styles.calorieInfoText}>
+                    Remaining: {dayData.targetCalories - parseInt(calorieInput)} / {dayData.targetCalories} cals
+                  </Text>
+                  <View style={styles.calorieBar}>
+                    <View 
+                      style={[
+                        styles.calorieBarFill,
+                        {
+                          width: `${Math.min((parseInt(calorieInput) / dayData.targetCalories) * 100, 100)}%`,
+                          backgroundColor: parseInt(calorieInput) > dayData.targetCalories ? '#F97316' : '#2E86AB'
+                        }
+                      ]}
                     />
                   </View>
-                )}
-              </View>
-            )}
+                </View>
+              )}
+            </View>
+          </View>
+          )}
+
+          {/* Notes */}
+          <View style={styles.inputGroup}>
+            <View style={styles.labelRow}>
+              <MaterialIcons name="description" size={20} color={colors.primary} />
+              <Text style={styles.label}>Notes (Optional)</Text>
+            </View>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              placeholder="e.g. Added extra rice, swapped for whole wheat..."
+              placeholderTextColor={colors.textSecondary}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+              value={descriptionInput}
+              onChangeText={setDescriptionInput}
+            />
           </View>
 
+          {inputMethod === 'audio' && (
+            <View style={styles.audioSection}>
+              <Ionicons name="lock-closed" size={Math.min(hp(5), wp(12))} color="#CCCCCC" />
+              <Text style={styles.audioInstructions}>Voice input coming soon</Text>
+              <Text style={styles.comingSoonMessage}>We're working on voice recognition for meal logging</Text>
+            </View>
+          )}
+          {inputMethod === 'photo' && (
+            <View style={styles.audioSection}>
+              <Ionicons name="lock-closed" size={Math.min(hp(5), wp(12))} color="#CCCCCC" />
+              <Text style={styles.audioInstructions}>Photo input coming soon</Text>
+              <Text style={styles.comingSoonMessage}>We're working on AI food recognition</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.menuButtons}>
@@ -720,23 +1470,681 @@ export default function DetailsDay () {
             <Text style={styles.backMenuText}>Back</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.submitMenuButton}
-            onPress={() => {
-              // Handle submit with all the data
-              console.log('Time:', selectedTime.toLocaleTimeString());
-              console.log('Food:', foodNameInput);
-              console.log('Description:', descriptionInput);
-              console.log('Image:', selectedImage);
-              console.log('Audio:', audioUri);
-              closeMenu();
+            style={[styles.submitMenuButton, (((!calorieInput.trim() && parseFloat(waterInput || '0') <= 0)) || isLoading) && {opacity: 0.5}]}
+            disabled={(((!calorieInput.trim() && parseFloat(waterInput || '0') <= 0)) || isLoading)}
+            onPress={async () => {
+              setIsLoading(true);
+              try {
+                const dayLogId = (dayData as any)._id || (props as any)._id;
+
+                console.log('🔍 [DetailsDay] Saving meal - dayLogId:', dayLogId);
+                console.log('🔍 [DetailsDay] dayData._id:', (dayData as any)._id);
+                console.log('🔍 [DetailsDay] props._id:', (props as any)._id);
+                console.log('🔍 [DetailsDay] Full props:', JSON.stringify(props, null, 2));
+
+                if (!dayLogId) {
+                  Alert.alert('Error', 'Unable to find day log. Please refresh and try again.');
+                  console.error('❌ [DetailsDay] No dayLogId found!');
+                  return;
+                }
+
+                let hasMeal = false;
+                let hasWater = false;
+                let successMessages = [];
+                let updatedDayData: any = { ...dayData };
+
+                // Log meal if calories are entered
+                if (calorieInput.trim()) {
+                  const calories = parseInt(calorieInput);
+                  const foodName = selectedFoodItem?.food_name || selectedFoodItem?.name || 'Custom Meal';
+                  const servingSize = selectedFoodItem?.serving_size || 'portion';
+                  const quantity = parseFloat(mealQuantity || '1');
+                  
+                  // Calculate nutrition values multiplied by quantity
+                  const baseProtein = selectedFoodItem?.protein_g || 0;
+                  const baseCarbs = selectedFoodItem?.carbs_g || selectedFoodItem?.carbohydrates_g || 0;
+                  const baseFats = selectedFoodItem?.fat_g || 0;
+                  
+                  const protein = Math.round(baseProtein * quantity);
+                  const carbs = Math.round(baseCarbs * quantity);
+                  const fats = Math.round(baseFats * quantity);
+
+                  const mealResponse = await dailyLogsApi.addMeal(
+                    dayLogId,
+                    foodName,
+                    quantity,
+                    servingSize,
+                    calories,
+                    protein,
+                    carbs,
+                    fats,
+                    descriptionInput
+                  );
+
+                  if (mealResponse) {
+                    hasMeal = true;
+                    successMessages.push(`${calories} calories logged`);
+                    
+                    updatedDayData = {
+                      ...updatedDayData,
+                      achievedCalories: (updatedDayData.achievedCalories || 0) + calories,
+                      meals: updatedDayData.meals ? [...updatedDayData.meals, mealResponse] : [mealResponse],
+                    };
+                  }
+                }
+
+                // Log water if amount is entered
+                const waterAmount = parseFloat(waterInput || '0');
+                if (waterAmount > 0) {
+                  const waterResponse = await dailyLogsApi.addWater(dayLogId, waterAmount);
+
+                  if (waterResponse) {
+                    hasWater = true;
+                    successMessages.push(`${waterAmount}L of water logged`);
+                    
+                    // Update with full response data to ensure accuracy
+                    updatedDayData = {
+                      ...updatedDayData,
+                      achieviedHydration: waterResponse.achieviedHydration || (updatedDayData.achieviedHydration || 0) + waterAmount,
+                      waterIntake: waterResponse.waterIntake || updatedDayData.waterIntake,
+                    };
+                  }
+                }
+
+                // Show combined success message
+                if (hasMeal || hasWater) {
+                  // Update state once with all changes
+                  setDayData(updatedDayData);
+                  
+                  // Reset forms immediately
+                  setFoodSearch('');
+                  setSelectedFoodItem(null);
+                  setCalorieInput('');
+                  setMealQuantity('1');
+                  setDescriptionInput('');
+                  setWaterInput('0');
+                  
+                  // Use setTimeout to ensure state updates are processed
+                  setTimeout(() => {
+                    closeMenu();
+                    
+                    Alert.alert(
+                      'Success! ✅',
+                      successMessages.join('\n')
+                    );
+                  }, 100);
+                } else {
+                  Alert.alert('Error', 'Please enter at least meal calories or water amount');
+                }
+              } catch (error: any) {
+                console.error('Error logging:', error);
+                
+                // Handle expired cycle error
+                if (error.message?.includes('old/completed cycle') || error.message?.includes('CYCLE_EXPIRED')) {
+                  Alert.alert(
+                    'Cycle Expired',
+                    'Your data is outdated. A new weekly cycle has been created. Please go back to refresh.',
+                    [
+                      {
+                        text: 'Go Back',
+                        onPress: () => {
+                          // Clear local storage to force refresh
+                          AsyncStorage.removeItem('JsonResponse').then(() => {
+                            router.back();
+                          });
+                        }
+                      }
+                    ]
+                  );
+                } else {
+                  Alert.alert('Error', 'Failed to log entry. Please check your connection.');
+                }
+              } finally {
+                setIsLoading(false);
+              }
             }}
           >
-            <Text style={styles.submitMenuText}>Submit</Text>
+            <Text style={styles.submitMenuText}>Save Entry</Text>
             <Ionicons name="checkmark" size={Math.min(hp(2.2), wp(5))} color="white" />
           </TouchableOpacity>
         </View>
       </KeyboardAwareScrollView>
     )}
+    
+    {/* Beautiful Completion Modal */}
+    <Modal
+      visible={showCompletionModal}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={() => {
+        if (completionModalType === 'confirm') {
+          setShowCompletionModal(false);
+        }
+      }}
+    >
+      <View style={styles.modalOverlay}>
+        <Animated.View style={styles.modalContainer}>
+          {completionModalType === 'confirm' && (
+            <View style={styles.modalContent}>
+              <View style={[styles.modalIconContainer, { backgroundColor: colors.warning + '15' }]}>
+                <Ionicons name="warning" size={48} color={colors.warning} />
+              </View>
+              <Text style={styles.modalTitle}>Complete Day {completionModalData.dayNumber}?</Text>
+              <Text style={styles.modalMessage}>
+                Are you sure you want to complete Day {completionModalData.dayNumber}? 
+                This action cannot be undone and will lock this day's progress.
+              </Text>
+              <View style={styles.modalButtonsRow}>
+                <Pressable 
+                  style={[styles.modalButton, styles.modalCancelButton]}
+                  onPress={completionModalData.onCancel}
+                >
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </Pressable>
+                <Pressable 
+                  style={[styles.modalButton, styles.modalConfirmButton, { backgroundColor: colors.warning }]}
+                  onPress={completionModalData.onConfirm}
+                  disabled={isCompletingDay}
+                >
+                  {isCompletingDay ? (
+                    <>
+                      <Ionicons name="hourglass" size={18} color="white" />
+                      <Text style={styles.modalConfirmText}>Completing...</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Ionicons name="checkmark-circle" size={18} color="white" />
+                      <Text style={styles.modalConfirmText}>Complete Day</Text>
+                    </>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          )}
+
+          {completionModalType === 'success' && (
+            <View style={styles.modalContent}>
+              <View style={[styles.modalIconContainer, { backgroundColor: colors.success + '15' }]}>
+                <Ionicons name="checkmark-circle" size={48} color={colors.success} />
+              </View>
+              <Text style={[styles.modalTitle, { color: colors.success }]}>Day Completed! 🎉</Text>
+              <Text style={styles.modalMessage}>
+                Congratulations! Day {completionModalData.dayNumber} has been completed successfully. 
+                The next day is now unlocked and ready for your progress.
+              </Text>
+              <View style={styles.modalSingleButtonContainer}>
+                <Pressable 
+                  style={[styles.modalButton, styles.modalSuccessButton, { backgroundColor: colors.success }]}
+                  onPress={completionModalData.onContinue}
+                >
+                  <Ionicons name="arrow-forward" size={18} color="white" />
+                  <Text style={styles.modalSuccessText}>Continue</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+
+          {completionModalType === 'weekComplete' && (
+            <View style={styles.modalContent}>
+              <View style={[styles.modalIconContainer, { backgroundColor: colors.primary + '15' }]}>
+                <Ionicons name="trophy" size={48} color={colors.primary} />
+              </View>
+              <Text style={[styles.modalTitle, { color: colors.primary }]}>Week Completed! 🏆</Text>
+              <Text style={styles.modalMessage}>
+                Amazing achievement! You've completed Day {completionModalData.dayNumber} and finished your entire week. 
+                A fresh new weekly cycle has started - you'll now see Day 1 again with all other days locked.
+              </Text>
+              <View style={styles.celebrationContainer}>
+                <Text style={styles.celebrationText}>🎊 New Weekly Cycle Started! 🎊</Text>
+              </View>
+              <View style={styles.modalSingleButtonContainer}>
+                <Pressable 
+                  style={[styles.modalButton, styles.modalPrimaryButton, { backgroundColor: colors.primary }]}
+                  onPress={completionModalData.onContinue}
+                >
+                  <Ionicons name="rocket" size={18} color="white" />
+                  <Text style={styles.modalPrimaryText}>Start New Cycle</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+
+          {completionModalType === 'error' && (
+            <View style={styles.modalContent}>
+              <View style={[styles.modalIconContainer, { backgroundColor: colors.error + '15' }]}>
+                <Ionicons name="alert-circle" size={48} color={colors.error} />
+              </View>
+              <Text style={[styles.modalTitle, { color: colors.error }]}>Error Occurred</Text>
+              <Text style={styles.modalMessage}>
+                {completionModalData.message}
+              </Text>
+              <View style={styles.modalSingleButtonContainer}>
+                <Pressable 
+                  style={[styles.modalButton, styles.modalErrorButton, { backgroundColor: colors.error }]}
+                  onPress={() => setShowCompletionModal(false)}
+                >
+                  <Ionicons name="close" size={18} color="white" />
+                  <Text style={styles.modalErrorText}>Close</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+        </Animated.View>
+      </View>
+    </Modal>
+    
+    {/* Diet Plan Viewer Modal */}
+    <PatientDietPlanViewer
+      visible={showDietPlanViewer}
+      onClose={() => setShowDietPlanViewer(false)}
+    />
+
+    {/* Custom Recipe Modal */}
+    <Modal
+      visible={showCustomRecipeModal}
+      animationType="slide"
+      transparent={false}
+      onRequestClose={() => setShowCustomRecipeModal(false)}
+    >
+      <View style={styles.customRecipeModalContainer}>
+        <View style={styles.customRecipeModalHeader}>
+          <TouchableOpacity onPress={() => setShowCustomRecipeModal(false)}>
+            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+          </TouchableOpacity>
+          <Text style={styles.customRecipeModalTitle}>Create Custom Recipe</Text>
+          <View style={{ width: 24 }} />
+        </View>
+
+        <KeyboardAwareScrollView
+          style={styles.customRecipeModalContent}
+          showsVerticalScrollIndicator={false}
+          enableOnAndroid={true}
+        >
+          {/* Recipe Name */}
+          <View style={styles.customRecipeSection}>
+            <Text style={styles.customRecipeLabel}>Recipe Name *</Text>
+            <TextInput
+              style={styles.customRecipeInput}
+              placeholder="e.g., My Special Biryani"
+              placeholderTextColor={colors.textSecondary}
+              value={customRecipeName}
+              onChangeText={setCustomRecipeName}
+            />
+          </View>
+
+          {/* Serving Size */}
+          <View style={styles.customRecipeSection}>
+            <Text style={styles.customRecipeLabel}>Serving Size *</Text>
+            <TextInput
+              style={styles.customRecipeInput}
+              placeholder="e.g., 1 bowl, 2 pieces"
+              placeholderTextColor={colors.textSecondary}
+              value={customRecipeServingSize}
+              onChangeText={setCustomRecipeServingSize}
+            />
+          </View>
+
+          {/* Nutrition Values Method Toggle */}
+          <View style={styles.customRecipeSection}>
+            <Text style={styles.customRecipeLabel}>How would you like to add nutrition values?</Text>
+            <View style={styles.nutritionMethodToggle}>
+              <TouchableOpacity
+                style={[
+                  styles.nutritionMethodButton,
+                  useCollectiveValues && styles.nutritionMethodButtonActive
+                ]}
+                onPress={() => setUseCollectiveValues(true)}
+              >
+                <Text style={[
+                  styles.nutritionMethodButtonText,
+                  useCollectiveValues && styles.nutritionMethodButtonTextActive
+                ]}>
+                  Collective Values
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.nutritionMethodButton,
+                  !useCollectiveValues && styles.nutritionMethodButtonActive
+                ]}
+                onPress={() => setUseCollectiveValues(false)}
+              >
+                <Text style={[
+                  styles.nutritionMethodButtonText,
+                  !useCollectiveValues && styles.nutritionMethodButtonTextActive
+                ]}>
+                  Per Ingredient
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Collective Nutritional Values */}
+          {useCollectiveValues && (
+            <View style={styles.customRecipeSection}>
+              <Text style={styles.customRecipeSectionTitle}>Nutritional Values (Total)</Text>
+              <View style={styles.nutritionInputsGrid}>
+                <View style={styles.nutritionInputWrapper}>
+                  <Text style={styles.nutritionInputLabel}>Calories (kcal) *</Text>
+                  <TextInput
+                    style={styles.nutritionInput}
+                    placeholder="210"
+                    placeholderTextColor={colors.textSecondary}
+                    value={customRecipeCalories}
+                    onChangeText={setCustomRecipeCalories}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View style={styles.nutritionInputWrapper}>
+                  <Text style={styles.nutritionInputLabel}>Protein (g)</Text>
+                  <TextInput
+                    style={styles.nutritionInput}
+                    placeholder="4"
+                    placeholderTextColor={colors.textSecondary}
+                    value={customRecipeProtein}
+                    onChangeText={setCustomRecipeProtein}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View style={styles.nutritionInputWrapper}>
+                  <Text style={styles.nutritionInputLabel}>Carbs (g)</Text>
+                  <TextInput
+                    style={styles.nutritionInput}
+                    placeholder="20"
+                    placeholderTextColor={colors.textSecondary}
+                    value={customRecipeCarbs}
+                    onChangeText={setCustomRecipeCarbs}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View style={styles.nutritionInputWrapper}>
+                  <Text style={styles.nutritionInputLabel}>Fat (g)</Text>
+                  <TextInput
+                    style={styles.nutritionInput}
+                    placeholder="12"
+                    placeholderTextColor={colors.textSecondary}
+                    value={customRecipeFat}
+                    onChangeText={setCustomRecipeFat}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Ingredients List with Individual Values */}
+          {!useCollectiveValues && (
+            <>
+              <View style={styles.customRecipeSection}>
+                <Text style={styles.customRecipeSectionTitle}>Add Ingredients</Text>
+                
+                {/* Current Ingredient Input */}
+                <View style={styles.ingredientInputCard}>
+                  <TextInput
+                    style={styles.customRecipeInput}
+                    placeholder="Ingredient name"
+                    placeholderTextColor={colors.textSecondary}
+                    value={currentIngredient.name}
+                    onChangeText={(text) => setCurrentIngredient({ ...currentIngredient, name: text })}
+                  />
+                  
+                  <View style={styles.ingredientNutritionRow}>
+                    <TextInput
+                      style={styles.ingredientNutritionInput}
+                      placeholder="Protein (g)"
+                      placeholderTextColor={colors.textSecondary}
+                      value={currentIngredient.protein_g}
+                      onChangeText={(text) => setCurrentIngredient({ ...currentIngredient, protein_g: text })}
+                      keyboardType="numeric"
+                    />
+                    <TextInput
+                      style={styles.ingredientNutritionInput}
+                      placeholder="Carbs (g)"
+                      placeholderTextColor={colors.textSecondary}
+                      value={currentIngredient.carbs_g}
+                      onChangeText={(text) => setCurrentIngredient({ ...currentIngredient, carbs_g: text })}
+                      keyboardType="numeric"
+                    />
+                    <TextInput
+                      style={styles.ingredientNutritionInput}
+                      placeholder="Fat (g)"
+                      placeholderTextColor={colors.textSecondary}
+                      value={currentIngredient.fat_g}
+                      onChangeText={(text) => setCurrentIngredient({ ...currentIngredient, fat_g: text })}
+                      keyboardType="numeric"
+                    />
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.addIngredientButton}
+                    onPress={() => {
+                      if (currentIngredient.name.trim()) {
+                        setCustomRecipeIngredients([
+                          ...customRecipeIngredients,
+                          {
+                            name: currentIngredient.name,
+                            protein_g: parseFloat(currentIngredient.protein_g) || 0,
+                            carbs_g: parseFloat(currentIngredient.carbs_g) || 0,
+                            fat_g: parseFloat(currentIngredient.fat_g) || 0,
+                          }
+                        ]);
+                        setCurrentIngredient({ name: '', protein_g: '', carbs_g: '', fat_g: '' });
+                      } else {
+                        Alert.alert('Error', 'Please enter ingredient name');
+                      }
+                    }}
+                  >
+                    <Ionicons name="add-circle" size={20} color="#FFFFFF" />
+                    <Text style={styles.addIngredientButtonText}>Add Ingredient</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Ingredients List */}
+                {customRecipeIngredients.length > 0 && (
+                  <View style={styles.ingredientsList}>
+                    <Text style={styles.ingredientsListTitle}>
+                      Ingredients ({customRecipeIngredients.length})
+                    </Text>
+                    {customRecipeIngredients.map((ingredient, index) => (
+                      <View key={index} style={styles.ingredientCard}>
+                        <View style={styles.ingredientCardHeader}>
+                          <Text style={styles.ingredientCardName}>{ingredient.name}</Text>
+                          <TouchableOpacity
+                            onPress={() => {
+                              setCustomRecipeIngredients(
+                                customRecipeIngredients.filter((_, i) => i !== index)
+                              );
+                            }}
+                          >
+                            <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                          </TouchableOpacity>
+                        </View>
+                        <View style={styles.ingredientCardNutrition}>
+                          <Text style={styles.ingredientNutritionText}>
+                            P: {ingredient.protein_g}g • C: {ingredient.carbs_g}g • F: {ingredient.fat_g}g
+                          </Text>
+                        </View>
+                      </View>
+                    ))}
+
+                    {/* Total Calculated Values */}
+                    <View style={styles.calculatedTotalsCard}>
+                      <Text style={styles.calculatedTotalsTitle}>Calculated Totals</Text>
+                      <View style={styles.calculatedTotalsGrid}>
+                        <View style={styles.calculatedTotalItem}>
+                          <Text style={styles.calculatedTotalLabel}>Protein</Text>
+                          <Text style={styles.calculatedTotalValue}>
+                            {customRecipeIngredients.reduce((sum, ing) => sum + ing.protein_g, 0).toFixed(1)}g
+                          </Text>
+                        </View>
+                        <View style={styles.calculatedTotalItem}>
+                          <Text style={styles.calculatedTotalLabel}>Carbs</Text>
+                          <Text style={styles.calculatedTotalValue}>
+                            {customRecipeIngredients.reduce((sum, ing) => sum + ing.carbs_g, 0).toFixed(1)}g
+                          </Text>
+                        </View>
+                        <View style={styles.calculatedTotalItem}>
+                          <Text style={styles.calculatedTotalLabel}>Fat</Text>
+                          <Text style={styles.calculatedTotalValue}>
+                            {customRecipeIngredients.reduce((sum, ing) => sum + ing.fat_g, 0).toFixed(1)}g
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              {/* Calories Input for Ingredient Method */}
+              <View style={styles.customRecipeSection}>
+                <Text style={styles.customRecipeLabel}>Total Calories (kcal) *</Text>
+                <TextInput
+                  style={styles.customRecipeInput}
+                  placeholder="210"
+                  placeholderTextColor={colors.textSecondary}
+                  value={customRecipeCalories}
+                  onChangeText={setCustomRecipeCalories}
+                  keyboardType="numeric"
+                />
+                <Text style={styles.helperText}>
+                  Note: Calories should be entered manually (not auto-calculated from macros)
+                </Text>
+              </View>
+            </>
+          )}
+
+          {/* Ingredients List (for collective method) */}
+          {useCollectiveValues && (
+            <View style={styles.customRecipeSection}>
+              <Text style={styles.customRecipeSectionTitle}>Ingredients (Optional)</Text>
+              <TextInput
+                style={[styles.customRecipeInput, styles.customRecipeTextArea]}
+                placeholder="e.g., &#10;- 2 cups rice&#10;- 500g chicken&#10;- 1 onion"
+                placeholderTextColor={colors.textSecondary}
+                multiline
+                numberOfLines={4}
+                value={customRecipeIngredients.map(i => i.name).join('\n')}
+                onChangeText={(text) => {
+                  const ingredients = text.split('\n').filter(i => i.trim()).map(name => ({
+                    name: name.trim(),
+                    protein_g: 0,
+                    carbs_g: 0,
+                    fat_g: 0,
+                  }));
+                  setCustomRecipeIngredients(ingredients);
+                }}
+              />
+            </View>
+          )}
+
+          {/* Action Buttons */}
+          <View style={styles.customRecipeActions}>
+            <TouchableOpacity
+              style={styles.customRecipeCancelButton}
+              onPress={() => {
+                setShowCustomRecipeModal(false);
+                setCustomRecipeName('');
+                setCustomRecipeServingSize('1 serving');
+                setCustomRecipeCalories('');
+                setCustomRecipeProtein('');
+                setCustomRecipeCarbs('');
+                setCustomRecipeFat('');
+                setCustomRecipeIngredients([]);
+                setCurrentIngredient({ name: '', protein_g: '', carbs_g: '', fat_g: '' });
+              }}
+            >
+              <Text style={styles.customRecipeCancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.customRecipeAddButton}
+              onPress={async () => {
+                // Validate inputs
+                if (!customRecipeName.trim()) {
+                  Alert.alert('Error', 'Please enter a recipe name');
+                  return;
+                }
+                if (!customRecipeCalories.trim()) {
+                  Alert.alert('Error', 'Please enter calories');
+                  return;
+                }
+
+                try {
+                  // Calculate values based on method
+                  let protein = 0;
+                  let carbs = 0;
+                  let fat = 0;
+
+                  if (useCollectiveValues) {
+                    protein = parseFloat(customRecipeProtein) || 0;
+                    carbs = parseFloat(customRecipeCarbs) || 0;
+                    fat = parseFloat(customRecipeFat) || 0;
+                  } else {
+                    protein = customRecipeIngredients.reduce((sum, ing) => sum + ing.protein_g, 0);
+                    carbs = customRecipeIngredients.reduce((sum, ing) => sum + ing.carbs_g, 0);
+                    fat = customRecipeIngredients.reduce((sum, ing) => sum + ing.fat_g, 0);
+                  }
+
+                  const calories = parseFloat(customRecipeCalories);
+
+                  // Save recipe to backend
+                  const savedRecipe = await customRecipesApi.createRecipe({
+                    recipeName: customRecipeName,
+                    servingSize: customRecipeServingSize,
+                    calories_kcal: calories,
+                    protein_g: protein,
+                    carbs_g: carbs,
+                    fat_g: fat,
+                    ingredients: customRecipeIngredients,
+                    useCollectiveValues: useCollectiveValues,
+                    isCustomRecipe: true
+                  });
+
+                  // Update local custom recipes list
+                  setUserCustomRecipes(prev => [savedRecipe, ...prev]);
+
+                  // Create the custom recipe as a meal
+                  setSelectedFoodItem({
+                    food_name: savedRecipe.recipeName,
+                    serving_size: savedRecipe.servingSize,
+                    calories_kcal: savedRecipe.calories_kcal,
+                    calories: savedRecipe.calories_kcal,
+                    protein_g: savedRecipe.protein_g,
+                    carbs_g: savedRecipe.carbs_g,
+                    fat_g: savedRecipe.fat_g,
+                    category: '⭐ My Recipe',
+                    isCustomRecipe: true,
+                    _id: savedRecipe._id
+                  });
+
+                  setCalorieInput(String(calories));
+                  setMealQuantity('1');
+
+                  // Close modal and reset
+                  setShowCustomRecipeModal(false);
+                  setCustomRecipeName('');
+                  setCustomRecipeServingSize('1 serving');
+                  setCustomRecipeCalories('');
+                  setCustomRecipeProtein('');
+                  setCustomRecipeCarbs('');
+                  setCustomRecipeFat('');
+                  setCustomRecipeIngredients([]);
+                  setCurrentIngredient({ name: '', protein_g: '', carbs_g: '', fat_g: '' });
+
+                  Alert.alert('Success', 'Custom recipe saved! You can now add it to your meal.');
+                } catch (error) {
+                  console.error('Error saving custom recipe:', error);
+                  Alert.alert('Error', 'Failed to save custom recipe. Please try again.');
+                }
+              }}
+            >
+              <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+              <Text style={styles.customRecipeAddButtonText}>Use This Recipe</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAwareScrollView>
+      </View>
+    </Modal>
   </View>
 );
 
@@ -744,8 +2152,9 @@ export default function DetailsDay () {
 const getStyles = (colors: any) => StyleSheet.create({
     heading: {
         paddingHorizontal: HEADER_PADDING_HORIZONTAL,
-        paddingVertical: HEADER_PADDING_VERTICAL,
+        paddingVertical: hp(1.2),
         marginBottom: 8,
+        backgroundColor: colors.screenColor,
     },
     headerContent: {
         flexDirection: 'row',
@@ -759,46 +2168,58 @@ const getStyles = (colors: any) => StyleSheet.create({
         justifyContent: 'center',
     },
     dayBadge: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
+        width: 60,
+        height: 60,
+        borderRadius: 30,
         backgroundColor: colors.primary,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 12,
+        marginRight: 16,
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.35,
+        shadowRadius: 10,
+        elevation: 6,
     },
     dayNumber: {
-        fontSize: 20,
-        fontWeight: 'bold',
+        fontSize: 24,
+        fontWeight: '800',
         color: 'white',
+        letterSpacing: 0.5,
     },
     dateInfo: {
         justifyContent: 'center',
     },
     dayLabel: {
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: '700',
         color: colors.textPrimary,
+        letterSpacing: 0.3,
     },
     date: {
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: '500',
         color: colors.textSecondary,
-        marginTop: 2,
+        marginTop: 4,
     },
     backButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: colors.cardBackground,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: colors.surface,
         justifyContent: 'center',
         alignItems: 'center',
+        shadowColor: "#000",
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 2,
     },
     scrollView: {
         flex: 1,
     },
     scrollContent: {
-        paddingBottom: hp(2),
+        paddingBottom: hp(12),
     },
     centerBody:{
         flex: 1,
@@ -806,156 +2227,204 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     topSection: {
         alignItems: 'center',
-        marginBottom: hp(1),
+        marginBottom: hp(2),
     },
     circleWrapper: {
         alignItems: 'center',
         justifyContent: 'center',
+        shadowColor: "#000",
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 4,
     },
     circleButton: {
-        height: Math.min(hp(17), wp(35)),
-        width: Math.min(hp(17), wp(35)),
+        height: Math.min(hp(20), wp(40)),
+        width: Math.min(hp(20), wp(40)),
     },
     remarksContainer: {
-        marginTop: hp(0.8),
-        marginBottom: 0,
+        marginTop: hp(1.5),
+        marginBottom: hp(1),
         paddingHorizontal: wp(4),
-        paddingVertical: hp(0.6),
-        backgroundColor: colors.primary + '10',
-        borderRadius: 8,
-        borderLeftWidth: 3,
+        paddingVertical: hp(1.2),
+        backgroundColor: colors.primary + '12',
+        borderRadius: 12,
+        borderLeftWidth: 4,
         borderLeftColor: colors.primary,
-        marginHorizontal: wp(5),
+        marginHorizontal: wp(4),
+        shadowColor: colors.primary,
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 2,
     },
     remarksText: {
-        fontSize: Math.min(hp(1.6), wp(3.8)),
+        fontSize: Math.min(hp(1.5), wp(3.6)),
         fontStyle: 'italic',
         color: colors.textPrimary,
         textAlign: 'center',
+        fontWeight: '500',
     },
     infoOuterBox:{
-        paddingHorizontal: wp(3),
+        paddingHorizontal: wp(4),
+        marginVertical: hp(1.5),
     },
     statsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: Math.min(hp(1), wp(2)),
+        gap: Math.min(hp(1.2), wp(2.5)),
         justifyContent: 'space-between',
+        marginBottom: hp(1.5),
     },
     statCard: {
         width: '48%',
-        minHeight: Math.min(hp(13), wp(28)),
-        maxHeight: Math.min(hp(13), wp(28)),
+        minHeight: Math.min(hp(14), wp(30)),
+        maxHeight: Math.min(hp(14), wp(30)),
         backgroundColor: colors.cardBackground,
-        borderRadius: 12,
-        padding: Math.min(hp(1.2), wp(2.8)),
+        borderRadius: 16,
+        padding: Math.min(hp(1.4), wp(3)),
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: "#000",
-        shadowOpacity: 0.06,
-        shadowRadius: 4,
-        shadowOffset: { width: 0, height: 1 },
-        elevation: 2,
-        borderWidth: 1,
-        borderColor: colors.gray + '20',
+        shadowColor: colors.primary,
+        shadowOpacity: 0.12,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 4,
+        borderWidth: 2,
+        borderColor: '#000000',
+        overflow: 'hidden',
     },
     statCardHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: wp(1),
+        gap: wp(1.2),
         marginBottom: hp(0.8),
     },
     statCardContent: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: wp(1),
-        marginBottom: hp(0.3),
+        gap: wp(1.2),
+        marginBottom: hp(0.6),
     },
     goalRowContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-around',
         width: '100%',
-        paddingHorizontal: wp(2),
+        paddingHorizontal: wp(1.5),
     },
     goalItem: {
         alignItems: 'center',
         flex: 1,
     },
     goalDivider: {
-        width: 1,
+        width: 1.5,
         height: hp(4),
-        backgroundColor: colors.gray + '40',
-        marginHorizontal: wp(1),
+        backgroundColor: colors.gray + '30',
+        marginHorizontal: wp(1.5),
     },
     statLabel: {
-        fontSize: Math.min(hp(1.3), wp(3)),
-        fontWeight: '600',
+        fontSize: Math.min(hp(1.2), wp(2.8)),
+        fontWeight: '700',
         color: colors.textSecondary,
-        marginTop: hp(0.3),
-        marginBottom: hp(0.3),
+        marginTop: hp(0.2),
+        marginBottom: hp(0.2),
         textTransform: 'uppercase',
-        letterSpacing: 0.3,
+        letterSpacing: 0.4,
     },
     statValue: {
-        fontSize: Math.min(hp(2.2), wp(5.2)),
+        fontSize: Math.min(hp(2.4), wp(5.5)),
         fontWeight: 'bold',
         color: colors.textPrimary,
         marginBottom: hp(0.1),
     },
     statValueLarge: {
-        fontSize: Math.min(hp(1.8), wp(4.2)),
+        fontSize: Math.min(hp(2), wp(4.5)),
         fontWeight: 'bold',
         color: colors.textPrimary,
+        letterSpacing: 0.3,
     },
     statUnit: {
-        fontSize: Math.min(hp(1.1), wp(2.5)),
+        fontSize: Math.min(hp(1), wp(2.3)),
         color: colors.textSecondary,
         marginBottom: hp(0.2),
+        fontWeight: '500',
     },
     input: {
-        borderWidth: 1,
-        borderColor: colors.gray + '50',
-        borderRadius: 10,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
+        borderWidth: 1.5,
+        borderColor: colors.gray + '40',
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
         backgroundColor: colors.cardBackground,
         color: colors.textPrimary,
-        fontSize: 16,
+        fontSize: 15,
+        fontWeight: '500',
     },
     trayButton: {
         flexDirection: 'row',
         backgroundColor: colors.primary,
-        paddingVertical: hp(1.4),
+        paddingVertical: hp(1.8),
         paddingHorizontal: wp(6),
-        marginHorizontal: wp(3),
-        marginTop: hp(1),
-        marginBottom: hp(0.5),
-        borderRadius: 12,
+        marginHorizontal: wp(4),
+        marginTop: hp(1.5),
+        marginBottom: hp(1),
+        borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 8,
+        gap: 10,
         shadowColor: colors.primary,
-        shadowOpacity: 0.3,
-        shadowRadius: 6,
-        shadowOffset: { width: 0, height: 2 },
-        elevation: 4,
+        shadowOpacity: 0.4,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 5 },
+        elevation: 6,
+        borderWidth: 1,
+        borderColor: colors.primary,
     },
     trayButtonText: {
         color: '#fff',
-        fontSize: Math.min(hp(1.8), wp(4.2)),
+        fontSize: Math.min(hp(1.7), wp(4)),
         fontWeight: '700',
+        letterSpacing: 0.3,
+    },
+    completeDayButton: {
+        flexDirection: 'row',
+        paddingVertical: hp(1.8),
+        paddingHorizontal: wp(6),
+        marginHorizontal: wp(4),
+        marginTop: hp(1),
+        marginBottom: hp(1.5),
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+        shadowOpacity: 0.4,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 5 },
+        elevation: 6,
+        borderWidth: 1,
+    },
+    completeDayButtonText: {
+        color: '#fff',
+        fontSize: Math.min(hp(1.7), wp(4)),
+        fontWeight: '700',
+        letterSpacing: 0.3,
     },
     congratsContainer: {
         backgroundColor: colors.success + '15',
         borderRadius: 16,
         padding: hp(2),
-        marginHorizontal: wp(3),
-        marginTop: hp(1.5),
-        marginBottom: hp(0.5),
+        marginHorizontal: wp(4),
+        marginTop: hp(2),
+        marginBottom: hp(1),
         alignItems: 'center',
         borderWidth: 2,
-        borderColor: colors.success + '40',
+        borderColor: '#000000',
+        shadowColor: colors.success,
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 4,
     },
     congratsTitle: {
         fontSize: Math.min(hp(2.2), wp(5.5)),
@@ -971,47 +2440,55 @@ const getStyles = (colors: any) => StyleSheet.create({
         lineHeight: Math.min(hp(2.2), wp(5)),
     },
     progressSection: {
-        marginTop: hp(1.5),
-        gap: hp(1.2),
+        marginTop: hp(2),
+        gap: hp(1.5),
+        marginHorizontal: wp(4),
     },
     progressItem: {
         backgroundColor: colors.cardBackground,
-        borderRadius: 12,
-        padding: Math.min(hp(1.5), wp(3.5)),
-        shadowColor: "#000",
-        shadowOpacity: 0.06,
-        shadowRadius: 4,
-        shadowOffset: { width: 0, height: 1 },
-        elevation: 2,
-        borderWidth: 1,
-        borderColor: colors.gray + '20',
+        borderRadius: 16,
+        padding: Math.min(hp(1.6), wp(3.8)),
+        shadowColor: colors.primary,
+        shadowOpacity: 0.12,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 4,
+        borderWidth: 2,
+        borderColor: '#000000',
+        overflow: 'hidden',
     },
     progressHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: wp(1.5),
-        marginBottom: hp(0.8),
+        gap: wp(1.8),
+        marginBottom: hp(1),
     },
     progressLabel: {
         fontSize: Math.min(hp(1.5), wp(3.5)),
-        fontWeight: '600',
+        fontWeight: '700',
         color: colors.textPrimary,
+        letterSpacing: 0.2,
     },
     progressBarContainer: {
-        height: hp(1),
-        backgroundColor: colors.gray + '20',
-        borderRadius: hp(0.5),
+        height: hp(1.4),
+        backgroundColor: colors.gray + '15',
+        borderRadius: 8,
         overflow: 'hidden',
-        marginBottom: hp(0.6),
+        marginBottom: hp(0.8),
+        shadowColor: "#000",
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        shadowOffset: { width: 0, height: 1 },
+        elevation: 1,
     },
     progressBar: {
         height: '100%',
-        borderRadius: hp(0.5),
+        borderRadius: 8,
     },
     progressPercentage: {
-        fontSize: Math.min(hp(1.8), wp(4.2)),
+        fontSize: Math.min(hp(1.9), wp(4.5)),
         fontWeight: 'bold',
-        color: colors.textPrimary,
+        color: colors.primary,
         textAlign: 'right',
     },
     Foodtray: {
@@ -1042,7 +2519,7 @@ const getStyles = (colors: any) => StyleSheet.create({
         flexGrow: 1,
         paddingHorizontal: wp(5),
         paddingTop: hp(3),
-        paddingBottom: hp(2),
+        paddingBottom: hp(15),
         justifyContent: 'space-between',
     },
     menuContent: {
@@ -1122,6 +2599,34 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     inputMethodTextActive: {
         color: 'white',
+    },
+    disabledButton: {
+        flex: 1,
+        paddingVertical: hp(1.5),
+        paddingHorizontal: wp(2),
+        borderRadius: 12,
+        backgroundColor: colors.gray + '10',
+        borderWidth: 2,
+        borderColor: colors.gray + '30',
+        alignItems: "center",
+        gap: hp(0.4),
+        opacity: 0.6,
+    },
+    disabledButtonText: {
+        fontSize: Math.min(hp(1.6), wp(3.6)),
+        fontWeight: "600",
+        color: '#CCCCCC',
+        marginTop: hp(0.3),
+    },
+    comingSoonBadge: {
+        fontSize: Math.min(hp(1.2), wp(2.8)),
+        fontWeight: "600",
+        color: '#FF9500',
+        marginTop: hp(0.2),
+        paddingHorizontal: wp(1.5),
+        paddingVertical: hp(0.2),
+        backgroundColor: '#FF950010',
+        borderRadius: 4,
     },
     dynamicInputSection: {
         flex: 1,
@@ -1292,13 +2797,18 @@ const getStyles = (colors: any) => StyleSheet.create({
     backMenuButton: {
         flex: 1,
         flexDirection: "row",
-        paddingVertical: hp(1.6),
-        borderWidth: 1.5,
-        borderColor: colors.primary,
-        borderRadius: 12,
+        paddingVertical: hp(1.8),
+        borderWidth: 2,
+        borderColor: '#000000',
+        borderRadius: 14,
         alignItems: "center",
         justifyContent: "center",
         gap: wp(1.5),
+        backgroundColor: colors.cardBackground,
+        shadowColor: '#000',
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+        elevation: 2,
     },
     backMenuText: {
         color: colors.primary,
@@ -1309,15 +2819,17 @@ const getStyles = (colors: any) => StyleSheet.create({
         flex: 1,
         flexDirection: "row",
         backgroundColor: colors.primary,
-        paddingVertical: hp(1.6),
-        borderRadius: 12,
+        paddingVertical: hp(1.8),
+        borderRadius: 14,
         alignItems: "center",
         justifyContent: "center",
         gap: wp(1.5),
         shadowColor: colors.primary,
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 4,
+        shadowOpacity: 0.4,
+        shadowRadius: 10,
+        elevation: 6,
+        borderWidth: 1,
+        borderColor: colors.primary,
     },
     submitMenuText: {
         color: "#fff",
@@ -1346,12 +2858,1637 @@ const getStyles = (colors: any) => StyleSheet.create({
         fontWeight: '600',
         fontSize: 16,
     },
-
+    // Suggestion styles
+    suggestionsSection: {
+        marginBottom: hp(2),
+    },
+    suggestionTitle: {
+        fontSize: Math.min(hp(1.7), wp(4)),
+        fontWeight: '700',
+        color: colors.textPrimary,
+        marginBottom: hp(1),
+        marginLeft: wp(1),
+    },
+    suggestionsScroll: {
+        marginHorizontal: -wp(5),
+        paddingHorizontal: wp(5),
+    },
+    suggestionsContent: {
+        gap: wp(2),
+        paddingRight: wp(5),
+    },
+    suggestionCard: {
+        backgroundColor: colors.primary + '15',
+        borderRadius: 12,
+        paddingHorizontal: wp(3.5),
+        paddingVertical: hp(1),
+        borderLeftWidth: 4,
+        borderLeftColor: colors.primary,
+        minWidth: wp(35),
+    },
+    suggestionFoodName: {
+        fontSize: Math.min(hp(1.5), wp(3.5)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+        marginBottom: hp(0.3),
+    },
+    suggestionCalories: {
+        fontSize: Math.min(hp(1.4), wp(3.2)),
+        fontWeight: '700',
+        color: colors.primary,
+    },
+    // Food search styles
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.cardBackground,
+        borderWidth: 1,
+        borderColor: colors.gray + '50',
+        borderRadius: 10,
+        paddingHorizontal: wp(3),
+    },
+    searchInput: {
+        flex: 1,
+        paddingVertical: hp(1.2),
+        fontSize: 16,
+        color: colors.textPrimary,
+    },
+    searchResults: {
+        marginTop: hp(1),
+        backgroundColor: colors.cardBackground,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: colors.gray + '30',
+        overflow: 'hidden',
+        maxHeight: hp(25),
+    },
+    resultItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: wp(3),
+        paddingVertical: hp(1.2),
+        borderBottomWidth: 1,
+        borderBottomColor: colors.gray + '20',
+    },
+    resultInfo: {
+        flex: 1,
+    },
+    resultFoodName: {
+        fontSize: Math.min(hp(1.6), wp(3.8)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+        marginBottom: hp(0.2),
+    },
+    resultCategory: {
+        fontSize: Math.min(hp(1.3), wp(3)),
+        color: colors.textSecondary,
+    },
+    resultCalories: {
+        fontSize: Math.min(hp(1.6), wp(3.8)),
+        fontWeight: 'bold',
+        color: colors.primary,
+        marginLeft: wp(2),
+    },
+    noResults: {
+        textAlign: 'center',
+        paddingVertical: hp(2),
+        color: colors.textSecondary,
+        fontSize: Math.min(hp(1.5), wp(3.5)),
+    },
+    // Selected food display
+    selectedFoodBox: {
+        backgroundColor: colors.success + '10',
+        borderRadius: 12,
+        padding: wp(4),
+        marginBottom: hp(1.5),
+        borderWidth: 2,
+        borderColor: colors.success + '30',
+    },
+    selectedFoodHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: hp(1),
+    },
+    selectedFoodInfo: {
+        flex: 1,
+        marginLeft: wp(2),
+    },
+    selectedFoodName: {
+        fontSize: Math.min(hp(1.7), wp(4)),
+        fontWeight: '700',
+        color: colors.textPrimary,
+    },
+    selectedFoodCalories: {
+        fontSize: Math.min(hp(1.4), wp(3.2)),
+        color: colors.success,
+        fontWeight: '600',
+        marginTop: hp(0.2),
+    },
+    selectedFoodServing: {
+        fontSize: Math.min(hp(1.2), wp(2.8)),
+        color: colors.textSecondary,
+        marginTop: hp(0.3),
+    },
+    nutritionBreakdown: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: wp(3),
+        marginTop: hp(1.2),
+        paddingTop: hp(1.2),
+        borderTopWidth: 1,
+        borderTopColor: colors.success + '20',
+    },
+    nutritionItem: {
+        minWidth: wp(20),
+    },
+    nutritionLabel: {
+        fontSize: Math.min(hp(1.2), wp(2.8)),
+        color: colors.textSecondary,
+        marginBottom: hp(0.3),
+    },
+    nutritionValue: {
+        fontSize: Math.min(hp(1.6), wp(3.8)),
+        fontWeight: '700',
+        color: colors.textPrimary,
+    },
+    // Quantity selector
+    quantitySection: {
+        marginTop: hp(1),
+        paddingTop: hp(1),
+        borderTopWidth: 1,
+        borderTopColor: colors.gray + '20',
+    },
+    quantityLabel: {
+        fontSize: Math.min(hp(1.4), wp(3.2)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+        marginBottom: hp(0.8),
+    },
+    quantityInputRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(2),
+    },
+    quantityBtn: {
+        width: wp(10),
+        height: wp(10),
+        borderRadius: wp(5),
+        backgroundColor: colors.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    quantityBtnText: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: 'white',
+    },
+    quantityInput: {
+        flex: 1,
+        borderWidth: 1,
+        borderColor: colors.gray + '50',
+        borderRadius: 8,
+        paddingHorizontal: wp(2),
+        paddingVertical: hp(0.8),
+        fontSize: 16,
+        color: colors.textPrimary,
+        textAlign: 'center',
+    },
+    // Calorie input
+    calorieInputContainer: {
+        gap: hp(1),
+    },
+    calorieInfo: {
+        backgroundColor: colors.primary + '10',
+        padding: wp(3),
+        borderRadius: 10,
+        borderLeftWidth: 4,
+        borderLeftColor: colors.primary,
+    },
+    calorieInfoText: {
+        fontSize: Math.min(hp(1.4), wp(3.2)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+        marginBottom: hp(0.6),
+    },
+    calorieBar: {
+        height: hp(1),
+        backgroundColor: colors.gray + '20',
+        borderRadius: hp(0.5),
+        overflow: 'hidden',
+    },
+    calorieBarFill: {
+        height: '100%',
+        borderRadius: hp(0.5),
+    },
+    comingSoonMessage: {
+        fontSize: Math.min(hp(1.5), wp(3.5)),
+        color: colors.textSecondary,
+        marginTop: hp(0.8),
+        textAlign: 'center',
+    },
+    // Water intake styles
+    waterOptionsContainer: {
+        gap: hp(1),
+        marginBottom: hp(2),
+    },
+    waterOptionButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: wp(3),
+        backgroundColor: colors.gray + '10',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: colors.primary + '30',
+        marginBottom: hp(0.8),
+    },
+    waterOptionText: {
+        marginLeft: wp(2),
+        fontSize: Math.min(hp(1.6), wp(4)),
+        color: colors.textPrimary,
+        fontWeight: '500',
+    },
+    customWaterSection: {
+        backgroundColor: colors.primary + '10',
+        padding: wp(3),
+        borderRadius: 10,
+        borderLeftWidth: 4,
+        borderLeftColor: '#2E86AB',
+    },
+    inputLabel: {
+        fontSize: Math.min(hp(1.4), wp(3.2)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+        marginBottom: hp(1),
+    },
+    waterInputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(2),
+        marginBottom: hp(1),
+    },
+    quantityButton: {
+        width: wp(10),
+        height: wp(10),
+        borderRadius: wp(5),
+        backgroundColor: colors.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    quantityButtonText: {
+        fontSize: Math.min(hp(2.5), wp(6)),
+        fontWeight: 'bold',
+        color: 'white',
+    },
+    waterAmountInput: {
+        flex: 1,
+        borderWidth: 1,
+        borderColor: colors.gray + '50',
+        borderRadius: 8,
+        paddingHorizontal: wp(2),
+        paddingVertical: hp(0.8),
+        fontSize: 16,
+        color: colors.textPrimary,
+        textAlign: 'center',
+    },
+    waterDisplayText: {
+        fontSize: Math.min(hp(1.4), wp(3.5)),
+        color: colors.textSecondary,
+        textAlign: 'center',
+        marginTop: hp(0.8),
+        fontWeight: '500',
+    },
+    // New Dual Input Styles
+    sectionTitleText: {
+        fontSize: Math.min(hp(2), wp(5)),
+        fontWeight: 'bold',
+        color: colors.textPrimary,
+        marginBottom: hp(1.5),
+        marginLeft: wp(4),
+    },
+    dualInputContainer: {
+        flexDirection: 'row',
+        paddingHorizontal: wp(4),
+        marginBottom: hp(2),
+        gap: wp(3),
+    },
+    trackingContentCard: {
+        backgroundColor: colors.cardBackground,
+        borderRadius: wp(4),
+        padding: wp(4),
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    // New Professional Styles
+    sectionContainer: {
+        marginBottom: hp(2.5),
+    },
+    sectionLabel: {
+        fontSize: Math.min(hp(1.8), wp(4)),
+        fontWeight: '700',
+        color: colors.textPrimary,
+        marginBottom: hp(1.2),
+        letterSpacing: 0.3,
+    },
+    fieldContainer: {
+        marginBottom: hp(2.5),
+    },
+    fieldLabel: {
+        fontSize: Math.min(hp(1.6), wp(3.8)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+        marginBottom: hp(1),
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    // Image Upload Button Styles
+    imageUploadButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.primary,
+        borderRadius: wp(3),
+        padding: wp(4),
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 5,
+        marginBottom: hp(1),
+    },
+    imageUploadIconContainer: {
+        width: wp(12),
+        height: wp(12),
+        borderRadius: wp(6),
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: wp(3),
+    },
+    imageUploadTextContainer: {
+        flex: 1,
+    },
+    imageUploadTitle: {
+        fontSize: Math.min(hp(1.8), wp(4.2)),
+        fontWeight: '700',
+        color: '#FFFFFF',
+        marginBottom: hp(0.3),
+    },
+    imageUploadSubtitle: {
+        fontSize: Math.min(hp(1.3), wp(3)),
+        color: 'rgba(255, 255, 255, 0.85)',
+    },
+    // Quick Pick Styles
+    quickPickScroll: {
+        marginTop: hp(0.5),
+    },
+    quickPickItem: {
+        width: wp(28),
+        marginRight: wp(3),
+        padding: wp(3),
+        backgroundColor: colors.cardBackground,
+        borderRadius: wp(3),
+        alignItems: 'center',
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+        elevation: 3,
+        borderWidth: 2,
+        borderColor: '#000000',
+    },
+    quickPickIcon: {
+        width: wp(12),
+        height: wp(12),
+        borderRadius: wp(6),
+        backgroundColor: colors.primary + '15',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: hp(0.8),
+    },
+    quickPickName: {
+        fontSize: Math.min(hp(1.4), wp(3.2)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+        textAlign: 'center',
+        marginBottom: hp(0.5),
+        minHeight: hp(4),
+    },
+    quickPickCalories: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(1),
+    },
+    quickPickCalText: {
+        fontSize: Math.min(hp(1.3), wp(3)),
+        fontWeight: '700',
+        color: '#F97316',
+    },
+    // Search Input Styles
+    searchInputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.cardBackground,
+        borderRadius: wp(3),
+        paddingHorizontal: wp(3),
+        paddingVertical: hp(1.2),
+        borderWidth: 2,
+        borderColor: '#000000',
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 6,
+        elevation: 2,
+    },
+    searchIconLeft: {
+        marginRight: wp(2),
+    },
+    searchInputField: {
+        flex: 1,
+        fontSize: Math.min(hp(1.7), wp(4)),
+        color: colors.textPrimary,
+        padding: 0,
+    },
+    searchClearButton: {
+        padding: wp(1),
+    },
+    // Search Results Styles
+    searchResultsContainer: {
+        marginTop: hp(1),
+        backgroundColor: colors.cardBackground,
+        borderRadius: wp(3),
+        overflow: 'hidden',
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        elevation: 4,
+        borderWidth: 2,
+        borderColor: '#000000',
+    },
+    searchResultsHeader: {
+        fontSize: Math.min(hp(1.4), wp(3.3)),
+        fontWeight: '600',
+        color: colors.textSecondary,
+        padding: wp(3),
+        backgroundColor: colors.gray + '10',
+        borderBottomWidth: 1,
+        borderBottomColor: colors.borderColor || '#E5E7EB',
+    },
+    searchResultsScroll: {
+        maxHeight: hp(35),
+    },
+    searchResultCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: wp(4),
+        borderBottomWidth: 1,
+        borderBottomColor: colors.borderColor || '#E5E7EB',
+        backgroundColor: colors.cardBackground,
+    },
+    searchResultLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+        marginRight: wp(3),
+    },
+    searchResultIconBg: {
+        width: wp(10),
+        height: wp(10),
+        borderRadius: wp(5),
+        backgroundColor: colors.primary + '15',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: wp(3),
+    },
+    searchResultInfo: {
+        flex: 1,
+    },
+    searchResultTitle: {
+        fontSize: Math.min(hp(1.7), wp(4)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+        marginBottom: hp(0.3),
+    },
+    searchResultMeta: {
+        fontSize: Math.min(hp(1.3), wp(3)),
+        color: colors.textSecondary,
+    },
+    searchResultRight: {
+        alignItems: 'flex-end',
+    },
+    searchResultCalValue: {
+        fontSize: Math.min(hp(2), wp(4.8)),
+        fontWeight: '700',
+        color: '#F97316',
+    },
+    searchResultCalLabel: {
+        fontSize: Math.min(hp(1.2), wp(2.8)),
+        color: colors.textSecondary,
+        marginTop: hp(0.2),
+    },
+    // Selected Food Container
+    selectedFoodContainer: {
+        marginBottom: hp(2),
+        backgroundColor: colors.cardBackground,
+        borderRadius: wp(4),
+        padding: wp(4),
+        borderWidth: 2,
+        borderColor: '#000000',
+        shadowColor: colors.success,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    // Drink Specific Styles
+    drinkResultCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: wp(4),
+        borderBottomWidth: 1,
+        borderBottomColor: colors.borderColor || '#E5E7EB',
+        backgroundColor: colors.cardBackground,
+    },
+    drinkResultIconBg: {
+        width: wp(10),
+        height: wp(10),
+        borderRadius: wp(5),
+        backgroundColor: '#2E86AB' + '20',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: wp(3),
+    },
+    drinkMetaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(2),
+        marginTop: hp(0.3),
+    },
+    hydrationBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(1),
+        backgroundColor: '#2E86AB' + '20',
+        paddingHorizontal: wp(2),
+        paddingVertical: hp(0.3),
+        borderRadius: wp(2),
+    },
+    hydrationText: {
+        fontSize: Math.min(hp(1.1), wp(2.6)),
+        fontWeight: '600',
+        color: '#2E86AB',
+    },
+    drinkCalValue: {
+        fontSize: Math.min(hp(2), wp(4.8)),
+        fontWeight: '700',
+        color: '#2E86AB',
+    },
+    selectedDrinkCard: {
+        marginBottom: hp(2),
+        backgroundColor: colors.cardBackground,
+        borderRadius: wp(4),
+        padding: wp(4),
+        borderWidth: 2,
+        borderColor: '#000000',
+        shadowColor: '#2E86AB',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.25,
+        shadowRadius: 10,
+        elevation: 5,
+    },
+    selectedDrinkHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: hp(2),
+    },
+    drinkIconLarge: {
+        marginRight: wp(3),
+    },
+    selectedDrinkInfo: {
+        flex: 1,
+    },
+    selectedDrinkName: {
+        fontSize: Math.min(hp(1.8), wp(4.3)),
+        fontWeight: '700',
+        color: colors.textPrimary,
+        marginBottom: hp(0.3),
+    },
+    selectedDrinkServing: {
+        fontSize: Math.min(hp(1.3), wp(3)),
+        color: colors.textSecondary,
+    },
+    removeDrinkBtn: {
+        padding: wp(2),
+    },
+    drinkNutritionGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: wp(3),
+        marginBottom: hp(2),
+        paddingTop: hp(1.5),
+        borderTopWidth: 1,
+        borderTopColor: colors.borderColor || '#E5E7EB',
+    },
+    drinkNutritionItem: {
+        minWidth: wp(20),
+        alignItems: 'center',
+        gap: hp(0.5),
+    },
+    drinkNutritionValue: {
+        fontSize: Math.min(hp(1.8), wp(4.2)),
+        fontWeight: '700',
+        color: '#2E86AB',
+    },
+    drinkNutritionLabel: {
+        fontSize: Math.min(hp(1.2), wp(2.8)),
+        color: colors.textSecondary,
+    },
+    quantityControlSection: {
+        marginTop: hp(1),
+    },
+    quantityControlLabel: {
+        fontSize: Math.min(hp(1.5), wp(3.5)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+        marginBottom: hp(1),
+    },
+    quantityControls: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: wp(3),
+    },
+    quantityControlBtn: {
+        padding: wp(2),
+        backgroundColor: colors.cardBackground,
+        borderRadius: wp(2),
+        borderWidth: 1,
+        borderColor: colors.borderColor || '#E5E7EB',
+    },
+    quantityDisplay: {
+        alignItems: 'center',
+        backgroundColor: colors.gray + '10',
+        paddingHorizontal: wp(4),
+        paddingVertical: hp(1),
+        borderRadius: wp(2),
+        minWidth: wp(25),
+    },
+    quantityDisplayInput: {
+        fontSize: Math.min(hp(2.5), wp(6)),
+        fontWeight: '700',
+        color: colors.textPrimary,
+        textAlign: 'center',
+        padding: 0,
+    },
+    quantityDisplayUnit: {
+        fontSize: Math.min(hp(1.2), wp(2.8)),
+        color: colors.textSecondary,
+        marginTop: hp(0.3),
+    },
+    // Water Styles
+    waterQuickGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: wp(3),
+        marginTop: hp(1),
+    },
+    waterQuickOption: {
+        width: wp(42),
+        padding: wp(4),
+        backgroundColor: colors.cardBackground,
+        borderRadius: wp(3),
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#000000',
+        shadowColor: '#2E86AB',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
+        elevation: 3,
+    },
+    waterQuickIconBg: {
+        marginBottom: hp(1),
+    },
+    waterQuickLabel: {
+        fontSize: Math.min(hp(1.5), wp(3.5)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+        marginBottom: hp(0.5),
+    },
+    waterQuickAmount: {
+        fontSize: Math.min(hp(1.8), wp(4.2)),
+        fontWeight: '700',
+        color: '#2E86AB',
+    },
+    waterAmountSelector: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: hp(1),
+    },
+    waterAdjustButton: {
+        padding: wp(2),
+    },
+    waterDisplayBox: {
+        flex: 1,
+        backgroundColor: colors.cardBackground,
+        borderRadius: wp(4),
+        padding: wp(4),
+        alignItems: 'center',
+        marginHorizontal: wp(2),
+        borderWidth: 2,
+        borderColor: '#2E86AB',
+        shadowColor: '#2E86AB',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        elevation: 3,
+    },
+    waterValueInput: {
+        fontSize: Math.min(hp(4), wp(10)),
+        fontWeight: '700',
+        color: '#2E86AB',
+        textAlign: 'center',
+        padding: 0,
+        minWidth: wp(20),
+    },
+    waterUnit: {
+        fontSize: Math.min(hp(1.6), wp(3.8)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+        marginTop: hp(0.5),
+    },
+    waterGlasses: {
+        fontSize: Math.min(hp(1.3), wp(3)),
+        color: colors.textSecondary,
+        marginTop: hp(0.3),
+    },
+    // Progress Styles
+    progressContainer: {
+        marginTop: hp(2),
+        padding: wp(4),
+        backgroundColor: colors.cardBackground,
+        borderRadius: wp(3),
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+        elevation: 3,
+        borderWidth: 2,
+        borderColor: '#000000',
+    },
+    hydProgressHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: hp(1),
+    },
+    progressTitle: {
+        fontSize: Math.min(hp(1.6), wp(3.8)),
+        fontWeight: '700',
+        color: colors.textPrimary,
+    },
+    progressPercent: {
+        fontSize: Math.min(hp(1.8), wp(4.2)),
+        fontWeight: '700',
+        color: '#2E86AB',
+    },
+    progressBarBg: {
+        height: hp(1.2),
+        backgroundColor: colors.gray + '30',
+        borderRadius: hp(0.6),
+        overflow: 'hidden',
+    },
+    progressBarFg: {
+        height: '100%',
+        borderRadius: hp(0.6),
+    },
+    progressStats: {
+        marginTop: hp(0.8),
+    },
+    progressCurrent: {
+        fontSize: Math.min(hp(1.4), wp(3.2)),
+        color: colors.textSecondary,
+        fontWeight: '500',
+    },
+    inputColumn: {
+        flex: 1,
+        backgroundColor: colors.cardBackground,
+        borderRadius: wp(3),
+        padding: wp(3),
+        borderWidth: 1,
+        borderColor: colors.borderColor || '#E5E7EB',
+    },
+    columnHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: hp(1),
+        gap: wp(2),
+    },
+    columnTitle: {
+        fontSize: Math.min(hp(1.8), wp(4.5)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+    },
+    miniSuggestionsSection: {
+        marginBottom: hp(1.2),
+    },
+    miniSuggestionsTitle: {
+        fontSize: Math.min(hp(1.2), wp(3)),
+        fontWeight: '500',
+        color: colors.textSecondary,
+        marginBottom: hp(0.5),
+    },
+    miniSuggestionsScroll: {
+        maxHeight: hp(6),
+    },
+    miniSuggestionCard: {
+        backgroundColor: colors.primary + '20',
+        paddingHorizontal: wp(2),
+        paddingVertical: hp(0.6),
+        borderRadius: wp(2),
+        marginRight: wp(1.5),
+        minWidth: wp(18),
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    miniSuggestionText: {
+        fontSize: Math.min(hp(1), wp(2.5)),
+        color: colors.primary,
+        fontWeight: '500',
+        textAlign: 'center',
+    },
+    miniSuggestionCals: {
+        fontSize: Math.min(hp(0.9), wp(2)),
+        color: colors.textSecondary,
+        marginTop: hp(0.2),
+    },
+    mealInput: {
+        backgroundColor: colors.inputBackground || '#F9FAFB',
+        borderWidth: 1,
+        borderColor: colors.borderColor || '#E5E7EB',
+        borderRadius: wp(2),
+        paddingHorizontal: wp(3),
+        paddingVertical: hp(0.8),
+        fontSize: Math.min(hp(1.4), wp(3.5)),
+        color: colors.textPrimary,
+        marginBottom: hp(0.8),
+    },
+    calorieInput: {
+        backgroundColor: colors.inputBackground || '#F9FAFB',
+        borderWidth: 1,
+        borderColor: colors.borderColor || '#E5E7EB',
+        borderRadius: wp(2),
+        paddingHorizontal: wp(3),
+        paddingVertical: hp(0.8),
+        fontSize: Math.min(hp(1.4), wp(3.5)),
+        color: colors.textPrimary,
+        marginBottom: hp(0.8),
+    },
+    foodResultsList: {
+        maxHeight: hp(12),
+        backgroundColor: colors.inputBackground || '#F9FAFB',
+        borderRadius: wp(2),
+        borderWidth: 1,
+        borderColor: colors.borderColor || '#E5E7EB',
+    },
+    foodResultItem: {
+        padding: wp(2.5),
+        borderBottomWidth: 1,
+        borderBottomColor: colors.borderColor || '#E5E7EB',
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    foodResultName: {
+        fontSize: Math.min(hp(1.2), wp(3)),
+        color: colors.textPrimary,
+        fontWeight: '500',
+        flex: 1,
+    },
+    foodResultCals: {
+        fontSize: Math.min(hp(1.1), wp(2.8)),
+        color: colors.primary,
+        fontWeight: '600',
+    },
+    miniWaterCard: {
+        backgroundColor: '#2E86AB' + '20',
+        paddingHorizontal: wp(2),
+        paddingVertical: hp(0.6),
+        borderRadius: wp(2),
+        marginRight: wp(1.5),
+        minWidth: wp(18),
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        gap: wp(1),
+    },
+    miniWaterText: {
+        fontSize: Math.min(hp(1), wp(2.5)),
+        color: '#2E86AB',
+        fontWeight: '500',
+        textAlign: 'center',
+    },
+    waterControlSection: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: hp(0.8),
+        gap: wp(2),
+    },
+    waterControlButton: {
+        width: wp(9),
+        height: wp(9),
+        borderRadius: wp(2),
+        backgroundColor: '#2E86AB' + '20',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    waterControlText: {
+        fontSize: Math.min(hp(1.8), wp(4.5)),
+        color: '#2E86AB',
+        fontWeight: 'bold',
+    },
+    waterInputField: {
+        flex: 1,
+        backgroundColor: colors.inputBackground || '#F9FAFB',
+        borderWidth: 1,
+        borderColor: '#2E86AB',
+        borderRadius: wp(2),
+        paddingHorizontal: wp(3),
+        paddingVertical: hp(0.8),
+        fontSize: Math.min(hp(1.4), wp(3.5)),
+        color: colors.textPrimary,
+        textAlign: 'center',
+    },
+    waterDisplayLabel: {
+        fontSize: Math.min(hp(1.1), wp(2.8)),
+        color: colors.textSecondary,
+        textAlign: 'center',
+        marginTop: hp(0.5),
+        fontWeight: '500',
+    },
+    // Glass Counter Styles
+    glassCounterSection: {
+        backgroundColor: '#2E86AB' + '10',
+        borderRadius: wp(3),
+        padding: wp(2.5),
+        marginTop: hp(1),
+        marginBottom: hp(1),
+    },
+    glassCounterHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: hp(0.5),
+        gap: wp(1.5),
+    },
+    glassCounterTitle: {
+        fontSize: Math.min(hp(1.2), wp(3)),
+        fontWeight: '600',
+        color: '#2E86AB',
+    },
+    glassCounterDisplay: {
+        alignItems: 'center',
+        paddingVertical: hp(0.5),
+    },
+    glassCount: {
+        fontSize: Math.min(hp(2), wp(5)),
+        fontWeight: 'bold',
+        color: '#2E86AB',
+    },
+    glassLabel: {
+        fontSize: Math.min(hp(1), wp(2.5)),
+        color: colors.textSecondary,
+        marginTop: hp(0.3),
+    },
+    waterInputDisplay: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: wp(1),
+    },
+    waterUnitLabel: {
+        fontSize: Math.min(hp(1.5), wp(4)),
+        fontWeight: '600',
+        color: '#2E86AB',
+    },
+    // Hydration Progress in Input Modal
+    hydrationProgressSection: {
+        backgroundColor: colors.cardBackground,
+        borderRadius: wp(3),
+        padding: wp(3),
+        marginTop: hp(1.5),
+        borderWidth: 1,
+        borderColor: '#2E86AB' + '30',
+    },
+    hydrationProgressHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: hp(0.8),
+    },
+    hydrationProgressTitle: {
+        fontSize: Math.min(hp(1.3), wp(3.5)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+    },
+    hydrationProgressPercent: {
+        fontSize: Math.min(hp(1.5), wp(4)),
+        fontWeight: 'bold',
+        color: '#2E86AB',
+    },
+    hydrationProgressBar: {
+        height: hp(1.2),
+        backgroundColor: '#E5E7EB',
+        borderRadius: wp(2),
+        overflow: 'hidden',
+        marginBottom: hp(0.8),
+    },
+    hydrationProgressFill: {
+        height: '100%',
+        backgroundColor: '#2E86AB',
+        borderRadius: wp(2),
+    },
+    hydrationProgressText: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingHorizontal: wp(1),
+    },
+    hydrationProgressCurrent: {
+        fontSize: Math.min(hp(1), wp(2.5)),
+        color: '#2E86AB',
+        fontWeight: '500',
+    },
+    hydrationProgressTarget: {
+        fontSize: Math.min(hp(1), wp(2.5)),
+        color: colors.textSecondary,
+    },
+    // Tracking Mode Selector Styles
+    trackingModeSection: {
+        backgroundColor: colors.cardBg,
+        borderRadius: 16,
+        padding: wp(5),
+        marginBottom: hp(2.5),
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.15,
+        shadowRadius: 10,
+        elevation: 4,
+        borderWidth: 2,
+        borderColor: '#000000',
+    },
+    trackingModeTitle: {
+        fontSize: Math.min(hp(1.5), wp(3.5)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+        marginBottom: hp(1.5),
+        letterSpacing: 0.3,
+    },
+    modeToggleContainer: {
+        flexDirection: 'row',
+        backgroundColor: colors.gray + '05',
+        borderRadius: 10,
+        padding: wp(2),
+        gap: wp(1),
+        alignItems: 'center',
+    },
+    modeButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: hp(1.2),
+        paddingHorizontal: wp(3),
+        borderRadius: 8,
+        backgroundColor: 'transparent',
+        gap: wp(1.5),
+    },
+    modeButtonActive: {
+        backgroundColor: colors.primary,
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 5,
+    },
+    modeButtonText: {
+        fontSize: Math.min(hp(1.4), wp(3.2)),
+        fontWeight: '600',
+        color: colors.textSecondary,
+    },
+    modeButtonTextActive: {
+        color: '#FFFFFF',
+        fontWeight: '700',
+    },
+    modeButtonDivider: {
+        width: 1,
+        height: hp(2),
+        backgroundColor: colors.gray + '30',
+    },
+    // Calorie Progress Styles
+    calProgressSection: {
+        marginTop: hp(1.5),
+        marginBottom: hp(2),
+        paddingHorizontal: wp(2),
+    },
+    calProgressHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: hp(0.8),
+    },
+    calProgressTitle: {
+        fontSize: Math.min(hp(1.3), wp(3)),
+        fontWeight: '700',
+        color: colors.textPrimary,
+    },
+    calProgressPercent: {
+        fontSize: Math.min(hp(1.2), wp(2.8)),
+        fontWeight: '700',
+        color: colors.primary,
+    },
+    calProgressBar: {
+        height: 8,
+        backgroundColor: colors.gray + '20',
+        borderRadius: 4,
+        marginBottom: hp(0.8),
+        overflow: 'hidden',
+    },
+    calProgressFill: {
+        height: '100%',
+        backgroundColor: colors.primary,
+        borderRadius: 4,
+    },
+    // Diet Plan Button Styles
+    dietPlanButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#8B5CF6', // Purple color for diet plan
+        borderRadius: 12,
+        padding: 16,
+        shadowColor: '#8B5CF6',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 5,
+    },
+    dietPlanIconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    dietPlanTextContainer: {
+        flex: 1,
+    },
+    dietPlanTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#FFFFFF',
+        marginBottom: 2,
+    },
+    dietPlanSubtitle: {
+        fontSize: 12,
+        color: 'rgba(255, 255, 255, 0.8)',
+    },
+    // Custom Recipe Button Styles
+    customRecipeButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F59E0B', // Amber color for custom recipe
+        borderRadius: 12,
+        padding: 16,
+        shadowColor: '#F59E0B',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 5,
+    },
+    customRecipeIconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    customRecipeTextContainer: {
+        flex: 1,
+    },
+    customRecipeTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#FFFFFF',
+        marginBottom: 2,
+    },
+    customRecipeSubtitle: {
+        fontSize: 12,
+        color: 'rgba(255, 255, 255, 0.8)',
+    },
+    // Custom Recipe Modal Styles
+    customRecipeModalContainer: {
+        flex: 1,
+        backgroundColor: colors.screenColor,
+    },
+    customRecipeModalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.gray + '20',
+        backgroundColor: colors.cardBackground,
+    },
+    customRecipeModalTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: colors.textPrimary,
+    },
+    customRecipeModalContent: {
+        flex: 1,
+        padding: 20,
+    },
+    customRecipeSection: {
+        marginBottom: 24,
+    },
+    customRecipeLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: colors.textPrimary,
+        marginBottom: 8,
+    },
+    customRecipeSectionTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: colors.textPrimary,
+        marginBottom: 12,
+    },
+    customRecipeInput: {
+        borderWidth: 1,
+        borderColor: colors.gray + '40',
+        borderRadius: 10,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        fontSize: 15,
+        color: colors.textPrimary,
+        backgroundColor: colors.cardBackground,
+    },
+    customRecipeTextArea: {
+        minHeight: 100,
+        textAlignVertical: 'top',
+    },
+    nutritionMethodToggle: {
+        flexDirection: 'row',
+        backgroundColor: colors.cardBackground,
+        borderRadius: 10,
+        padding: 4,
+        marginTop: 8,
+    },
+    nutritionMethodButton: {
+        flex: 1,
+        paddingVertical: 10,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    nutritionMethodButtonActive: {
+        backgroundColor: colors.primary,
+    },
+    nutritionMethodButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: colors.textSecondary,
+    },
+    nutritionMethodButtonTextActive: {
+        color: '#FFFFFF',
+    },
+    nutritionInputsGrid: {
+        gap: 12,
+    },
+    nutritionInputWrapper: {
+        marginBottom: 8,
+    },
+    nutritionInputLabel: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: colors.textSecondary,
+        marginBottom: 6,
+    },
+    nutritionInput: {
+        borderWidth: 1,
+        borderColor: colors.gray + '40',
+        borderRadius: 8,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        fontSize: 15,
+        color: colors.textPrimary,
+        backgroundColor: colors.cardBackground,
+    },
+    ingredientInputCard: {
+        backgroundColor: colors.cardBackground,
+        borderRadius: 12,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: colors.gray + '20',
+        marginBottom: 16,
+    },
+    ingredientNutritionRow: {
+        flexDirection: 'row',
+        gap: 8,
+        marginTop: 12,
+    },
+    ingredientNutritionInput: {
+        flex: 1,
+        borderWidth: 1,
+        borderColor: colors.gray + '40',
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        fontSize: 13,
+        color: colors.textPrimary,
+        backgroundColor: colors.surface,
+    },
+    addIngredientButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.primary,
+        borderRadius: 8,
+        paddingVertical: 10,
+        marginTop: 12,
+        gap: 6,
+    },
+    addIngredientButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#FFFFFF',
+    },
+    ingredientsList: {
+        marginTop: 16,
+    },
+    ingredientsListTitle: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: colors.textPrimary,
+        marginBottom: 12,
+    },
+    ingredientCard: {
+        backgroundColor: colors.cardBackground,
+        borderRadius: 10,
+        padding: 12,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: colors.gray + '20',
+    },
+    ingredientCardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 6,
+    },
+    ingredientCardName: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: colors.textPrimary,
+        flex: 1,
+    },
+    ingredientCardNutrition: {
+        marginTop: 4,
+    },
+    ingredientNutritionText: {
+        fontSize: 12,
+        color: colors.textSecondary,
+    },
+    calculatedTotalsCard: {
+        backgroundColor: colors.primary + '10',
+        borderRadius: 10,
+        padding: 14,
+        marginTop: 12,
+        borderWidth: 1,
+        borderColor: colors.primary + '30',
+    },
+    calculatedTotalsTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: colors.primary,
+        marginBottom: 10,
+    },
+    calculatedTotalsGrid: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    calculatedTotalItem: {
+        alignItems: 'center',
+    },
+    calculatedTotalLabel: {
+        fontSize: 12,
+        color: colors.textSecondary,
+        marginBottom: 4,
+    },
+    calculatedTotalValue: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: colors.textPrimary,
+    },
+    helperText: {
+        fontSize: 12,
+        color: colors.textSecondary,
+        marginTop: 6,
+        fontStyle: 'italic',
+    },
+    customRecipeActions: {
+        flexDirection: 'row',
+        gap: 12,
+        marginTop: 24,
+        marginBottom: 20,
+    },
+    customRecipeCancelButton: {
+        flex: 1,
+        paddingVertical: 14,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: colors.gray + '40',
+        backgroundColor: colors.cardBackground,
+        alignItems: 'center',
+    },
+    customRecipeCancelButtonText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: colors.textPrimary,
+    },
+    customRecipeAddButton: {
+        flex: 2,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 14,
+        borderRadius: 10,
+        backgroundColor: colors.primary,
+        gap: 8,
+    },
+    customRecipeAddButtonText: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#FFFFFF',
+    },
+    calProgressText: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        gap: wp(2),
+    },
+    calProgressCurrent: {
+        fontSize: Math.min(hp(1), wp(2.5)),
+        color: colors.primary,
+        fontWeight: '500',
+    },
+    calProgressTarget: {
+        fontSize: Math.min(hp(1), wp(2.5)),
+        color: colors.textSecondary,
+    },
+    
+    // Beautiful Completion Modal Styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: wp(8),
+    },
+    modalContainer: {
+        backgroundColor: colors.screenColor || '#FFFFFF',
+        borderRadius: 24,
+        width: '100%',
+        maxWidth: wp(85),
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 20 },
+        shadowOpacity: 0.3,
+        shadowRadius: 25,
+        elevation: 25,
+        borderWidth: 3,
+        borderColor: colors.primary || '#007AFF',
+    },
+    modalContent: {
+        padding: wp(6),
+        alignItems: 'center',
+    },
+    modalIconContainer: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: hp(2),
+    },
+    modalTitle: {
+        fontSize: Math.min(hp(2.8), wp(6.5)),
+        fontWeight: '800',
+        color: colors.textPrimary,
+        textAlign: 'center',
+        marginBottom: hp(1.5),
+        letterSpacing: 0.3,
+    },
+    modalMessage: {
+        fontSize: Math.min(hp(1.8), wp(4.2)),
+        color: colors.textSecondary,
+        textAlign: 'center',
+        lineHeight: Math.min(hp(2.6), wp(6)),
+        marginBottom: hp(3),
+        paddingHorizontal: wp(2),
+    },
+    celebrationContainer: {
+        backgroundColor: colors.primary + '10',
+        borderRadius: 12,
+        paddingVertical: hp(1),
+        paddingHorizontal: wp(4),
+        marginBottom: hp(2),
+    },
+    celebrationText: {
+        fontSize: Math.min(hp(1.6), wp(3.8)),
+        fontWeight: '700',
+        color: colors.primary,
+        textAlign: 'center',
+    },
+    modalButtonsRow: {
+        flexDirection: 'row',
+        gap: wp(3),
+        width: '100%',
+    },
+    modalSingleButtonContainer: {
+        width: '100%',
+    },
+    modalButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: hp(2),
+        paddingHorizontal: wp(4),
+        borderRadius: 16,
+        gap: wp(2),
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 6,
+    },
+    modalCancelButton: {
+        backgroundColor: colors.cardBackground,
+        borderWidth: 2,
+        borderColor: colors.gray + '30',
+    },
+    modalCancelText: {
+        fontSize: Math.min(hp(1.8), wp(4.2)),
+        fontWeight: '600',
+        color: colors.textPrimary,
+    },
+    modalConfirmButton: {
+        shadowColor: colors.warning,
+    },
+    modalConfirmText: {
+        fontSize: Math.min(hp(1.8), wp(4.2)),
+        fontWeight: '700',
+        color: 'white',
+    },
+    modalSuccessButton: {
+        shadowColor: colors.success,
+    },
+    modalSuccessText: {
+        fontSize: Math.min(hp(1.8), wp(4.2)),
+        fontWeight: '700',
+        color: 'white',
+    },
+    modalPrimaryButton: {
+        shadowColor: colors.primary,
+    },
+    modalPrimaryText: {
+        fontSize: Math.min(hp(1.8), wp(4.2)),
+        fontWeight: '700',
+        color: 'white',
+    },
+    modalErrorButton: {
+        shadowColor: colors.error,
+    },
+    modalErrorText: {
+        fontSize: Math.min(hp(1.8), wp(4.2)),
+        fontWeight: '700',
+        color: 'white',
+    },
 })
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 
 const ProgressCircle = (CircleProps: ProgressCircleProps) =>{
+    const { colors } = useTheme();
     const outerRadius = 55;
     const innerRadius = 40;
     const outerCircumference = 2 * Math.PI * outerRadius;
@@ -1396,7 +4533,7 @@ const ProgressCircle = (CircleProps: ProgressCircleProps) =>{
                 stroke="#E5E7EB"  strokeWidth="10"  fill="transparent"/>
         {/* Calories progress */}
         <AnimatedCircle  cx="60" cy="60" r={outerRadius}
-            stroke={colorsSheet.progressBarColor}  strokeWidth="10"  fill="transparent"
+            stroke={colors.primary}  strokeWidth="10"  fill="transparent"
             strokeDasharray={outerCircumference} //total
             animatedProps={animatedCalProps}
             strokeLinecap="round"transform= "rotate(-90 60 60)" />

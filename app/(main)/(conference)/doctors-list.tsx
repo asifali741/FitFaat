@@ -1,10 +1,11 @@
-import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View, ScrollView } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import BackButton from '@/components/BackButton';
+import { theme } from "@/constants/theme";
 import { Ionicons } from "@expo/vector-icons";
-import { colorsSheet } from "../(settings)/_ui_elements";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React from "react";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { getDoctorsByDate } from "./_doctorsData";
 
 export default function DoctorsListScreen() {
@@ -14,7 +15,7 @@ export default function DoctorsListScreen() {
 
   const handleDoctorSelect = (doctorId: string) => {
     router.push({
-      pathname: "/(main)/(conference)/doctor-details",
+      pathname: "/(main)/(conference)/doctor-details" as any,
       params: { doctorId, date }
     });
   };
@@ -22,16 +23,14 @@ export default function DoctorsListScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={colorsSheet.textOnPrimary} />
-        </TouchableOpacity>
+        <BackButton style={styles.backButton} testID="doctorslist-back" />
         <Text style={styles.headerTitle}>Consultants Available</Text>
         <View style={styles.spacer} />
       </View>
 
       <View style={styles.content}>
         <View style={styles.dateInfoContainer}>
-          <Ionicons name="calendar" size={20} color={colorsSheet.primary} />
+          <Ionicons name="calendar" size={20} color={theme.colors.primary} />
           <Text style={styles.dateInfo}>
             {new Date(date).toLocaleDateString("en-GB", {
               day: "2-digit",
@@ -49,7 +48,7 @@ export default function DoctorsListScreen() {
         >
           {doctors.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Ionicons name="calendar-outline" size={60} color={colorsSheet.textSecondary} />
+              <Ionicons name="calendar-outline" size={60} color={theme.colors.textSecondary} />
               <Text style={styles.emptyText}>No consultants available on this date</Text>
               <Text style={styles.emptySubtext}>Please select a different date</Text>
             </View>
@@ -61,13 +60,13 @@ export default function DoctorsListScreen() {
                 onPress={() => handleDoctorSelect(doctor.id)}
               >
                 <View style={styles.avatarContainer}>
-                  <Ionicons name="person-circle" size={50} color={colorsSheet.primary} />
+                  <Ionicons name="person-circle" size={50} color={theme.colors.primary} />
                 </View>
                 <View style={styles.doctorInfo}>
                   <Text style={styles.doctorName}>{doctor.name}</Text>
                   <Text style={styles.doctorEmail}>{doctor.email}</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={24} color={colorsSheet.textSecondary} />
+                <Ionicons name="chevron-forward" size={24} color={theme.colors.textSecondary} />
               </TouchableOpacity>
             ))
           )}
@@ -80,7 +79,7 @@ export default function DoctorsListScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: theme.colors.primary,
   },
   header: {
     flexDirection: "row",
@@ -95,7 +94,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: hp(2.2),
     fontWeight: "bold",
-    color: colorsSheet.textOnPrimary,
+    color: theme.colors.textOnPrimary,
     flex: 1,
     textAlign: "center",
   },
@@ -104,7 +103,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: colorsSheet.screenColor,
+    backgroundColor: theme.colors.screenColor,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     paddingTop: hp(3),
@@ -113,7 +112,7 @@ const styles = StyleSheet.create({
   dateInfoContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colorsSheet.primarySoft,
+    backgroundColor: theme.colors.primarySoft,
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.5),
     borderRadius: 15,
@@ -121,14 +120,14 @@ const styles = StyleSheet.create({
   },
   dateInfo: {
     fontSize: hp(1.8),
-    color: colorsSheet.textPrimary,
+    color: theme.colors.textPrimary,
     fontWeight: "600",
     marginLeft: wp(2),
   },
   sectionTitle: {
     fontSize: hp(2),
     fontWeight: "600",
-    color: colorsSheet.textPrimary,
+    color: theme.colors.textPrimary,
     marginBottom: hp(2),
   },
   doctorsList: {
@@ -137,11 +136,11 @@ const styles = StyleSheet.create({
   doctorCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colorsSheet.white,
+    backgroundColor: theme.colors.white,
     borderRadius: 15,
     padding: wp(4),
     marginBottom: hp(1.5),
-    shadowColor: colorsSheet.primary,
+    shadowColor: theme.colors.primary,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -159,12 +158,12 @@ const styles = StyleSheet.create({
   doctorName: {
     fontSize: hp(2),
     fontWeight: "600",
-    color: colorsSheet.textPrimary,
+    color: theme.colors.textPrimary,
     marginBottom: hp(0.5),
   },
   doctorEmail: {
     fontSize: hp(1.6),
-    color: colorsSheet.textSecondary,
+    color: theme.colors.textSecondary,
   },
   emptyContainer: {
     alignItems: "center",
@@ -174,12 +173,12 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: hp(2),
     fontWeight: "600",
-    color: colorsSheet.textPrimary,
+    color: theme.colors.textPrimary,
     marginTop: hp(2),
   },
   emptySubtext: {
     fontSize: hp(1.6),
-    color: colorsSheet.textSecondary,
+    color: theme.colors.textSecondary,
     marginTop: hp(1),
   },
 });

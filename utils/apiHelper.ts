@@ -1,4 +1,7 @@
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+
+const ENV = Constants.expoConfig?.extra;
 
 /**
  * Get the correct API base URL for the current platform
@@ -7,6 +10,11 @@ import { Platform } from 'react-native';
  * - Physical device: Use environment variable or localhost
  */
 export const getApiBaseUrl = (): string => {
+  // Use environment variable if available
+  if (ENV?.EXPO_PUBLIC_BACKEND_API_URL) {
+    return ENV.EXPO_PUBLIC_BACKEND_API_URL.replace(/\/api\/?$/, '');
+  }
+  
   // For Android Emulator, use 10.0.2.2 to reach the host machine
   if (Platform.OS === 'android') {
     return 'http://10.0.2.2:5001';

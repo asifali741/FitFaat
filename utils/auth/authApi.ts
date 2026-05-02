@@ -36,6 +36,44 @@ api.interceptors.request.use(async (config) => {
 });
 
 export const authApi = {
+  // Send OTP to email
+  sendOTP: async (email: string) => {
+    try {
+      console.log('Sending OTP request:', { email });
+
+      const response = await api.post('/auth/send-otp', { email });
+      console.log('OTP sent:', response.data);
+
+      return response.data;
+    } catch (error: any) {
+      console.error('Send OTP error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      throw error;
+    }
+  },
+
+  // Verify OTP
+  verifyOTP: async (email: string, otp: string) => {
+    try {
+      console.log('Verifying OTP:', { email, otp });
+
+      const response = await api.post('/auth/verify-otp', { email, otp });
+      console.log('OTP verified:', response.data);
+
+      return response.data;
+    } catch (error: any) {
+      console.error('Verify OTP error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      throw error;
+    }
+  },
+
   // Register new user
   register: async (userData: { email: string; username: string; password: string }) => {
     try {
@@ -243,6 +281,26 @@ export const authApi = {
   approveAppointment: async (doctorId: string, appointmentId: string) => {
     try {
       const response = await api.put(`/appointments/doctor/${doctorId}/${appointmentId}/approve`);
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Grant chat access to user (Doctor only)
+  grantChatAccess: async (appointmentId: string) => {
+    try {
+      const response = await api.post(`/chat/appointment/${appointmentId}/grant-access`);
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Get premium status
+  getPremiumStatus: async () => {
+    try {
+      const response = await api.get('/payment/premium-status');
       return response.data;
     } catch (error: any) {
       throw error.response?.data || error.message;

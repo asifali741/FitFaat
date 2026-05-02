@@ -1,5 +1,5 @@
-import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, StyleSheet } from "react-native";
-import React, { useEffect, useState } from "react";
+import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, StyleSheet, TextInput } from "react-native";
+import React, { useEffect, useState, useMemo } from "react";
 import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -37,9 +37,24 @@ export default function ExercisesScreen() {
   const { colors } = useTheme();
   const [exercises, setExercises] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
   const router = useRouter();
   const navigation = useNavigation();
   const { bodypart, name } = useLocalSearchParams();
+
+  // Filter exercises based on search query
+  const filteredExercises = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return exercises;
+    }
+    
+    const query = searchQuery.toLowerCase().trim();
+    return exercises.filter(exercise => 
+      exercise.name.toLowerCase().includes(query) ||
+      exercise.target.toLowerCase().includes(query) ||
+      (exercise.equipment && exercise.equipment.toLowerCase().includes(query))
+    );
+  }, [exercises, searchQuery]);
 
   const handleBackPress = () => {
     // Navigate back to workout screen explicitly
@@ -199,24 +214,55 @@ export default function ExercisesScreen() {
 
       {/* Main Content */}
       <View style={styles.content}>
+        {/* Search Bar */}
+        <View style={{ paddingHorizontal: wp(4), marginTop: hp(2), marginBottom: hp(2) }}>
+          <View style={[styles.searchContainer, { backgroundColor: colors.cardBackground }]}>
+            <Ionicons name="search" size={20} color={colors.textSecondary} style={{ marginRight: wp(2) }} />
+            <TextInput
+              style={[styles.searchInput, { color: colors.textPrimary }]}
+              placeholder="Search exercises..."
+              placeholderTextColor={colors.textSecondary}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
         {/* Exercise Count */}
         <Text style={styles.exerciseCount}>
-          {exercises.length} exercises found
+          {filteredExercises.length} {filteredExercises.length === 1 ? 'exercise' : 'exercises'} found
         </Text>
 
         {/* Exercises List */}
-        <FlatList
-          data={exercises}
-          numColumns={2}
-          keyExtractor={(item) => item.id || item.name}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{
-            paddingBottom: hp(3),
-          }}
-          renderItem={({ item, index }) => (
-            <ExerciseCard item={item} index={index} />
-          )}
-        />
+        {filteredExercises.length === 0 ? (
+          <View style={styles.noResultsContainer}>
+            <Ionicons name="search" size={48} color={colors.textSecondary} style={{ marginBottom: hp(2) }} />
+            <Text style={styles.noResultsText}>
+              No exercises found
+            </Text>
+            <Text style={styles.noResultsSubtext}>
+              Try searching with different keywords
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={filteredExercises}
+            numColumns={2}
+            keyExtractor={(item) => item.id || item.name}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{
+              paddingBottom: hp(3),
+            }}
+            renderItem={({ item, index }) => (
+              <ExerciseCard item={item} index={index} />
+            )}
+          />
+        )}
       </View>
     </SafeAreaView>
   );
@@ -284,5 +330,40 @@ const getStyles = (colors: any) => StyleSheet.create({
     textAlign: "center",
     marginBottom: hp(2),
     marginTop: hp(1),
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: hp(2.5),
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: Math.min(hp(1.8), wp(4.5)),
+    marginLeft: wp(2),
+    paddingVertical: hp(0.8),
+  },
+  noResultsContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: wp(5),
+  },
+  noResultsText: {
+    fontSize: Math.min(hp(2.2), wp(5.5)),
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: hp(1),
+  },
+  noResultsSubtext: {
+    fontSize: Math.min(hp(1.6), wp(4)),
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
 });

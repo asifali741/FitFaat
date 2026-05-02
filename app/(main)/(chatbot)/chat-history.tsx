@@ -1,4 +1,6 @@
+import BackButton from '@/components/BackButton';
 import { useChatbotStorage } from "@/contexts/ChatbotStorage";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { DrawerActions, useNavigation } from "@react-navigation/native";
 import { useRouter } from "expo-router";
@@ -6,7 +8,6 @@ import React, { useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useTheme } from "@/contexts/ThemeContext";
 
 export default function ChatHistoryScreen() {
   const { colors } = useTheme();
@@ -108,12 +109,7 @@ export default function ChatHistoryScreen() {
           <Ionicons name="menu" size={24} color={colors.textOnPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Chat History</Text>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Ionicons name="arrow-back" size={24} color={colors.textOnPrimary} />
-        </TouchableOpacity>
+        <BackButton style={styles.backButton} testID="chathistory-back" />
       </View>
 
       {/* Main Content */}

@@ -9,19 +9,19 @@ interface ThemeContextType {
 }
 
 const lightColors = {
-  // Primary Green Theme
-  primary: "#26867C",
-  primaryLight: "#4CAF50",
-  primaryDark: "#1B5E20",
-  primarySoft: "#E8F5E8",
+  // Primary Professional Health Theme
+  primary: "#0891B2",          // Trustworthy Teal
+  primaryLight: "#06B6D4",     // Light Teal
+  primaryDark: "#0E7490",      // Dark Teal
+  primarySoft: "#E0F2FE",      // Soft Teal Background
   
   // Secondary Colors
-  secondary: "#2E7D32",
-  accent: "#66BB6A",
-  success: "#4CAF50",
-  warning: "#FF9800",
-  error: "#F44336",
-  info: "#2196F3",
+  secondary: "#10B981",         // Vital Green
+  accent: "#06B6D4",           // Energetic Cyan
+  success: "#10B981",          // Success Green
+  warning: "#F59E0B",          // Warning Amber
+  error: "#EF4444",            // Error Red
+  info: "#0891B2",             // Info Teal
   
   // Neutrals
   white: "#FFFFFF",
@@ -33,38 +33,38 @@ const lightColors = {
   black: "#000000",
   
   // App Specific Colors
-  background: "#26867C",
-  screenColor: "#FFFFFF",
-  cardBackground: "#FFFFFF",
-  cardBorder: "#E8F5E8",
+  background: "#0891B2",       // Primary Background
+  screenColor: "#FFFFFF",      // Clean White Screen
+  cardBackground: "#FFFFFF",   // White Cards
+  cardBorder: "#E2E8F0",        // Subtle Border
   
   // Text Colors
-  textPrimary: "#2C3E50",
-  textSecondary: "#7F8C8D",
-  textLight: "#BDC3C7",
-  textOnPrimary: "#FFFFFF",
-  textOnCard: "#2C3E50",
+  textPrimary: "#0F172A",       // Deep Slate
+  textSecondary: "#64748B",     // Slate Gray
+  textLight: "#94A3B8",         // Light Slate
+  textOnPrimary: "#FFFFFF",     // White on Primary
+  textOnCard: "#0F172A",        // Dark on Cards
   
   // Button Colors
-  buttonPrimary: "#26867C",
-  buttonSecondary: "#4CAF50",
-  buttonSuccess: "#2E7D32",
-  buttonDanger: "#F44336",
-  buttonText: "#FFFFFF",
+  buttonPrimary: "#0891B2",     // Primary Teal
+  buttonSecondary: "#10B981",   // Secondary Green
+  buttonSuccess: "#10B981",     // Success Green
+  buttonDanger: "#EF4444",      // Danger Red
+  buttonText: "#FFFFFF",        // White Text
   
   // Drawer Colors
-  drawerBackground: "#26867C",
-  drawerActiveTabColor: "#4CAF50",
-  drawerTintColor: "#FFFFFF",
+  drawerBackground: "#0891B2",  // Teal Drawer
+  drawerActiveTabColor: "#10B981", // Active Green
+  drawerTintColor: "#FFFFFF",    // White Tint
   
   // Status Colors
-  activeStatus: "#4CAF50",
-  finishedStatus: "#2E7D32",
-  lockedStatus: "#9E9E9E",
+  activeStatus: "#10B981",      // Active Green
+  finishedStatus: "#10B981",    // Finished Green
+  lockedStatus: "#94A3B8",      // Locked Gray
   
   // Progress Colors
-  progressBarColor: "#4CAF50",
-  progressBackground: "#E8F5E8",
+  progressBarColor: "#10B981",  // Green Progress
+  progressBackground: "#E0F2FE", // Soft Teal Background
   
   // Shadow Colors
   shadowLight: "#E8F5E8",
@@ -78,19 +78,19 @@ const lightColors = {
 };
 
 const darkColors = {
-  // Primary Green Theme (adjusted for dark mode)
-  primary: "#26867C",
-  primaryLight: "#388E3C",
-  primaryDark: "#1B5E20",
-  primarySoft: "#263238",
+  // Primary Professional Health Theme (Dark Mode)
+  primary: "#06B6D4",           // Bright Cyan (Dark Mode)
+  primaryLight: "#22D3EE",      // Light Cyan
+  primaryDark: "#0891B2",       // Dark Teal
+  primarySoft: "#1E293B",       // Dark Slate Background
   
   // Secondary Colors
-  secondary: "#1B5E20",
-  accent: "#4CAF50",
-  success: "#388E3C",
-  warning: "#F57C00",
-  error: "#D32F2F",
-  info: "#1976D2",
+  secondary: "#10B981",         // Vital Green
+  accent: "#22D3EE",           // Bright Cyan Accent
+  success: "#10B981",          // Success Green
+  warning: "#F59E0B",          // Warning Amber
+  error: "#EF4444",            // Error Red
+  info: "#06B6D4",             // Info Cyan
   
   // Neutrals
   white: "#121212",
@@ -102,38 +102,38 @@ const darkColors = {
   black: "#FFFFFF",
   
   // App Specific Colors
-  background: "#1A1A1A",
-  screenColor: "#121212",
-  cardBackground: "#1E1E1E",
-  cardBorder: "#2C2C2C",
+  background: "#0F172A",       // Deep Slate Background
+  screenColor: "#0F172A",     // Dark Slate Screen
+  cardBackground: "#1E293B",   // Slate Card Background
+  cardBorder: "#334155",       // Slate Border
   
   // Text Colors
-  textPrimary: "#FFFFFF",
-  textSecondary: "#B0B0B0",
-  textLight: "#757575",
-  textOnPrimary: "#FFFFFF",
-  textOnCard: "#FFFFFF",
+  textPrimary: "#F1F5F9",      // Light Slate Text
+  textSecondary: "#94A3B8",     // Medium Slate
+  textLight: "#64748B",         // Dark Slate
+  textOnPrimary: "#FFFFFF",     // White on Primary
+  textOnCard: "#F1F5F9",        // Light on Cards
   
   // Button Colors
-  buttonPrimary: "#1F6B62",
-  buttonSecondary: "#388E3C",
-  buttonSuccess: "#2E7D32",
-  buttonDanger: "#D32F2F",
-  buttonText: "#FFFFFF",
+  buttonPrimary: "#06B6D4",     // Bright Cyan
+  buttonSecondary: "#10B981",   // Green
+  buttonSuccess: "#10B981",     // Success Green
+  buttonDanger: "#EF4444",      // Danger Red
+  buttonText: "#FFFFFF",        // White Text
   
   // Drawer Colors
-  drawerBackground: "#1A1A1A",
-  drawerActiveTabColor: "#4CAF50",
-  drawerTintColor: "#FFFFFF",
+  drawerBackground: "#0F172A", // Dark Slate Drawer
+  drawerActiveTabColor: "#10B981", // Active Green
+  drawerTintColor: "#F1F5F9",    // Light Tint
   
   // Status Colors
-  activeStatus: "#388E3C",
-  finishedStatus: "#2E7D32",
-  lockedStatus: "#616161",
+  activeStatus: "#10B981",      // Active Green
+  finishedStatus: "#10B981",    // Finished Green
+  lockedStatus: "#64748B",      // Locked Slate
   
   // Progress Colors
-  progressBarColor: "#388E3C",
-  progressBackground: "#1A3A37",
+  progressBarColor: "#10B981",  // Green Progress
+  progressBackground: "#1E293B", // Dark Slate Background
   
   // Shadow Colors
   shadowLight: "#000000",

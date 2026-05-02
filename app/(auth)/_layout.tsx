@@ -1,3 +1,4 @@
+console.log("TOP OF FILE")
 import { Stack } from "expo-router";
 import { useEffect } from "react";
 

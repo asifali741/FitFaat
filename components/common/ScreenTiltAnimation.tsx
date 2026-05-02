@@ -1,10 +1,11 @@
-import { colorsSheet as color } from "@/app/(main)/(settings)/_ui_elements";
+import { useTheme } from "@/contexts/ThemeContext";
 import { useDrawerProgress } from "@react-navigation/drawer";
 import React, { ReactNode } from "react";
 import { View } from "react-native";
 import Animated, { interpolate, useAnimatedStyle } from "react-native-reanimated";
 
 export const ScreenSceneWrapper = ({ children }: { children: ReactNode }) => {
+  const { colors } = useTheme();
   const progress = useDrawerProgress(); // direct from drawer
 
   const animatedStyle = useAnimatedStyle(() => {
@@ -29,9 +30,9 @@ export const ScreenSceneWrapper = ({ children }: { children: ReactNode }) => {
 
 
   return (
-    <View style={{ flex: 1, backgroundColor: color.background }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Animated.View
-        style={[{ flex: 1, backgroundColor: color.screenColor }, animatedStyle]}
+        style={[{ flex: 1, backgroundColor: colors.screenColor }, animatedStyle]}
       >
         {children}
       </Animated.View>

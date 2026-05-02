@@ -1,10 +1,10 @@
-import { useTheme } from "@/contexts/ThemeContext";
 import AppHeader from "@/components/AppHeader";
 import Message from "@/components/Message";
 import { useChatbotStorage } from "@/contexts/ChatbotStorage";
+import { useTheme } from "@/contexts/ThemeContext";
 import Controls from "@/Control/controls";
 import { useRouter } from "expo-router";
-import React, { useEffect } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import { FlatList, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -32,9 +32,17 @@ export default function Baat() {
     addMessage, 
     createNewSession, 
     currentSession,
-    isLoading 
+    isLoading,
+    clearAllChats
   } = useChatbotStorage();
   const router = useRouter();
+  const flatListRef = useRef<FlatList>(null);
+  
+  // Keep a stable ref to addMessage even if it changes
+  const addMessageRef = useRef(addMessage);
+  useEffect(() => {
+    addMessageRef.current = addMessage;
+  }, [addMessage]);
 
   // Initialize session and load messages
   useEffect(() => {
@@ -52,18 +60,33 @@ export default function Baat() {
       }))
     : [WelcomeText];
 
-  const handleAddMessage = (text: string, isUser: boolean) => {
-    addMessage(text, isUser);
-  };
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (displayMessages.length > 0) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [displayMessages.length]);
+
+  const handleAddMessage = useCallback((text: string, isUser: boolean, source?: string) => {
+    try {
+      addMessageRef.current(text, isUser);
+    } catch (err) {
+      console.error('Error adding message:', err);
+    }
+  }, []); // Empty dependency array since we use ref
 
   const styles = getStyles(colors, insets);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <AppHeader 
-        title="HeaLora Chat"
-        showStepIndicator={false}
-      />
+      <View style={styles.headerContainer}>
+        <AppHeader 
+          title="HeaLora Chat"
+          showStepIndicator={false}
+        />
+      </View>
 
       {/* Chat Content */}
       <View style={styles.content}>
@@ -78,6 +101,7 @@ export default function Baat() {
         
         <View style={styles.chatSection}>
           <FlatList
+            ref={flatListRef}
             data={displayMessages}
             keyExtractor={(_, index) => index.toString()}
             renderItem={({ item }) => <Message msg={item} />}
@@ -85,6 +109,7 @@ export default function Baat() {
             showsVerticalScrollIndicator={false}
             keyboardDismissMode="on-drag"
             keyboardShouldPersistTaps="handled"
+            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
           />
         </View>
         
@@ -93,7 +118,10 @@ export default function Baat() {
           keyboardVerticalOffset={Platform.OS === 'ios' ? hp(10) : 0}
         >
           <View style={styles.inputContainer}>
-            <Controls onAddMessage={handleAddMessage} />
+            <Controls 
+              onAddMessage={handleAddMessage}
+              sessionId={currentSession?.id}
+            />
           </View>
         </KeyboardAvoidingView>
       </View>
@@ -105,6 +133,14 @@ const getStyles = (colors: any, insets: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.primary,
+  },
+  headerContainer: {
+    position: 'relative',
+  },
+  clearButtonText: {
+    color: '#fff',
+    fontSize: hp(1.6),
+    fontWeight: '600',
   },
   content: {
     flex: 1,
@@ -142,7 +178,7 @@ const getStyles = (colors: any, insets: any) => StyleSheet.create({
   },
   messageList: {
     padding: hp(1),
-    paddingBottom: hp(12), // Extra padding to account for fixed input bar
+    paddingBottom: Platform.OS === 'ios' ? hp(20) : hp(18),
     flexGrow: 1,
   },
   inputContainer: {

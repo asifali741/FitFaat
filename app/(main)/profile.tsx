@@ -1,16 +1,32 @@
 import AppHeader from "@/components/AppHeader";
+import { BottomTabBar } from "@/components/BottomTabBar";
 import { useAppointments } from "@/contexts/AppointmentContext";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
+import Constants from "expo-constants";
 import { useRouter } from "expo-router";
+import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from "react";
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import {
-  heightPercentageToDP as hp,
-  widthPercentageToDP as wp,
+    heightPercentageToDP as hp,
+    widthPercentageToDP as wp,
 } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { colorsSheet } from "./(settings)/_ui_elements";
+import { theme } from "@/constants/theme";
+
+const ENV = Constants.expoConfig?.extra;
+
+const getAPIURL = () => {
+  const envUrl = ENV?.EXPO_PUBLIC_BACKEND_API_URL;
+  if (envUrl) {
+    return envUrl.replace(/\/api\/?$/, '');
+  }
+  const defaultHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
+  return `http://${defaultHost}:5001`;
+};
+
+const API_URL = getAPIURL();
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -19,12 +35,34 @@ export default function ProfileScreen() {
   const activeAppointments = getActiveAppointments();
   const [selectedTab, setSelectedTab] = useState('overview');
   const [user, setUser] = useState<any>(null);
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const loadUser = async () => {
       try {
         const userData = await tokenStorage.getUser();
         setUser(userData);
+        
+        // Fetch profile image from backend
+        const token = await SecureStore.getItemAsync('fitfaat_auth_token');
+        if (token) {
+          try {
+            const response = await fetch(`${API_URL}/api/user/profile-picture`, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            });
+
+            const data = await response.json();
+            if (data.success && data.data.imageUrl) {
+              setProfileImageUrl(`${API_URL}${data.data.imageUrl}`);
+            }
+          } catch (error) {
+            console.log('No profile picture found, using default');
+          }
+        }
       } catch (error) {
         console.error('Error loading user:', error);
       }
@@ -55,22 +93,23 @@ export default function ProfileScreen() {
   };
 
   const quickActions = [
-    { title: "Book Appointment", icon: "📅", color: colorsSheet.primary, action: () => router.push('/(main)/(conference)') },
-    { title: "Chat History", icon: "💬", color: colorsSheet.info, action: () => router.push('/(main)/(chatbot)/chat-history') },
-    { title: "Health Records", icon: "📋", color: colorsSheet.secondary, action: () => console.log("Health Records") },
-    { title: "Emergency Contact", icon: "🚨", color: colorsSheet.error, action: () => console.log("Emergency Contact") },
+    { title: "Book Appointment", icon: "📅", color: theme.colors.primary, action: () => router.push('/(main)/(conference)') },
+    { title: "Chat History", icon: "💬", color: theme.colors.info, action: () => router.push('/(main)/(chatbot)/chat-history') },
+    { title: "Health Records", icon: "📋", color: theme.colors.secondary, action: () => console.log("Health Records") },
+    { title: "Emergency Contact", icon: "🚨", color: theme.colors.error, action: () => console.log("Emergency Contact") },
   ];
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
-      <AppHeader 
-        title="My Profile"
-        showStepIndicator={false}
-        showMenuButton={true}
-      />
+    <View style={{ flex: 1 }}>
+      <SafeAreaView style={styles.container} edges={['bottom']}>
+        <AppHeader 
+          title="My Profile"
+          showStepIndicator={false}
+          showMenuButton={true}
+        />
 
-      <View style={styles.content}>
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <View style={styles.content}>
+          <ScrollView showsVerticalScrollIndicator={false}>
         {/* Profile Picture Section */}
         <View style={{
           alignItems: 'center',
@@ -91,7 +130,11 @@ export default function ProfileScreen() {
             marginBottom: hp(2),
           }}>
             <Image 
-              source={require("../../assets/images/Default_Profile.png")}
+              source={
+                profileImageUrl
+                  ? { uri: profileImageUrl }
+                  : require("../../assets/images/Default_Profile.png")
+              }
               style={{
                 width: hp(12),
                 height: hp(12),
@@ -217,7 +260,7 @@ export default function ProfileScreen() {
                   >
                     <View style={styles.historyCardHeader}>
                       <View style={styles.historyIcon}>
-                        <Ionicons name="checkmark-circle" size={20} color={colorsSheet.success} />
+                        <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />
                       </View>
                       <View style={styles.historyInfo}>
                         <Text style={styles.historyTitle}>Completed Consultation</Text>
@@ -243,7 +286,7 @@ export default function ProfileScreen() {
                   >
                     <View style={styles.historyCardHeader}>
                       <View style={styles.historyIcon}>
-                        <Ionicons name="close-circle" size={20} color={colorsSheet.error} />
+                        <Ionicons name="close-circle" size={20} color={theme.colors.error} />
                       </View>
                       <View style={styles.historyInfo}>
                         <Text style={styles.historyTitle}>Cancelled Appointment</Text>
@@ -289,7 +332,7 @@ export default function ProfileScreen() {
                   <Text style={styles.achievementDescription}>{achievement.description}</Text>
                   {achievement.earned && (
                     <View style={styles.achievementBadge}>
-                      <Ionicons name="checkmark" size={16} color={colorsSheet.textOnPrimary} />
+                      <Ionicons name="checkmark" size={16} color={theme.colors.textOnPrimary} />
                     </View>
                   )}
                 </View>
@@ -312,7 +355,7 @@ export default function ProfileScreen() {
               >
                 <View style={styles.appointmentHeader}>
                   <View style={styles.appointmentIcon}>
-                    <Ionicons name="videocam" size={20} color={colorsSheet.textOnPrimary} />
+                    <Ionicons name="videocam" size={20} color={theme.colors.textOnPrimary} />
                   </View>
                   <View style={styles.appointmentInfo}>
                     <Text style={styles.appointmentTitle}>Active Session</Text>
@@ -338,7 +381,7 @@ export default function ProfileScreen() {
               >
                 <View style={styles.appointmentHeader}>
                   <View style={styles.appointmentIcon}>
-                    <Ionicons name="calendar" size={20} color={colorsSheet.primary} />
+                    <Ionicons name="calendar" size={20} color={theme.colors.primary} />
                   </View>
                   <View style={styles.appointmentInfo}>
                     <Text style={styles.appointmentTitle}>Upcoming Appointment</Text>
@@ -361,17 +404,19 @@ export default function ProfileScreen() {
         </ScrollView>
       </View>
     </SafeAreaView>
+    <BottomTabBar />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: theme.colors.primary,
   },
   content: {
     flex: 1,
-    backgroundColor: colorsSheet.screenColor,
+    backgroundColor: theme.colors.screenColor,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
   },
@@ -396,11 +441,11 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
     borderLeftWidth: 4,
-    borderLeftColor: colorsSheet.primary,
+    borderLeftColor: theme.colors.primary,
   },
   activeAppointmentCard: {
-    backgroundColor: colorsSheet.primarySoft,
-    borderLeftColor: colorsSheet.success,
+    backgroundColor: theme.colors.primarySoft,
+    borderLeftColor: theme.colors.success,
   },
   appointmentHeader: {
     flexDirection: 'row',
@@ -411,7 +456,7 @@ const styles = StyleSheet.create({
     width: hp(4),
     height: hp(4),
     borderRadius: hp(2),
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: wp(3),
@@ -430,7 +475,7 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   appointmentStatus: {
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: theme.colors.primary,
     paddingHorizontal: wp(3),
     paddingVertical: hp(0.5),
     borderRadius: hp(1),
@@ -438,7 +483,7 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: hp(1.2),
     fontWeight: 'bold',
-    color: colorsSheet.textOnPrimary,
+    color: theme.colors.textOnPrimary,
   },
   appointmentDetails: {
     marginLeft: hp(5),
@@ -456,7 +501,7 @@ const styles = StyleSheet.create({
   },
   appointmentSpecialty: {
     fontSize: hp(1.3),
-    color: colorsSheet.primary,
+    color: theme.colors.primary,
     fontWeight: '500',
   },
   // Tab Navigation Styles
@@ -480,7 +525,7 @@ const styles = StyleSheet.create({
     borderRadius: hp(1.5),
   },
   activeTab: {
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: theme.colors.primary,
   },
   tabText: {
     fontSize: hp(1.6),
@@ -488,7 +533,7 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   activeTabText: {
-    color: colorsSheet.textOnPrimary,
+    color: theme.colors.textOnPrimary,
   },
   // Health Statistics Styles
   statsSection: {
@@ -515,7 +560,7 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: hp(2.5),
     fontWeight: 'bold',
-    color: colorsSheet.primary,
+    color: theme.colors.primary,
     marginBottom: hp(0.5),
   },
   statLabel: {
@@ -582,11 +627,11 @@ const styles = StyleSheet.create({
   },
   completedCard: {
     borderLeftWidth: 4,
-    borderLeftColor: colorsSheet.success,
+    borderLeftColor: theme.colors.success,
   },
   cancelledCard: {
     borderLeftWidth: 4,
-    borderLeftColor: colorsSheet.error,
+    borderLeftColor: theme.colors.error,
   },
   historyCardHeader: {
     flexDirection: 'row',
@@ -615,7 +660,7 @@ const styles = StyleSheet.create({
   },
   historySpecialty: {
     fontSize: hp(1.3),
-    color: colorsSheet.primary,
+    color: theme.colors.primary,
     fontWeight: '500',
   },
   // Empty State Styles
@@ -664,7 +709,7 @@ const styles = StyleSheet.create({
   },
   achievementEarned: {
     borderWidth: 2,
-    borderColor: colorsSheet.success,
+    borderColor: theme.colors.success,
   },
   achievementLocked: {
     opacity: 0.6,
@@ -695,7 +740,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: hp(1),
     right: hp(1),
-    backgroundColor: colorsSheet.success,
+    backgroundColor: theme.colors.success,
     borderRadius: hp(1),
     width: hp(2),
     height: hp(2),

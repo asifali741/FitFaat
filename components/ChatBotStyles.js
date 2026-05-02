@@ -1,15 +1,15 @@
-import { colorsSheet as colors } from "@/app/(main)/(settings)/_ui_elements";
+import { theme } from "@/constants/theme";
 import { StyleSheet } from "react-native";
 import {
-  heightPercentageToDP as hp,
-  widthPercentageToDP as wp,
+    heightPercentageToDP as hp,
+    widthPercentageToDP as wp,
 } from "react-native-responsive-screen";
 export const ChatBotStyles = StyleSheet.create({
   container: {
     width: '100%',
     height: '100%',
     alignItems: "center",
-    backgroundColor: colors.screenColor, //"#F8F9FA",
+    backgroundColor: theme.colors.screenColor, //"#F8F9FA",
   },
   indexImage: {
     height: hp(22),

@@ -1,10 +1,11 @@
-import React, { useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View, ScrollView, TextInput } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import BackButton from '@/components/BackButton';
+import { theme } from "@/constants/theme";
 import { Ionicons } from "@expo/vector-icons";
-import { colorsSheet } from "../(settings)/_ui_elements";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useState } from "react";
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { getDoctorById } from "./_doctorsData";
 
 export default function BookingConfirmationScreen() {
@@ -47,9 +48,7 @@ export default function BookingConfirmationScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={colorsSheet.textOnPrimary} />
-        </TouchableOpacity>
+        <BackButton style={styles.backButton} testID="booking-confirmation-back" />
         <Text style={styles.headerTitle}>Finalize Booking</Text>
         <View style={styles.spacer} />
       </View>
@@ -58,7 +57,7 @@ export default function BookingConfirmationScreen() {
         {/* Doctor Info Card */}
         <View style={styles.infoCard}>
           <View style={styles.avatarContainer}>
-            <Ionicons name="person-circle" size={60} color={colorsSheet.primary} />
+            <Ionicons name="person-circle" size={60} color={theme.colors.primary} />
           </View>
           <View style={styles.doctorInfoText}>
             <Text style={styles.doctorName}>{doctor.name}</Text>
@@ -116,7 +115,7 @@ export default function BookingConfirmationScreen() {
               <TextInput
                 style={styles.problemInput}
                 placeholder="Enter your symptoms or concerns..."
-                placeholderTextColor={colorsSheet.textLight}
+                placeholderTextColor={theme.colors.textLight}
                 multiline
                 numberOfLines={4}
                 value={problemDescription}
@@ -142,7 +141,7 @@ export default function BookingConfirmationScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colorsSheet.primary,
+    backgroundColor: theme.colors.primary,
   },
   header: {
     flexDirection: "row",
@@ -157,7 +156,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: hp(2.2),
     fontWeight: "bold",
-    color: colorsSheet.textOnPrimary,
+    color: theme.colors.textOnPrimary,
     flex: 1,
     textAlign: "center",
   },
@@ -166,7 +165,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: colorsSheet.screenColor,
+    backgroundColor: theme.colors.screenColor,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     paddingTop: hp(3),
@@ -175,11 +174,11 @@ const styles = StyleSheet.create({
   infoCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colorsSheet.white,
+    backgroundColor: theme.colors.white,
     borderRadius: 15,
     padding: wp(4),
     marginBottom: hp(2),
-    shadowColor: colorsSheet.primary,
+    shadowColor: theme.colors.primary,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -197,12 +196,12 @@ const styles = StyleSheet.create({
   doctorName: {
     fontSize: hp(2),
     fontWeight: "600",
-    color: colorsSheet.textPrimary,
+    color: theme.colors.textPrimary,
     marginBottom: hp(0.5),
   },
   doctorSpecialty: {
     fontSize: hp(1.6),
-    color: colorsSheet.textSecondary,
+    color: theme.colors.textSecondary,
   },
   section: {
     marginBottom: hp(2),
@@ -210,14 +209,14 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: hp(2),
     fontWeight: "600",
-    color: colorsSheet.textPrimary,
+    color: theme.colors.textPrimary,
     marginBottom: hp(1.5),
   },
   detailBox: {
-    backgroundColor: colorsSheet.white,
+    backgroundColor: theme.colors.white,
     borderRadius: 15,
     padding: wp(4),
-    shadowColor: colorsSheet.primary,
+    shadowColor: theme.colors.primary,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -232,17 +231,17 @@ const styles = StyleSheet.create({
   detailLabel: {
     fontSize: hp(1.7),
     fontWeight: "600",
-    color: colorsSheet.textSecondary,
+    color: theme.colors.textSecondary,
     marginBottom: hp(0.8),
   },
   detailValue: {
     fontSize: hp(1.9),
-    color: colorsSheet.textPrimary,
+    color: theme.colors.textPrimary,
     fontWeight: "500",
   },
   divider: {
     height: 1,
-    backgroundColor: colorsSheet.gray,
+    backgroundColor: theme.colors.gray,
     marginVertical: hp(1),
   },
   timePickerContainer: {
@@ -251,46 +250,46 @@ const styles = StyleSheet.create({
     gap: wp(2),
   },
   timeSlot: {
-    backgroundColor: colorsSheet.primarySoft,
+    backgroundColor: theme.colors.primarySoft,
     paddingHorizontal: wp(4),
     paddingVertical: hp(1),
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: colorsSheet.primarySoft,
+    borderColor: theme.colors.primarySoft,
   },
   timeSlotSelected: {
-    backgroundColor: colorsSheet.primary,
-    borderColor: colorsSheet.primary,
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
   },
   timeSlotText: {
     fontSize: hp(1.6),
-    color: colorsSheet.textPrimary,
+    color: theme.colors.textPrimary,
     fontWeight: "500",
   },
   timeSlotTextSelected: {
-    color: colorsSheet.white,
+    color: theme.colors.white,
     fontWeight: "600",
   },
   problemSection: {
     paddingVertical: hp(1),
   },
   problemInput: {
-    backgroundColor: colorsSheet.primarySoft,
+    backgroundColor: theme.colors.primarySoft,
     borderRadius: 12,
     padding: wp(3),
     fontSize: hp(1.7),
-    color: colorsSheet.textPrimary,
+    color: theme.colors.textPrimary,
     minHeight: hp(12),
   },
   continueButton: {
-    backgroundColor: colorsSheet.black,
+    backgroundColor: theme.colors.black,
     paddingVertical: hp(2),
     paddingHorizontal: wp(6),
     borderRadius: 25,
     alignItems: "center",
     justifyContent: "center",
     marginVertical: hp(3),
-    shadowColor: colorsSheet.black,
+    shadowColor: theme.colors.black,
     shadowOffset: {
       width: 0,
       height: 3,
@@ -300,7 +299,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   continueButtonText: {
-    color: colorsSheet.white,
+    color: theme.colors.white,
     fontSize: hp(2),
     fontWeight: "600",
   },

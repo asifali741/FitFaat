@@ -53,6 +53,10 @@ export default function Settings() {
         router.push("/payment-methods");
         break;
       
+      case "Premium":
+        router.push("/premium");
+        break;
+      
       case "Workout Preferences":
         router.push("/(exercises)/workout");
         break;
@@ -350,6 +354,12 @@ export default function Settings() {
               subtitle="Manage your payment options"
               onPress={() => handleSettingPress("Payment Methods")}
             />
+            <SettingItem
+              icon="star-outline"
+              title="Premium"
+              subtitle="Upgrade to unlock premium features"
+              onPress={() => handleSettingPress("Premium")}
+            />
           </View>
 
           {/* Preferences Section */}
@@ -359,15 +369,7 @@ export default function Settings() {
               icon="notifications-outline"
               title="Notifications"
               subtitle="Manage notification preferences"
-              rightComponent={
-                <Switch
-                  value={notifications}
-                  onValueChange={setNotifications}
-                  trackColor={{ false: colors.textSecondary + '40', true: colors.primary + '40' }}
-                  thumbColor={notifications ? colors.primary : colors.textSecondary}
-                />
-              }
-              showArrow={false}
+              onPress={() => router.push("/notification-settings")}
             />
             <SettingItem
               icon="moon-outline"

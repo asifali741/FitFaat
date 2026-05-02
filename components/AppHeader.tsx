@@ -44,8 +44,30 @@ export default function AppHeader({
   const handleBackPress = () => {
     if (onBackPress) {
       onBackPress();
-    } else {
+      return;
+    }
+
+    try {
+      // Prefer navigation.goBack if available
+      // @ts-ignore
+      if (navigation && typeof (navigation as any).canGoBack === 'function' && (navigation as any).canGoBack()) {
+        // @ts-ignore
+        (navigation as any).goBack();
+        return;
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    try {
       router.back();
+    } catch (e) {
+      // fallback: replace to dashboard
+      try {
+        router.replace('/(main)/(dashboard)');
+      } catch (err) {
+        // ignore
+      }
     }
   };
 
@@ -73,7 +95,7 @@ export default function AppHeader({
               onPress={onNotificationPress}
             >
               <Ionicons name="notifications" size={24} color={colors.textOnPrimary} />
-              {notificationCount && notificationCount > 0 && (
+              {notificationCount > 0 && (
                 <View style={[styles.badge, { backgroundColor: '#FF6B6B' }]}>
                   <Text style={styles.badgeText}>
                     {notificationCount > 99 ? '99+' : notificationCount}
