@@ -22,6 +22,7 @@ import {
     widthPercentageToDP as wp,
 } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { getBackendBaseUrl } from '@/utils/config';
 
 interface PaymentMethod {
   id: string;
@@ -49,7 +50,7 @@ export default function PaymentMethods() {
   });
 
   const ENV = Constants.expoConfig?.extra;
-  const API_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === "android" ? "http://10.0.2.2:5001" : "http://localhost:5001")).replace(/\/api\/?$/, '');
+  const API_URL = getBackendBaseUrl();
 
   useFocusEffect(
     useCallback(() => {

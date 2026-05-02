@@ -1,8 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import Constants from 'expo-constants';
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { Platform } from 'react-native';
+import { getBackendBaseUrl } from '@/utils/config';
 
 interface NewsItem {
   _id: string;
@@ -41,19 +40,7 @@ export const NewsProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const previousIdsRef = useRef<Set<string>>(new Set());
 
-  // Get the correct API URL based on platform
-  const getApiUrl = () => {
-    const ENV = Constants.expoConfig?.extra;
-    if (ENV?.EXPO_PUBLIC_BACKEND_API_URL) {
-      return ENV.EXPO_PUBLIC_BACKEND_API_URL.replace(/\/api\/?$/, '');
-    }
-    if (Platform.OS === 'android') {
-      return 'http://10.0.2.2:5001';
-    }
-    return 'http://localhost:5001';
-  };
-
-  const API_BASE_URL = getApiUrl();
+  const API_BASE_URL = getBackendBaseUrl();
 
   // Load read news from storage
   const loadReadNews = async () => {

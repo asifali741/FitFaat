@@ -1,27 +1,11 @@
-import Constants from 'expo-constants';
-import { Platform } from 'react-native';
-
-const ENV = Constants.expoConfig?.extra;
+import { getBackendBaseUrl } from './config';
 
 /**
- * Get the correct API base URL for the current platform
- * - Android Emulator: 10.0.2.2 (special IP to reach host)
- * - iOS Simulator: localhost
- * - Physical device: Use environment variable or localhost
+ * Get the correct API base URL for the current platform.
+ * Uses the centralized config helper for reliable access across all environments.
  */
 export const getApiBaseUrl = (): string => {
-  // Use environment variable if available
-  if (ENV?.EXPO_PUBLIC_BACKEND_API_URL) {
-    return ENV.EXPO_PUBLIC_BACKEND_API_URL.replace(/\/api\/?$/, '');
-  }
-  
-  // For Android Emulator, use 10.0.2.2 to reach the host machine
-  if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:5001';
-  }
-  
-  // For iOS or other platforms
-  return 'http://localhost:5001';
+  return getBackendBaseUrl();
 };
 
 /**

@@ -10,7 +10,8 @@ import {
   heightPercentageToDP as hp
 } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { getStarted } from "../../components/getStarted";
+import { useTheme } from "@/contexts/ThemeContext";
+import { createGetStartedStyles } from "../../components/getStarted";
 
 const mission = [
   {
@@ -38,6 +39,8 @@ const mission = [
 
 export default function Index() {
   const router = useRouter();
+  const { colors } = useTheme();
+  const screenStyles = createGetStartedStyles(colors);
 
   const [fontsLoaded] = useFonts({
     Pacifico: require("../../assets/fonts/Pacifico-Regular.ttf"),
@@ -50,90 +53,90 @@ export default function Index() {
   }
 
   return (
-    <SafeAreaView style={getStarted.container}>
+    <SafeAreaView style={screenStyles.container}>
       <ScrollView 
-        contentContainerStyle={getStarted.scrollContent}
+        contentContainerStyle={screenStyles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {/* Decorative Header with Gradient */}
-        <View style={getStarted.decorativeHeader}>
-          <View style={[getStarted.gradientCircle, getStarted.circle1]} />
-          <View style={[getStarted.gradientCircle, getStarted.circle2]} />
+        <View style={screenStyles.decorativeHeader}>
+          <View style={[screenStyles.gradientCircle, screenStyles.circle1]} />
+          <View style={[screenStyles.gradientCircle, screenStyles.circle2]} />
         </View>
 
         {/* Logo Section */}
-        <View style={getStarted.logoSection}>
-          <View style={getStarted.logoBadge}>
+        <View style={screenStyles.logoSection}>
+          <View style={screenStyles.logoBadge}>
             <Image
               source={require("../../assets/images/logo.png")}
-              style={getStarted.logoSize}
+              style={screenStyles.logoSize}
             />
           </View>
-          <Text style={getStarted.mainHeading}>FitFaat</Text>
-          <Text style={getStarted.taglineSmall}>Transform Your Body, Transform Your Life</Text>
+          <Text style={screenStyles.mainHeading}>FitFaat</Text>
+          <Text style={screenStyles.taglineSmall}>Transform Your Body, Transform Your Life</Text>
         </View>
 
         {/* Instructions Card */}
-        <View style={getStarted.instructionCard}>
-          <View style={getStarted.sectionHeader}>
-            <Ionicons name="list-outline" size={hp(2.8)} color="#26867C" />
-            <Text style={getStarted.instructionTitle}>Setup Steps</Text>
+        <View style={screenStyles.instructionCard}>
+          <View style={screenStyles.sectionHeader}>
+            <Ionicons name="list-outline" size={hp(2.8)} color={colors.primary} />
+            <Text style={screenStyles.instructionTitle}>Setup Steps</Text>
           </View>
           
-          <View style={getStarted.stepsList}>
-            <StepItem number="1" text="Create your account" icon="create-outline" />
-            <StepItem number="2" text="Set your fitness goals" icon="target-outline" />
-            <StepItem number="3" text="Enter your details" icon="person-outline" />
-            <StepItem number="4" text="Get personalized plan" icon="flash-outline" />
+          <View style={screenStyles.stepsList}>
+            <StepItem number="1" text="Create your account" icon="create-outline" styles={screenStyles} colors={colors} />
+            <StepItem number="2" text="Set your fitness goals" icon="target-outline" styles={screenStyles} colors={colors} />
+            <StepItem number="3" text="Enter your details" icon="person-outline" styles={screenStyles} colors={colors} />
+            <StepItem number="4" text="Get personalized plan" icon="flash-outline" styles={screenStyles} colors={colors} />
           </View>
         </View>
 
         {/* Mission Cards */}
-        <View style={getStarted.missionContainer}>
-          <View style={getStarted.sectionHeader}>
-            <Ionicons name="rocket-outline" size={hp(2.8)} color="#26867C" />
-            <Text style={getStarted.missionTitle}>Your Goals</Text>
+        <View style={screenStyles.missionContainer}>
+          <View style={screenStyles.sectionHeader}>
+            <Ionicons name="rocket-outline" size={hp(2.8)} color={colors.primary} />
+            <Text style={screenStyles.missionTitle}>Your Goals</Text>
           </View>
           
-          <View style={getStarted.goalsGrid}>
+          <View style={screenStyles.goalsGrid}>
             {mission.map((item) => (
-              <GoalCard key={item.id} item={item} />
+              <GoalCard key={item.id} item={item} styles={screenStyles} />
             ))}
           </View>
         </View>
 
         {/* Benefits Section */}
-        <View style={getStarted.benefitsContainer}>
-          <Text style={getStarted.benefitsTitle}>Why Choose FitFaat?</Text>
-          <BenefitItem icon="checkmark-circle" text="Personalized diet plans" />
-          <BenefitItem icon="checkmark-circle" text="Expert nutritional guidance" />
-          <BenefitItem icon="checkmark-circle" text="Real-time progress tracking" />
-          <BenefitItem icon="checkmark-circle" text="Community support & motivation" />
+        <View style={screenStyles.benefitsContainer}>
+          <Text style={screenStyles.benefitsTitle}>Why Choose FitFaat?</Text>
+          <BenefitItem icon="checkmark-circle" text="Personalized diet plans" styles={screenStyles} colors={colors} />
+          <BenefitItem icon="checkmark-circle" text="Expert nutritional guidance" styles={screenStyles} colors={colors} />
+          <BenefitItem icon="checkmark-circle" text="Real-time progress tracking" styles={screenStyles} colors={colors} />
+          <BenefitItem icon="checkmark-circle" text="Community support & motivation" styles={screenStyles} colors={colors} />
         </View>
 
         {/* CTA Section */}
-        <View style={getStarted.ctaSection}>
-          <Text style={getStarted.ctaDescription}>
+        <View style={screenStyles.ctaSection}>
+          <Text style={screenStyles.ctaDescription}>
             Ready to start your transformation journey?
           </Text>
           <TouchableOpacity
-            style={getStarted.getStartedButton}
+            style={screenStyles.getStartedButton}
             onPress={() => router.push('/DietSection/InformationForm')}
             activeOpacity={0.8}
           >
-            <Text style={getStarted.getStartedButtonText}>
+            <Text style={screenStyles.getStartedButtonText}>
               Get Started with Diet Plan
             </Text>
-            <Ionicons name="arrow-forward" size={hp(2.2)} color="#FFFFFF" />
+            <Ionicons name="arrow-forward" size={hp(2.2)} color={colors.textOnPrimary} />
           </TouchableOpacity>
         </View>
 
         {/* Footer */}
-        <View style={getStarted.footerSection}>
-          <Text style={getStarted.copyRightText}>
+        <View style={screenStyles.footerSection}>
+          <Text style={screenStyles.copyRightText}>
             © 2025 FitFaat. All rights reserved.
           </Text>
-          <Text style={getStarted.footerTagline}>
+          <Text style={screenStyles.footerTagline}>
             Empowering your fitness journey
           </Text>
         </View>
@@ -143,41 +146,41 @@ export default function Index() {
 }
 
 // Reusable Components
-const StepItem = ({ number, text, icon }: any) => {
+const StepItem = ({ number, text, icon, styles, colors }: any) => {
   return (
-    <View style={getStarted.stepItem}>
-      <View style={getStarted.stepNumberBadge}>
-        <Text style={getStarted.stepNumber}>{number}</Text>
+    <View style={styles.stepItem}>
+      <View style={styles.stepNumberBadge}>
+        <Text style={styles.stepNumber}>{number}</Text>
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={getStarted.stepText}>{text}</Text>
+        <Text style={styles.stepText}>{text}</Text>
       </View>
-      <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={hp(2.4)} color="#26867C" />
+      <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={hp(2.4)} color={colors.primary} />
     </View>
   );
 };
 
-const GoalCard = ({ item }: any) => {
+const GoalCard = ({ item, styles }: any) => {
   return (
-    <View style={getStarted.goalCard}>
-      <View style={[getStarted.goalIconContainer, { backgroundColor: item.color + '15' }]}>
+    <View style={styles.goalCard}>
+      <View style={[styles.goalIconContainer, { backgroundColor: item.color + '15' }]}>
         <Ionicons
           name={item.icon as keyof typeof Ionicons.glyphMap}
           size={hp(3.5)}
           color={item.color}
         />
       </View>
-      <Text style={getStarted.goalName}>{item.name}</Text>
-      <Text style={getStarted.goalDescription}>{item.description}</Text>
+      <Text style={styles.goalName}>{item.name}</Text>
+      <Text style={styles.goalDescription}>{item.description}</Text>
     </View>
   );
 };
 
-const BenefitItem = ({ icon, text }: any) => {
+const BenefitItem = ({ icon, text, styles, colors }: any) => {
   return (
-    <View style={getStarted.benefitItem}>
-      <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={hp(2.4)} color="#4ECDC4" />
-      <Text style={getStarted.benefitText}>{text}</Text>
+    <View style={styles.benefitItem}>
+      <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={hp(2.4)} color={colors.secondary} />
+      <Text style={styles.benefitText}>{text}</Text>
     </View>
   );
 };

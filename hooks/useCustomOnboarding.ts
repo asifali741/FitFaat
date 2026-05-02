@@ -21,7 +21,6 @@ export const useCustomOnboarding = () => {
       const heightFeet = parseFloat(userInfo.height);
       const heightInCm = heightFeet * 30.48;
 
-      // Convert string values to numbers where needed and send to backend
       await authApi.completeOnboarding({
         name: userInfo.name.trim(),
         height: heightInCm,

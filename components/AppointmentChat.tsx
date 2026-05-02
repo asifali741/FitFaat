@@ -1,31 +1,39 @@
 import BackButton from '@/components/BackButton';
 import DietPlanModal from '@/components/DietPlanModal';
-import IncomingCallModal from '@/components/IncomingCallModal';
 import VideoCallButton from '@/components/VideoCallButton';
 import { theme } from '@/constants/theme';
-import { useVideoCall } from '@/hooks/useVideoCall';
+import { useTheme } from '@/contexts/ThemeContext';
 import { tokenStorage } from '@/utils/auth/tokenStorage';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import Constants from 'expo-constants';
+import * as SystemUI from 'expo-system-ui';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
-  SafeAreaView,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
+import type { KeyboardEvent } from 'react-native';
+import {
+  heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
+} from 'react-native-responsive-screen';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { io, Socket } from 'socket.io-client';
+import { getBackendBaseUrl } from '@/utils/config';
 
 interface ChatMessage {
   _id: string;
@@ -41,14 +49,18 @@ interface ChatMessage {
 
 // Remove /api from BACKEND_URL since routes already include it
 const ENV = Constants.expoConfig?.extra;
-const BACKEND_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')).replace(/\/api\/?$/, '');
+const BACKEND_URL = getBackendBaseUrl();
+const ANDROID_KEYBOARD_EXTRA_LIFT = hp(11);
 
 interface AppointmentChatProps {
   appointmentId: string;
 }
 
 export default function AppointmentChat({ appointmentId }: AppointmentChatProps) {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
@@ -74,31 +86,57 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
   const [showDietPlanModal, setShowDietPlanModal] = useState(false);
   const [loadingDietPlan, setLoadingDietPlan] = useState(false);
   const [appointmentData, setAppointmentData] = useState<any>(null);
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+  const [keyboardLift, setKeyboardLift] = useState(0);
   
   const socketRef = useRef<Socket | null>(null);
   const flatListRef = useRef<FlatList | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
   const timerIntervalRef = useRef<number | null>(null);
   const isInVideoCall = useRef<boolean>(false);
+  const androidNavigationBarHeight = Platform.OS === 'android' && !isKeyboardVisible ? insets.bottom : 0;
+  const inputBottomPadding = isKeyboardVisible
+    ? hp(0.6)
+    : Platform.OS === 'android'
+      ? hp(1.4)
+      : Math.max(insets.bottom, hp(1.5));
 
-  // Video call functionality
-  const {
-    initiateCall,
-    acceptCall,
-    rejectCall,
-    incomingCall,
-    isCallInProgress,
-    isInitiatingCall,
-    isVideoCallAvailable,
-  } = useVideoCall({
-    socketRef,
-    appointmentId,
-    userRole,
-    otherUserId,
-    otherUserName,
-    canSend,
-    isInVideoCallRef: isInVideoCall,
-  });
+  const scrollToBottom = useCallback((animated = true) => {
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated });
+      }, Platform.OS === 'ios' ? 80 : 120);
+    });
+  }, []);
+
+  useEffect(() => {
+    const handleKeyboardShow = (event: KeyboardEvent) => {
+      Keyboard.scheduleLayoutAnimation(event);
+      setKeyboardVisible(true);
+      setKeyboardLift(
+        Platform.OS === 'android'
+          ? Math.max(0, (event.endCoordinates?.height ?? 0) - insets.bottom + ANDROID_KEYBOARD_EXTRA_LIFT)
+          : 0
+      );
+      scrollToBottom();
+    };
+
+    const handleKeyboardHide = (event: KeyboardEvent) => {
+      Keyboard.scheduleLayoutAnimation(event);
+      setKeyboardVisible(false);
+      setKeyboardLift(0);
+    };
+
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSubscription = Keyboard.addListener(showEvent, handleKeyboardShow);
+    const hideSubscription = Keyboard.addListener(hideEvent, handleKeyboardHide);
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [insets.bottom, scrollToBottom]);
 
   // Initialize socket and load chat
   useEffect(() => {
@@ -125,6 +163,18 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
       }
     };
   }, [appointmentId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS !== 'android') return;
+
+      SystemUI.setBackgroundColorAsync(colors.primary).catch(() => {});
+
+      return () => {
+        SystemUI.setBackgroundColorAsync(colors.screenColor).catch(() => {});
+      };
+    }, [])
+  );
 
   // CRITICAL: Disconnect socket when screen loses focus (user navigates away)
   // This prevents the chat socket from receiving messages and marking them as read
@@ -471,60 +521,6 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
         socket.emit('join-appointment', { appointmentId });
       });
 
-      // Listen for incoming video calls
-      socket.on('video:incoming-call', (payload: any) => {
-        console.log('📞 [CHAT SCREEN] Incoming video call received:', payload);
-        const { roomName, callerId, callerName, receiverId } = payload;
-        
-        Alert.alert(
-          '📹 Incoming Video Call',
-          `${callerName || 'Doctor'} is calling you`,
-          [
-            {
-              text: 'Decline',
-              style: 'cancel',
-              onPress: () => {
-                console.log('📞 [CHAT SCREEN] User declined call');
-                socket.emit('video:reject-call', {
-                  roomName,
-                  callerId,
-                  reason: 'User declined'
-                });
-              }
-            },
-            {
-              text: 'Accept',
-              onPress: async () => {
-                console.log('📞 [CHAT SCREEN] User accepted call');
-                // Extract appointmentId from roomName (format: appointment_<id>)
-                const callAppointmentId = roomName.replace('appointment_', '');
-                
-                // Get current user ID
-                const currentUserId = receiverId || accessData.userId;
-                
-                // Notify caller that call was accepted
-                socket.emit('video:accept-call', {
-                  roomName,
-                  callerId,
-                  receiverId: currentUserId
-                });
-                
-                console.log('📞 [CHAT SCREEN] Navigating to video call screen');
-                // Navigate to video call screen
-                router.push({
-                  pathname: '/(main)/(conference)/video-call',
-                  params: {
-                    callId: roomName,
-                    userName: accessData.userRole === 'user' ? 'Patient' : 'Doctor',
-                    appointmentId: callAppointmentId
-                  }
-                });
-              }
-            }
-          ],
-          { cancelable: false }
-        );
-      });
 
     } catch (error) {
       console.error('Error initializing chat:', error);
@@ -649,25 +645,25 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
       
       const status = item.status || 'sent';
       const isRead = status === 'read';
-      const iconColor = isRead ? theme.colors.info : theme.colors.textTertiary;
+      const iconColor = isRead ? colors.info : colors.textTertiary;
       
       if (status === 'sent') {
         // Single tick - sent but not delivered
-        return <Ionicons name="checkmark" size={14} color={iconColor} style={styles.statusIcon} />;
+        return <Ionicons name="checkmark" size={Math.min(hp(1.7), wp(3.7))} color={iconColor} style={styles.statusIcon} />;
       } else if (status === 'delivered') {
         // Double tick - delivered but not read
         return (
           <View style={styles.doubleTickContainer}>
-            <Ionicons name="checkmark" size={14} color={iconColor} style={styles.doubleTick1} />
-            <Ionicons name="checkmark" size={14} color={iconColor} style={styles.doubleTick2} />
+            <Ionicons name="checkmark" size={Math.min(hp(1.7), wp(3.7))} color={iconColor} style={styles.doubleTick1} />
+            <Ionicons name="checkmark" size={Math.min(hp(1.7), wp(3.7))} color={iconColor} style={styles.doubleTick2} />
           </View>
         );
       } else if (status === 'read') {
         // Double tick blue - read
         return (
           <View style={styles.doubleTickContainer}>
-            <Ionicons name="checkmark" size={14} color={iconColor} style={styles.doubleTick1} />
-            <Ionicons name="checkmark" size={14} color={iconColor} style={styles.doubleTick2} />
+            <Ionicons name="checkmark" size={Math.min(hp(1.7), wp(3.7))} color={iconColor} style={styles.doubleTick1} />
+            <Ionicons name="checkmark" size={Math.min(hp(1.7), wp(3.7))} color={iconColor} style={styles.doubleTick2} />
           </View>
         );
       }
@@ -682,8 +678,8 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
           <View style={styles.otherUserAvatar}>
             <Ionicons 
               name={userRole === 'doctor' ? 'person' : 'medical'} 
-              size={24} 
-              color={theme.colors.primary} 
+              size={Math.min(hp(3), wp(6.4))} 
+              color={colors.primary} 
             />
           </View>
         )}
@@ -721,9 +717,10 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading chat...</Text>
         </View>
       </SafeAreaView>
@@ -732,9 +729,10 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
 
   if (chatClosed) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
         <View style={styles.closedContainer}>
-          <Ionicons name="chatbubbles-outline" size={64} color={theme.colors.textTertiary} />
+          <Ionicons name="chatbubbles-outline" size={Math.min(hp(7.8), wp(17))} color={colors.textTertiary} />
           <Text style={styles.closedTitle}>Chat Unavailable</Text>
           <Text style={styles.closedReason}>{closedReason}</Text>
           <TouchableOpacity 
@@ -760,7 +758,8 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       {/* Custom Header with Profile and Timer */}
       <View style={styles.header}>
         <BackButton style={styles.backButton} testID="appointment-back" />
@@ -769,8 +768,8 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
           <View style={styles.profileImageContainer}>
             <Ionicons 
               name={userRole === 'doctor' ? 'person' : 'medical'} 
-              size={38} 
-              color={theme.colors.primary} 
+              size={Math.min(hp(4.7), wp(10.1))} 
+              color={colors.primary} 
               
             />
           </View>
@@ -779,18 +778,27 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
               {otherUserName || (userRole === 'doctor' ? 'Patient' : 'Doctor')}
             </Text>
             {/* <View style={styles.timerContainer}>
-              <Ionicons name="time-outline" size={14} color={theme.colors.surface} />
+              <Ionicons name="time-outline" size={Math.min(hp(1.7), wp(3.7))} color={colors.surface} />
               <Text style={styles.timerText}>{timeRemaining || 'Loading...'}</Text>
             </View> */}
           </View>
         </View>
         
-        {/* Video Call Button */}
+        {/* Video Call Button - ZegoCloud Room */}
         <VideoCallButton
-          onPress={initiateCall}
-          disabled={!isVideoCallAvailable || chatClosed}
-          loading={isInitiatingCall}
-          size={24}
+          onPress={() => {
+            router.push({
+              pathname: '/(main)/(conference)/video-call' as any,
+              params: {
+                callId: appointmentId,
+                appointmentId: appointmentId,
+                userName: otherUserName || 'User',
+              }
+            });
+          }}
+          disabled={!canSend || chatClosed}
+          loading={false}
+          size={Math.min(hp(3), wp(6.4))}
         />
         
         {/* Patient Stats Button - Doctor Only */}
@@ -801,9 +809,9 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
             activeOpacity={0.7}
           >
             {loadingStats ? (
-              <ActivityIndicator size="small" color={theme.colors.surface} />
+              <ActivityIndicator size="small" color={colors.textOnPrimary} />
             ) : (
-              <Ionicons name="bar-chart-outline" size={24} color={theme.colors.surface} />
+              <Ionicons name="bar-chart-outline" size={Math.min(hp(3), wp(6.4))} color={colors.textOnPrimary} />
             )}
           </TouchableOpacity>
         )}
@@ -827,15 +835,15 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
             activeOpacity={0.7}
           >
             {loadingDietPlan ? (
-              <ActivityIndicator size="small" color={theme.colors.surface} />
+              <ActivityIndicator size="small" color={colors.textOnPrimary} />
             ) : (
-              <Ionicons name="nutrition-outline" size={24} color={theme.colors.surface} />
+              <Ionicons name="nutrition-outline" size={Math.min(hp(3), wp(6.4))} color={colors.textOnPrimary} />
             )}
           </TouchableOpacity>
         )}
         
         <TouchableOpacity style={styles.infoButton}>
-          <Ionicons name="information-circle-outline" size={26} color={theme.colors.surface} />
+          <Ionicons name="information-circle-outline" size={Math.min(hp(3.2), wp(6.9))} color={colors.textOnPrimary} />
         </TouchableOpacity>
       </View>
 
@@ -844,7 +852,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
         <View style={styles.grantAccessBanner}>
           <View style={styles.grantAccessContent}>
             <View style={styles.grantAccessIcon}>
-              <Ionicons name="lock-closed" size={20} color="#FF9500" />
+              <Ionicons name="lock-closed" size={Math.min(hp(2.5), wp(5.4))} color="#FF9500" />
             </View>
             <View style={styles.grantAccessTextContainer}>
               <Text style={styles.grantAccessTitle}>Chat Access Required</Text>
@@ -858,10 +866,10 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
             activeOpacity={0.8}
           >
             {isGrantingAccess ? (
-              <ActivityIndicator size="small" color={theme.colors.surface} />
+              <ActivityIndicator size="small" color={colors.textOnPrimary} />
             ) : (
               <>
-                <Ionicons name="key" size={18} color={theme.colors.surface} />
+                <Ionicons name="key" size={Math.min(hp(2.2), wp(4.8))} color={colors.textOnPrimary} />
                 <Text style={styles.grantAccessButtonText}>Grant Access</Text>
               </>
             )}
@@ -870,9 +878,9 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
       )}
 
       <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.container}
-        keyboardVerticalOffset={90}
+        keyboardVerticalOffset={0}
       >
         {/* Messages List */}
         <FlatList
@@ -881,9 +889,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
           renderItem={renderMessage}
           keyExtractor={(item) => item._id}
           contentContainerStyle={styles.messagesList}
-          onContentSizeChange={() => {
-            flatListRef.current?.scrollToEnd({ animated: true });
-          }}
+          onContentSizeChange={() => scrollToBottom()}
         />
 
         {/* Typing Indicator */}
@@ -894,45 +900,41 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
         )}
 
         {/* Input Area */}
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            value={inputText}
-            onChangeText={handleTextChange}
-            placeholder={canSend ? "Type a message..." : (accessMessage || "Waiting for chat access...")}
-            placeholderTextColor={theme.colors.textTertiary}
-            multiline
-            maxLength={1000}
-            editable={!chatClosed && canSend}
-          />
-          <TouchableOpacity 
-            style={[
-              styles.sendButton,
-              (!inputText.trim() || sending || chatClosed || !canSend) && styles.sendButtonDisabled
-            ]}
-            onPress={sendMessage}
-            disabled={!inputText.trim() || sending || chatClosed || !canSend}
-            activeOpacity={0.8}
-          >
-            {sending ? (
-              <ActivityIndicator size="small" color={theme.colors.surface} />
-            ) : (
-              <Ionicons name="send" size={24} color={theme.colors.surface} />
-            )}
-          </TouchableOpacity>
+        <View style={[styles.composerContainer, { marginBottom: keyboardLift }]}>
+          <View style={[styles.inputContainer, { paddingBottom: inputBottomPadding }]}>
+            <TextInput
+              style={styles.input}
+              value={inputText}
+              onChangeText={handleTextChange}
+              placeholder={canSend ? "Type a message..." : (accessMessage || "Waiting for chat access...")}
+              placeholderTextColor={colors.textTertiary}
+              multiline
+              maxLength={1000}
+              editable={!chatClosed && canSend}
+            />
+            <TouchableOpacity 
+              style={[
+                styles.sendButton,
+                (!inputText.trim() || sending || chatClosed || !canSend) && styles.sendButtonDisabled
+              ]}
+              onPress={sendMessage}
+              disabled={!inputText.trim() || sending || chatClosed || !canSend}
+              activeOpacity={0.8}
+            >
+              {sending ? (
+                <ActivityIndicator size="small" color={colors.textOnPrimary} />
+              ) : (
+                <Ionicons name="send" size={Math.min(hp(3), wp(6.4))} color={colors.textOnPrimary} />
+              )}
+            </TouchableOpacity>
+          </View>
+          {androidNavigationBarHeight > 0 && (
+            <View style={[styles.androidNavigationBarBackground, { height: androidNavigationBarHeight }]} />
+          )}
         </View>
       </KeyboardAvoidingView>
 
-      {/* Incoming Call Modal */}
-      {incomingCall && (
-        <IncomingCallModal
-          visible={!!incomingCall}
-          callerName={incomingCall.callerName}
-          callerRole={incomingCall.callerRole}
-          onAccept={acceptCall}
-          onReject={rejectCall}
-        />
-      )}
+
 
       {/* Patient Stats Modal */}
       <Modal
@@ -946,7 +948,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Patient Health Overview</Text>
               <TouchableOpacity onPress={() => setShowStatsModal(false)}>
-                <Ionicons name="close" size={24} color={theme.colors.textPrimary} />
+                <Ionicons name="close" size={Math.min(hp(3), wp(6.4))} color={colors.textPrimary} />
               </TouchableOpacity>
             </View>
 
@@ -973,7 +975,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
                   <View style={styles.sectionContainer}>
                     <Text style={styles.sectionTitle}>Daily Calorie Goal</Text>
                     <View style={styles.goalCard}>
-                      <Ionicons name="flame" size={24} color="#FF9500" />
+                      <Ionicons name="flame" size={Math.min(hp(3), wp(6.4))} color="#FF9500" />
                       <View style={styles.goalInfo}>
                         <Text style={styles.goalValue}>{patientStats.goalCalories || 'Not set'} kcal</Text>
                         <Text style={styles.goalLabel}>Daily Target</Text>
@@ -1000,7 +1002,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
                                 styles.logBar, 
                                 { 
                                   width: `${Math.min((log.achievedCalories / (log.targetCalories || 2000)) * 100, 100)}%`,
-                                  backgroundColor: log.achievedCalories > log.targetCalories ? '#FF3B30' : theme.colors.primary 
+                                  backgroundColor: log.achievedCalories > log.targetCalories ? '#FF3B30' : colors.primary 
                                 }
                               ]} 
                             />
@@ -1009,19 +1011,19 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
                       ))
                     ) : (
                       <View style={styles.emptyContainer}>
-                        <Ionicons name="calendar-outline" size={48} color={theme.colors.textTertiary} />
+                        <Ionicons name="calendar-outline" size={Math.min(hp(5.9), wp(12.8))} color={colors.textTertiary} />
                         <Text style={styles.emptyText}>No recent tracking logs found</Text>
                       </View>
                     )}
                   </View>
                 </>
               ) : (
-                <View style={[styles.loadingContainer, { height: 300 }]}>
-                  <ActivityIndicator size="large" color={theme.colors.primary} />
+                <View style={[styles.loadingContainer, { height: hp(37) }]}>
+                  <ActivityIndicator size="large" color={colors.primary} />
                   <Text style={styles.loadingText}>Loading health data...</Text>
                 </View>
               )}
-              <View style={{ height: 30 }} />
+              <View style={{ height: hp(3.7) }} />
             </ScrollView>
           </View>
         </View>
@@ -1041,17 +1043,21 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.screenColor
+  },
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background
+    backgroundColor: colors.screenColor
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: theme.spacing.lg,
-    paddingVertical: 14,
-    backgroundColor: theme.colors.primary,
+    paddingVertical: hp(1.7),
+    backgroundColor: colors.primary,
     ...theme.shadows.large
   },
   backButton: {
@@ -1064,36 +1070,36 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   profileImageContainer: {
-    marginRight: 14,
-    marginTop: 13,
-    backgroundColor: theme.colors.surface,
-    borderRadius: 25,
-    padding: 3,
+    marginRight: wp(3.7),
+    marginTop: hp(1.6),
+    backgroundColor: colors.cardBackground,
+    borderRadius: wp(6.7),
+    padding: wp(0.8),
     ...theme.shadows.small
   },
   headerInfo: {
     flex: 1
   },
   headerName: {
-    fontSize: 19,
+    fontSize: Math.min(hp(2.3), wp(5.1)),
     fontWeight: theme.typography.fontWeight.bold as any,
-    color: theme.colors.surface,
-    marginBottom: 4
+    color: colors.textOnPrimary,
+    marginBottom: hp(0.5)
   },
   timerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: wp(2.7),
+    paddingVertical: hp(0.6),
     borderRadius: theme.borderRadius.large,
     alignSelf: 'flex-start'
   },
   timerText: {
     fontSize: theme.typography.fontSize.xs,
-    color: theme.colors.surface,
+    color: colors.textOnPrimary,
     fontWeight: theme.typography.fontWeight.bold as any,
-    marginLeft: 5
+    marginLeft: wp(1.3)
   },
   infoButton: {
     padding: theme.spacing.sm
@@ -1116,76 +1122,76 @@ const styles = StyleSheet.create({
     marginRight: '22%'
   },
   otherUserAvatar: {
-    marginRight: 10,
-    marginTop: 4,
-    backgroundColor: theme.colors.border,
-    borderRadius: 20,
-    width: 40,
-    height: 40,
+    marginRight: wp(2.7),
+    marginTop: hp(0.5),
+    backgroundColor: colors.border,
+    borderRadius: Math.min(hp(2.5), wp(5.4)),
+    width: Math.min(hp(4.9), wp(10.7)),
+    height: Math.min(hp(4.9), wp(10.7)),
     justifyContent: 'center',
     alignItems: 'center'
   },
   senderName: {
     fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.primary,
-    marginBottom: 6,
+    color: colors.primary,
+    marginBottom: hp(0.7),
     marginLeft: theme.spacing.sm,
     fontWeight: theme.typography.fontWeight.bold as any
   },
   messageBubble: {
     borderRadius: theme.borderRadius.xl,
     paddingHorizontal: theme.spacing.lg,
-    paddingVertical: 11,
+    paddingVertical: hp(1.35),
     ...theme.shadows.small,
-    minWidth: 80
+    minWidth: wp(21.3)
   },
   ownBubble: {
-    backgroundColor: theme.colors.primary,
-    borderBottomRightRadius: 4
+    backgroundColor: colors.primary,
+    borderBottomRightRadius: wp(1.1)
   },
   otherBubble: {
-    backgroundColor: theme.colors.surface,
-    borderBottomLeftRadius: 4,
+    backgroundColor: colors.cardBackground,
+    borderBottomLeftRadius: wp(1.1),
     borderWidth: 1,
-    borderColor: theme.colors.border
+    borderColor: colors.border
   },
   messageText: {
     fontSize: theme.typography.fontSize.base,
-    lineHeight: 22,
-    marginBottom: 4
+    lineHeight: hp(2.7),
+    marginBottom: hp(0.5)
   },
   ownMessageText: {
-    color: theme.colors.surface
+    color: colors.textOnPrimary
   },
   otherMessageText: {
-    color: theme.colors.textPrimary
+    color: colors.textPrimary
   },
   messageFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    marginTop: 3
+    marginTop: hp(0.35)
   },
   messageTime: {
-    fontSize: 11,
-    marginRight: 4,
+    fontSize: Math.min(hp(1.35), wp(3)),
+    marginRight: wp(1.1),
     fontWeight: theme.typography.fontWeight.medium as any
   },
   ownMessageTime: {
     color: 'rgba(255, 255, 255, 0.8)'
   },
   otherMessageTime: {
-    color: theme.colors.textTertiary
+    color: colors.textTertiary
   },
   statusIcon: {
-    marginLeft: 2
+    marginLeft: wp(0.5)
   },
   doubleTickContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 2,
-    height: 14,
-    width: 18,
+    marginLeft: wp(0.5),
+    height: hp(1.7),
+    width: wp(4.8),
     position: 'relative'
   },
   doubleTick1: {
@@ -1195,7 +1201,7 @@ const styles = StyleSheet.create({
   },
   doubleTick2: {
     position: 'absolute',
-    left: 5,
+    left: wp(1.3),
     top: 0
   },
   typingContainer: {
@@ -1205,49 +1211,55 @@ const styles = StyleSheet.create({
   },
   typingText: {
     fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontStyle: 'italic',
     fontWeight: theme.typography.fontWeight.semiBold as any
+  },
+  composerContainer: {
+    backgroundColor: colors.primary,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    padding: 14,
+    padding: wp(3.7),
     paddingHorizontal: theme.spacing.lg,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.cardBackground,
     borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
+    borderTopColor: colors.border,
     ...theme.shadows.medium
+  },
+  androidNavigationBarBackground: {
+    backgroundColor: colors.primary,
   },
   input: {
     flex: 1,
-    minHeight: 44,
-    maxHeight: 100,
-    backgroundColor: theme.colors.background,
-    borderRadius: 24,
-    paddingHorizontal: 18,
-    paddingVertical: 11,
+    minHeight: hp(5.4),
+    maxHeight: hp(12.3),
+    backgroundColor: colors.backgroundHeader,
+    borderRadius: wp(6.4),
+    paddingHorizontal: wp(4.8),
+    paddingVertical: hp(1.35),
     fontSize: theme.typography.fontSize.base,
     marginRight: theme.spacing.md,
     borderWidth: 1.5,
-    borderColor: theme.colors.border,
-    color: theme.colors.textPrimary
+    borderColor: colors.border,
+    color: colors.textPrimary
   },
   sendButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: theme.colors.accent,
+    width: Math.min(hp(5.7), wp(12.3)),
+    height: Math.min(hp(5.7), wp(12.3)),
+    borderRadius: Math.min(hp(2.8), wp(6.1)),
+    backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: theme.colors.accent,
-    shadowOffset: { width: 0, height: 3 },
+    shadowColor: colors.accent,
+    shadowOffset: { width: 0, height: hp(0.35) },
     shadowOpacity: 0.3,
-    shadowRadius: 5,
+    shadowRadius: wp(1.3),
     elevation: 5
   },
   sendButtonDisabled: {
-    backgroundColor: theme.colors.disabled,
+    backgroundColor: colors.disabled,
     shadowOpacity: 0.1
   },
   grantAccessBanner: {
@@ -1264,9 +1276,9 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md
   },
   grantAccessIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: Math.min(hp(4.9), wp(10.7)),
+    height: Math.min(hp(4.9), wp(10.7)),
+    borderRadius: Math.min(hp(2.5), wp(5.4)),
     backgroundColor: '#FFE0B2',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1279,7 +1291,7 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.fontSize.base,
     fontWeight: theme.typography.fontWeight.semiBold as any,
     color: '#E65100',
-    marginBottom: 2
+    marginBottom: hp(0.25)
   },
   grantAccessSubtitle: {
     fontSize: theme.typography.fontSize.sm,
@@ -1289,22 +1301,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.colors.secondary,
+    backgroundColor: colors.secondary,
     paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.xl,
-    borderRadius: 24,
+    borderRadius: wp(6.4),
     gap: theme.spacing.sm,
-    shadowColor: theme.colors.secondary,
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: colors.secondary,
+    shadowOffset: { width: 0, height: hp(0.25) },
     shadowOpacity: 0.3,
-    shadowRadius: 4,
+    shadowRadius: wp(1.1),
     elevation: 3
   },
   grantAccessButtonText: {
-    color: theme.colors.surface,
+    color: colors.textOnPrimary,
     fontSize: theme.typography.fontSize.base,
     fontWeight: theme.typography.fontWeight.semiBold as any,
-    letterSpacing: 0.5
+    letterSpacing: 0
   },
   loadingContainer: {
     flex: 1,
@@ -1314,7 +1326,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: theme.spacing.md,
     fontSize: theme.typography.fontSize.base,
-    color: theme.colors.textSecondary
+    color: colors.textSecondary
   },
   closedContainer: {
     flex: 1,
@@ -1325,12 +1337,12 @@ const styles = StyleSheet.create({
   closedTitle: {
     fontSize: theme.typography.fontSize.xl,
     fontWeight: theme.typography.fontWeight.semiBold as any,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginTop: theme.spacing.lg
   },
   closedReason: {
     fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     marginTop: theme.spacing.sm
   },
@@ -1338,17 +1350,17 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.xl,
     paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.xl,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     borderRadius: theme.borderRadius.medium
   },
   backButtonText: {
-    color: theme.colors.surface,
+    color: colors.textOnPrimary,
     fontSize: theme.typography.fontSize.base,
     fontWeight: theme.typography.fontWeight.semiBold as any
   },
   statsButton: {
     padding: theme.spacing.sm,
-    marginRight: 4
+    marginRight: wp(1.1)
   },
   modalOverlay: {
     flex: 1,
@@ -1356,9 +1368,9 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: theme.colors.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: colors.cardBackground,
+    borderTopLeftRadius: wp(6.4),
+    borderTopRightRadius: wp(6.4),
     height: '85%',
     padding: theme.spacing.xl,
   },
@@ -1369,21 +1381,21 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.xl,
   },
   modalTitle: {
-    fontSize: 22,
+    fontSize: Math.min(hp(2.7), wp(5.9)),
     fontWeight: 'bold',
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
   },
   modalBody: {
     flex: 1,
   },
   statsCard: {
     flexDirection: 'row',
-    backgroundColor: theme.colors.background,
-    borderRadius: 16,
+    backgroundColor: colors.backgroundHeader,
+    borderRadius: wp(4.3),
     padding: theme.spacing.lg,
     marginBottom: theme.spacing.xl,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     justifyContent: 'space-around',
     alignItems: 'center',
   },
@@ -1392,93 +1404,93 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   statDivider: {
-    width: 1,
+    width: wp(0.25),
     height: '60%',
-    backgroundColor: theme.colors.border,
+    backgroundColor: colors.border,
   },
   statLabel: {
-    fontSize: 12,
-    color: theme.colors.textSecondary,
-    marginBottom: 4,
+    fontSize: Math.min(hp(1.5), wp(3.2)),
+    color: colors.textSecondary,
+    marginBottom: hp(0.5),
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0,
   },
   statValue: {
-    fontSize: 18,
+    fontSize: Math.min(hp(2.2), wp(4.8)),
     fontWeight: 'bold',
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   sectionContainer: {
-    marginBottom: 24,
+    marginBottom: hp(3),
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: Math.min(hp(2), wp(4.3)),
     fontWeight: 'bold',
-    color: theme.colors.textPrimary,
-    marginBottom: 12,
+    color: colors.textPrimary,
+    marginBottom: hp(1.5),
   },
   goalCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFF4E5',
-    padding: 16,
-    borderRadius: 12,
+    padding: wp(4.3),
+    borderRadius: wp(3.2),
     borderWidth: 1,
     borderColor: '#FFE0B2',
   },
   goalInfo: {
-    marginLeft: 12,
+    marginLeft: wp(3.2),
   },
   goalValue: {
-    fontSize: 20,
+    fontSize: Math.min(hp(2.5), wp(5.4)),
     fontWeight: 'bold',
     color: '#E65100',
   },
   goalLabel: {
-    fontSize: 12,
+    fontSize: Math.min(hp(1.5), wp(3.2)),
     color: '#F57C00',
   },
   logItem: {
-    marginBottom: 16,
+    marginBottom: hp(2),
   },
   logHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: hp(0.7),
   },
   logDate: {
-    fontSize: 14,
+    fontSize: Math.min(hp(1.8), wp(3.8)),
     fontWeight: '500',
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
   },
   logValues: {
-    fontSize: 14,
+    fontSize: Math.min(hp(1.8), wp(3.8)),
     fontWeight: 'bold',
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
   },
   logBarContainer: {
-    height: 8,
-    backgroundColor: theme.colors.border,
-    borderRadius: 4,
+    height: hp(1),
+    backgroundColor: colors.border,
+    borderRadius: hp(0.5),
     overflow: 'hidden',
   },
   logBar: {
     height: '100%',
-    borderRadius: 4,
+    borderRadius: hp(0.5),
   },
   emptyContainer: {
     alignItems: 'center',
-    padding: 32,
-    backgroundColor: theme.colors.background,
-    borderRadius: 12,
+    padding: wp(8.5),
+    backgroundColor: colors.backgroundHeader,
+    borderRadius: wp(3.2),
     borderStyle: 'dashed',
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
   },
   emptyText: {
-    marginTop: 12,
-    color: theme.colors.textSecondary,
-    fontSize: 14,
+    marginTop: hp(1.5),
+    color: colors.textSecondary,
+    fontSize: Math.min(hp(1.8), wp(3.8)),
   }
 });

@@ -1,8 +1,6 @@
 import AppHeader from "@/components/AppHeader";
 import { useTheme } from "@/contexts/ThemeContext";
-import { useUser } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
-import Constants from "expo-constants";
 import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from "react";
 import {
@@ -19,656 +17,463 @@ import {
 } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { getBackendBaseUrl } from '@/utils/config';
 
-const ENV = Constants.expoConfig?.extra;
-
-// Get base URL from environment variables or use platform-specific defaults
-const getAPIURL = () => {
-  const envUrl = ENV?.EXPO_PUBLIC_BACKEND_API_URL;
-  if (envUrl) {
-    // Remove trailing /api if it exists (we'll add it explicitly in requests)
-    return envUrl.replace(/\/api\/?$/, '');
-  }
-  // Default: use 10.0.2.2 for Android emulator, localhost for iOS
-  const defaultHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
-  return `http://${defaultHost}:5001`;
-};
-
-const API_URL = getAPIURL();
+const API_URL = getBackendBaseUrl();
 
 export default function ProfileInformation() {
   const { colors } = useTheme();
-  const { user, isLoaded } = useUser();
   
   const [backendUserData, setBackendUserData] = useState<any>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
-  const [isClerkUser, setIsClerkUser] = useState(false);
-  
-  const [formData, setFormData] = useState({
-    firstName: user?.firstName || "",
-    lastName: user?.lastName || "",
-    email: user?.primaryEmailAddress?.emailAddress || "",
-    phoneNumber: user?.primaryPhoneNumber?.phoneNumber || "",
-    username: user?.username || "",
-    bio: "",
-  });
-  
-  const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    checkAuthMethod();
-    fetchBackendUserData();
-  }, []);
+const [formData, setFormData] = useState({
+  firstName: "",
+  lastName: "",
+  email: "",
+  phoneNumber: "",
+  username: "",
+  bio: "",
+});
 
-  const checkAuthMethod = async () => {
-    // Check if user is logged in with Clerk (has Clerk user object)
-    if (user && isLoaded) {
-      setIsClerkUser(true);
-      console.log("User authenticated with Clerk");
-    } else {
-      setIsClerkUser(false);
-      console.log("User authenticated with backend email");
-    }
-  };
+const [isEditing, setIsEditing] = useState(false);
+const [isSaving, setIsSaving] = useState(false);
 
-  const fetchBackendUserData = async () => {
-    try {
-      setIsLoadingData(true);
-      
-      const token = await SecureStore.getItemAsync('fitfaat_auth_token');
-      
-      if (!token) {
-        Alert.alert(
-          "Authentication Required", 
-          "No authentication token found. Please log out and log in again.",
-          [
-            {
-              text: "OK",
-              onPress: () => setIsLoadingData(false)
-            }
-          ]
-        );
-        return;
-      }
+useEffect(() => {
+  fetchBackendUserData();
+}, []);
 
-      const url = `${API_URL}/api/user/profile`;
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
+const fetchBackendUserData = async () => {
+  try {
+    setIsLoadingData(true);
 
-      const data = await response.json();
-      
-      if (data.success) {
-        setBackendUserData(data.data);
-      } else {
-        Alert.alert("Error", data.message || "Failed to load profile data");
-      }
-    } catch (error) {
-      let errorMessage = "Unknown error occurred";
-      
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      
+    const token = await SecureStore.getItemAsync('fitfaat_auth_token');
+
+    if (!token) {
       Alert.alert(
-        "Connection Error", 
-        `Failed to connect to server. Please check if backend is running.`
+        "Authentication Required",
+        "No authentication token found. Please log out and log in again.",
+        [
+          {
+            text: "OK",
+            onPress: () => setIsLoadingData(false)
+          }
+        ]
       );
-    } finally {
-      setIsLoadingData(false);
+      return;
     }
-  };
 
-  const handleSave = async () => {
-    setIsSaving(true);
-    try {
-      // Update user profile with Clerk
-      await user?.update({
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        username: formData.username,
-      });
-      
-      setIsEditing(false);
-      Alert.alert("Success", "Profile information updated successfully!");
-    } catch (error: any) {
-      Alert.alert("Error", error.message || "Failed to update profile");
-    } finally {
-      setIsSaving(false);
+    const url = `${API_URL}/api/user/profile`;
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      setBackendUserData(data.data);
+    } else {
+      Alert.alert("Error", data.message || "Failed to load profile data");
     }
-  };
+  } catch (error) {
+    let errorMessage = "Unknown error occurred";
 
-  const getBMICategory = (bmi: number) => {
-    if (bmi < 18.5) return "Underweight";
-    if (bmi < 25) return "Normal";
-    if (bmi < 30) return "Overweight";
-    return "Obese";
-  };
-
-  const getFitnessGoalText = (goal: number) => {
-    switch(goal) {
-      case 1: return "Weight Loss";
-      case 2: return "Muscle Gain";
-      case 3: return "Weight Gain";
-      default: return "Not Set";
+    if (error instanceof Error) {
+      errorMessage = error.message;
     }
-  };
 
-  const InfoField = ({ 
-    label, 
-    value, 
-    field, 
-    editable = true,
-    keyboardType = "default",
-    multiline = false 
-  }: {
-    label: string;
-    value: string;
-    field: string;
-    editable?: boolean;
-    keyboardType?: any;
-    multiline?: boolean;
-  }) => (
-    <View style={styles.infoField}>
-      <Text style={styles.label}>{label}</Text>
-      {isEditing && editable ? (
-        <TextInput
-          style={[styles.input, multiline && styles.multilineInput]}
-          value={value}
-          onChangeText={(text) => setFormData({ ...formData, [field]: text })}
-          placeholder={`Enter ${label.toLowerCase()}`}
-          placeholderTextColor={colors.textSecondary}
-          keyboardType={keyboardType}
-          multiline={multiline}
-          numberOfLines={multiline ? 4 : 1}
-        />
-      ) : (
-        <Text style={styles.value}>{value || "Not provided"}</Text>
-      )}
-    </View>
-  );
+    Alert.alert(
+      "Connection Error",
+      `Failed to connect to server. Please check if backend is running.`
+    );
+  } finally {
+    setIsLoadingData(false);
+  }
+};
 
-  const styles = getStyles(colors);
+const getBMICategory = (bmi: number) => {
+  if (bmi < 18.5) return "Underweight";
+  if (bmi < 25) return "Normal";
+  if (bmi < 30) return "Overweight";
+  return "Obese";
+};
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <AppHeader 
-        title="Profile Information"
-        showStepIndicator={false}
-        showMenuButton={false}
-        showBackButton={true}
+const getFitnessGoalText = (goal: number) => {
+  switch (goal) {
+    case 1: return "Weight Loss";
+    case 2: return "Muscle Gain";
+    case 3: return "Weight Gain";
+    default: return "Not Set";
+  }
+};
+
+const InfoField = ({
+  label,
+  value,
+  field,
+  editable = true,
+  keyboardType = "default",
+  multiline = false
+}: {
+  label: string;
+  value: string;
+  field: string;
+  editable?: boolean;
+  keyboardType?: any;
+  multiline?: boolean;
+}) => (
+  <View style={styles.infoField}>
+    <Text style={styles.label}>{label}</Text>
+    {isEditing && editable ? (
+      <TextInput
+        style={[styles.input, multiline && styles.multilineInput]}
+        value={value}
+        onChangeText={(text) => setFormData({ ...formData, [field]: text })}
+        placeholder={`Enter ${label.toLowerCase()}`}
+        placeholderTextColor={colors.textSecondary}
+        keyboardType={keyboardType}
+        multiline={multiline}
+        numberOfLines={multiline ? 4 : 1}
       />
+    ) : (
+      <Text style={styles.value}>{value || "Not provided"}</Text>
+    )}
+  </View>
+);
 
-      <View style={styles.content}>
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={{ flex: 1 }}
-        >
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {/* Authentication Method Badge */}
-            <View style={styles.authBadgeContainer}>
-              <View style={[styles.authBadge, { backgroundColor: isClerkUser ? colors.primary : colors.secondary }]}>
-                <Ionicons 
-                  name={isClerkUser ? "logo-google" : "mail"} 
-                  size={16} 
-                  color="white" 
-                />
-                <Text style={styles.authBadgeText}>
-                  {isClerkUser ? "Clerk Authentication" : "Email Authentication"}
-                </Text>
+const styles = getStyles(colors);
+
+return (
+  <SafeAreaView style={styles.container}>
+    <AppHeader
+      title="Profile Information"
+      showStepIndicator={false}
+      showMenuButton={false}
+      showBackButton={true}
+    />
+
+    <View style={styles.content}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+      >
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {/* Authentication Method Badge */}
+          <View style={styles.authBadgeContainer}>
+            <View style={[styles.authBadge, { backgroundColor: colors.secondary }]}>
+              <Ionicons
+                name="mail"
+                size={16}
+                color="white"
+              />
+              <Text style={styles.authBadgeText}>
+                Email Authentication
+              </Text>
+            </View>
+          </View>
+
+          {/* Profile Picture Section */}
+          <View style={styles.profileSection}>
+            <View style={styles.profileImageContainer}>
+              <View style={styles.profileImage}>
+                <Ionicons name="person" size={50} color={colors.primary} />
               </View>
             </View>
+            <Text style={styles.profileName}>
+              {backendUserData?.user?.userInfo?.name || backendUserData?.user?.username || "User"}
+            </Text>
+            <Text style={styles.profileEmail}>
+              {backendUserData?.user?.email || ""}
+            </Text>
+            {backendUserData?.user?.username && (
+              <Text style={styles.profileUsername}>
+                @{backendUserData.user.username}
+              </Text>
+            )}
+          </View>
 
-            {/* Profile Picture Section */}
-            <View style={styles.profileSection}>
-              <View style={styles.profileImageContainer}>
-                {(isClerkUser && user?.imageUrl) ? (
-                  <View style={styles.profileImage}>
-                    <Text style={styles.profileInitials}>
-                      {(user?.firstName?.[0] || "") + (user?.lastName?.[0] || "")}
+          {backendUserData?.user && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Account Information</Text>
+
+              <View style={styles.infoField}>
+                <Text style={styles.label}>Full Name</Text>
+                <Text style={[styles.value, styles.highlightValue]}>
+                  {backendUserData.user.userInfo?.name || "Not provided"}
+                </Text>
+              </View>
+
+              <View style={styles.infoField}>
+                <Text style={styles.label}>Email</Text>
+                <Text style={styles.value}>{backendUserData.user.email}</Text>
+              </View>
+
+              <View style={styles.infoField}>
+                <Text style={styles.label}>User ID</Text>
+                <Text style={[styles.value, styles.highlightValue]}>
+                  #{backendUserData.user.username}
+                </Text>
+              </View>
+
+              <View style={styles.infoField}>
+                <Text style={styles.label}>Member Since</Text>
+                <Text style={styles.value}>
+                  {backendUserData.user.createdAt ? new Date(backendUserData.user.createdAt).toLocaleDateString() : "N/A"}
+                </Text>
+              </View>
+
+              <View style={styles.infoField}>
+                <Text style={styles.label}>Onboarding Status</Text>
+                <View style={styles.verifiedBadge}>
+                  <Ionicons
+                    name={backendUserData.user.isOnboardingComplete ? "checkmark-circle" : "close-circle"}
+                    size={20}
+                    color={backendUserData.user.isOnboardingComplete ? colors.success : colors.error}
+                  />
+                  <Text style={[
+                    styles.verifiedText,
+                    { color: backendUserData.user.isOnboardingComplete ? colors.success : colors.error }
+                  ]}>
+                    {backendUserData.user.isOnboardingComplete ? "Complete" : "Incomplete"}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Backend User Data - Physical Information */}
+          {isLoadingData ? (
+            <View style={[styles.section, styles.loadingContainer]}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={styles.loadingText}>Loading user data...</Text>
+            </View>
+          ) : (
+            <>
+              {/* Debug/Refresh Section */}
+              <View style={styles.section}>
+                <TouchableOpacity
+                  style={styles.refreshButton}
+                  onPress={fetchBackendUserData}
+                >
+                  <Ionicons name="refresh" size={20} color="white" />
+                  <Text style={styles.refreshButtonText}>Refresh Backend Data</Text>
+                </TouchableOpacity>
+
+                {!backendUserData && (
+                  <View style={styles.noDataContainer}>
+                    <Ionicons name="alert-circle-outline" size={40} color={colors.textSecondary} />
+                    <Text style={styles.noDataText}>No backend data available</Text>
+                    <Text style={styles.noDataSubtext}>
+                      Complete your onboarding to see your fitness data here
                     </Text>
-                  </View>
-                ) : (
-                  <View style={styles.profileImage}>
-                    <Ionicons name="person" size={50} color={colors.primary} />
+                    <Text style={styles.debugText}>
+                      Check console logs for details
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.debugButton}
+                      onPress={async () => {
+                        const token = await SecureStore.getItemAsync('fitfaat_auth_token');
+                        const user = await SecureStore.getItemAsync('fitfaat_user');
+                        Alert.alert(
+                          "Debug Info",
+                          `API URL: ${API_URL}\n` +
+                          `Token exists: ${!!token}\n` +
+                          `User exists: ${!!user}\n` +
+                          `Has Backend Data: ${!!backendUserData}\n` +
+                          `Check console for full logs`
+                        );
+                      }}
+                    >
+                      <Text style={styles.debugButtonText}>Show Debug Info</Text>
+                    </TouchableOpacity>
                   </View>
                 )}
               </View>
-              <Text style={styles.profileName}>
-                {isClerkUser 
-                  ? (user?.fullName || "User")
-                  : (backendUserData?.user?.userInfo?.name || "User")}
-              </Text>
-              <Text style={styles.profileEmail}>
-                {isClerkUser 
-                  ? (user?.primaryEmailAddress?.emailAddress || "")
-                  : (backendUserData?.user?.email || "")}
-              </Text>
-              {!isClerkUser && backendUserData?.user?.username && (
-                <Text style={styles.profileUsername}>
-                  @{backendUserData.user.username}
-                </Text>
-              )}
-              {isClerkUser && user?.username && (
-                <Text style={styles.profileUsername}>
-                  @{user.username}
-                </Text>
-              )}
-            </View>
 
-            {/* Edit Button - Only for Clerk users */}
-            {isClerkUser && (
-              <TouchableOpacity 
-                style={styles.editButton}
-                onPress={() => isEditing ? handleSave() : setIsEditing(true)}
-                disabled={isSaving}
-              >
-                <Ionicons 
-                  name={isEditing ? "checkmark-outline" : "create-outline"} 
-                  size={20} 
-                  color="white" 
-                />
-                <Text style={styles.editButtonText}>
-                  {isSaving ? "Saving..." : isEditing ? "Save Changes" : "Edit Profile"}
-                </Text>
-              </TouchableOpacity>
-            )}
+              {backendUserData?.user?.userInfo ? (
+                <>
+                  <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Physical Information</Text>
 
-            {/* Personal Information - Show based on auth method */}
-            {isClerkUser ? (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Personal Information (Clerk)</Text>
-              
-              <InfoField 
-                label="First Name" 
-                value={formData.firstName} 
-                field="firstName"
-              />
-              
-              <InfoField 
-                label="Last Name" 
-                value={formData.lastName} 
-                field="lastName"
-              />
-              
-              <InfoField 
-                label="Username (Clerk)" 
-                value={formData.username} 
-                field="username"
-              />
-              
-              <InfoField 
-                label="Bio" 
-                value={formData.bio} 
-                field="bio"
-                multiline={true}
-              />
-            </View>
-            ) : null}
+                    <View style={styles.infoField}>
+                      <Text style={styles.label}>Full Name</Text>
+                      <Text style={styles.value}>{backendUserData.user.userInfo.name || "N/A"}</Text>
+                    </View>
 
-            {/* Backend User Information - Only for email auth */}
-            {!isClerkUser && backendUserData?.user && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Account Information</Text>
-                
-                <View style={styles.infoField}>
-                  <Text style={styles.label}>Full Name</Text>
-                  <Text style={[styles.value, styles.highlightValue]}>
-                    {backendUserData.user.userInfo?.name || "Not provided"}
-                  </Text>
-                </View>
+                    <View style={styles.infoField}>
+                      <Text style={styles.label}>Gender</Text>
+                      <Text style={styles.value}>
+                        {backendUserData.user.userInfo.gender
+                          ? backendUserData.user.userInfo.gender.charAt(0).toUpperCase() + backendUserData.user.userInfo.gender.slice(1)
+                          : "N/A"}
+                      </Text>
+                    </View>
 
-                <View style={styles.infoField}>
-                  <Text style={styles.label}>Email</Text>
-                  <Text style={styles.value}>{backendUserData.user.email}</Text>
-                </View>
+                    <View style={styles.infoField}>
+                      <Text style={styles.label}>Age</Text>
+                      <Text style={styles.value}>{backendUserData.user.userInfo.age || "N/A"} years</Text>
+                    </View>
 
-                <View style={styles.infoField}>
-                  <Text style={styles.label}>User ID</Text>
-                  <Text style={[styles.value, styles.highlightValue]}>
-                    #{backendUserData.user.username}
-                  </Text>
-                </View>
+                    <View style={styles.infoField}>
+                      <Text style={styles.label}>Date of Birth</Text>
+                      <Text style={styles.value}>
+                        {backendUserData.user.userInfo.birthDate
+                          ? `${backendUserData.user.userInfo.birthDate.day}/${backendUserData.user.userInfo.birthDate.month}/${backendUserData.user.userInfo.birthDate.year}`
+                          : "N/A"}
+                      </Text>
+                    </View>
 
-                <View style={styles.infoField}>
-                  <Text style={styles.label}>Member Since</Text>
-                  <Text style={styles.value}>
-                    {backendUserData.user.createdAt ? new Date(backendUserData.user.createdAt).toLocaleDateString() : "N/A"}
-                  </Text>
-                </View>
+                    <View style={styles.infoField}>
+                      <Text style={styles.label}>Height</Text>
+                      <Text style={styles.value}>{backendUserData.user.userInfo.height || "N/A"} cm</Text>
+                    </View>
 
-                <View style={styles.infoField}>
-                  <Text style={styles.label}>Onboarding Status</Text>
-                  <View style={styles.verifiedBadge}>
-                    <Ionicons 
-                      name={backendUserData.user.isOnboardingComplete ? "checkmark-circle" : "close-circle"} 
-                      size={20} 
-                      color={backendUserData.user.isOnboardingComplete ? colors.success : colors.error} 
-                    />
-                    <Text style={[
-                      styles.verifiedText,
-                      { color: backendUserData.user.isOnboardingComplete ? colors.success : colors.error }
-                    ]}>
-                      {backendUserData.user.isOnboardingComplete ? "Complete" : "Incomplete"}
-                    </Text>
+                    <View style={styles.infoField}>
+                      <Text style={styles.label}>Weight</Text>
+                      <Text style={styles.value}>{backendUserData.user.userInfo.weight || "N/A"} kg</Text>
+                    </View>
+
+                    <View style={styles.infoField}>
+                      <Text style={styles.label}>BMI</Text>
+                      <Text style={[styles.value, styles.highlightValue]}>
+                        {backendUserData.user.userInfo.bmi
+                          ? `${backendUserData.user.userInfo.bmi.toFixed(1)} - ${getBMICategory(backendUserData.user.userInfo.bmi)}`
+                          : "N/A"}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-              </View>
-            )}
 
-            {/* Contact Information - Only for Clerk users */}
-            {isClerkUser && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Contact Information</Text>
-                
-                <InfoField 
-                  label="Email" 
-                  value={formData.email} 
-                  field="email"
-                  editable={false}
-                  keyboardType="email-address"
-                />
-                
-                <InfoField 
-                  label="Phone Number" 
-                  value={formData.phoneNumber} 
-                  field="phoneNumber"
-                  keyboardType="phone-pad"
-                />
-              </View>
-            )}
+                  <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Fitness Information</Text>
 
-            {/* Backend User Data - Physical Information */}
-            {isLoadingData ? (
-              <View style={[styles.section, styles.loadingContainer]}>
-                <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={styles.loadingText}>Loading user data...</Text>
-              </View>
-            ) : (
-              <>
-                {/* Debug/Refresh Section */}
-                <View style={styles.section}>
-                  <TouchableOpacity 
-                    style={styles.refreshButton}
-                    onPress={fetchBackendUserData}
-                  >
-                    <Ionicons name="refresh" size={20} color="white" />
-                    <Text style={styles.refreshButtonText}>Refresh Backend Data</Text>
-                  </TouchableOpacity>
-                  
-                  {!backendUserData && (
-                    <View style={styles.noDataContainer}>
-                      <Ionicons name="alert-circle-outline" size={40} color={colors.textSecondary} />
-                      <Text style={styles.noDataText}>No backend data available</Text>
-                      <Text style={styles.noDataSubtext}>
-                        Complete your onboarding to see your fitness data here
+                    <View style={styles.infoField}>
+                      <Text style={styles.label}>Activity Level</Text>
+                      <Text style={styles.value}>
+                        {backendUserData.user.userInfo.activityLevel
+                          ? backendUserData.user.userInfo.activityLevel.charAt(0).toUpperCase() + backendUserData.user.userInfo.activityLevel.slice(1)
+                          : "N/A"}
                       </Text>
-                      <Text style={styles.debugText}>
-                        Check console logs for details
+                    </View>
+
+                    <View style={styles.infoField}>
+                      <Text style={styles.label}>Fitness Goal</Text>
+                      <Text style={styles.value}>{getFitnessGoalText(backendUserData.user.userInfo.fitnessGoal)}</Text>
+                    </View>
+
+                    <View style={styles.infoField}>
+                      <Text style={styles.label}>Daily Calorie Goal</Text>
+                      <Text style={[styles.value, styles.highlightValue]}>
+                        {backendUserData.user.userInfo.goalCalories || "N/A"} kcal
                       </Text>
-                      <TouchableOpacity 
-                        style={styles.debugButton}
-                        onPress={async () => {
-                          const token = await SecureStore.getItemAsync('fitfaat_auth_token');
-                          const user = await SecureStore.getItemAsync('fitfaat_user');
-                          Alert.alert(
-                            "Debug Info",
-                            `API URL: ${API_URL}\n` +
-                            `Token exists: ${!!token}\n` +
-                            `User exists: ${!!user}\n` +
-                            `Is Clerk User: ${isClerkUser}\n` +
-                            `Has Backend Data: ${!!backendUserData}\n` +
-                            `Check console for full logs`
-                          );
-                        }}
-                      >
-                        <Text style={styles.debugButtonText}>Show Debug Info</Text>
-                      </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.infoField}>
+                      <Text style={styles.label}>Daily Hydration Goal</Text>
+                      <Text style={[styles.value, styles.highlightValue]}>
+                        {backendUserData.user.userInfo.hydrationGoal
+                          ? `${backendUserData.user.userInfo.hydrationGoal.toFixed(1)} L`
+                          : "N/A"}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Today's Progress */}
+                  {backendUserData.todayProgress && (
+                    <View style={styles.section}>
+                      <Text style={styles.sectionTitle}>Today's Progress</Text>
+
+                      <View style={styles.progressCard}>
+                        <View style={styles.progressItem}>
+                          <Ionicons name="flame" size={24} color={colors.primary} />
+                          <View style={styles.progressInfo}>
+                            <Text style={styles.progressLabel}>Calories</Text>
+                            <Text style={styles.progressValue}>
+                              {backendUserData.todayProgress.caloriesConsumed || 0} / {backendUserData.todayProgress.targetCalories || 0} kcal
+                            </Text>
+                            <View style={styles.progressBar}>
+                              <View
+                                style={[
+                                  styles.progressBarFill,
+                                  {
+                                    width: `${Math.min(((backendUserData.todayProgress.caloriesConsumed || 0) / (backendUserData.todayProgress.targetCalories || 1)) * 100, 100)}%`,
+                                    backgroundColor: colors.primary
+                                  }
+                                ]}
+                              />
+                            </View>
+                          </View>
+                        </View>
+
+                        <View style={styles.progressItem}>
+                          <Ionicons name="water" size={24} color={colors.secondary} />
+                          <View style={styles.progressInfo}>
+                            <Text style={styles.progressLabel}>Hydration</Text>
+                            <Text style={styles.progressValue}>
+                              {(backendUserData.todayProgress.hydrationLevel || 0).toFixed(1)} / {(backendUserData.todayProgress.targetHydration || 0).toFixed(1)} L
+                            </Text>
+                            <View style={styles.progressBar}>
+                              <View
+                                style={[
+                                  styles.progressBarFill,
+                                  {
+                                    width: `${Math.min(((backendUserData.todayProgress.hydrationLevel || 0) / (backendUserData.todayProgress.targetHydration || 1)) * 100, 100)}%`,
+                                    backgroundColor: colors.secondary
+                                  }
+                                ]}
+                              />
+                            </View>
+                          </View>
+                        </View>
+
+                        <View style={styles.infoField}>
+                          <Text style={styles.label}>Meals Logged Today</Text>
+                          <Text style={styles.value}>{backendUserData.todayProgress.mealsLogged || 0} meals</Text>
+                        </View>
+                      </View>
                     </View>
                   )}
-                </View>
 
-                {backendUserData?.user?.userInfo ? (
-                  <>
+                  {/* Weekly Statistics */}
+                  {backendUserData.weeklyStats && backendUserData.weeklyStats.length > 0 && (
                     <View style={styles.section}>
-                      <Text style={styles.sectionTitle}>Physical Information</Text>
-                  
-                  <View style={styles.infoField}>
-                    <Text style={styles.label}>Full Name</Text>
-                    <Text style={styles.value}>{backendUserData.user.userInfo.name || "N/A"}</Text>
-                  </View>
-                  
-                  <View style={styles.infoField}>
-                    <Text style={styles.label}>Gender</Text>
-                    <Text style={styles.value}>
-                      {backendUserData.user.userInfo.gender 
-                        ? backendUserData.user.userInfo.gender.charAt(0).toUpperCase() + backendUserData.user.userInfo.gender.slice(1)
-                        : "N/A"}
-                    </Text>
-                  </View>
+                      <Text style={styles.sectionTitle}>Recent Weekly Stats</Text>
 
-                  <View style={styles.infoField}>
-                    <Text style={styles.label}>Age</Text>
-                    <Text style={styles.value}>{backendUserData.user.userInfo.age || "N/A"} years</Text>
-                  </View>
-
-                  <View style={styles.infoField}>
-                    <Text style={styles.label}>Date of Birth</Text>
-                    <Text style={styles.value}>
-                      {backendUserData.user.userInfo.birthDate 
-                        ? `${backendUserData.user.userInfo.birthDate.day}/${backendUserData.user.userInfo.birthDate.month}/${backendUserData.user.userInfo.birthDate.year}`
-                        : "N/A"}
-                    </Text>
-                  </View>
-                  
-                  <View style={styles.infoField}>
-                    <Text style={styles.label}>Height</Text>
-                    <Text style={styles.value}>{backendUserData.user.userInfo.height || "N/A"} cm</Text>
-                  </View>
-                  
-                  <View style={styles.infoField}>
-                    <Text style={styles.label}>Weight</Text>
-                    <Text style={styles.value}>{backendUserData.user.userInfo.weight || "N/A"} kg</Text>
-                  </View>
-                  
-                  <View style={styles.infoField}>
-                    <Text style={styles.label}>BMI</Text>
-                    <Text style={[styles.value, styles.highlightValue]}>
-                      {backendUserData.user.userInfo.bmi 
-                        ? `${backendUserData.user.userInfo.bmi.toFixed(1)} - ${getBMICategory(backendUserData.user.userInfo.bmi)}`
-                        : "N/A"}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Fitness Information</Text>
-                  
-                  <View style={styles.infoField}>
-                    <Text style={styles.label}>Activity Level</Text>
-                    <Text style={styles.value}>
-                      {backendUserData.user.userInfo.activityLevel 
-                        ? backendUserData.user.userInfo.activityLevel.charAt(0).toUpperCase() + backendUserData.user.userInfo.activityLevel.slice(1)
-                        : "N/A"}
-                    </Text>
-                  </View>
-                  
-                  <View style={styles.infoField}>
-                    <Text style={styles.label}>Fitness Goal</Text>
-                    <Text style={styles.value}>{getFitnessGoalText(backendUserData.user.userInfo.fitnessGoal)}</Text>
-                  </View>
-                  
-                  <View style={styles.infoField}>
-                    <Text style={styles.label}>Daily Calorie Goal</Text>
-                    <Text style={[styles.value, styles.highlightValue]}>
-                      {backendUserData.user.userInfo.goalCalories || "N/A"} kcal
-                    </Text>
-                  </View>
-                  
-                  <View style={styles.infoField}>
-                    <Text style={styles.label}>Daily Hydration Goal</Text>
-                    <Text style={[styles.value, styles.highlightValue]}>
-                      {backendUserData.user.userInfo.hydrationGoal 
-                        ? `${backendUserData.user.userInfo.hydrationGoal.toFixed(1)} L`
-                        : "N/A"}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Today's Progress */}
-                {backendUserData.todayProgress && (
-                  <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Today's Progress</Text>
-                    
-                    <View style={styles.progressCard}>
-                      <View style={styles.progressItem}>
-                        <Ionicons name="flame" size={24} color={colors.primary} />
-                        <View style={styles.progressInfo}>
-                          <Text style={styles.progressLabel}>Calories</Text>
-                          <Text style={styles.progressValue}>
-                            {backendUserData.todayProgress.caloriesConsumed || 0} / {backendUserData.todayProgress.targetCalories || 0} kcal
-                          </Text>
-                          <View style={styles.progressBar}>
-                            <View 
-                              style={[
-                                styles.progressBarFill, 
-                                { 
-                                  width: `${Math.min(((backendUserData.todayProgress.caloriesConsumed || 0) / (backendUserData.todayProgress.targetCalories || 1)) * 100, 100)}%`,
-                                  backgroundColor: colors.primary
-                                }
-                              ]} 
-                            />
+                      {backendUserData.weeklyStats.map((week: any, index: number) => (
+                        <View key={index} style={styles.weekCard}>
+                          <Text style={styles.weekTitle}>Week {week.week}, {week.year}</Text>
+                          <View style={styles.weekStats}>
+                            <View style={styles.weekStat}>
+                              <Text style={styles.weekStatLabel}>Total Calories</Text>
+                              <Text style={styles.weekStatValue}>{week.totalCalories || 0} kcal</Text>
+                            </View>
+                            <View style={styles.weekStat}>
+                              <Text style={styles.weekStatLabel}>Avg Hydration</Text>
+                              <Text style={styles.weekStatValue}>{week.averageHydration ? week.averageHydration.toFixed(1) : '0.0'} L</Text>
+                            </View>
+                            <View style={styles.weekStat}>
+                              <Text style={styles.weekStatLabel}>Days Tracked</Text>
+                              <Text style={styles.weekStatValue}>{week.daysTracked || 0} days</Text>
+                            </View>
                           </View>
                         </View>
-                      </View>
-
-                      <View style={styles.progressItem}>
-                        <Ionicons name="water" size={24} color={colors.secondary} />
-                        <View style={styles.progressInfo}>
-                          <Text style={styles.progressLabel}>Hydration</Text>
-                          <Text style={styles.progressValue}>
-                            {(backendUserData.todayProgress.hydrationLevel || 0).toFixed(1)} / {(backendUserData.todayProgress.targetHydration || 0).toFixed(1)} L
-                          </Text>
-                          <View style={styles.progressBar}>
-                            <View 
-                              style={[
-                                styles.progressBarFill, 
-                                { 
-                                  width: `${Math.min(((backendUserData.todayProgress.hydrationLevel || 0) / (backendUserData.todayProgress.targetHydration || 1)) * 100, 100)}%`,
-                                  backgroundColor: colors.secondary
-                                }
-                              ]} 
-                            />
-                          </View>
-                        </View>
-                      </View>
-
-                      <View style={styles.infoField}>
-                        <Text style={styles.label}>Meals Logged Today</Text>
-                        <Text style={styles.value}>{backendUserData.todayProgress.mealsLogged || 0} meals</Text>
-                      </View>
+                      ))}
                     </View>
-                  </View>
-                )}
+                  )}
+                </>
+              ) : null}
+            </>
+          )}
 
-                {/* Weekly Statistics */}
-                {backendUserData.weeklyStats && backendUserData.weeklyStats.length > 0 && (
-                  <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Recent Weekly Stats</Text>
-                    
-                    {backendUserData.weeklyStats.map((week: any, index: number) => (
-                      <View key={index} style={styles.weekCard}>
-                        <Text style={styles.weekTitle}>Week {week.week}, {week.year}</Text>
-                        <View style={styles.weekStats}>
-                          <View style={styles.weekStat}>
-                            <Text style={styles.weekStatLabel}>Total Calories</Text>
-                            <Text style={styles.weekStatValue}>{week.totalCalories || 0} kcal</Text>
-                          </View>
-                          <View style={styles.weekStat}>
-                            <Text style={styles.weekStatLabel}>Avg Hydration</Text>
-                            <Text style={styles.weekStatValue}>{week.averageHydration ? week.averageHydration.toFixed(1) : '0.0'} L</Text>
-                          </View>
-                          <View style={styles.weekStat}>
-                            <Text style={styles.weekStatLabel}>Days Tracked</Text>
-                            <Text style={styles.weekStatValue}>{week.daysTracked || 0} days</Text>
-                          </View>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </>
-            ) : null}
-          </>
-        )}
-
-            {/* Clerk Account Information - Only for Clerk users */}
-            {isClerkUser && user && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Clerk Account Details</Text>
-                
-                <View style={styles.infoField}>
-                  <Text style={styles.label}>User ID</Text>
-                  <Text style={styles.value}>{user?.id || "N/A"}</Text>
-                </View>
-                
-                <View style={styles.infoField}>
-                  <Text style={styles.label}>Member Since</Text>
-                  <Text style={styles.value}>
-                    {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : "N/A"}
-                  </Text>
-                </View>
-                
-                <View style={styles.infoField}>
-                  <Text style={styles.label}>Email Verified</Text>
-                  <View style={styles.verifiedBadge}>
-                    <Ionicons 
-                      name={user?.primaryEmailAddress?.verification?.status === "verified" ? "checkmark-circle" : "close-circle"} 
-                      size={20} 
-                      color={user?.primaryEmailAddress?.verification?.status === "verified" ? colors.success : colors.error} 
-                    />
-                    <Text style={[
-                      styles.verifiedText,
-                      { color: user?.primaryEmailAddress?.verification?.status === "verified" ? colors.success : colors.error }
-                    ]}>
-                      {user?.primaryEmailAddress?.verification?.status === "verified" ? "Verified" : "Not Verified"}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            )}
-
-            {isEditing && isClerkUser && (
-              <TouchableOpacity 
-                style={styles.cancelButton}
-                onPress={() => {
-                  setIsEditing(false);
-                  // Reset form data
-                  setFormData({
-                    firstName: user?.firstName || "",
-                    lastName: user?.lastName || "",
-                    email: user?.primaryEmailAddress?.emailAddress || "",
-                    phoneNumber: user?.primaryPhoneNumber?.phoneNumber || "",
-                    username: user?.username || "",
-                    bio: "",
-                  });
-                }}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-            )}
-
-            <View style={{ height: hp(4) }} />
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </View>
-    </SafeAreaView>
-  );
+          <View style={{ height: hp(4) }} />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
+  </SafeAreaView>
+);
 }
 
 const getStyles = (colors: any) => StyleSheet.create({

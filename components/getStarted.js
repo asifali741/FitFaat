@@ -4,11 +4,29 @@ import {
     widthPercentageToDP as wp,
 } from "react-native-responsive-screen";
 
-export const getStarted = StyleSheet.create({
+const fallbackColors = {
+  screenColor: "#FAFBFC",
+  cardBackground: "#FFFFFF",
+  backgroundHeader: "#F8FFFE",
+  primary: "#26867C",
+  secondary: "#4ECDC4",
+  error: "#FF6B6B",
+  border: "#E5E7EB",
+  textPrimary: "#1A1A1A",
+  textSecondary: "#666666",
+  textTertiary: "#999999",
+  textOnPrimary: "#FFFFFF",
+  shadowLight: "#000000",
+};
+
+export const createGetStartedStyles = (themeColors = fallbackColors) => {
+  const colors = { ...fallbackColors, ...themeColors };
+
+  return StyleSheet.create({
   // Main Container
   container: {
     flex: 1,
-    backgroundColor: "#FAFBFC",
+    backgroundColor: colors.screenColor,
   },
   scrollContent: {
     paddingBottom: hp(4),
@@ -28,14 +46,14 @@ export const getStarted = StyleSheet.create({
   circle1: {
     width: hp(25),
     height: hp(25),
-    backgroundColor: "#4ECDC4",
+    backgroundColor: colors.secondary,
     top: -hp(10),
     right: -hp(5),
   },
   circle2: {
     width: hp(20),
     height: hp(20),
-    backgroundColor: "#FF6B6B",
+    backgroundColor: colors.error,
     top: hp(5),
     left: -hp(8),
   },
@@ -50,11 +68,11 @@ export const getStarted = StyleSheet.create({
     width: hp(10),
     height: hp(10),
     borderRadius: hp(5),
-    backgroundColor: "#26867C",
+    backgroundColor: colors.primary,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: hp(2),
-    shadowColor: "#26867C",
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
@@ -69,14 +87,14 @@ export const getStarted = StyleSheet.create({
     fontFamily: "LoraRegular",
     fontSize: hp(3.8),
     fontWeight: "800",
-    color: "#1A1A1A",
+    color: colors.textPrimary,
     marginBottom: hp(1),
     letterSpacing: 0.5,
   },
   taglineSmall: {
     fontFamily: "LoraRegular",
     fontSize: hp(1.8),
-    color: "#26867C",
+    color: colors.primary,
     fontWeight: "600",
     textAlign: "center",
   },
@@ -85,10 +103,10 @@ export const getStarted = StyleSheet.create({
   instructionCard: {
     marginHorizontal: wp(5),
     marginVertical: hp(2),
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.cardBackground,
     borderRadius: 16,
     padding: hp(2.5),
-    shadowColor: "#000",
+    shadowColor: colors.shadowLight,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
@@ -103,14 +121,14 @@ export const getStarted = StyleSheet.create({
     fontFamily: "LoraRegular",
     fontSize: hp(2.2),
     fontWeight: "700",
-    color: "#1A1A1A",
+    color: colors.textPrimary,
     marginLeft: wp(2),
   },
   missionTitle: {
     fontFamily: "LoraRegular",
     fontSize: hp(2.2),
     fontWeight: "700",
-    color: "#1A1A1A",
+    color: colors.textPrimary,
     marginLeft: wp(2),
   },
 
@@ -123,22 +141,22 @@ export const getStarted = StyleSheet.create({
     alignItems: "center",
     paddingVertical: hp(1.2),
     paddingHorizontal: wp(2),
-    backgroundColor: "#F8FFFE",
+    backgroundColor: colors.backgroundHeader,
     borderRadius: 12,
     borderLeftWidth: 4,
-    borderLeftColor: "#4ECDC4",
+    borderLeftColor: colors.secondary,
   },
   stepNumberBadge: {
     width: hp(4),
     height: hp(4),
     borderRadius: hp(2),
-    backgroundColor: "#26867C",
+    backgroundColor: colors.primary,
     justifyContent: "center",
     alignItems: "center",
     marginRight: wp(3),
   },
   stepNumber: {
-    color: "#FFFFFF",
+    color: colors.textOnPrimary,
     fontWeight: "700",
     fontSize: hp(1.8),
     fontFamily: "LoraRegular",
@@ -146,13 +164,13 @@ export const getStarted = StyleSheet.create({
   stepText: {
     fontFamily: "LoraRegular",
     fontSize: hp(1.6),
-    color: "#2C3E50",
+    color: colors.textPrimary,
     fontWeight: "600",
     flex: 1,
   },
 
   // Mission Container
-  missionContainer: {
+  legacyMissionContainer: {
     marginHorizontal: wp(5),
     marginVertical: hp(2.5),
   },
@@ -166,11 +184,11 @@ export const getStarted = StyleSheet.create({
   },
   goalCard: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.cardBackground,
     borderRadius: 16,
     padding: wp(4),
     alignItems: "center",
-    shadowColor: "#000",
+    shadowColor: colors.shadowLight,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
@@ -189,14 +207,14 @@ export const getStarted = StyleSheet.create({
     fontFamily: "LoraRegular",
     fontSize: hp(1.6),
     fontWeight: "700",
-    color: "#1A1A1A",
+    color: colors.textPrimary,
     marginBottom: hp(0.8),
     textAlign: "center",
   },
   goalDescription: {
     fontFamily: "LoraRegular",
     fontSize: hp(1.3),
-    color: "#666",
+    color: colors.textSecondary,
     textAlign: "center",
     lineHeight: hp(1.9),
   },
@@ -205,10 +223,10 @@ export const getStarted = StyleSheet.create({
   benefitsContainer: {
     marginHorizontal: wp(5),
     marginVertical: hp(2.5),
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.cardBackground,
     borderRadius: 16,
     padding: hp(2.5),
-    shadowColor: "#000",
+    shadowColor: colors.shadowLight,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
@@ -218,7 +236,7 @@ export const getStarted = StyleSheet.create({
     fontFamily: "LoraRegular",
     fontSize: hp(2.2),
     fontWeight: "700",
-    color: "#1A1A1A",
+    color: colors.textPrimary,
     marginBottom: hp(2),
     textAlign: "center",
   },
@@ -231,7 +249,7 @@ export const getStarted = StyleSheet.create({
   benefitText: {
     fontFamily: "LoraRegular",
     fontSize: hp(1.5),
-    color: "#2C3E50",
+    color: colors.textPrimary,
     fontWeight: "600",
     marginLeft: wp(3),
     flex: 1,
@@ -247,12 +265,12 @@ export const getStarted = StyleSheet.create({
     fontFamily: "LoraRegular",
     fontSize: hp(2),
     fontWeight: "600",
-    color: "#1A1A1A",
+    color: colors.textPrimary,
     textAlign: "center",
     marginBottom: hp(2.5),
   },
   getStartedButton: {
-    backgroundColor: "#26867C",
+    backgroundColor: colors.primary,
     flexDirection: "row",
     paddingVertical: hp(2),
     paddingHorizontal: wp(8),
@@ -260,15 +278,15 @@ export const getStarted = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: wp(2),
-    shadowColor: "#26867C",
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.4,
     shadowRadius: 12,
     elevation: 8,
     width: "100%",
   },
-  getStartedButtonText: {
-    color: "#FFFFFF",
+  getStartedButtonContainer: {
+    color: colors.textOnPrimary,
     fontSize: hp(1.8),
     fontWeight: "700",
     fontFamily: "LoraRegular",
@@ -286,7 +304,7 @@ export const getStarted = StyleSheet.create({
     textAlign: "center",
     fontFamily: "LoraRegular",
     fontSize: hp(1.3),
-    color: "#999",
+    color: colors.textTertiary,
     fontWeight: "500",
     marginBottom: hp(0.8),
   },
@@ -294,7 +312,7 @@ export const getStarted = StyleSheet.create({
     textAlign: "center",
     fontFamily: "LoraRegular",
     fontSize: hp(1.3),
-    color: "#26867C",
+    color: colors.primary,
     fontWeight: "600",
   },
 
@@ -325,7 +343,7 @@ export const getStarted = StyleSheet.create({
   missionText: {
     fontFamily: "LoraRegular",
     fontSize: hp(2.4),
-    color: "#222",
+    color: colors.textPrimary,
     marginBottom: hp(2),
     textAlign: "center",
   },
@@ -350,14 +368,18 @@ export const getStarted = StyleSheet.create({
     right: wp(5),
   },
   getStartedButtonText: {
-    backgroundColor: "#26867C",
+    backgroundColor: colors.primary,
+    color: colors.textOnPrimary,
     padding: 20,
     borderRadius: 12,
     alignItems: "center",
-    shadowColor: "#26867C",
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 3,
   },
-});
+  });
+};
+
+export const getStarted = createGetStartedStyles();

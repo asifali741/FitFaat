@@ -166,7 +166,7 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
     // Create or update session
     if (!sessionToUse) {
       const newSessionId = Date.now().toString();
-      sessionToUse = {
+      const newSession: ChatSession = {
         id: newSessionId,
         title: text.length > 30 ? text.substring(0, 30) + '...' : text,
         createdAt: new Date(),
@@ -174,8 +174,9 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
         messageCount: 1,
         messages: [message]
       };
-      setSessions(prev => [sessionToUse, ...prev]);
-      setCurrentSession(sessionToUse);
+      sessionToUse = newSession;
+      setSessions(prev => [newSession, ...prev]);
+      setCurrentSession(newSession);
       setMessages([message]);
       return;
     }

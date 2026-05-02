@@ -1,39 +1,32 @@
+import { LogBox } from "react-native";
+
+// Suppress expo-notifications Expo Go warning (SDK 53 removed push notification support from Expo Go)
+// This only affects development in Expo Go; production builds are unaffected
+LogBox.ignoreLogs([
+  'expo-notifications: Android Push notifications',
+  'expo-notifications` functionality is not fully supported in Expo Go',
+]);
+
 import SafeScreen from "@/components/SafeScreen";
 import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
-import { ClerkProvider, useAuth, useUser } from "@clerk/clerk-expo";
-import { tokenCache } from "@clerk/clerk-expo/token-cache";
+import { authApi } from "@/utils/auth/authApi";
 import { StripeProvider } from "@stripe/stripe-react-native";
-import { Slot, useRouter } from "expo-router";
+import { Slot, useRouter, useSegments } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, StatusBar, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import Constants from 'expo-constants';
-
-// Safely get keys from Constants
-const publishableKey = Constants.expoConfig?.extra?.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
+import { getStripePublishableKey } from '@/utils/config';
 
 export default function RootLayout() {
-  const stripePublishableKey = Constants.expoConfig?.extra?.EXPO_PUBLIC_STRIPE_PK;
-  
-  // Fail-safe check: If keys are missing, show loader instead of crashing
-  if (!publishableKey || !stripePublishableKey) {
-    console.warn("Keys missing in RootLayout, showing ActivityIndicator");
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: '#000' }}>
-        <ActivityIndicator size="large" color="#fff" />
-      </View>
-    );
-  }
+  const stripePublishableKey = getStripePublishableKey();
   
   return (
     <StripeProvider publishableKey={stripePublishableKey}>
-      <ClerkProvider tokenCache={tokenCache} publishableKey={publishableKey}> 
-        <ThemeProvider>
-          <SafeAreaProvider>
-            <ThemedApp />
-          </SafeAreaProvider>
-        </ThemeProvider>
-      </ClerkProvider>
+      <ThemeProvider>
+        <SafeAreaProvider>
+          <ThemedApp />
+        </SafeAreaProvider>
+      </ThemeProvider>
     </StripeProvider>
   );
 }
@@ -53,41 +46,66 @@ function ThemedApp() {
 
 function AuthGate() {
   const router = useRouter();
-  const { isLoaded, isSignedIn } = useAuth();
-  const { user, isLoaded: userLoaded } = useUser();
-  const [isNavigating, setIsNavigating] = useState(false);
+  const segments = useSegments();
+  const segmentKey = segments.join("/");
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   useEffect(() => {
-    if (!isLoaded || !userLoaded || isNavigating) return;
+    let isActive = true;
 
     const handleAuthFlow = async () => {
-      setIsNavigating(true);
-      
       try {
-        if (isSignedIn && user) {
-          const hasCompletedOnboarding = user.unsafeMetadata?.hasCompletedOnboarding;
-          
-          if (hasCompletedOnboarding) {
-            router.replace("/(main)/(dashboard)");
-          } else {
-            router.replace("/DietSection");
+        const isAuthenticated = await authApi.isAuthenticated();
+        const rootSegment = segments[0];
+        const isInAuthGroup = rootSegment === "(auth)";
+        const isInMainGroup = rootSegment === "(main)";
+        const isInOnboarding = rootSegment === "DietSection";
+
+        if (!isAuthenticated) {
+          if (!isInAuthGroup) {
+            router.replace("/(auth)");
           }
-        } else {
-          router.replace("/(auth)");
+          return;
+        }
+
+        try {
+          const onboardingStatus = await authApi.getOnboardingStatus();
+          const isOnboardingComplete = Boolean(onboardingStatus?.isOnboardingComplete);
+
+          if (!isOnboardingComplete && !isInOnboarding) {
+            router.replace("/DietSection");
+            return;
+          }
+
+          if (isOnboardingComplete && !isInMainGroup) {
+            router.replace("/(main)/(dashboard)");
+          }
+        } catch {
+          if (!isInMainGroup) {
+            router.replace("/(main)/(dashboard)");
+          }
         }
       } catch (err) {
         console.error("Navigation error in AuthGate:", err);
+        if (segments[0] !== "(auth)") {
+          router.replace("/(auth)");
+        }
       } finally {
-        setIsNavigating(false);
+        if (isActive) {
+          setIsCheckingAuth(false);
+        }
       }
     };
 
     handleAuthFlow();
-  }, [isLoaded, userLoaded, isSignedIn, user, isNavigating]);
+    return () => {
+      isActive = false;
+    };
+  }, [segmentKey]);
 
-  if (!isLoaded || !userLoaded || isNavigating) {
+  if (isCheckingAuth) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: 'white' }}>
         <ActivityIndicator size="large" />
       </View>
     );

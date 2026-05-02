@@ -3,6 +3,10 @@ import { Ionicons, FontAwesome } from '@expo/vector-icons';
 import React from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import {
+  heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
+} from 'react-native-responsive-screen';
 
 interface StreakDisplayProps {
   streakCount: number;
@@ -48,7 +52,7 @@ export const StreakDisplay: React.FC<StreakDisplayProps> = ({
     : {};
 
   return (
-    <View style={[styles.container, { marginBottom: 20 }]}>
+    <View style={[styles.container, { marginBottom: hp(2.5) }]}>
       <LinearGradient
         colors={
           isStreakActive
@@ -58,7 +62,7 @@ export const StreakDisplay: React.FC<StreakDisplayProps> = ({
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={{
-          borderRadius: 16,
+          borderRadius: wp(4.3),
           overflow: 'hidden',
         }}
       >
@@ -114,7 +118,7 @@ export const StreakDisplay: React.FC<StreakDisplayProps> = ({
             {/* Reminder Icon (if applicable) */}
             {shouldSendReminder && streakCount > 0 && (
               <View style={[styles.reminderBadge, { backgroundColor: '#FFB800' }]}>
-                <Ionicons name="notifications" size={14} color="#FFFFFF" />
+                <Ionicons name="notifications" size={Math.min(hp(1.7), wp(3.7))} color="#FFFFFF" />
               </View>
             )}
           </View>
@@ -180,57 +184,57 @@ export const StreakDisplay: React.FC<StreakDisplayProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 16,
-    marginTop: 12,
+    paddingHorizontal: wp(4.3),
+    marginTop: hp(1.5),
   },
   streakCard: {
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: wp(4.3),
+    padding: wp(4.3),
     borderWidth: 1.5,
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: hp(2),
   },
   fireIconContainer: {
-    marginRight: 12,
+    marginRight: wp(3.2),
     justifyContent: 'center',
     alignItems: 'center',
   },
   fireIcon: {
-    fontSize: 40,
+    fontSize: Math.min(hp(4.9), wp(10.7)),
   },
   streakInfo: {
     flex: 1,
   },
   streakCount: {
-    fontSize: 22,
+    fontSize: Math.min(hp(2.7), wp(5.9)),
     fontWeight: '700',
-    marginBottom: 4,
+    marginBottom: hp(0.5),
   },
   streakMessage: {
-    fontSize: 13,
+    fontSize: Math.min(hp(1.6), wp(3.5)),
     fontWeight: '500',
-    lineHeight: 18,
+    lineHeight: hp(2.2),
   },
   reminderBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: Math.min(hp(3.9), wp(8.5)),
+    height: Math.min(hp(3.9), wp(8.5)),
+    borderRadius: Math.min(hp(2), wp(4.3)),
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 8,
+    marginLeft: wp(2.1),
   },
   progressBarContainer: {
-    height: 6,
-    borderRadius: 3,
-    marginBottom: 14,
+    height: hp(0.7),
+    borderRadius: hp(0.35),
+    marginBottom: hp(1.7),
     overflow: 'hidden',
   },
   progressBar: {
     height: '100%',
-    borderRadius: 3,
+    borderRadius: hp(0.35),
   },
   bottomRow: {
     flexDirection: 'row',
@@ -242,19 +246,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statLabel: {
-    fontSize: 11,
+    fontSize: Math.min(hp(1.35), wp(3)),
     fontWeight: '500',
-    marginBottom: 4,
+    marginBottom: hp(0.5),
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0,
   },
   statValue: {
-    fontSize: 18,
+    fontSize: Math.min(hp(2.2), wp(4.8)),
     fontWeight: '700',
   },
   divider: {
-    width: 1,
-    height: 24,
+    width: wp(0.25),
+    height: hp(3),
     backgroundColor: 'rgba(0, 0, 0, 0.1)',
   },
 });

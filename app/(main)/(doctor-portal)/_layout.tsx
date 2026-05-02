@@ -6,10 +6,7 @@ import { View } from "react-native";
 export default function DoctorPortalLayout() {
   return (
       <ScreenSceneWrapper>
-        <View style={{ flex: 1 }}>
           <Slot />
-          <BottomTabBar />
-        </View>
       </ScreenSceneWrapper>
     );
 }

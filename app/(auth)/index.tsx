@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import "../../global.css";
-import { useSocialAuth } from '../../hooks/useSocialAuth';
 import { useTheme } from '@/contexts/ThemeContext';
 import {
   widthPercentageToDP as wp,
@@ -15,7 +14,6 @@ const FULL_TEXT =
   "Your complete fitness companion with personalized diet plans, AI chatbot support, expert video consultations, and structured workouts - all in one app.";
 
 export default function Index() {
-  const { handleGoogleAuth } = useSocialAuth();
   const router = useRouter();
   const { colors, isDarkMode } = useTheme();
   const [visibleText, setVisibleText] = useState("");
@@ -52,6 +50,10 @@ export default function Index() {
 
   if (!fontsLoaded) return null;
 
+  const headingLogoSource = isDarkMode
+    ? require("../../assets/images/new_black_logo.jpeg")
+    : require("../../assets/images/logo.png");
+
   return (
     <View style={styles.container}>
       <ScrollView 
@@ -76,8 +78,9 @@ export default function Index() {
           <View style={styles.mainHeading}>
             <Text style={styles.mainHeadingText}>Welcome To</Text>
             <Image
-              source={require("../../assets/images/logo.png")}
+              source={headingLogoSource}
               style={styles.logoStyle}
+              resizeMode={isDarkMode ? "cover" : "contain"}
             />
           </View>
           
@@ -85,24 +88,6 @@ export default function Index() {
         </View>
         
         <View style={styles.buttonContainer}>
-          <TouchableOpacity 
-            onPress={handleGoogleAuth} 
-            style={styles.googleButton}
-            activeOpacity={0.8}
-          >
-            <Image
-              source={require("../../assets/images/goog.png")}
-              style={styles.googleLogo}
-            />
-            <Text style={styles.googleButtonText}>Continue with Google</Text>
-          </TouchableOpacity>
-
-          <View style={styles.dividerContainer}>
-            <View style={styles.divider} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.divider} />
-          </View>
-
           <TouchableOpacity
             onPress={() => router.push('/email-login')}
             style={styles.emailButton}
@@ -181,10 +166,9 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
     color: colors.textPrimary,
   },
   logoStyle: {
-    width: Math.min(wp(20), 100),
-    height: Math.min(hp(8), 80),
+    width: Math.min(wp(24), 112),
+    height: Math.min(hp(8), 82),
     marginLeft: wp(2),
-    resizeMode: "contain",
   },
   paragraphText: {
     textAlign: "center",

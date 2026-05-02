@@ -1,33 +1,65 @@
 import { useTheme } from "@/contexts/ThemeContext";
-import { useAuth, useUser } from "@clerk/clerk-expo";
+import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
 import {
     DrawerContentComponentProps,
     DrawerItem
 } from "@react-navigation/drawer";
-import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
+import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Image, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Animated, {
     useAnimatedStyle,
     useSharedValue,
     withSpring,
 } from "react-native-reanimated";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
+} from "react-native-responsive-screen";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { DrawerFonts } from "../app/(main)/(settings)/_ui_elements";
-type DrawerSceneWrapperProps = DrawerContentComponentProps;
+import { getBackendBaseUrl } from '@/utils/config';
+type DrawerSceneWrapperProps = DrawerContentComponentProps & {
+  onDrawerStatusChange?: (isOpen: boolean) => void;
+};
 
-// Helper function to get API URL
 const getAPIURL = () => {
-  const ENV = Constants.expoConfig?.extra;
-  const apiUrl = ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001');
-  return apiUrl.replace(/\/api\/?$/, '');
+  return getBackendBaseUrl();
+};
+
+const AnimatedLogoutLetter = ({
+  letter,
+  isActive,
+  textStyle,
+}: {
+  letter: string;
+  isActive: boolean;
+  textStyle: any;
+}) => {
+  const scale = useSharedValue(1);
+
+  useEffect(() => {
+    scale.value = withSpring(isActive ? 1.5 : 1, {
+      damping: 6,
+      stiffness: 200,
+    });
+  }, [isActive, scale]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <Animated.Text style={[textStyle, animatedStyle]}>{letter}</Animated.Text>
+  );
 };
 
 export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
   const { colors } = useTheme();
-  const { user } = useUser(); // Get Clerk user
+  const insets = useSafeAreaInsets();
   const [userName, setUserName] = useState('User');
   const [userEmail, setUserEmail] = useState('user@example.com');
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
@@ -37,7 +69,22 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
   useEffect(() => {
     fetchUserData();
     checkDoctorStatus();
-  }, [user]);
+  }, []);
+
+  useEffect(() => {
+    const navigation = props.navigation as any;
+    const unsubscribeOpen = navigation.addListener?.('drawerOpen', () => {
+      props.onDrawerStatusChange?.(true);
+    });
+    const unsubscribeClose = navigation.addListener?.('drawerClose', () => {
+      props.onDrawerStatusChange?.(false);
+    });
+
+    return () => {
+      unsubscribeOpen?.();
+      unsubscribeClose?.();
+    };
+  }, [props.navigation, props.onDrawerStatusChange]);
 
   const checkDoctorStatus = async () => {
     try {
@@ -45,7 +92,7 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
       if (!token) return;
 
       const API_URL = getAPIURL();
-      const baseURL = Platform.OS === 'android' ? API_URL.replace('localhost', '10.0.2.2') : API_URL;
+      const baseURL = API_URL;
 
       const response = await fetch(`${baseURL}/api/doctors/status`, {
         method: 'GET',
@@ -72,32 +119,15 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
   const fetchUserData = async () => {
     try {
       console.log('=== Drawer: Fetching user data ===');
-      console.log('Clerk user object:', JSON.stringify(user, null, 2));
-      console.log('Clerk user exists:', !!user);
-      
-      // Check if user is logged in with Clerk
-      if (user) {
-        console.log('Using Clerk user data');
-        console.log('Clerk firstName:', user.firstName);
-        console.log('Clerk username:', user.username);
-        console.log('Clerk email:', user.primaryEmailAddress?.emailAddress);
-        console.log('Clerk imageUrl:', user.imageUrl);
-        
-        const name = user.firstName || user.username || 'User';
-        const email = user.primaryEmailAddress?.emailAddress || 'user@example.com';
-        const imageUrl = user.imageUrl || null;
-        
-        console.log('Setting Clerk data - Name:', name, 'Email:', email);
-        setUserName(name);
-        setUserEmail(email);
-        setProfileImageUrl(imageUrl);
-        return;
-      }
 
-      console.log('No Clerk user, checking backend token');
-      // Otherwise, fetch from backend for email/password users
       const token = await SecureStore.getItemAsync('fitfaat_auth_token');
       console.log('Backend token:', token ? `Found (${token.substring(0, 20)}...)` : 'Not found');
+
+      const storedUser = await tokenStorage.getUser();
+      if (storedUser) {
+        setUserName(storedUser.userInfo?.name || storedUser.name || storedUser.username || 'User');
+        setUserEmail(storedUser.email || 'user@example.com');
+      }
       
       if (!token) {
         console.log('No token found, using defaults');
@@ -105,8 +135,7 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
       }
 
       const API_URL = getAPIURL();
-      console.log('API_URL from config:', API_URL);
-      const baseURL = Platform.OS === 'android' ? API_URL.replace('localhost', '10.0.2.2') : API_URL;
+      const baseURL = API_URL;
       console.log('Base URL:', baseURL);
       console.log('Fetching from:', `${baseURL}/api/user/profile`);
 
@@ -131,7 +160,7 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
         if (result.success && result.data && result.data.user) {
           const data = result.data.user;
           console.log('Setting user data from backend:', data.username, data.email);
-          setUserName(data.username || 'User');
+          setUserName(data.userInfo?.name || data.name || data.username || 'User');
           setUserEmail(data.email || 'user@example.com');
           
           // Fetch profile image if available
@@ -168,7 +197,22 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
     return currentRoute === '(exercises)/workout' || currentRoute.startsWith('(exercises)');
   };
 
-  const styles = getStyles(colors);
+  const styles = getStyles(colors, insets.bottom);
+  const drawerLabelStyle = {
+    marginLeft: wp(2),
+    fontSize: Math.min(hp(2.05), wp(4.6)),
+    fontFamily: "PoppinsMedium500",
+    color: colors.textOnPrimary,
+  };
+  const drawerItemStyle = (isActive: boolean) => ({
+    marginHorizontal: wp(3.2),
+    marginVertical: hp(0.05),
+    borderRadius: wp(6.5),
+    paddingHorizontal: wp(5),
+    paddingVertical: hp(0.45),
+    minHeight: hp(4.9),
+    backgroundColor: isActive ? colors.drawerActiveTabColor : 'transparent',
+  });
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.drawerBackground }}>
@@ -197,124 +241,50 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
       </TouchableOpacity>
 
       {/* Drawer Items */}
-      <View style={{ flex: 1, paddingVertical: 10 }}>
+      <ScrollView
+        style={styles.drawerItems}
+        contentContainerStyle={styles.drawerItemsContent}
+        showsVerticalScrollIndicator={false}
+      >
         <DrawerItem
           label="Dashboard"
           onPress={() => props.navigation.navigate('(dashboard)')}
-          labelStyle={{
-            marginLeft: 8,
-            fontSize: 18,
-            fontFamily: "PoppinsMedium500",
-            color: colors.textOnPrimary,
-          }}
-          style={{
-            marginHorizontal: 12,
-            marginVertical: 1,
-            borderRadius: 25,
-            paddingHorizontal: 20,
-            paddingVertical: 8,
-            minHeight: 45,
-            backgroundColor: isRouteActive('(dashboard)') ? colors.drawerActiveTabColor : 'transparent',
-          }}
+          labelStyle={drawerLabelStyle}
+          style={drawerItemStyle(isRouteActive('(dashboard)'))}
         />
         <DrawerItem
           label="Chatbot"
           onPress={() => props.navigation.navigate('(chatbot)')}
-          labelStyle={{
-            marginLeft: 8,
-            fontSize: 18,
-            fontFamily: "PoppinsMedium500",
-            color: colors.textOnPrimary,
-          }}
-          style={{
-            marginHorizontal: 12,
-            marginVertical: 1,
-            borderRadius: 25,
-            paddingHorizontal: 20,
-            paddingVertical: 8,
-            minHeight: 45,
-            backgroundColor: isRouteActive('(chatbot)') ? colors.drawerActiveTabColor : 'transparent',
-          }}
+          labelStyle={drawerLabelStyle}
+          style={drawerItemStyle(isRouteActive('(chatbot)'))}
         />
         {!isDoctor && (
           <DrawerItem
             label="Conference"
             onPress={() => props.navigation.navigate('(conference)')}
-            labelStyle={{
-              marginLeft: 8,
-              fontSize: 18,
-              fontFamily: "PoppinsMedium500",
-              color: colors.textOnPrimary,
-            }}
-            style={{
-              marginHorizontal: 12,
-              marginVertical: 1,
-              borderRadius: 25,
-              paddingHorizontal: 20,
-              paddingVertical: 8,
-              minHeight: 45,
-              backgroundColor: isRouteActive('(conference)') ? colors.drawerActiveTabColor : 'transparent',
-            }}
+            labelStyle={drawerLabelStyle}
+            style={drawerItemStyle(isRouteActive('(conference)'))}
           />
         )}
         <DrawerItem
           label="Workouts 👑"
           onPress={() => props.navigation.navigate('(exercises)/workout')}
-          labelStyle={{
-            marginLeft: 8,
-            fontSize: 18,
-            fontFamily: "PoppinsMedium500",
-            color: colors.textOnPrimary,
-          }}
-          style={{
-            marginHorizontal: 12,
-            marginVertical: 1,
-            borderRadius: 25,
-            paddingHorizontal: 20,
-            paddingVertical: 8,
-            minHeight: 45,
-            backgroundColor: isExercisesActive() ? colors.drawerActiveTabColor : 'transparent',
-          }}
+          labelStyle={drawerLabelStyle}
+          style={drawerItemStyle(isExercisesActive())}
         />
         <DrawerItem
           label={isDoctor && doctorName ? `Dr. ${doctorName} 👨‍⚕️` : "Join as Doctor 👨‍⚕️"}
           onPress={() => props.navigation.navigate('(doctor-portal)')}
-          labelStyle={{
-            marginLeft: 8,
-            fontSize: 18,
-            fontFamily: "PoppinsMedium500",
-            color: colors.textOnPrimary,
-          }}
-          style={{
-            marginHorizontal: 12,
-            marginVertical: 1,
-            borderRadius: 25,
-            paddingHorizontal: 20,
-            paddingVertical: 8,
-            minHeight: 45,
-            backgroundColor: isRouteActive('(doctor-portal)') ? colors.drawerActiveTabColor : 'transparent',
-          }}
+          labelStyle={drawerLabelStyle}
+          style={drawerItemStyle(isRouteActive('(doctor-portal)'))}
         />
         <DrawerItem
           label="Settings"
           onPress={() => props.navigation.navigate('(settings)')}
-          labelStyle={{
-            marginLeft: 8,
-            fontSize: 18,
-            fontFamily: "PoppinsMedium500",
-            color: colors.textOnPrimary,
-          }}
-          style={{
-            marginHorizontal: 12,
-            marginVertical: 1,
-            borderRadius: 25,
-            paddingHorizontal: 20,
-            paddingVertical: 8,
-            minHeight: 45,
-            backgroundColor: isRouteActive('(settings)') ? colors.drawerActiveTabColor : 'transparent',
-          }}
+          labelStyle={drawerLabelStyle}
+          style={drawerItemStyle(isRouteActive('(settings)'))}
         />
-      </View>
+      </ScrollView>
 
       {/* Bottom Part */}
       <Logout_Button/>
@@ -325,27 +295,17 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
 
 const Logout_Button = () => {
   const { colors } = useTheme();
-  const { signOut } = useAuth();
-  const { user } = useUser();
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
   const baseText = "Logout".split(""); // Array of letters
   const [activeIndex, setActiveIndex] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Shared values for each letter
-  const scales = baseText.map(() => useSharedValue(1));
-
-  const animateLetter = (index: number) => {
-    scales.forEach((s, i) => {
-      s.value = withSpring(i === index ? 1.5 : 1, { damping: 6, stiffness: 200 });
-    });
-  };
 
   const handleLongPress = () => {
     if (intervalRef.current) return;
     intervalRef.current = setInterval(() => {
       setActiveIndex((prev) => {
         const next = (prev + 1) % baseText.length;
-        animateLetter(next);
         return next;
       });
     }, 200);
@@ -357,31 +317,19 @@ const Logout_Button = () => {
       intervalRef.current = null;
     }
     setActiveIndex(0);
-    animateLetter(0);
 
     try {
-      // Check if user is logged in with Clerk
-      if (user) {
-        console.log("Logging out Clerk user");
-        await signOut();
-        console.log("Clerk user signed out successfully");
-      } else {
-        // Backend email/password user - clear token and navigate to auth
-        console.log("Logging out backend user");
-        await SecureStore.deleteItemAsync('fitfaat_auth_token');
-        await SecureStore.deleteItemAsync('fitfaat_user_data');
-        console.log("Backend user signed out successfully");
-        
-        // Navigate to auth screen (you'll need to import router)
-        const { router } = require('expo-router');
-        router.replace('/(auth)');
-      }
+      console.log("Logging out user");
+      await tokenStorage.clearAll();
+      await SecureStore.deleteItemAsync('fitfaat_user_data');
+      await AsyncStorage.removeItem('weeklyTrackingId');
+      router.replace('/(auth)');
     } catch (err) {
       console.error("Error signing out:", err);
     }
   };
 
-  const styles = getStyles(colors);
+  const styles = getStyles(colors, insets.bottom);
 
   return (
     <Pressable
@@ -389,36 +337,33 @@ const Logout_Button = () => {
       onLongPress={handleLongPress}
       onPressOut={handlePressOut}
     >
-      <Ionicons name="log-out" size={24} color={colors.textOnPrimary} />
-      <View style={{ flexDirection: "row", marginLeft: 5 }}>
-        {baseText.map((letter, i) => {
-          const animatedStyle = useAnimatedStyle(() => ({
-            transform: [{ scale: scales[i].value }],
-          }));
-
-          return (
-            <Animated.Text key={i} style={[styles.logoutText, animatedStyle]}>
-              {letter}
-            </Animated.Text>
-          );
-        })}
+      <Ionicons name="log-out" size={Math.min(hp(3), wp(6.4))} color={colors.textOnPrimary} />
+      <View style={styles.logoutTextRow}>
+        {baseText.map((letter, i) => (
+          <AnimatedLogoutLetter
+            key={`${letter}-${i}`}
+            letter={letter}
+            isActive={activeIndex === i}
+            textStyle={styles.logoutText}
+          />
+        ))}
       </View>
     </Pressable>
   );
 };
 
 
-const getStyles = (colors: any) => StyleSheet.create({
+const getStyles = (colors: any, bottomInset = 0) => StyleSheet.create({
   userContainer: {
   flexDirection: "row",
   alignItems: "center",
-  padding: 16,
-  marginHorizontal: 12,
+  padding: wp(4),
+  marginHorizontal: wp(3.2),
   backgroundColor: colors.cardBackground,
   borderBottomWidth: 1,
   borderBottomColor: colors.cardBorder,
-  borderRadius: 25,
-  marginBottom: 20,
+  borderRadius: wp(6.5),
+  marginBottom: hp(1.4),
 },
 
 userInfo: {
@@ -435,32 +380,45 @@ userName: {
 userEmail: {
   fontSize: DrawerFonts.drawerEmail,
   color: colors.textSecondary,
-  marginTop: 2,
+  marginTop: hp(0.25),
 },
 
   userImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginRight: 12,
+    width: Math.min(wp(15), hp(7.4)),
+    height: Math.min(wp(15), hp(7.4)),
+    borderRadius: Math.min(wp(7.5), hp(3.7)),
+    marginRight: wp(3.2),
     borderWidth: 2,
     borderColor: colors.cardBorder,
+  },
+  drawerItems: {
+    flex: 1,
+  },
+  drawerItemsContent: {
+    paddingVertical: hp(0.4),
+    paddingBottom: hp(0.6),
   },
   logoutButton: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
-    marginHorizontal: 12,
-    marginVertical: 20,
+    paddingVertical: hp(1.45),
+    paddingHorizontal: wp(4),
+    marginHorizontal: wp(3.2),
+    marginTop: hp(0.5),
+    marginBottom: bottomInset + hp(2.2),
     backgroundColor: colors.error,
-    borderRadius: 25,
+    borderRadius: wp(6.5),
     justifyContent: "center",
     alignSelf: 'stretch',
   },
+  logoutTextRow: {
+    flexDirection: "row",
+    marginLeft: wp(1.5),
+  },
   logoutText: {
     color: colors.white,
-    fontSize: 16,
+    fontSize: Math.min(hp(2), wp(4.3)),
     fontWeight: "600",
-    marginLeft: 8,
+    marginLeft: wp(0.4),
   },
 });

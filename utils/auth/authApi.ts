@@ -1,33 +1,19 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import Constants from 'expo-constants';
-import { Platform } from 'react-native';
 import { tokenStorage } from './tokenStorage';
-
-const ENV = Constants.expoConfig?.extra;
-
-// Get base URL from environment variables or use platform-specific defaults
-const getAPIURL = () => {
-  const envUrl = ENV?.EXPO_PUBLIC_BACKEND_API_URL;
-  if (envUrl) {
-    return envUrl;
-  }
-  // Default: use 10.0.2.2 for Android emulator, localhost for iOS
-  const defaultHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
-  return `http://${defaultHost}:5001/api`;
-};
-
-const API_URL = getAPIURL();
+import { getBackendUrl } from '../config';
 
 const api = axios.create({
-  baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Add token to requests if it exists
+// Add baseURL and token to every request
 api.interceptors.request.use(async (config) => {
+  // Always set baseURL dynamically from centralized config
+  config.baseURL = getBackendUrl();
+  
   const token = await tokenStorage.getToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -78,7 +64,7 @@ export const authApi = {
   register: async (userData: { email: string; username: string; password: string }) => {
     try {
       console.log('Sending registration request:', {
-        url: API_URL + '/auth/register',
+        url: getBackendUrl() + '/auth/register',
         data: { ...userData, password: '***' }
       });
 
@@ -110,7 +96,7 @@ export const authApi = {
   login: async (credentials: { identifier: string; password: string }) => {
     try {
       console.log('Sending login request:', {
-        url: API_URL + '/auth/login',
+        url: getBackendUrl() + '/auth/login',
         identifier: credentials.identifier
       });
 

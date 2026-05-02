@@ -270,8 +270,8 @@ export default function ExerciseDetails() {
           style={{
             height: hp(45),
             width: "100%",
-            borderBottomLeftRadius: 30,
-            borderBottomRightRadius: 30,
+            borderBottomLeftRadius: wp(8),
+            borderBottomRightRadius: wp(8),
           }}
         />
       
@@ -661,8 +661,8 @@ const getStyles = (colors: any) => StyleSheet.create({
   content: {
     flex: 1,
     backgroundColor: colors.screenColor,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
+    borderTopLeftRadius: wp(8),
+    borderTopRightRadius: wp(8),
   },
   spacer: {
     width: wp(10),

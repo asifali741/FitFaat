@@ -1,5 +1,5 @@
-import { dataScreenStyles } from "@/components/dataScreenStyles";
-import { theme } from "@/constants/theme";
+import { createDataScreenStyles } from "@/components/dataScreenStyles";
+import { useTheme } from '@/contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts } from "expo-font";
 import { useRouter } from "expo-router";
@@ -8,17 +8,17 @@ import { ActivityIndicator, Alert, Image, ScrollView, Text, TextInput, Touchable
 import { heightPercentageToDP as hp } from "react-native-responsive-screen";
 
 const specializations = [
-  { id: 1, name: "Nutrition", icon: "nutrition", color: theme.colors.success },
-  { id: 2, name: "Weight Loss", icon: "fitness", color: theme.colors.error },
-  { id: 3, name: "Weight Gain", icon: "trending-up", color: theme.colors.primary },
-  { id: 4, name: "Muscle Gain", icon: "barbell", color: theme.colors.info },
-  { id: 5, name: "Fitness Coaching", icon: "body", color: theme.colors.warning },
+  { id: 1, name: "Nutrition", icon: "nutrition", colorKey: "success" },
+  { id: 2, name: "Weight Loss", icon: "fitness", colorKey: "error" },
+  { id: 3, name: "Weight Gain", icon: "trending-up", colorKey: "primary" },
+  { id: 4, name: "Muscle Gain", icon: "barbell", colorKey: "info" },
+  { id: 5, name: "Fitness Coaching", icon: "body", colorKey: "warning" },
 ];
 
 const consultationModes = [
-  { id: 1, name: "In-person", icon: "location", color: theme.colors.success },
-  { id: 2, name: "Online", icon: "videocam", color: theme.colors.info },
-  { id: 3, name: "Both", icon: "options", color: theme.colors.primary },
+  { id: 1, name: "In-person", icon: "location", colorKey: "success" },
+  { id: 2, name: "Online", icon: "videocam", colorKey: "info" },
+  { id: 3, name: "Both", icon: "options", colorKey: "primary" },
 ];
 
 // Dropdown options
@@ -92,6 +92,8 @@ const availableHoursOptions = [
 ];
 
 export default function DoctorRegistration() {
+  const { colors } = useTheme();
+  const screenStyles = createDataScreenStyles(colors);
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   
@@ -182,62 +184,64 @@ export default function DoctorRegistration() {
   }
 
   return (
-    <View style={dataScreenStyles.container}>
-      <View style={dataScreenStyles.headingandlogo}>
-        <Text style={dataScreenStyles.mainHeading}>FitFaat</Text>
+    <View style={screenStyles.container}>
+      <View style={screenStyles.headingandlogo}>
+        <Text style={screenStyles.mainHeading}>FitFaat</Text>
         <Image
           source={require("../../../assets/images/logo.png")}
-          style={dataScreenStyles.logoImage}
+          style={screenStyles.logoImage}
         />
       </View>
       
-      <View style={[dataScreenStyles.mainBox, { height: hp(85), flex: 1 }]}>
+      <View style={[screenStyles.mainBox, { height: hp(85), flex: 1 }]}>
         <ScrollView 
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: hp(3) }}
         >
-        <Text style={dataScreenStyles.personalizedText}>
+        <Text style={screenStyles.personalizedText}>
           Complete your doctor profile to join FitFaat healthcare network
         </Text>
 
         {/* Personal Information */}
-        <Text style={[dataScreenStyles.subHeading, {marginTop: hp(2)}]}>Personal Information</Text>
+        <Text style={[screenStyles.subHeading, {marginTop: hp(2)}]}>Personal Information</Text>
         
-        <Text style={dataScreenStyles.subHeading}>Full Name *</Text>
+        <Text style={screenStyles.subHeading}>Full Name *</Text>
         <TextInput
-          placeholderTextColor="#999"
+          placeholderTextColor={colors.textTertiary}
           placeholder="Enter your full name"
-          style={dataScreenStyles.mainTextInput}
+          style={screenStyles.mainTextInput}
           value={formData.fullName}
           onChangeText={(value) => updateFormData('fullName', value)}
         />
 
-        <Text style={dataScreenStyles.subHeading}>Email Address *</Text>
+        <Text style={screenStyles.subHeading}>Email Address *</Text>
         <TextInput
-          placeholderTextColor="#999"
+          placeholderTextColor={colors.textTertiary}
           placeholder="Enter your email"
-          style={dataScreenStyles.mainTextInput}
+          style={screenStyles.mainTextInput}
           value={formData.email}
           keyboardType="email-address"
           onChangeText={(value) => updateFormData('email', value)}
         />
 
-        <View style={dataScreenStyles.subContainer}>
+        <View style={screenStyles.subContainer}>
           <View>
-            <Text style={dataScreenStyles.subsubHeading}>Phone Number *</Text>
+            <Text style={screenStyles.subsubHeading}>Phone Number *</Text>
             <TextInput
-              style={dataScreenStyles.miniTextInput}
+              style={screenStyles.miniTextInput}
               placeholder="e.g. +1234567890"
+              placeholderTextColor={colors.textTertiary}
               keyboardType="phone-pad"
               value={formData.phoneNumber}
               onChangeText={(value) => updateFormData('phoneNumber', value)}
             />
           </View>
           <View>
-            <Text style={dataScreenStyles.subsubHeading}>Password *</Text>
+            <Text style={screenStyles.subsubHeading}>Password *</Text>
             <TextInput
-              style={dataScreenStyles.miniTextInput}
+              style={screenStyles.miniTextInput}
               placeholder="Enter password"
+              placeholderTextColor={colors.textTertiary}
               secureTextEntry
               value={formData.password}
               onChangeText={(value) => updateFormData('password', value)}
@@ -247,134 +251,140 @@ export default function DoctorRegistration() {
 
         {/* Gender Selection */}
         <View>
-          <Text style={dataScreenStyles.genderHeading}>Gender *</Text>
-          <View style={dataScreenStyles.subContainer}>
+          <Text style={screenStyles.genderHeading}>Gender *</Text>
+          <View style={screenStyles.subContainer}>
             <TouchableOpacity 
               style={[
-                dataScreenStyles.genderSelection,
-                formData.selectedGender === 'male' && { backgroundColor: '#e3f2fd', borderColor: '#2563eb', borderWidth: 2 }
+                screenStyles.genderSelection,
+                formData.selectedGender === 'male' && { backgroundColor: colors.primarySoft, borderColor: colors.info, borderWidth: 2 }
               ]}
               onPress={() => updateFormData('selectedGender', 'male')}
             >
-              <Ionicons name="male-outline" size={32} color="#2563eb" />
+              <Ionicons name="male-outline" size={32} color={formData.selectedGender === 'male' ? colors.info : colors.textTertiary} />
             </TouchableOpacity>
             <TouchableOpacity 
               style={[
-                dataScreenStyles.genderSelection,
-                formData.selectedGender === 'female' && { backgroundColor: '#fce4ec', borderColor: '#db2777', borderWidth: 2 }
+                screenStyles.genderSelection,
+                formData.selectedGender === 'female' && { backgroundColor: colors.primarySoft, borderColor: colors.error, borderWidth: 2 }
               ]}
               onPress={() => updateFormData('selectedGender', 'female')}
             >
-              <Ionicons name="female-outline" size={32} color="#db2777" />
+              <Ionicons name="female-outline" size={32} color={formData.selectedGender === 'female' ? colors.error : colors.textTertiary} />
             </TouchableOpacity>
             <TouchableOpacity 
               style={[
-                dataScreenStyles.genderSelection,
-                formData.selectedGender === 'other' && { backgroundColor: '#f3e5f5', borderColor: 'purple', borderWidth: 2 }
+                screenStyles.genderSelection,
+                formData.selectedGender === 'other' && { backgroundColor: colors.primarySoft, borderColor: colors.primary, borderWidth: 2 }
               ]}
               onPress={() => updateFormData('selectedGender', 'other')}
             >
-              <Ionicons name="male-female-outline" size={32} color="purple" />
+              <Ionicons name="male-female-outline" size={32} color={formData.selectedGender === 'other' ? colors.primary : colors.textTertiary} />
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Professional Information */}
-        <Text style={[dataScreenStyles.subHeading, {marginTop: hp(2)}]}>Professional Information</Text>
+        <Text style={[screenStyles.subHeading, {marginTop: hp(2)}]}>Professional Information</Text>
         
         {/* Specialization */}
-        <Text style={dataScreenStyles.subHeading}>Specialization *</Text>
+        <Text style={screenStyles.subHeading}>Specialization *</Text>
         <TextInput
-          placeholderTextColor="#999"
+          placeholderTextColor={colors.textTertiary}
           placeholder="e.g. Cardiologist, Dermatologist, etc."
-          style={dataScreenStyles.mainTextInput}
+          style={screenStyles.mainTextInput}
           value={formData.specialization}
           onChangeText={(value) => updateFormData('specialization', value)}
         />
 
-        <View style={dataScreenStyles.subContainer}>
+        <View style={screenStyles.subContainer}>
           <View>
-            <Text style={dataScreenStyles.subsubHeading}>Years Experience *</Text>
+            <Text style={screenStyles.subsubHeading}>Years Experience *</Text>
             <TextInput
-              style={dataScreenStyles.miniTextInput}
+              style={screenStyles.miniTextInput}
               placeholder="e.g. 5 years"
+              placeholderTextColor={colors.textTertiary}
               value={formData.yearsExperience}
               onChangeText={(value) => updateFormData('yearsExperience', value)}
             />
           </View>
           <View>
-            <Text style={dataScreenStyles.subsubHeading}>Qualification *</Text>
+            <Text style={screenStyles.subsubHeading}>Qualification *</Text>
             <TextInput
-              style={dataScreenStyles.miniTextInput}
+              style={screenStyles.miniTextInput}
               placeholder="e.g. MBBS, MD"
+              placeholderTextColor={colors.textTertiary}
               value={formData.qualification}
               onChangeText={(value) => updateFormData('qualification', value)}
             />
           </View>
         </View>
 
-        <Text style={dataScreenStyles.subHeading}>University/Institute *</Text>
+        <Text style={screenStyles.subHeading}>University/Institute *</Text>
         <TextInput
-          placeholderTextColor="#999"
+          placeholderTextColor={colors.textTertiary}
           placeholder="Enter your university or institute name"
-          style={dataScreenStyles.mainTextInput}
+          style={screenStyles.mainTextInput}
           value={formData.university}
           onChangeText={(value) => updateFormData('university', value)}
         />
 
         {/* Clinic Information */}
-        <Text style={[dataScreenStyles.subHeading, {marginTop: hp(2)}]}>Clinic Information</Text>
+        <Text style={[screenStyles.subHeading, {marginTop: hp(2)}]}>Clinic Information</Text>
         
-        <View style={dataScreenStyles.subContainer}>
+        <View style={screenStyles.subContainer}>
           <View>
-            <Text style={dataScreenStyles.subsubHeading}>Consultation Fee *</Text>
+            <Text style={screenStyles.subsubHeading}>Consultation Fee *</Text>
             <TextInput
-              style={dataScreenStyles.miniTextInput}
+              style={screenStyles.miniTextInput}
               placeholder="e.g. $100"
+              placeholderTextColor={colors.textTertiary}
               keyboardType="numeric"
               value={formData.consultationFee}
               onChangeText={(value) => updateFormData('consultationFee', value)}
             />
           </View>
           <View>
-            <Text style={dataScreenStyles.subsubHeading}>Primary Language *</Text>
+            <Text style={screenStyles.subsubHeading}>Primary Language *</Text>
             <TextInput
-              style={dataScreenStyles.miniTextInput}
+              style={screenStyles.miniTextInput}
               placeholder="e.g. English"
+              placeholderTextColor={colors.textTertiary}
               value={formData.primaryLanguage}
               onChangeText={(value) => updateFormData('primaryLanguage', value)}
             />
           </View>
         </View>
 
-        <Text style={dataScreenStyles.subHeading}>Bio/Description *</Text>
+        <Text style={screenStyles.subHeading}>Bio/Description *</Text>
         <TextInput
-          placeholderTextColor="#999"
+          placeholderTextColor={colors.textTertiary}
           placeholder="Write a short description about yourself and your practice"
-          style={[dataScreenStyles.mainTextInput, { height: hp(10), textAlignVertical: 'top' }]}
+          style={[screenStyles.mainTextInput, { height: hp(10), textAlignVertical: 'top' }]}
           multiline
           value={formData.bio}
           onChangeText={(value) => updateFormData('bio', value)}
         />
 
         {/* Availability Information */}
-        <Text style={[dataScreenStyles.subHeading, {marginTop: hp(2)}]}>Availability</Text>
+        <Text style={[screenStyles.subHeading, {marginTop: hp(2)}]}>Availability</Text>
         
-        <View style={dataScreenStyles.subContainer}>
+        <View style={screenStyles.subContainer}>
           <View>
-            <Text style={dataScreenStyles.subsubHeading}>Available Days *</Text>
+            <Text style={screenStyles.subsubHeading}>Available Days *</Text>
             <TextInput
-              style={dataScreenStyles.miniTextInput}
+              style={screenStyles.miniTextInput}
               placeholder="e.g. Mon-Fri"
+              placeholderTextColor={colors.textTertiary}
               value={formData.availableDays}
               onChangeText={(value) => updateFormData('availableDays', value)}
             />
           </View>
           <View>
-            <Text style={dataScreenStyles.subsubHeading}>Available Hours *</Text>
+            <Text style={screenStyles.subsubHeading}>Available Hours *</Text>
             <TextInput
-              style={dataScreenStyles.miniTextInput}
+              style={screenStyles.miniTextInput}
               placeholder="e.g. 9AM-5PM"
+              placeholderTextColor={colors.textTertiary}
               value={formData.availableHours}
               onChangeText={(value) => updateFormData('availableHours', value)}
             />
@@ -382,50 +392,54 @@ export default function DoctorRegistration() {
         </View>
 
         {/* Consultation Mode Selection */}
-        <Text style={dataScreenStyles.subHeading}>Consultation Mode *</Text>
-        <View style={dataScreenStyles.mappingCol}>
-          {consultationModes.map((item) => (
-            <TouchableOpacity 
-              key={item.id} 
-              style={[
-                dataScreenStyles.mapping,
-                formData.selectedConsultationMode === item.id && { 
-                  backgroundColor: '#f0f8ff', 
-                  borderColor: item.color, 
-                  borderWidth: 2 
-                }
-              ]}
-              onPress={() => updateFormData('selectedConsultationMode', item.id)}
-            >
-              <Ionicons
-                name={item.icon as any}
-                size={26}
-                color={item.color}
-                style={{ marginRight: hp(1) }}
-              />
-              <View style={{ flexDirection: "column" }}>
-                <Text style={[
-                  dataScreenStyles.mappingHeading,
-                  formData.selectedConsultationMode === item.id && { fontWeight: 'bold' }
-                ]}>{item.name}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+        <Text style={screenStyles.subHeading}>Consultation Mode *</Text>
+        <View style={screenStyles.mappingCol}>
+          {consultationModes.map((item) => {
+            const itemColor = colors[item.colorKey as keyof typeof colors] as string;
+
+            return (
+              <TouchableOpacity 
+                key={item.id} 
+                style={[
+                  screenStyles.mapping,
+                  formData.selectedConsultationMode === item.id && { 
+                    backgroundColor: colors.primarySoft, 
+                    borderColor: itemColor, 
+                    borderWidth: 2 
+                  }
+                ]}
+                onPress={() => updateFormData('selectedConsultationMode', item.id)}
+              >
+                <Ionicons
+                  name={item.icon as any}
+                  size={26}
+                  color={itemColor}
+                  style={{ marginRight: hp(1) }}
+                />
+                <View style={{ flexDirection: "column" }}>
+                  <Text style={[
+                    screenStyles.mappingHeading,
+                    formData.selectedConsultationMode === item.id && { fontWeight: 'bold' }
+                  ]}>{item.name}</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         <TouchableOpacity
           style={[
-            dataScreenStyles.generateButton,
-            { backgroundColor: theme.colors.primary },
+            screenStyles.generateButton,
+            { backgroundColor: colors.primary },
             isLoading && { opacity: 0.7 }
           ]}
           onPress={handleSubmit}
           disabled={isLoading}
         >
             {isLoading ? (
-              <ActivityIndicator color="white" size="small" />
+              <ActivityIndicator color={colors.textOnPrimary} size="small" />
             ) : (
-              <Text style={{ color: "white", fontSize: hp(2.2) }}>Submit Registration</Text>
+              <Text style={{ color: colors.textOnPrimary, fontSize: hp(2.2) }}>Submit Registration</Text>
             )}
           </TouchableOpacity>
         </ScrollView>
@@ -433,3 +447,4 @@ export default function DoctorRegistration() {
     </View>
   );
 }
+

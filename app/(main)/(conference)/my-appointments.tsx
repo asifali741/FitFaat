@@ -1,7 +1,9 @@
 import AppHeader from '@/components/AppHeader';
 import ChatButton from '@/components/ChatButton';
 import { theme } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 import { authApi } from '@/utils/auth/authApi';
+import { tokenStorage } from '@/utils/auth/tokenStorage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -18,7 +20,19 @@ import {
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+const getErrorMessage = (error: any): string => {
+  if (typeof error === 'string') return error;
+  return error?.message || 'Failed to load appointments';
+};
+
+const isUnauthorizedError = (error: any): boolean => {
+  const status = error?.status || error?.response?.status;
+  return status === 401 || /not authorized|unauthorized|jwt expired|please login/i.test(getErrorMessage(error));
+};
+
 export default function MyAppointmentsScreen() {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const router = useRouter();
   const [appointments, setAppointments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -41,8 +55,18 @@ export default function MyAppointmentsScreen() {
         Alert.alert('Error', 'Failed to load appointments');
       }
     } catch (error) {
-      console.error('Failed to fetch appointments:', error);
-      Alert.alert('Error', 'Failed to load appointments');
+      const message = getErrorMessage(error);
+      if (isUnauthorizedError(error)) {
+        console.log('[MyAppointments] Unauthorized appointment fetch:', message);
+        setAppointments([]);
+        await tokenStorage.clearAll();
+        Alert.alert('Session expired', 'Please sign in again.', [
+          { text: 'OK', onPress: () => router.replace('/(auth)') },
+        ]);
+      } else {
+        console.log('Failed to fetch appointments:', error);
+        Alert.alert('Error', 'Failed to load appointments');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -76,15 +100,15 @@ export default function MyAppointmentsScreen() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending':
-        return theme.colors.statusPending;
+        return colors.statusPending;
       case 'confirmed':
-        return theme.colors.statusConfirmed;
+        return colors.statusConfirmed;
       case 'cancelled':
-        return theme.colors.statusCancelled;
+        return colors.statusCancelled;
       case 'completed':
-        return theme.colors.success;
+        return colors.success;
       default:
-        return theme.colors.textSecondary;
+        return colors.textSecondary;
     }
   };
 
@@ -117,20 +141,20 @@ export default function MyAppointmentsScreen() {
   const renderStatusHeader = (status: string) => {
     let icon = '';
     let label = '';
-    let color = theme.colors.textSecondary;
+    let color = colors.textSecondary;
 
     if (status === 'confirmed' || status === 'completed') {
       icon = 'checkmark-circle';
       label = 'Confirmed Appointments';
-      color = theme.colors.statusConfirmed;
+      color = colors.statusConfirmed;
     } else if (status === 'pending') {
       icon = 'hourglass';
       label = 'Pending Appointments';
-      color = theme.colors.statusPending;
+      color = colors.statusPending;
     } else if (status === 'cancelled') {
       icon = 'close-circle';
       label = 'Cancelled Appointments';
-      color = theme.colors.statusCancelled;
+      color = colors.statusCancelled;
     }
 
     return (
@@ -220,7 +244,7 @@ export default function MyAppointmentsScreen() {
             <View
               style={[
                 styles.dateBox,
-                { backgroundColor: theme.colors.primary + '20' },
+                { backgroundColor: colors.primary + '20' },
               ]}
             >
               <Text style={styles.dateBoxDay}>
@@ -240,7 +264,7 @@ export default function MyAppointmentsScreen() {
               {item.doctorId?.professionalInfo?.specialization || 'Specialist'}
             </Text>
             <View style={styles.timeRow}>
-              <Ionicons name="time" size={14} color={theme.colors.textSecondary} />
+              <Ionicons name="time" size={14} color={colors.textSecondary} />
               <Text style={styles.timeText}>{item.time}</Text>
             </View>
           </View>
@@ -266,7 +290,7 @@ export default function MyAppointmentsScreen() {
 
         {isUpcoming && (
           <View style={styles.upcomingBadge}>
-            <Ionicons name="alert-circle" size={14} color={theme.colors.success} />
+            <Ionicons name="alert-circle" size={14} color={colors.success} />
             <Text style={styles.upcomingText}>Upcoming</Text>
           </View>
         )}
@@ -282,7 +306,7 @@ export default function MyAppointmentsScreen() {
           showStepIndicator={false}
         />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       </SafeAreaView>
     );
@@ -295,10 +319,10 @@ export default function MyAppointmentsScreen() {
         showStepIndicator={false}
       />
 
-      <View style={[styles.content, { backgroundColor: theme.colors.background }]}>
+      <View style={[styles.content, { backgroundColor: colors.background }]}>
         {appointments.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Ionicons name="calendar-outline" size={64} color={theme.colors.textSecondary} />
+            <Ionicons name="calendar-outline" size={64} color={colors.textSecondary} />
             <Text style={styles.emptyTitle}>No Appointments</Text>
             <Text style={styles.emptySubtitle}>
               You don't have any appointments yet
@@ -328,7 +352,7 @@ export default function MyAppointmentsScreen() {
               onPress={() => setShowModal(false)}
               style={styles.closeButton}
             >
-              <Ionicons name="close" size={28} color={theme.colors.textPrimary} />
+              <Ionicons name="close" size={28} color={colors.textPrimary} />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>Appointment Details</Text>
             <View style={styles.headerSpacer} />
@@ -342,7 +366,7 @@ export default function MyAppointmentsScreen() {
                   <Text style={styles.sectionTitle}>Doctor</Text>
                   <View style={styles.doctorInfoCard}>
                     <View style={styles.doctorAvatar}>
-                      <Ionicons name="person" size={40} color={theme.colors.primary} />
+                      <Ionicons name="person" size={40} color={colors.primary} />
                     </View>
                     <View style={styles.doctorDetails}>
                       <Text style={styles.doctorNameLarge}>
@@ -363,7 +387,7 @@ export default function MyAppointmentsScreen() {
                   <Text style={styles.sectionTitle}>Appointment Details</Text>
 
                   <View style={styles.detailRow}>
-                    <Ionicons name="calendar" size={20} color={theme.colors.info} />
+                    <Ionicons name="calendar" size={20} color={colors.info} />
                     <View style={styles.detailContent}>
                       <Text style={styles.detailLabel}>Date</Text>
                       <Text style={styles.detailValue}>
@@ -377,7 +401,7 @@ export default function MyAppointmentsScreen() {
                   </View>
 
                   <View style={styles.detailRow}>
-                    <Ionicons name="time" size={20} color={theme.colors.warning} />
+                    <Ionicons name="time" size={20} color={colors.warning} />
                     <View style={styles.detailContent}>
                       <Text style={styles.detailLabel}>Time</Text>
                       <Text style={styles.detailValue}>{selectedAppointment.time}</Text>
@@ -385,7 +409,7 @@ export default function MyAppointmentsScreen() {
                   </View>
 
                   <View style={styles.detailRow}>
-                    <Ionicons name="cash" size={20} color={theme.colors.success} />
+                    <Ionicons name="cash" size={20} color={colors.success} />
                     <View style={styles.detailContent}>
                       <Text style={styles.detailLabel}>Consultation Fee</Text>
                       <Text style={styles.detailValue}>Rs {selectedAppointment.price}</Text>
@@ -453,7 +477,7 @@ export default function MyAppointmentsScreen() {
                             Alert.alert('Update', 'Update functionality coming soon!');
                           }}
                         >
-                          <Ionicons name="create" size={20} color={theme.colors.surface} />
+                          <Ionicons name="create" size={20} color={colors.surface} />
                           <Text style={styles.actionButtonText}>Update Appointment</Text>
                         </TouchableOpacity>
 
@@ -481,12 +505,12 @@ export default function MyAppointmentsScreen() {
                         >
                           {isCancelling ? (
                             <>
-                              <ActivityIndicator color={theme.colors.surface} />
+                              <ActivityIndicator color={colors.surface} />
                               <Text style={styles.actionButtonText}>Cancelling...</Text>
                             </>
                           ) : (
                             <>
-                              <Ionicons name="trash" size={20} color={theme.colors.surface} />
+                              <Ionicons name="trash" size={20} color={colors.surface} />
                               <Text style={styles.actionButtonText}>Cancel Appointment</Text>
                             </>
                           )}
@@ -510,15 +534,15 @@ export default function MyAppointmentsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
   },
   content: {
     flex: 1,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
+    borderTopLeftRadius: wp(8),
+    borderTopRightRadius: wp(8),
     paddingTop: hp(2),
   },
   loadingContainer: {
@@ -535,25 +559,25 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: hp(2.5),
     fontWeight: theme.typography.fontWeight.bold as any,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginTop: hp(2),
     marginBottom: hp(0.5),
   },
   emptySubtitle: {
     fontSize: hp(1.6),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: hp(3),
   },
   scheduleButton: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     paddingVertical: hp(1.8),
     paddingHorizontal: wp(6),
     borderRadius: theme.borderRadius.large,
     alignItems: 'center',
   },
   scheduleButtonText: {
-    color: theme.colors.surface,
+    color: colors.surface,
     fontSize: hp(1.8),
     fontWeight: theme.typography.fontWeight.semiBold as any,
   },
@@ -579,17 +603,17 @@ const styles = StyleSheet.create({
     marginLeft: wp(2),
   },
   appointmentCard: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: theme.borderRadius.large,
     padding: wp(4),
     marginBottom: hp(2),
     borderLeftWidth: 4,
-    borderLeftColor: theme.colors.primary,
+    borderLeftColor: colors.primary,
     ...theme.shadows.medium,
   },
   appointmentCardCancelled: {
     opacity: 0.6,
-    borderLeftColor: theme.colors.statusCancelled,
+    borderLeftColor: colors.statusCancelled,
   },
   appointmentContent: {
     flexDirection: 'row',
@@ -608,11 +632,11 @@ const styles = StyleSheet.create({
   dateBoxDay: {
     fontSize: hp(2),
     fontWeight: theme.typography.fontWeight.bold as any,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
   },
   dateBoxMonth: {
     fontSize: hp(1.2),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: hp(0.2),
   },
   appointmentMiddle: {
@@ -621,12 +645,12 @@ const styles = StyleSheet.create({
   doctorName: {
     fontSize: hp(1.8),
     fontWeight: theme.typography.fontWeight.semiBold as any,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: hp(0.3),
   },
   doctorSpecialty: {
     fontSize: hp(1.4),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: hp(0.5),
   },
   timeRow: {
@@ -635,7 +659,7 @@ const styles = StyleSheet.create({
   },
   timeText: {
     fontSize: hp(1.4),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     marginLeft: wp(1),
   },
   appointmentRight: {
@@ -658,19 +682,19 @@ const styles = StyleSheet.create({
     marginTop: hp(1),
     paddingTop: hp(1),
     borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
+    borderTopColor: colors.border,
     alignItems: 'center',
   },
   upcomingText: {
     fontSize: hp(1.3),
-    color: theme.colors.success,
+    color: colors.success,
     fontWeight: theme.typography.fontWeight.medium as any,
     marginLeft: wp(1),
   },
   // Modal Styles
   modalContainer: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: colors.background,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -678,9 +702,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: wp(4),
     paddingVertical: hp(2),
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    borderBottomColor: colors.border,
   },
   closeButton: {
     padding: hp(0.5),
@@ -688,7 +712,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: hp(2.2),
     fontWeight: theme.typography.fontWeight.bold as any,
-    color: theme.colors.surface,
+    color: colors.surface,
   },
   headerSpacer: {
     width: hp(3),
@@ -704,12 +728,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: hp(2),
     fontWeight: theme.typography.fontWeight.bold as any,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: hp(1),
   },
   doctorInfoCard: {
     flexDirection: 'row',
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: theme.borderRadius.large,
     padding: wp(4),
     alignItems: 'center',
@@ -718,7 +742,7 @@ const styles = StyleSheet.create({
     width: wp(16),
     height: wp(16),
     borderRadius: wp(8),
-    backgroundColor: theme.colors.primary + '20',
+    backgroundColor: colors.primary + '20',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: wp(3),
@@ -729,21 +753,21 @@ const styles = StyleSheet.create({
   doctorNameLarge: {
     fontSize: hp(1.9),
     fontWeight: theme.typography.fontWeight.semiBold as any,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: hp(0.3),
   },
   doctorSpecialtyLarge: {
     fontSize: hp(1.5),
-    color: theme.colors.primary,
+    color: colors.primary,
     marginBottom: hp(0.3),
   },
   doctorExperience: {
     fontSize: hp(1.4),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
   },
   detailRow: {
     flexDirection: 'row',
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: theme.borderRadius.medium,
     padding: wp(4),
     marginBottom: hp(1),
@@ -755,24 +779,24 @@ const styles = StyleSheet.create({
   },
   detailLabel: {
     fontSize: hp(1.3),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: hp(0.3),
   },
   detailValue: {
     fontSize: hp(1.7),
     fontWeight: theme.typography.fontWeight.semiBold as any,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
   },
   descriptionBox: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: theme.borderRadius.medium,
     padding: wp(4),
     borderLeftWidth: 3,
-    borderLeftColor: theme.colors.primary,
+    borderLeftColor: colors.primary,
   },
   descriptionText: {
     fontSize: hp(1.6),
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     lineHeight: hp(2.4),
   },
   chatButtonContainer: {
@@ -792,25 +816,25 @@ const styles = StyleSheet.create({
     marginBottom: hp(1.2),
   },
   updateButton: {
-    backgroundColor: theme.colors.info,
+    backgroundColor: colors.info,
   },
   cancelButton: {
-    backgroundColor: theme.colors.error,
+    backgroundColor: colors.error,
   },
   cancelButtonDisabled: {
     opacity: 0.6,
   },
   actionButtonText: {
-    color: theme.colors.surface,
+    color: colors.surface,
     fontSize: hp(1.7),
     fontWeight: theme.typography.fontWeight.semiBold as any,
     marginLeft: wp(2),
   },
   closeModalButton: {
-    backgroundColor: theme.colors.border,
+    backgroundColor: colors.border,
   },
   closeModalButtonText: {
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     fontSize: hp(1.7),
     fontWeight: theme.typography.fontWeight.semiBold as any,
   },

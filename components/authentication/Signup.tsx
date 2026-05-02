@@ -3,6 +3,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
+} from 'react-native-responsive-screen';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { authApi } from '../../utils/auth/authApi';
 
@@ -166,7 +170,7 @@ export default function Signup() {
             <View style={styles.header}>
               <View style={styles.logoContainer}>
                 <View style={styles.logoBg}>
-                  <Ionicons name="heart" size={32} color="#FFFFFF" />
+                  <Ionicons name="heart" size={Math.min(hp(3.9), wp(8.5))} color="#FFFFFF" />
                 </View>
               </View>
               <Text style={styles.title}>Create Account</Text>
@@ -198,7 +202,7 @@ export default function Signup() {
               ]}>
                 <Ionicons 
                   name="mail-outline" 
-                  size={20} 
+                  size={Math.min(hp(2.5), wp(5.4))} 
                   color={focusedField === 'email' ? colors.primary : colors.textLight}
                   style={styles.inputIcon}
                 />
@@ -222,7 +226,7 @@ export default function Signup() {
               </View>
               {errors.email && (
                 <View style={styles.errorContainer}>
-                  <Ionicons name="alert-circle" size={14} color={colors.error} />
+                  <Ionicons name="alert-circle" size={Math.min(hp(1.7), wp(3.7))} color={colors.error} />
                   <Text style={styles.errorText}>{errors.email}</Text>
                 </View>
               )}
@@ -238,7 +242,7 @@ export default function Signup() {
               ]}>
                 <Ionicons 
                   name="person-outline" 
-                  size={20} 
+                  size={Math.min(hp(2.5), wp(5.4))} 
                   color={focusedField === 'username' ? colors.primary : colors.textLight}
                   style={styles.inputIcon}
                 />
@@ -261,7 +265,7 @@ export default function Signup() {
               </View>
               {errors.username && (
                 <View style={styles.errorContainer}>
-                  <Ionicons name="alert-circle" size={14} color={colors.error} />
+                  <Ionicons name="alert-circle" size={Math.min(hp(1.7), wp(3.7))} color={colors.error} />
                   <Text style={styles.errorText}>{errors.username}</Text>
                 </View>
               )}
@@ -277,7 +281,7 @@ export default function Signup() {
               ]}>
                 <Ionicons 
                   name="lock-closed-outline" 
-                  size={20} 
+                  size={Math.min(hp(2.5), wp(5.4))} 
                   color={focusedField === 'password' ? colors.primary : colors.textLight}
                   style={styles.inputIcon}
                 />
@@ -303,14 +307,14 @@ export default function Signup() {
                 >
                   <Ionicons 
                     name={showPassword ? "eye-outline" : "eye-off-outline"} 
-                    size={20} 
+                    size={Math.min(hp(2.5), wp(5.4))} 
                     color={colors.textLight}
                   />
                 </TouchableOpacity>
               </View>
               {errors.password && (
                 <View style={styles.errorContainer}>
-                  <Ionicons name="alert-circle" size={14} color={colors.error} />
+                  <Ionicons name="alert-circle" size={Math.min(hp(1.7), wp(3.7))} color={colors.error} />
                   <Text style={styles.errorText}>{errors.password}</Text>
                 </View>
               )}
@@ -326,7 +330,7 @@ export default function Signup() {
               ]}>
                 <Ionicons 
                   name="shield-checkmark-outline" 
-                  size={20} 
+                  size={Math.min(hp(2.5), wp(5.4))} 
                   color={focusedField === 'confirmPassword' ? colors.primary : colors.textLight}
                   style={styles.inputIcon}
                 />
@@ -351,14 +355,14 @@ export default function Signup() {
                 >
                   <Ionicons 
                     name={showConfirmPassword ? "eye-outline" : "eye-off-outline"} 
-                    size={20} 
+                    size={Math.min(hp(2.5), wp(5.4))} 
                     color={colors.textLight}
                   />
                 </TouchableOpacity>
               </View>
               {errors.confirmPassword && (
                 <View style={styles.errorContainer}>
-                  <Ionicons name="alert-circle" size={14} color={colors.error} />
+                  <Ionicons name="alert-circle" size={Math.min(hp(1.7), wp(3.7))} color={colors.error} />
                   <Text style={styles.errorText}>{errors.confirmPassword}</Text>
                 </View>
               )}
@@ -376,7 +380,7 @@ export default function Signup() {
               ) : (
                 <View style={styles.buttonContent}>
                   <Text style={styles.buttonText}>Send Verification Code</Text>
-                  <Ionicons name="arrow-forward" size={20} color="#FFFFFF" style={styles.buttonIcon} />
+                  <Ionicons name="arrow-forward" size={Math.min(hp(2.5), wp(5.4))} color="#FFFFFF" style={styles.buttonIcon} />
                 </View>
               )}
             </TouchableOpacity>
@@ -414,7 +418,7 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
     flexGrow: 1,
   },
   decorativeHeader: {
-    height: 120,
+    height: hp(14.8),
     position: 'relative',
     overflow: 'hidden',
   },
@@ -424,67 +428,67 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
     opacity: 0.1,
   },
   circle1: {
-    width: 300,
-    height: 300,
+    width: wp(80),
+    height: wp(80),
     backgroundColor: colors.primary,
-    top: -150,
-    right: -100,
+    top: -hp(18.5),
+    right: -wp(26.7),
   },
   circle2: {
-    width: 200,
-    height: 200,
+    width: wp(53.3),
+    height: wp(53.3),
     backgroundColor: colors.primary,
-    top: 20,
-    left: -80,
+    top: hp(2.5),
+    left: -wp(21.3),
   },
   formContainer: {
-    paddingHorizontal: 24,
-    paddingBottom: 40,
+    paddingHorizontal: wp(6.4),
+    paddingBottom: hp(4.9),
   },
   header: {
-    marginBottom: 32,
+    marginBottom: hp(3.9),
     alignItems: 'center',
   },
   logoContainer: {
-    marginBottom: 20,
+    marginBottom: hp(2.5),
   },
   logoBg: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: Math.min(hp(8.6), wp(18.7)),
+    height: Math.min(hp(8.6), wp(18.7)),
+    borderRadius: Math.min(hp(4.3), wp(9.3)),
     backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: hp(0.5) },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowRadius: wp(2.1),
     elevation: 5,
   },
   title: {
-    fontSize: 32,
+    fontSize: Math.min(hp(3.9), wp(8.5)),
     fontWeight: '800',
     color: colors.textPrimary,
-    marginBottom: 8,
+    marginBottom: hp(1),
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 15,
+    fontSize: Math.min(hp(1.9), wp(4)),
     color: colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: hp(2.7),
   },
   progressContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 32,
-    marginTop: 8,
+    marginBottom: hp(3.9),
+    marginTop: hp(1),
   },
   progressStep: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: Math.min(hp(4.4), wp(9.6)),
+    height: Math.min(hp(4.4), wp(9.6)),
+    borderRadius: Math.min(hp(2.2), wp(4.8)),
     borderWidth: 2,
     borderColor: isDarkMode ? colors.gray : '#E5E7EB',
     justifyContent: 'center',
@@ -496,34 +500,34 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
     borderColor: colors.primary,
   },
   progressText: {
-    fontSize: 14,
+    fontSize: Math.min(hp(1.8), wp(3.8)),
     fontWeight: '700',
     color: colors.textPrimary,
   },
   progressLine: {
     flex: 1,
-    height: 2,
+    height: hp(0.25),
     backgroundColor: isDarkMode ? colors.gray : '#E5E7EB',
-    marginHorizontal: 8,
+    marginHorizontal: wp(2.1),
   },
   inputContainer: {
-    marginBottom: 20,
+    marginBottom: hp(2.5),
   },
   label: {
-    fontSize: 14,
+    fontSize: Math.min(hp(1.8), wp(3.8)),
     fontWeight: '700',
     color: colors.textPrimary,
-    marginBottom: 10,
-    letterSpacing: 0.3,
+    marginBottom: hp(1.2),
+    letterSpacing: 0,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 56,
+    height: hp(6.9),
     borderWidth: 1.5,
     borderColor: isDarkMode ? colors.gray : '#E5E7EB',
-    borderRadius: 14,
-    paddingHorizontal: 14,
+    borderRadius: wp(3.7),
+    paddingHorizontal: wp(3.7),
     backgroundColor: isDarkMode ? colors.cardBackground : '#FFFFFF',
   },
   inputWrapperFocused: {
@@ -531,9 +535,9 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
     borderWidth: 2,
     backgroundColor: isDarkMode ? colors.cardBackground : '#F9FAFB',
     shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: hp(0.25) },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: wp(1.1),
     elevation: 3,
   },
   inputWrapperError: {
@@ -541,41 +545,41 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
     borderWidth: 2,
   },
   inputIcon: {
-    marginRight: 10,
+    marginRight: wp(2.7),
   },
   input: {
     flex: 1,
-    fontSize: 16,
+    fontSize: Math.min(hp(2), wp(4.3)),
     color: colors.textPrimary,
     fontWeight: '500',
   },
   eyeIcon: {
-    padding: 8,
-    marginRight: -8,
+    padding: wp(2.1),
+    marginRight: -wp(2.1),
   },
   errorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
-    paddingHorizontal: 4,
+    marginTop: hp(1),
+    paddingHorizontal: wp(1.1),
   },
   errorText: {
     color: colors.error,
-    fontSize: 13,
-    marginLeft: 6,
+    fontSize: Math.min(hp(1.6), wp(3.5)),
+    marginLeft: wp(1.6),
     fontWeight: '500',
   },
   button: {
     backgroundColor: colors.primary,
-    height: 56,
-    borderRadius: 14,
+    height: hp(6.9),
+    borderRadius: wp(3.7),
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 12,
+    marginTop: hp(1.5),
     shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: hp(0.5) },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowRadius: wp(2.1),
     elevation: 5,
     overflow: 'hidden',
   },
@@ -586,21 +590,21 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
+    gap: wp(2.1),
   },
   buttonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: Math.min(hp(2), wp(4.3)),
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 0,
   },
   buttonIcon: {
-    marginLeft: 4,
+    marginLeft: wp(1.1),
   },
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 28,
+    marginVertical: hp(3.4),
   },
   divider: {
     flex: 1,
@@ -608,24 +612,24 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
     backgroundColor: isDarkMode ? colors.gray : '#E5E7EB',
   },
   dividerText: {
-    marginHorizontal: 12,
+    marginHorizontal: wp(3.2),
     color: colors.textSecondary,
-    fontSize: 13,
+    fontSize: Math.min(hp(1.6), wp(3.5)),
     fontWeight: '500',
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 8,
+    paddingTop: hp(1),
   },
   footerText: {
-    fontSize: 15,
+    fontSize: Math.min(hp(1.9), wp(4)),
     color: colors.textSecondary,
     fontWeight: '500',
   },
   linkText: {
-    fontSize: 15,
+    fontSize: Math.min(hp(1.9), wp(4)),
     color: colors.primary,
     fontWeight: '700',
     textDecorationLine: 'underline',

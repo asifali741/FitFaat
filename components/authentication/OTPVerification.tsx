@@ -4,6 +4,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
+} from 'react-native-responsive-screen';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { authApi } from '../../utils/auth/authApi';
 
@@ -146,7 +150,7 @@ export default function OTPVerification() {
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.iconContainer}>
-              <Ionicons name="mail-outline" size={60} color={colors.primary} />
+              <Ionicons name="mail-outline" size={Math.min(hp(7.4), wp(16))} color={colors.primary} />
             </View>
             <Text style={styles.title}>Verify Your Email</Text>
             <Text style={styles.subtitle}>
@@ -188,7 +192,7 @@ export default function OTPVerification() {
             ) : (
               <View style={styles.buttonContent}>
                 <Text style={styles.buttonText}>Verify & Continue</Text>
-                <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+                <Ionicons name="checkmark-circle" size={Math.min(hp(2.5), wp(5.4))} color="#FFFFFF" />
               </View>
             )}
           </TouchableOpacity>
@@ -217,7 +221,7 @@ export default function OTPVerification() {
 
           {/* Help Text */}
           <View style={styles.helpContainer}>
-            <Ionicons name="information-circle-outline" size={20} color={colors.textLight} />
+            <Ionicons name="information-circle-outline" size={Math.min(hp(2.5), wp(5.4))} color={colors.textLight} />
             <Text style={styles.helpText}>
               Check your spam folder if you don't see the email
             </Text>
@@ -238,41 +242,41 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 20,
+    paddingHorizontal: wp(6.4),
+    paddingTop: hp(2.5),
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: Math.min(hp(4.9), wp(10.7)),
+    height: Math.min(hp(4.9), wp(10.7)),
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: hp(2.5),
   },
   header: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: hp(4.9),
   },
   iconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: Math.min(hp(14.8), wp(32)),
+    height: Math.min(hp(14.8), wp(32)),
+    borderRadius: Math.min(hp(7.4), wp(16)),
     backgroundColor: isDarkMode ? colors.cardBackground : '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: hp(3),
   },
   title: {
-    fontSize: 28,
+    fontSize: Math.min(hp(3.4), wp(7.5)),
     fontWeight: '800',
     color: colors.textPrimary,
-    marginBottom: 12,
+    marginBottom: hp(1.5),
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 15,
+    fontSize: Math.min(hp(1.9), wp(4)),
     color: colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: hp(2.7),
   },
   emailText: {
     color: colors.primary,
@@ -281,17 +285,17 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   otpContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 32,
-    paddingHorizontal: 10,
+    marginBottom: hp(3.9),
+    paddingHorizontal: wp(2.7),
   },
   otpInput: {
-    width: 50,
-    height: 60,
+    width: wp(13.3),
+    height: hp(7.4),
     borderWidth: 2,
     borderColor: isDarkMode ? colors.gray : '#E5E7EB',
-    borderRadius: 12,
+    borderRadius: wp(3.2),
     textAlign: 'center',
-    fontSize: 24,
+    fontSize: Math.min(hp(3), wp(6.4)),
     fontWeight: '700',
     color: colors.textPrimary,
     backgroundColor: isDarkMode ? colors.cardBackground : '#FFFFFF',
@@ -302,15 +306,15 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   },
   button: {
     backgroundColor: colors.primary,
-    height: 56,
-    borderRadius: 14,
+    height: hp(6.9),
+    borderRadius: wp(3.7),
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: hp(3),
     shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: hp(0.5) },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowRadius: wp(2.1),
     elevation: 5,
   },
   buttonDisabled: {
@@ -320,20 +324,20 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
+    gap: wp(2.1),
   },
   buttonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: Math.min(hp(2), wp(4.3)),
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 0,
   },
   resendContainer: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: hp(3),
   },
   timerText: {
-    fontSize: 15,
+    fontSize: Math.min(hp(1.9), wp(4)),
     color: colors.textSecondary,
     fontWeight: '500',
   },
@@ -342,7 +346,7 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
     fontWeight: '700',
   },
   resendText: {
-    fontSize: 15,
+    fontSize: Math.min(hp(1.9), wp(4)),
     color: colors.textSecondary,
     fontWeight: '500',
   },
@@ -356,12 +360,12 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: isDarkMode ? colors.cardBackground : '#F3F4F6',
-    padding: 16,
-    borderRadius: 12,
-    gap: 8,
+    padding: wp(4.3),
+    borderRadius: wp(3.2),
+    gap: wp(2.1),
   },
   helpText: {
-    fontSize: 13,
+    fontSize: Math.min(hp(1.6), wp(3.5)),
     color: colors.textLight,
     flex: 1,
     flexWrap: 'wrap',

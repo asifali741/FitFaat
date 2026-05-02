@@ -4,11 +4,29 @@ import {
     widthPercentageToDP as wp,
 } from "react-native-responsive-screen";
 
-export const dataScreenStyles = StyleSheet.create({
+const fallbackColors = {
+  screenColor: "#FAFBFC",
+  cardBackground: "#FFFFFF",
+  backgroundHeader: "#F8FFFE",
+  primary: "#26867C",
+  secondary: "#4ECDC4",
+  border: "#E5E7EB",
+  disabled: "#A0AEC0",
+  textPrimary: "#1A1A1A",
+  textSecondary: "#666666",
+  textTertiary: "#A0AEC0",
+  textOnPrimary: "#FFFFFF",
+  shadowLight: "#000000",
+};
+
+export const createDataScreenStyles = (themeColors = fallbackColors) => {
+  const colors = { ...fallbackColors, ...themeColors };
+
+  return StyleSheet.create({
   // Main Container
   container: {
     flex: 1,
-    backgroundColor: "#FAFBFC",
+    backgroundColor: colors.screenColor,
   },
   
   // Header Section
@@ -29,7 +47,7 @@ export const dataScreenStyles = StyleSheet.create({
     fontSize: hp(3.2),
     fontWeight: "800",
     fontFamily: "LoraRegular",
-    color: "#1A1A1A",
+    color: colors.textPrimary,
     letterSpacing: 0.5,
   },
 
@@ -38,10 +56,10 @@ export const dataScreenStyles = StyleSheet.create({
     flex: 1,
     marginHorizontal: wp(5),
     marginVertical: hp(1.5),
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.cardBackground,
     borderRadius: 16,
     padding: hp(2.5),
-    shadowColor: "#000",
+    shadowColor: colors.shadowLight,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
@@ -54,7 +72,7 @@ export const dataScreenStyles = StyleSheet.create({
     textAlign: "center",
     fontSize: hp(1.8),
     fontWeight: "600",
-    color: "#26867C",
+    color: colors.primary,
     fontFamily: "LoraRegular",
     marginBottom: hp(1.5),
     letterSpacing: 0.3,
@@ -64,7 +82,7 @@ export const dataScreenStyles = StyleSheet.create({
   subHeading: {
     fontSize: hp(1.6),
     fontWeight: "700",
-    color: "#1A1A1A",
+    color: colors.textPrimary,
     fontFamily: "LoraRegular",
     marginTop: hp(1.8),
     marginBottom: hp(0.8),
@@ -73,7 +91,7 @@ export const dataScreenStyles = StyleSheet.create({
   subsubHeading: {
     fontSize: hp(1.5),
     fontWeight: "700",
-    color: "#1A1A1A",
+    color: colors.textPrimary,
     fontFamily: "LoraRegular",
     marginBottom: hp(0.6),
     letterSpacing: 0.2,
@@ -81,7 +99,7 @@ export const dataScreenStyles = StyleSheet.create({
   genderHeading: {
     fontSize: hp(1.6),
     fontWeight: "700",
-    color: "#1A1A1A",
+    color: colors.textPrimary,
     fontFamily: "LoraRegular",
     marginTop: hp(1.8),
     marginBottom: hp(1),
@@ -91,41 +109,41 @@ export const dataScreenStyles = StyleSheet.create({
   // Text Inputs
   mainTextInput: {
     height: hp(5.5),
-    backgroundColor: "#F8FFFE",
+    backgroundColor: colors.backgroundHeader,
     borderWidth: 1.5,
-    borderColor: "#E5E7EB",
+    borderColor: colors.border,
     borderRadius: 12,
     fontSize: hp(1.6),
     paddingHorizontal: hp(1.8),
     fontFamily: "LoraRegular",
-    color: "#1A1A1A",
-    placeholderTextColor: "#A0AEC0",
+    color: colors.textPrimary,
+    placeholderTextColor: colors.textTertiary,
   },
   miniTextInput: {
     height: hp(5.5),
-    backgroundColor: "#F8FFFE",
+    backgroundColor: colors.backgroundHeader,
     borderWidth: 1.5,
-    borderColor: "#E5E7EB",
+    borderColor: colors.border,
     borderRadius: 12,
     fontSize: hp(1.6),
     textAlign: "center",
     paddingHorizontal: hp(1),
     fontFamily: "LoraRegular",
-    color: "#1A1A1A",
-    placeholderTextColor: "#A0AEC0",
+    color: colors.textPrimary,
+    placeholderTextColor: colors.textTertiary,
   },
 
   // Gender Selection
   genderSelection: {
     height: hp(7),
     width: hp(8),
-    backgroundColor: "#F8FFFE",
+    backgroundColor: colors.backgroundHeader,
     borderWidth: 1.5,
-    borderColor: "#E5E7EB",
+    borderColor: colors.border,
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
+    shadowColor: colors.shadowLight,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -136,9 +154,9 @@ export const dataScreenStyles = StyleSheet.create({
   dob: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F8FFFE",
+    backgroundColor: colors.backgroundHeader,
     borderWidth: 1.5,
-    borderColor: "#E5E7EB",
+    borderColor: colors.border,
     borderRadius: 12,
     height: hp(5.5),
     paddingHorizontal: hp(1.5),
@@ -150,11 +168,11 @@ export const dataScreenStyles = StyleSheet.create({
     textAlign: "center",
     fontSize: hp(1.6),
     fontFamily: "LoraRegular",
-    color: "#1A1A1A",
+    color: colors.textPrimary,
   },
   dobText: {
     fontSize: hp(1.8),
-    color: "#26867C",
+    color: colors.primary,
     fontWeight: "600",
     marginHorizontal: hp(1),
   },
@@ -166,13 +184,13 @@ export const dataScreenStyles = StyleSheet.create({
   mapping: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F8FFFE",
+    backgroundColor: colors.backgroundHeader,
     borderWidth: 1.5,
-    borderColor: "#E5E7EB",
+    borderColor: colors.border,
     borderRadius: 12,
     padding: hp(1.5),
     marginBottom: hp(1),
-    shadowColor: "#000",
+    shadowColor: colors.shadowLight,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -182,12 +200,12 @@ export const dataScreenStyles = StyleSheet.create({
     fontSize: hp(1.8),
     fontWeight: "700",
     fontFamily: "LoraRegular",
-    color: "#1A1A1A",
+    color: colors.textPrimary,
     marginLeft: hp(1),
   },
   mappingHeadingName: {
     fontSize: hp(1.3),
-    color: "#666",
+    color: colors.textSecondary,
     marginTop: hp(0.4),
     marginLeft: hp(1),
     fontFamily: "LoraRegular",
@@ -197,14 +215,14 @@ export const dataScreenStyles = StyleSheet.create({
   // Button
   generateButton: {
     height: hp(5.5),
-    backgroundColor: "#26867C",
+    backgroundColor: colors.primary,
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
     marginTop: hp(2),
     flexDirection: "row",
     gap: wp(2),
-    shadowColor: "#26867C",
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.35,
     shadowRadius: 12,
@@ -233,4 +251,7 @@ export const dataScreenStyles = StyleSheet.create({
     paddingLeft: hp(6),
     fontFamily: "LoraRegular",
   },
-});
+  });
+};
+
+export const dataScreenStyles = createDataScreenStyles();

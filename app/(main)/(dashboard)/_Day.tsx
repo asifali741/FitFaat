@@ -8,7 +8,7 @@ import Animated, {
   useSharedValue,
   withSpring
 } from "react-native-reanimated";
-import { widthPercentageToDP as wp } from "react-native-responsive-screen";
+import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
 import Svg, { Circle, Defs, LinearGradient, Stop, Text as SvgText } from "react-native-svg";
 import { DashFonts, rs } from "../(settings)/_ui_elements";
 import { Day } from "./types";
@@ -46,7 +46,6 @@ export const Days = ({props, onDayPress}: {props: Day, onDayPress: (dayNo : numb
 
 const ActiveDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}) => {
   const { colors } = useTheme();
-  var time = '00:00:00'
   const scale = useSharedValue(1);
   const finalProgress : number = Math.min(100, Math.round(((info.achievedCalories + info.achieviedHydration) / (info.targetCalories + info.targetHydration)) * 100))
   const animatedContainerStyle = useAnimatedStyle(() => ({
@@ -229,7 +228,8 @@ const ProgressCircle = React.memo(({finalProgress}: {finalProgress: number})=>{
           </Svg>
         </View>
   </>
-})
+});
+ProgressCircle.displayName = 'ProgressCircle';
 
 
 const InfoTray = React.memo(({ duration }: { duration: number }) => {
@@ -285,36 +285,36 @@ const InfoTray = React.memo(({ duration }: { duration: number }) => {
     
   );
 });
+InfoTray.displayName = 'InfoTray';
 
 
 const getStyles = (colors: any) => StyleSheet.create({
   listitem: {
-    margin: rs(8),
-    minHeight: rs(72),
+    margin: wp(2.1),
+    minHeight: hp(8.8),
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: colors.screenColor,
-
-    borderRadius: rs(12),
-    padding: rs(10),
-    marginBottom: rs(10),
+    borderRadius: wp(3.2),
+    padding: wp(2.7),
+    marginBottom: wp(2.7),
     shadowColor: "#000",
     shadowOpacity: 0.2,
-    shadowRadius: rs(10),
+    shadowRadius: wp(2.7),
     elevation: 8,
   },
 
   activeItem: {
-    margin: rs(10),
-    minHeight: rs(140),
+    margin: wp(2.7),
+    minHeight: hp(17.2),
     flexDirection: "column",
     backgroundColor: colors.screenColor,
-    borderRadius: rs(14),
-    padding: rs(10),
-    marginBottom: rs(10),
+    borderRadius: wp(3.7),
+    padding: wp(2.7),
+    marginBottom: wp(2.7),
     shadowColor: colors.activeDayShadowColor,
     shadowOpacity: 0.3,
-    shadowRadius: rs(10),
+    shadowRadius: wp(2.7),
     elevation: 12,
   },
 
@@ -324,61 +324,61 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
 
   circleWrapper: {
-    width: rs(70),
+    width: wp(18.6),
     justifyContent: "center",
     alignItems: "center",
   },
 
   circleActiveWrapper: {
-    width: rs(70),
-    height: rs(80),
+    width: wp(18.6),
+    height: hp(9.8),
     alignItems: "center",
   },
 
   contentWrapper: {
     flex: 1,
-    paddingLeft: rs(10),
+    paddingLeft: wp(2.7),
     minWidth: 0,
   },
 
   activeContentWrapper: {
     flex: 1,
-    paddingLeft: rs(10),
+    paddingLeft: wp(2.7),
   },
 
   dayText: {
     fontWeight: "700",
-    fontSize: DashFonts.dayText,
+    fontSize: hp(2.2),
     fontFamily: 'LoraItalic',
   },
   activeDayText: {
-    paddingTop: rs(6),
+    paddingTop: hp(0.7),
     fontWeight: "700",
-    fontSize: DashFonts.dayText,
+    fontSize: hp(2.2),
     fontFamily: 'Inter',
   },
   dateText: {
-    paddingLeft: rs(8),
+    paddingLeft: wp(2.1),
     fontWeight: "500",
-    fontSize: DashFonts.dateText,
+    fontSize: hp(1.8),
     color: "#666",
   },
   activeDateText: {
-    paddingLeft: rs(8),
-    paddingTop: rs(6),
+    paddingLeft: wp(2.1),
+    paddingTop: hp(0.7),
     fontWeight: "500",
-    fontSize: DashFonts.activeDateText,
+    fontSize: hp(1.8),
     color: "#666",
   },
   activeSubtitle: {
-    paddingTop: rs(6),
+    paddingTop: hp(0.7),
     color: "#666",
-    fontSize: DashFonts.subtitle,
+    fontSize: hp(1.7),
   },
   subtitle: {
-    paddingTop: rs(6),
+    paddingTop: hp(0.7),
     color: "#12b82e",
-    fontSize: DashFonts.subtitle,
+    fontSize: hp(1.7),
   },
   topHeader: {
     flexDirection: "row",
@@ -388,63 +388,63 @@ const getStyles = (colors: any) => StyleSheet.create({
 
   bottomBody: {
     width: "100%",
-    marginTop: rs(8),
+    marginTop: hp(1),
     alignItems: "center",
   },
 
   activeInformation: {
     width: "100%",
     maxWidth: 520,
-    borderRadius: rs(10),
+    borderRadius: wp(2.7),
     backgroundColor: "#E9E9EB",
-    paddingVertical: rs(8),
-    paddingHorizontal: rs(10),
+    paddingVertical: hp(1),
+    paddingHorizontal: wp(2.7),
   },
 
   bodyHeadings: {
-    width: rs(72),
+    width: wp(19.2),
     fontWeight: "500",
-    fontSize: rs(14),
+    fontSize: hp(1.7),
   },
   bodyValues: {
     flex: 1,
-    fontSize: rs(14),
+    fontSize: hp(1.7),
     color: "#2D6EFF",
-    marginLeft: rs(10),
+    marginLeft: wp(2.7),
   },
   activeInfoBoxRow: {
     flexDirection: "row",
-    paddingLeft: rs(8),
-    paddingTop: rs(8),
+    paddingLeft: wp(2.1),
+    paddingTop: hp(1),
     alignItems: "center",
   },
 
   viewButton: {
     backgroundColor: "#000000",
-    paddingVertical: rs(6),
-    paddingHorizontal: rs(10),
-    borderRadius: rs(8),
+    paddingVertical: hp(0.7),
+    paddingHorizontal: wp(2.7),
+    borderRadius: wp(2.1),
     justifyContent: "center",
     alignItems: "center",
   },
   viewButtonText: {
     color: "#fff",
-    fontSize: rs(15),
+    fontSize: hp(1.8),
     fontWeight: "700",
   },
   
   // Modern Active Day Styles
   modernActiveItem: {
-    margin: rs(8),
+    margin: wp(2.1),
     marginHorizontal: wp(3),
     backgroundColor: colors.cardBackground,
-    borderRadius: rs(20),
-    padding: rs(18),
-    marginBottom: rs(16),
+    borderRadius: wp(5.3),
+    padding: wp(4.8),
+    marginBottom: wp(4.3),
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.18,
-    shadowRadius: rs(12),
+    shadowRadius: wp(3.2),
     elevation: 8,
     borderLeftWidth: 5,
     borderLeftColor: colors.primary,
@@ -456,8 +456,8 @@ const getStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: rs(16),
-    paddingBottom: rs(14),
+    marginBottom: wp(4.3),
+    paddingBottom: wp(3.7),
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
@@ -469,20 +469,20 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   
   modernDayNumber: {
-    fontSize: rs(38),
+    fontSize: hp(4.5),
     fontWeight: '800',
     color: colors.primary,
-    marginRight: rs(16),
+    marginRight: wp(4.3),
     backgroundColor: colors.primarySoft,
-    borderRadius: rs(14),
-    paddingHorizontal: rs(16),
-    paddingVertical: rs(10),
+    borderRadius: wp(3.7),
+    paddingHorizontal: wp(4.3),
+    paddingVertical: hp(1.2),
     textAlign: 'center',
-    minWidth: rs(75),
+    minWidth: wp(20),
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.22,
-    shadowRadius: rs(5),
+    shadowRadius: wp(1.3),
     elevation: 4,
   },
   
@@ -491,15 +491,15 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   
   modernDayText: {
-    fontSize: rs(22),
+    fontSize: hp(2.7),
     fontWeight: '800',
     color: colors.textPrimary,
-    marginBottom: rs(4),
+    marginBottom: hp(0.5),
     letterSpacing: 0.5,
   },
   
   modernDateText: {
-    fontSize: rs(14),
+    fontSize: hp(1.7),
     color: colors.textSecondary,
     fontWeight: '500',
     letterSpacing: 0.2,
@@ -513,58 +513,58 @@ const getStyles = (colors: any) => StyleSheet.create({
   modernStatusSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: rs(16),
+    marginBottom: wp(4.3),
     backgroundColor: colors.offWhite,
-    borderRadius: rs(14),
-    padding: rs(14),
+    borderRadius: wp(3.7),
+    padding: wp(3.7),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
-    shadowRadius: rs(3),
+    shadowRadius: wp(0.8),
   },
   
   modernStatusItem: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    paddingVertical: rs(4),
+    paddingVertical: hp(0.5),
   },
   
   calorieIconBox: {
-    width: rs(42),
-    height: rs(42),
-    borderRadius: rs(11),
+    width: wp(11.2),
+    height: wp(11.2),
+    borderRadius: wp(2.9),
     backgroundColor: '#F97316',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#F97316',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.28,
-    shadowRadius: rs(5),
+    shadowRadius: wp(1.3),
     elevation: 4,
   },
   
   hydrationIconBox: {
-    width: rs(42),
-    height: rs(42),
-    borderRadius: rs(11),
+    width: wp(11.2),
+    height: wp(11.2),
+    borderRadius: wp(2.9),
     backgroundColor: '#2E86AB',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#2E86AB',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.28,
-    shadowRadius: rs(5),
+    shadowRadius: wp(1.3),
     elevation: 4,
   },
   
   statusContent: {
-    marginLeft: rs(10),
+    marginLeft: wp(2.7),
     flex: 1,
   },
   
   statusLabel: {
-    fontSize: rs(11),
+    fontSize: hp(1.4),
     color: colors.textSecondary,
     fontWeight: '500',
     textTransform: 'uppercase',
@@ -572,73 +572,73 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   
   statusValue: {
-    fontSize: rs(15),
+    fontSize: hp(1.8),
     color: colors.textPrimary,
     fontWeight: '700',
-    marginTop: rs(2),
+    marginTop: hp(0.2),
   },
   
   modernStatusText: {
-    fontSize: rs(14),
+    fontSize: hp(1.7),
     color: colors.textPrimary,
     fontWeight: '600',
-    marginLeft: rs(8),
+    marginLeft: wp(2.1),
   },
   
   modernRemarksSection: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     backgroundColor: colors.primarySoft,
-    borderRadius: rs(12),
-    padding: rs(12),
-    marginBottom: rs(14),
+    borderRadius: wp(3.2),
+    padding: wp(3.2),
+    marginBottom: wp(3.7),
     borderLeftWidth: 4,
     borderLeftColor: colors.primary,
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: rs(3),
+    shadowRadius: wp(0.8),
   },
   
   modernRemarksText: {
-    fontSize: rs(14),
+    fontSize: hp(1.7),
     color: colors.primary,
     fontStyle: 'italic',
-    marginLeft: rs(10),
+    marginLeft: wp(2.7),
     flex: 1,
     fontWeight: '500',
-    lineHeight: rs(20),
+    lineHeight: hp(2.5),
   },
   
   modernActionSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: rs(10),
+    gap: wp(2.7),
   },
   
   modernNextMeal: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.primarySoft,
-    borderRadius: rs(12),
-    paddingHorizontal: rs(14),
-    paddingVertical: rs(10),
+    borderRadius: wp(3.2),
+    paddingHorizontal: wp(3.7),
+    paddingVertical: hp(1.2),
     flex: 1,
     borderWidth: 1.5,
     borderColor: colors.primary + '30',
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
-    shadowRadius: rs(5),
+    shadowRadius: wp(1.3),
     elevation: 3,
   },
   
   modernNextMealText: {
-    fontSize: rs(13),
+    fontSize: hp(1.6),
     color: colors.primary,
     fontWeight: '700',
-    marginLeft: rs(8),
+    marginLeft: wp(2.1),
     letterSpacing: 0.3,
   },
   
@@ -647,35 +647,35 @@ const getStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.primary,
-    borderRadius: rs(12),
-    paddingHorizontal: rs(16),
-    paddingVertical: rs(12),
+    borderRadius: wp(3.2),
+    paddingHorizontal: wp(4.3),
+    paddingVertical: hp(1.5),
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.4,
-    shadowRadius: rs(8),
+    shadowRadius: wp(2.1),
     elevation: 6,
   },
   
   modernViewButtonText: {
     color: '#FFFFFF',
-    fontSize: rs(14),
+    fontSize: hp(1.7),
     fontWeight: '700',
     letterSpacing: 0.4,
   },
   
   // Modern Finished Day Styles
   modernFinishedItem: {
-    margin: rs(8),
+    margin: wp(2.1),
     marginHorizontal: wp(3),
     backgroundColor: colors.cardBackground,
-    borderRadius: rs(20),
-    padding: rs(18),
-    marginBottom: rs(16),
+    borderRadius: wp(5.3),
+    padding: wp(4.8),
+    marginBottom: wp(4.3),
     shadowColor: colors.success,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.16,
-    shadowRadius: rs(10),
+    shadowRadius: wp(2.7),
     elevation: 8,
     borderLeftWidth: 5,
     borderLeftColor: colors.success,
@@ -687,11 +687,11 @@ const getStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: rs(14),
+    marginBottom: wp(3.7),
   },
   
   modernSuccessIcon: {
-    marginRight: rs(12),
+    marginRight: wp(3.2),
   },
   
   modernFinishedInfo: {
@@ -699,33 +699,33 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   
   modernFinishedDayNumber: {
-    fontSize: rs(30),
+    fontSize: hp(3.7),
     fontWeight: '800',
     color: colors.success,
     backgroundColor: colors.primarySoft,
-    borderRadius: rs(10),
-    paddingHorizontal: rs(12),
-    paddingVertical: rs(8),
+    borderRadius: wp(2.7),
+    paddingHorizontal: wp(3.2),
+    paddingVertical: hp(1),
     textAlign: 'center',
     alignSelf: 'flex-start',
-    marginBottom: rs(8),
+    marginBottom: hp(1),
     shadowColor: colors.success,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
-    shadowRadius: rs(4),
+    shadowRadius: wp(1.1),
     elevation: 2,
   },
   
   modernFinishedDayText: {
-    fontSize: rs(20),
+    fontSize: hp(2.5),
     fontWeight: '800',
     color: colors.textPrimary,
-    marginBottom: rs(4),
+    marginBottom: hp(0.5),
     letterSpacing: 0.4,
   },
   
   modernFinishedDateText: {
-    fontSize: rs(14),
+    fontSize: hp(1.7),
     color: colors.textSecondary,
     fontWeight: '500',
     letterSpacing: 0.2,
@@ -733,22 +733,22 @@ const getStyles = (colors: any) => StyleSheet.create({
   
   modernFinishedProgress: {
     alignItems: 'center',
-    paddingVertical: rs(10),
-    paddingHorizontal: rs(12),
+    paddingVertical: hp(1.2),
+    paddingHorizontal: wp(3.2),
     backgroundColor: colors.primarySoft,
-    borderRadius: rs(10),
+    borderRadius: wp(2.7),
   },
   
   modernFinishedPercentage: {
-    fontSize: rs(28),
+    fontSize: hp(3.5),
     fontWeight: '800',
     color: colors.success,
-    marginBottom: rs(4),
+    marginBottom: hp(0.5),
     letterSpacing: 0.3,
   },
   
   modernFinishedLabel: {
-    fontSize: rs(12),
+    fontSize: hp(1.5),
     color: colors.success,
     fontWeight: '700',
     textTransform: 'uppercase',
@@ -760,36 +760,36 @@ const getStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.success,
-    borderRadius: rs(12),
-    paddingHorizontal: rs(20),
-    paddingVertical: rs(12),
+    borderRadius: wp(3.2),
+    paddingHorizontal: wp(5.3),
+    paddingVertical: hp(1.5),
     shadowColor: colors.success,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: rs(6),
+    shadowRadius: wp(1.6),
     elevation: 5,
-    marginTop: rs(12),
+    marginTop: hp(1.5),
   },
   
   modernFinishedButtonText: {
     color: colors.buttonText,
-    fontSize: rs(14),
+    fontSize: hp(1.7),
     fontWeight: '700',
     letterSpacing: 0.4,
   },
   
   // Modern Locked Day Styles
   modernLockedItem: {
-    margin: rs(8),
+    margin: wp(2.1),
     marginHorizontal: wp(3),
     backgroundColor: colors.cardBackground,
-    borderRadius: rs(20),
-    padding: rs(18),
-    marginBottom: rs(16),
+    borderRadius: wp(5.3),
+    padding: wp(4.8),
+    marginBottom: wp(4.3),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
-    shadowRadius: rs(4),
+    shadowRadius: wp(1.1),
     elevation: 2,
     borderWidth: 1.5,
     borderColor: '#000000',
@@ -800,11 +800,11 @@ const getStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: rs(12),
+    marginBottom: hp(1.5),
   },
   
   modernLockedIcon: {
-    marginRight: rs(12),
+    marginRight: wp(3.2),
     opacity: 0.6,
   },
   
@@ -813,48 +813,48 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   
   modernLockedDayNumber: {
-    fontSize: rs(24),
+    fontSize: hp(3),
     fontWeight: '700',
     color: colors.lockedStatus,
     backgroundColor: colors.lightGray,
-    borderRadius: rs(10),
-    paddingHorizontal: rs(10),
-    paddingVertical: rs(6),
+    borderRadius: wp(2.7),
+    paddingHorizontal: wp(2.7),
+    paddingVertical: hp(0.7),
     textAlign: 'center',
     alignSelf: 'flex-start',
-    marginBottom: rs(6),
+    marginBottom: hp(0.7),
   },
   
   modernLockedDayText: {
-    fontSize: rs(18),
+    fontSize: hp(2.2),
     fontWeight: '600',
     color: colors.textSecondary,
-    marginBottom: rs(3),
+    marginBottom: hp(0.4),
     letterSpacing: 0.2,
   },
   
   modernLockedDateText: {
-    fontSize: rs(14),
+    fontSize: hp(1.7),
     color: colors.lockedStatus,
     fontWeight: '500',
   },
   
   modernLockedStatus: {
     alignItems: 'center',
-    paddingVertical: rs(8),
+    paddingVertical: hp(1),
   },
   
   modernLockedStatusText: {
-    fontSize: rs(15),
+    fontSize: hp(1.8),
     fontWeight: '700',
     color: colors.lockedStatus,
     textTransform: 'uppercase',
-    marginBottom: rs(3),
+    marginBottom: hp(0.4),
     letterSpacing: 0.5,
   },
   
   modernLockedSubText: {
-    fontSize: rs(11),
+    fontSize: hp(1.4),
     color: colors.textLight,
     textAlign: 'center',
     fontStyle: 'italic',

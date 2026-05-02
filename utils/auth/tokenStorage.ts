@@ -1,6 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 
 const TOKEN_KEY = 'fitfaat_auth_token';
+const LEGACY_TOKEN_KEY = 'authToken';
 const USER_KEY = 'fitfaat_user';
 
 export const tokenStorage = {
@@ -16,7 +17,16 @@ export const tokenStorage = {
   // Get auth token
   getToken: async () => {
     try {
-      return await SecureStore.getItemAsync(TOKEN_KEY);
+      const token = await SecureStore.getItemAsync(TOKEN_KEY);
+      if (token) return token;
+
+      const legacyToken = await SecureStore.getItemAsync(LEGACY_TOKEN_KEY);
+      if (legacyToken) {
+        await SecureStore.setItemAsync(TOKEN_KEY, legacyToken);
+        await SecureStore.deleteItemAsync(LEGACY_TOKEN_KEY);
+      }
+
+      return legacyToken;
     } catch (error) {
       console.error('Error getting token:', error);
       return null;
@@ -26,7 +36,10 @@ export const tokenStorage = {
   // Remove auth token
   removeToken: async () => {
     try {
-      await SecureStore.deleteItemAsync(TOKEN_KEY);
+      await Promise.all([
+        SecureStore.deleteItemAsync(TOKEN_KEY),
+        SecureStore.deleteItemAsync(LEGACY_TOKEN_KEY),
+      ]);
     } catch (error) {
       console.error('Error removing token:', error);
     }
@@ -66,6 +79,7 @@ export const tokenStorage = {
     try {
       await Promise.all([
         SecureStore.deleteItemAsync(TOKEN_KEY),
+        SecureStore.deleteItemAsync(LEGACY_TOKEN_KEY),
         SecureStore.deleteItemAsync(USER_KEY),
       ]);
     } catch (error) {

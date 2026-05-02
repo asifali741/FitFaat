@@ -6,15 +6,22 @@
 import BackButton from '@/components/BackButton';
 import { KeyboardAwareContainer, ThemedButton } from '@/components/themed';
 import { theme } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
+} from 'react-native-responsive-screen';
 
 import { authApi } from '../../utils/auth/authApi';
 
 export default function OTPVerificationThemed() {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const params = useLocalSearchParams();
   const email = params.email as string;
   const username = params.username as string;
@@ -133,7 +140,7 @@ export default function OTPVerificationThemed() {
     <KeyboardAwareContainer scrollable={false}>
       {/* Professional Header with Gradient */}
       <LinearGradient
-        colors={[theme.colors.primary, theme.colors.accent]}
+        colors={[colors.primary, colors.accent]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.headerGradient}
@@ -146,10 +153,10 @@ export default function OTPVerificationThemed() {
         <View style={styles.header}>
           <View style={styles.iconContainer}>
             <LinearGradient
-              colors={[theme.colors.primary, theme.colors.accent]}
+              colors={[colors.primary, colors.accent]}
               style={styles.iconGradient}
             >
-              <Ionicons name="mail-open-outline" size={56} color={theme.colors.surface} />
+              <Ionicons name="mail-open-outline" size={Math.min(hp(6.9), wp(15))} color={colors.textOnPrimary} />
             </LinearGradient>
           </View>
           <Text style={styles.title}>Verify Your Email</Text>
@@ -211,7 +218,7 @@ export default function OTPVerificationThemed() {
 
         {/* Help Text */}
         <View style={styles.helpContainer}>
-          <Ionicons name="information-circle-outline" size={20} color={theme.colors.textSecondary} />
+          <Ionicons name="information-circle-outline" size={Math.min(hp(2.5), wp(5.4))} color={colors.textSecondary} />
           <Text style={styles.helpText}>
             Check your spam folder if you don't see the email
           </Text>
@@ -221,65 +228,65 @@ export default function OTPVerificationThemed() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   headerGradient: {
-    height: 180,
-    paddingTop: 60,
+    height: hp(22),
+    paddingTop: hp(7.4),
     paddingHorizontal: theme.spacing.xl,
   },
   content: {
     flex: 1,
     paddingHorizontal: theme.spacing.xl,
     paddingTop: theme.spacing.xxl,
-    backgroundColor: theme.colors.screenColor,
-    marginTop: -40,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
+    backgroundColor: colors.screenColor,
+    marginTop: -hp(4.9),
+    borderTopLeftRadius: wp(8.5),
+    borderTopRightRadius: wp(8.5),
     ...theme.shadows.large,
   },
   backButton: {
-    width: 48,
-    height: 48,
+    width: Math.min(hp(5.9), wp(12.8)),
+    height: Math.min(hp(5.9), wp(12.8)),
     borderRadius: theme.borderRadius.full,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1.5,
+    borderWidth: wp(0.4),
     borderColor: 'rgba(255, 255, 255, 0.3)',
     ...theme.shadows.medium,
   },
   header: {
     alignItems: 'center',
     marginBottom: theme.spacing.xxxl,
-    marginTop: -20,
+    marginTop: -hp(2.5),
   },
   iconContainer: {
     marginBottom: theme.spacing.lg,
   },
   iconGradient: {
-    width: 100,
-    height: 100,
+    width: Math.min(hp(12.3), wp(26.7)),
+    height: Math.min(hp(12.3), wp(26.7)),
     borderRadius: theme.borderRadius.full,
     justifyContent: 'center',
     alignItems: 'center',
     ...theme.shadows.large,
   },
   title: {
-    fontSize: theme.typography.fontSize.xxxl + 4,
+    fontSize: Math.min(hp(4.4), wp(9.6)),
     fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: theme.spacing.sm,
-    letterSpacing: -0.5,
+    letterSpacing: 0,
   },
   subtitle: {
     fontSize: theme.typography.fontSize.base,
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: hp(3),
   },
   email: {
     fontWeight: theme.typography.fontWeight.semiBold,
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   otpContainer: {
     flexDirection: 'row',
@@ -289,20 +296,20 @@ const styles = StyleSheet.create({
   },
   otpInput: {
     flex: 1,
-    height: 68,
-    borderWidth: 2.5,
-    borderColor: theme.colors.border,
+    height: hp(8.4),
+    borderWidth: wp(0.65),
+    borderColor: colors.border,
     borderRadius: theme.borderRadius.large,
-    fontSize: theme.typography.fontSize.xxl + 4,
+    fontSize: Math.min(hp(3.4), wp(7.5)),
     fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     textAlign: 'center',
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     ...theme.shadows.small,
   },
   otpInputFilled: {
-    borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.backgroundHighlight,
+    borderColor: colors.primary,
+    backgroundColor: colors.backgroundHighlight,
     ...theme.shadows.medium,
   },
   timerContainer: {
@@ -311,16 +318,16 @@ const styles = StyleSheet.create({
   },
   timerText: {
     fontSize: theme.typography.fontSize.base,
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
   },
   timerHighlight: {
     fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   resendText: {
     fontSize: theme.typography.fontSize.base,
     fontWeight: theme.typography.fontWeight.semiBold,
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   helpContainer: {
     flexDirection: 'row',
@@ -331,7 +338,8 @@ const styles = StyleSheet.create({
   },
   helpText: {
     fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     flex: 1,
   },
 });
+

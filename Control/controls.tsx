@@ -1,6 +1,6 @@
 import { tokenStorage } from '@/utils/auth/tokenStorage';
+import { getBackendBaseUrl } from '@/utils/config';
 import { Ionicons } from "@expo/vector-icons";
-import Constants from 'expo-constants';
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -26,9 +26,16 @@ type Message = {
 type ControlsProps = {
   onAddMessage?: (text: string, isUser: boolean, source?: string) => void;
   sessionId?: string;
+  onInputFocus?: () => void;
+  onInputBlur?: () => void;
 };
 
-export default function Controls({ onAddMessage, sessionId }: ControlsProps) {
+export default function Controls({
+  onAddMessage,
+  sessionId,
+  onInputFocus,
+  onInputBlur,
+}: ControlsProps) {
   const [content, setContent] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [chatLimit, setChatLimit] = useState<any>(null);
@@ -36,11 +43,7 @@ export default function Controls({ onAddMessage, sessionId }: ControlsProps) {
   const [showLimitModal, setShowLimitModal] = useState(false);
   const router = useRouter();
 
-  const API_URL = (() => {
-    const baseUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_API_URL ||
-      (Platform.OS === "android" ? "http://10.0.2.2:5001" : "http://localhost:5001");
-    return baseUrl.replace(/\/api\/?$/, '');
-  })();
+  const API_URL = getBackendBaseUrl();
 
   // Check chat limit on component mount and periodically
   useEffect(() => {
@@ -66,7 +69,7 @@ export default function Controls({ onAddMessage, sessionId }: ControlsProps) {
       const data = await response.json();
       setChatLimit(data);
     } catch (error) {
-      console.error('Error checking chat limit:', error);
+      console.warn('Error checking chat limit:', error);
     } finally {
       setCheckingLimit(false);
     }
@@ -110,7 +113,7 @@ export default function Controls({ onAddMessage, sessionId }: ControlsProps) {
       // Refresh chat limit after sending message
       await checkChatLimit();
     } catch (error: any) {
-      console.error('Chat error:', error);
+      console.warn('Chat error:', error);
       
       // Check if it's a limit error
       if (error.message && error.message.includes('limit')) {
@@ -141,6 +144,8 @@ export default function Controls({ onAddMessage, sessionId }: ControlsProps) {
           placeholderTextColor="#999"
           onChangeText={setContent}
           value={content}
+          onFocus={onInputFocus}
+          onBlur={onInputBlur}
           returnKeyType="send"
           blurOnSubmit={false}
           onSubmitEditing={handleSend}

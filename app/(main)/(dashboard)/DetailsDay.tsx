@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Day as typeDay } from "./types";
+import { getBackendBaseUrl } from '@/utils/config';
 interface ProgressCircleProps {
   achievedCalories: number;
   targetCalories: number;
@@ -372,9 +373,8 @@ export default function DetailsDay () {
         } as any);
 
         // Get backend URL
-        const ENV = Constants.expoConfig?.extra;
-        const baseUrl = ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001');
-        const apiUrl = baseUrl.replace(/\/api\/?$/, '') + '/api/food-detect/upload';
+        const base = getBackendBaseUrl();
+        const apiUrl = base.replace(/\/api\/?$/, '') + '/api/food-detect/upload';
 
         // Upload to backend (Clarifai food detection)
         const response = await fetch(apiUrl, {
@@ -4031,8 +4031,8 @@ const getStyles = (colors: any) => StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#8B5CF6', // Purple color for diet plan
-        borderRadius: 12,
-        padding: 16,
+        borderRadius: wp(3),
+        padding: wp(4),
         shadowColor: '#8B5CF6',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
@@ -4040,9 +4040,9 @@ const getStyles = (colors: any) => StyleSheet.create({
         elevation: 5,
     },
     dietPlanIconContainer: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: wp(10),
+        height: wp(10),
+        borderRadius: wp(5),
         backgroundColor: 'rgba(255, 255, 255, 0.2)',
         justifyContent: 'center',
         alignItems: 'center',
@@ -4066,8 +4066,8 @@ const getStyles = (colors: any) => StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#F59E0B', // Amber color for custom recipe
-        borderRadius: 12,
-        padding: 16,
+        borderRadius: wp(3),
+        padding: wp(4),
         shadowColor: '#F59E0B',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
@@ -4075,9 +4075,9 @@ const getStyles = (colors: any) => StyleSheet.create({
         elevation: 5,
     },
     customRecipeIconContainer: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: wp(10),
+        height: wp(10),
+        borderRadius: wp(5),
         backgroundColor: 'rgba(255, 255, 255, 0.2)',
         justifyContent: 'center',
         alignItems: 'center',
@@ -4138,10 +4138,10 @@ const getStyles = (colors: any) => StyleSheet.create({
     customRecipeInput: {
         borderWidth: 1,
         borderColor: colors.gray + '40',
-        borderRadius: 10,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        fontSize: 15,
+        borderRadius: wp(2.5),
+        paddingHorizontal: wp(4),
+        paddingVertical: hp(1.5),
+        fontSize: hp(1.8),
         color: colors.textPrimary,
         backgroundColor: colors.cardBackground,
     },
@@ -4367,7 +4367,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     modalContainer: {
         backgroundColor: colors.screenColor || '#FFFFFF',
-        borderRadius: 24,
+        borderRadius: wp(6),
         width: '100%',
         maxWidth: wp(85),
         shadowColor: '#000',

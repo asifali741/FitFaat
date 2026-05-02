@@ -8,6 +8,10 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import {
+  heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
+} from 'react-native-responsive-screen';
 
 const EmailSignIn = () => {
   const [isRegistering, setIsRegistering] = useState(false);
@@ -111,26 +115,26 @@ const EmailSignIn = () => {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 20,
+    padding: wp(5.3),
     width: '100%',
   },
   title: {
-    fontSize: 20,
+    fontSize: Math.min(hp(2.5), wp(5.4)),
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: hp(2.5),
     textAlign: 'center',
   },
   input: {
     backgroundColor: '#f0f0f0',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
+    padding: wp(4),
+    borderRadius: wp(2.7),
+    marginBottom: hp(1.2),
   },
   button: {
     backgroundColor: '#007AFF',
-    padding: 15,
-    borderRadius: 10,
-    marginTop: 10,
+    padding: wp(4),
+    borderRadius: wp(2.7),
+    marginTop: hp(1.2),
   },
   buttonText: {
     color: 'white',
@@ -138,7 +142,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   switchButton: {
-    marginTop: 15,
+    marginTop: hp(1.8),
   },
   switchButtonText: {
     color: '#007AFF',

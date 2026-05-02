@@ -1,22 +1,42 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import Constants from 'expo-constants';
-import * as Notifications from 'expo-notifications';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { router } from 'expo-router';
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { AppState, Platform } from 'react-native';
 import { tokenStorage } from '@/utils/auth/tokenStorage';
+import { getBackendBaseUrl } from '@/utils/config';
 
-// Configure notification behavior
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+// Detect if running in Expo Go (push notifications are not supported in Expo Go with SDK 53+)
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+// Lazily loaded Notifications module - only imported when NOT in Expo Go
+let Notifications: typeof import('expo-notifications') | null = null;
+
+async function getNotificationsModule() {
+  if (isExpoGo) return null;
+  if (!Notifications) {
+    Notifications = await import('expo-notifications');
+  }
+  return Notifications;
+}
+
+// Configure notification behavior (only when not in Expo Go)
+if (!isExpoGo) {
+  getNotificationsModule().then((mod) => {
+    if (mod) {
+      mod.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,
+          shouldPlaySound: true,
+          shouldSetBadge: true,
+          shouldShowBanner: true,
+          shouldShowList: true,
+        }),
+      });
+    }
+  });
+}
 
 // Notification settings keys
 const NOTIFICATION_SETTINGS_KEY = 'notification_settings';
@@ -50,7 +70,7 @@ interface NotificationData {
 
 interface NotificationContextType {
   expoPushToken: string | null;
-  notification: Notifications.Notification | null;
+  notification: any | null;
   permissionStatus: 'granted' | 'denied' | 'undetermined';
   notificationSettings: NotificationSettings;
   badgeCount: number;
@@ -74,13 +94,13 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
-  const [notification, setNotification] = useState<Notifications.Notification | null>(null);
+  const [notification, setNotification] = useState<any | null>(null);
   const [permissionStatus, setPermissionStatus] = useState<'granted' | 'denied' | 'undetermined'>('undetermined');
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(defaultSettings);
   const [badgeCount, setBadgeCountState] = useState(0);
   
-  const notificationListener = useRef<Notifications.Subscription | null>(null);
-  const responseListener = useRef<Notifications.Subscription | null>(null);
+  const notificationListener = useRef<any>(null);
+  const responseListener = useRef<any>(null);
   const appState = useRef(AppState.currentState);
 
   // Load settings on mount
@@ -96,20 +116,40 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   // Setup notification listeners
   useEffect(() => {
-    // Listen for notifications when app is in foreground
-    notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
-      console.log('📬 Notification received (foreground):', notification.request.content.title);
-      setNotification(notification);
-      incrementBadge();
-    });
+    if (isExpoGo) {
+      console.log('📱 Running in Expo Go - notification listeners are not available.');
+      // Still listen for app state changes
+      const subscription = AppState.addEventListener('change', nextAppState => {
+        if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+          loadBadgeCount();
+        }
+        appState.current = nextAppState;
+      });
+      return () => {
+        subscription.remove();
+      };
+    }
 
-    // Listen for notification interactions (when user taps notification)
-    responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
-      console.log('👆 Notification tapped:', response.notification.request.content.title);
-      const data = response.notification.request.content.data;
-      if (data && typeof data === 'object' && 'type' in data) {
-        handleNotificationTap(data as unknown as NotificationData);
-      }
+    // Load the notifications module and set up listeners
+    let cleanedUp = false;
+    getNotificationsModule().then((mod) => {
+      if (!mod || cleanedUp) return;
+
+      // Listen for notifications when app is in foreground
+      notificationListener.current = mod.addNotificationReceivedListener((notif: any) => {
+        console.log('📬 Notification received (foreground):', notif.request.content.title);
+        setNotification(notif);
+        incrementBadge();
+      });
+
+      // Listen for notification interactions (when user taps notification)
+      responseListener.current = mod.addNotificationResponseReceivedListener((response: any) => {
+        console.log('👆 Notification tapped:', response.notification.request.content.title);
+        const data = response.notification.request.content.data;
+        if (data && typeof data === 'object' && 'type' in data) {
+          handleNotificationTap(data as unknown as NotificationData);
+        }
+      });
     });
 
     // Listen for app state changes to update badge
@@ -122,6 +162,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     });
 
     return () => {
+      cleanedUp = true;
       if (notificationListener.current) {
         notificationListener.current.remove();
       }
@@ -134,8 +175,17 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   // Check and request permissions on first launch
   const checkAndRequestPermissions = async () => {
+    if (isExpoGo) {
+      console.log('📱 Running in Expo Go - push notifications are not available. Use a development build for full notification support.');
+      setPermissionStatus('undetermined');
+      return;
+    }
+
     try {
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      const mod = await getNotificationsModule();
+      if (!mod) return;
+
+      const { status: existingStatus } = await mod.getPermissionsAsync();
       setPermissionStatus(existingStatus as 'granted' | 'denied' | 'undetermined');
       
       if (existingStatus === 'undetermined') {
@@ -155,9 +205,17 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   // Request notification permissions
   const requestPermissions = async (): Promise<boolean> => {
+    if (isExpoGo) {
+      console.log('📱 Running in Expo Go - skipping push notification permission request.');
+      return false;
+    }
+
     try {
+      const mod = await getNotificationsModule();
+      if (!mod) return false;
+
       console.log('🔔 Requesting notification permissions...');
-      const { status } = await Notifications.requestPermissionsAsync({
+      const { status } = await mod.requestPermissionsAsync({
         ios: {
           allowAlert: true,
           allowBadge: true,
@@ -183,10 +241,18 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   // Register for push notifications
   const registerForPushNotifications = async () => {
+    if (isExpoGo) {
+      console.log('📱 Running in Expo Go - skipping push token registration.');
+      return;
+    }
+
     try {
+      const mod = await getNotificationsModule();
+      if (!mod) return;
+
       // Get Expo Push Token
       const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-      const token = await Notifications.getExpoPushTokenAsync({
+      const token = await mod.getExpoPushTokenAsync({
         projectId: projectId,
       });
       console.log('✅ Expo Push Token:', token.data);
@@ -206,38 +272,41 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   // Setup Android notification channels
   const setupAndroidChannels = async () => {
+    const mod = await getNotificationsModule();
+    if (!mod) return;
+
     // Default channel
-    await Notifications.setNotificationChannelAsync('default', {
+    await mod.setNotificationChannelAsync('default', {
       name: 'Default',
-      importance: Notifications.AndroidImportance.MAX,
+      importance: mod.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#4A90D9',
       sound: 'default',
     });
 
     // Appointment reminders channel
-    await Notifications.setNotificationChannelAsync('appointments', {
+    await mod.setNotificationChannelAsync('appointments', {
       name: 'Appointment Reminders',
       description: 'Reminders for upcoming appointments',
-      importance: Notifications.AndroidImportance.HIGH,
+      importance: mod.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#4A90D9',
       sound: 'default',
     });
 
     // Chat messages channel
-    await Notifications.setNotificationChannelAsync('chat', {
+    await mod.setNotificationChannelAsync('chat', {
       name: 'Chat Messages',
       description: 'New chat messages',
-      importance: Notifications.AndroidImportance.HIGH,
+      importance: mod.AndroidImportance.HIGH,
       sound: 'default',
     });
 
     // News updates channel
-    await Notifications.setNotificationChannelAsync('news', {
+    await mod.setNotificationChannelAsync('news', {
       name: 'News Updates',
       description: 'Health news and updates',
-      importance: Notifications.AndroidImportance.DEFAULT,
+      importance: mod.AndroidImportance.DEFAULT,
       sound: 'default',
     });
   };
@@ -246,7 +315,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const registerTokenWithBackend = async (pushToken: string) => {
     try {
       const ENV = Constants.expoConfig?.extra;
-      const API_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')).replace(/\/api\/?$/, '');
+      const API_URL = getBackendBaseUrl();
 
       // Get user ID from storage
       const user = await tokenStorage.getUser();
@@ -349,7 +418,15 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       return null;
     }
 
+    if (isExpoGo) {
+      console.log('📱 Running in Expo Go - cannot schedule notifications.');
+      return null;
+    }
+
     try {
+      const mod = await getNotificationsModule();
+      if (!mod) return null;
+
       const reminderTime = new Date(appointmentTime.getTime() - notificationSettings.reminderMinutes * 60 * 1000);
       
       // Don't schedule if reminder time is in the past
@@ -358,7 +435,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         return null;
       }
 
-      const notificationId = await Notifications.scheduleNotificationAsync({
+      const notificationId = await mod.scheduleNotificationAsync({
         content: {
           title: '📅 Upcoming Appointment',
           body: `Your appointment with ${doctorName} is in ${notificationSettings.reminderMinutes} minutes`,
@@ -372,7 +449,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         trigger: {
           date: reminderTime,
           channelId: 'appointments',
-        },
+        } as any,
       });
 
       console.log(`⏰ Appointment reminder scheduled for ${reminderTime.toLocaleString()}`);
@@ -386,7 +463,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   // Cancel appointment reminder
   const cancelAppointmentReminder = async (notificationId: string) => {
     try {
-      await Notifications.cancelScheduledNotificationAsync(notificationId);
+      const mod = await getNotificationsModule();
+      if (!mod) return;
+
+      await mod.cancelScheduledNotificationAsync(notificationId);
       console.log('❌ Appointment reminder cancelled:', notificationId);
     } catch (error) {
       console.error('Error cancelling reminder:', error);
@@ -409,8 +489,16 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       return;
     }
 
+    if (isExpoGo) {
+      console.log('📱 Running in Expo Go - cannot send notifications.');
+      return;
+    }
+
     try {
-      await Notifications.scheduleNotificationAsync({
+      const mod = await getNotificationsModule();
+      if (!mod) return;
+
+      await mod.scheduleNotificationAsync({
         content: {
           title,
           body,
@@ -432,7 +520,11 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       const count = await AsyncStorage.getItem('badge_count');
       const parsedCount = count ? parseInt(count, 10) : 0;
       setBadgeCountState(parsedCount);
-      await Notifications.setBadgeCountAsync(parsedCount);
+
+      if (!isExpoGo) {
+        const mod = await getNotificationsModule();
+        if (mod) await mod.setBadgeCountAsync(parsedCount);
+      }
     } catch (error) {
       console.error('Error loading badge count:', error);
     }
@@ -441,7 +533,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const setBadgeCount = async (count: number) => {
     try {
       setBadgeCountState(count);
-      await Notifications.setBadgeCountAsync(count);
+      if (!isExpoGo) {
+        const mod = await getNotificationsModule();
+        if (mod) await mod.setBadgeCountAsync(count);
+      }
       await AsyncStorage.setItem('badge_count', count.toString());
       console.log('🔢 Badge count set to:', count);
     } catch (error) {
@@ -453,7 +548,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     try {
       const newCount = badgeCount + 1;
       setBadgeCountState(newCount);
-      await Notifications.setBadgeCountAsync(newCount);
+      if (!isExpoGo) {
+        const mod = await getNotificationsModule();
+        if (mod) await mod.setBadgeCountAsync(newCount);
+      }
       await AsyncStorage.setItem('badge_count', newCount.toString());
     } catch (error) {
       console.error('Error incrementing badge:', error);
@@ -463,7 +561,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const clearBadge = async () => {
     try {
       setBadgeCountState(0);
-      await Notifications.setBadgeCountAsync(0);
+      if (!isExpoGo) {
+        const mod = await getNotificationsModule();
+        if (mod) await mod.setBadgeCountAsync(0);
+      }
       await AsyncStorage.setItem('badge_count', '0');
       console.log('🔢 Badge cleared');
     } catch (error) {
@@ -474,7 +575,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   // Clear all notifications
   const clearAllNotifications = async () => {
     try {
-      await Notifications.dismissAllNotificationsAsync();
+      if (!isExpoGo) {
+        const mod = await getNotificationsModule();
+        if (mod) await mod.dismissAllNotificationsAsync();
+      }
       await clearBadge();
       console.log('🧹 All notifications cleared');
     } catch (error) {

@@ -1,5 +1,6 @@
 import AppHeader from "@/components/AppHeader";
 import { theme } from "@/constants/theme";
+import { useTheme } from '@/contexts/ThemeContext';
 import { useDoctorRegistration } from "@/hooks/useDoctorRegistration";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -10,6 +11,8 @@ import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-nat
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function DoctorPortal() {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const router = useRouter();
   const { getDoctorStatus } = useDoctorRegistration();
   const [doctorStatus, setDoctorStatus] = useState<string | null>(null);
@@ -62,7 +65,7 @@ export default function DoctorPortal() {
     <SafeAreaView style={styles.container}>
       {/* Professional Header with Gradient */}
       <LinearGradient
-        colors={[theme.colors.primary, theme.colors.accent]}
+        colors={[colors.primary, colors.accent]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.headerGradient}
@@ -100,13 +103,13 @@ export default function DoctorPortal() {
             activeOpacity={doctorStatus === 'approved' ? 0.8 : 1}
           >
             <LinearGradient
-              colors={doctorStatus === 'approved' ? [theme.colors.primary + '15', theme.colors.accent + '10'] : ['#F1F5F9', '#F1F5F9']}
+              colors={doctorStatus === 'approved' ? [colors.primary + '15', colors.accent + '10'] : ['#F1F5F9', '#F1F5F9']}
               style={styles.featureIconContainer}
             >
               <Ionicons 
                 name="videocam" 
                 size={32} 
-                color={doctorStatus === 'approved' ? theme.colors.primary : theme.colors.textSecondary} 
+                color={doctorStatus === 'approved' ? colors.primary : colors.textSecondary} 
               />
             </LinearGradient>
             <Text style={[styles.featureTitle, doctorStatus !== 'approved' && styles.featureTitleDisabled]}>
@@ -117,7 +120,7 @@ export default function DoctorPortal() {
             </Text>
             {doctorStatus !== 'approved' && (
               <View style={styles.lockBadge}>
-                <Ionicons name="lock-closed" size={16} color={theme.colors.textSecondary} />
+                <Ionicons name="lock-closed" size={16} color={colors.textSecondary} />
                 <Text style={styles.lockText}>Locked</Text>
               </View>
             )}
@@ -130,13 +133,13 @@ export default function DoctorPortal() {
             activeOpacity={doctorStatus === 'approved' ? 0.8 : 1}
           >
             <LinearGradient
-              colors={doctorStatus === 'approved' ? [theme.colors.secondary + '15', theme.colors.success + '10'] : ['#F1F5F9', '#F1F5F9']}
+              colors={doctorStatus === 'approved' ? [colors.secondary + '15', colors.success + '10'] : ['#F1F5F9', '#F1F5F9']}
               style={styles.featureIconContainer}
             >
               <Ionicons 
                 name="chatbubbles" 
                 size={32} 
-                color={doctorStatus === 'approved' ? theme.colors.secondary : theme.colors.textSecondary} 
+                color={doctorStatus === 'approved' ? colors.secondary : colors.textSecondary} 
               />
             </LinearGradient>
             <Text style={[styles.featureTitle, doctorStatus !== 'approved' && styles.featureTitleDisabled]}>
@@ -147,7 +150,7 @@ export default function DoctorPortal() {
             </Text>
             {doctorStatus !== 'approved' && (
               <View style={styles.lockBadge}>
-                <Ionicons name="lock-closed" size={16} color={theme.colors.textSecondary} />
+                <Ionicons name="lock-closed" size={16} color={colors.textSecondary} />
                 <Text style={styles.lockText}>Locked</Text>
               </View>
             )}
@@ -160,13 +163,13 @@ export default function DoctorPortal() {
             activeOpacity={doctorStatus === 'approved' ? 0.8 : 1}
           >
             <LinearGradient
-              colors={doctorStatus === 'approved' ? [theme.colors.accent + '15', theme.colors.primary + '10'] : ['#F1F5F9', '#F1F5F9']}
+              colors={doctorStatus === 'approved' ? [colors.accent + '15', colors.primary + '10'] : ['#F1F5F9', '#F1F5F9']}
               style={styles.featureIconContainer}
             >
               <Ionicons 
                 name="people" 
                 size={32} 
-                color={doctorStatus === 'approved' ? theme.colors.accent : theme.colors.textSecondary} 
+                color={doctorStatus === 'approved' ? colors.accent : colors.textSecondary} 
               />
             </LinearGradient>
             <Text style={[styles.featureTitle, doctorStatus !== 'approved' && styles.featureTitleDisabled]}>
@@ -181,7 +184,7 @@ export default function DoctorPortal() {
               </View>
             ) : (
               <View style={styles.lockBadge}>
-                <Ionicons name="lock-closed" size={16} color={theme.colors.textSecondary} />
+                <Ionicons name="lock-closed" size={16} color={colors.textSecondary} />
                 <Text style={styles.lockText}>Locked</Text>
               </View>
             )}
@@ -193,13 +196,13 @@ export default function DoctorPortal() {
             activeOpacity={doctorStatus === 'approved' ? 0.8 : 1}
           >
             <LinearGradient
-              colors={doctorStatus === 'approved' ? [theme.colors.secondary + '15', theme.colors.success + '10'] : ['#F1F5F9', '#F1F5F9']}
+              colors={doctorStatus === 'approved' ? [colors.secondary + '15', colors.success + '10'] : ['#F1F5F9', '#F1F5F9']}
               style={styles.featureIconContainer}
             >
               <Ionicons 
                 name="nutrition" 
                 size={32} 
-                color={doctorStatus === 'approved' ? theme.colors.secondary : theme.colors.textSecondary} 
+                color={doctorStatus === 'approved' ? colors.secondary : colors.textSecondary} 
               />
             </LinearGradient>
             <Text style={[styles.featureTitle, doctorStatus !== 'approved' && styles.featureTitleDisabled]}>
@@ -210,7 +213,7 @@ export default function DoctorPortal() {
             </Text>
             {doctorStatus !== 'approved' && (
               <View style={styles.lockBadge}>
-                <Ionicons name="lock-closed" size={16} color={theme.colors.textSecondary} />
+                <Ionicons name="lock-closed" size={16} color={colors.textSecondary} />
                 <Text style={styles.lockText}>Locked</Text>
               </View>
             )}
@@ -226,7 +229,7 @@ export default function DoctorPortal() {
             disabled={isLoadingStatus}
           >
             <LinearGradient
-              colors={[theme.colors.primary, theme.colors.secondary]}
+              colors={[colors.primary, colors.secondary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.gradientButton}
@@ -234,7 +237,7 @@ export default function DoctorPortal() {
               <Ionicons 
                 name={doctorStatus === 'approved' ? "checkmark-circle" : "add-circle"} 
                 size={24} 
-                color={theme.colors.surface} 
+                color={colors.surface} 
                 style={styles.buttonIcon}
               />
               <Text style={styles.gradientButtonText}>
@@ -248,20 +251,17 @@ export default function DoctorPortal() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.screenColor,
+    backgroundColor: colors.screenColor,
   },
   headerGradient: {
     paddingBottom: hp(2),
   },
   content: {
     flex: 1,
-    backgroundColor: theme.colors.screenColor,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    marginTop: -20,
+    backgroundColor: colors.screenColor,
     ...theme.shadows.large,
   },
   scrollContent: {
@@ -278,13 +278,13 @@ const styles = StyleSheet.create({
     width: hp(12),
     height: hp(12),
     borderRadius: hp(6),
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: hp(2),
     ...theme.shadows.medium,
     borderWidth: 3,
-    borderColor: theme.colors.primary + '20',
+    borderColor: colors.primary + '20',
   },
   logo: {
     width: hp(9),
@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     fontSize: Math.min(hp(3), wp(7.5)),
     fontWeight: "800",
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     textAlign: "center",
     marginBottom: hp(1),
     paddingHorizontal: wp(4),
@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
   },
   welcomeSubtitle: {
     fontSize: Math.min(hp(1.9), wp(4.8)),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: "center",
     lineHeight: Math.min(hp(2.8), wp(7)),
     paddingHorizontal: wp(8),
@@ -313,19 +313,19 @@ const styles = StyleSheet.create({
     gap: hp(2),
   },
   featureCard: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 20,
     padding: wp(5),
     marginBottom: hp(1.5),
     ...theme.shadows.medium,
     borderWidth: 1.5,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     minHeight: hp(14),
     justifyContent: 'space-between',
   },
   featureCardDisabled: {
     opacity: 0.7,
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: colors.offWhite,
   },
   featureIconContainer: {
     width: hp(7),
@@ -338,22 +338,22 @@ const styles = StyleSheet.create({
   },
   featureTitle: {
     fontSize: hp(2.2),
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     fontWeight: "700",
     marginBottom: hp(0.5),
     letterSpacing: 0.2,
   },
   featureTitleDisabled: {
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
   },
   featureDescription: {
     fontSize: hp(1.7),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     fontWeight: "400",
     lineHeight: hp(2.4),
   },
   featureDescriptionDisabled: {
-    color: theme.colors.textTertiary,
+    color: colors.textTertiary,
   },
   lockBadge: {
     flexDirection: 'row',
@@ -362,13 +362,13 @@ const styles = StyleSheet.create({
     marginTop: hp(1),
     paddingHorizontal: wp(3),
     paddingVertical: hp(0.5),
-    backgroundColor: theme.colors.offWhite,
+    backgroundColor: colors.offWhite,
     borderRadius: 12,
     gap: wp(1.5),
   },
   lockText: {
     fontSize: hp(1.4),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     fontWeight: '600',
   },
   newBadge: {
@@ -376,11 +376,11 @@ const styles = StyleSheet.create({
     marginTop: hp(1),
     paddingHorizontal: wp(3.5),
     paddingVertical: hp(0.6),
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     borderRadius: 12,
   },
   newBadgeText: {
-    color: theme.colors.surface,
+    color: colors.surface,
     fontSize: hp(1.4),
     fontWeight: '700',
     letterSpacing: 0.5,
@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
     marginRight: wp(1),
   },
   gradientButtonText: {
-    color: theme.colors.surface,
+    color: colors.surface,
     fontSize: hp(2.2),
     fontWeight: "700",
     letterSpacing: 0.3,

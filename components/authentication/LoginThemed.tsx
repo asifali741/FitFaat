@@ -5,14 +5,21 @@
 
 import { KeyboardAwareContainer, ThemedButton, ThemedInput } from '@/components/themed';
 import { theme } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
+} from 'react-native-responsive-screen';
 import { authApi } from '../../utils/auth/authApi';
 
 export default function LoginThemed() {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -65,7 +72,7 @@ export default function LoginThemed() {
     <KeyboardAwareContainer keyboardVerticalOffset={20}>
       {/* Professional Header with Gradient */}
       <LinearGradient
-        colors={[theme.colors.primary, theme.colors.secondary]}
+        colors={[colors.primary, colors.secondary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.headerGradient}
@@ -81,7 +88,7 @@ export default function LoginThemed() {
         <View style={styles.header}>
           <View style={styles.logoContainer}>
             <View style={styles.logoBg}>
-              <Ionicons name="heart" size={36} color={theme.colors.surface} />
+              <Ionicons name="heart" size={Math.min(hp(4.4), wp(9.6))} color={colors.textOnPrimary} />
             </View>
           </View>
           <Text style={styles.title}>Welcome Back!</Text>
@@ -159,9 +166,9 @@ export default function LoginThemed() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   headerGradient: {
-    height: 220,
+    height: hp(27),
     position: 'relative',
     overflow: 'hidden',
   },
@@ -179,58 +186,58 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   circle1: {
-    width: 250,
-    height: 250,
-    top: -100,
-    left: -80,
+    width: wp(66.7),
+    height: wp(66.7),
+    top: -hp(12.3),
+    left: -wp(21.3),
   },
   circle2: {
-    width: 180,
-    height: 180,
-    top: 80,
-    right: -50,
+    width: wp(48),
+    height: wp(48),
+    top: hp(9.8),
+    right: -wp(13.3),
   },
   formContainer: {
     flex: 1,
     paddingHorizontal: theme.spacing.xl,
     paddingTop: theme.spacing.xxl,
-    backgroundColor: theme.colors.screenColor,
-    marginTop: -40,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
+    backgroundColor: colors.screenColor,
+    marginTop: -hp(4.9),
+    borderTopLeftRadius: wp(8.5),
+    borderTopRightRadius: wp(8.5),
     ...theme.shadows.large,
   },
   header: {
     alignItems: 'center',
     marginBottom: theme.spacing.xxxl,
-    marginTop: -60,
+    marginTop: -hp(7.4),
   },
   logoContainer: {
     marginBottom: theme.spacing.lg,
   },
   logoBg: {
-    width: 80,
-    height: 80,
+    width: Math.min(hp(9.8), wp(21.3)),
+    height: Math.min(hp(9.8), wp(21.3)),
     borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 4,
-    borderColor: theme.colors.surface,
+    borderWidth: wp(1),
+    borderColor: colors.textOnPrimary,
     ...theme.shadows.large,
   },
   title: {
-    fontSize: theme.typography.fontSize.xxxl + 4,
+    fontSize: Math.min(hp(4.4), wp(9.6)),
     fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: theme.spacing.xs,
-    letterSpacing: -0.5,
+    letterSpacing: 0,
   },
   subtitle: {
     fontSize: theme.typography.fontSize.base,
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: hp(2.7),
   },
   forgotContainer: {
     alignSelf: 'flex-end',
@@ -239,7 +246,7 @@ const styles = StyleSheet.create({
   },
   forgotText: {
     fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: theme.typography.fontWeight.medium,
   },
   dividerContainer: {
@@ -250,12 +257,12 @@ const styles = StyleSheet.create({
   divider: {
     flex: 1,
     height: 1,
-    backgroundColor: theme.colors.border,
+    backgroundColor: colors.border,
   },
   dividerText: {
     marginHorizontal: theme.spacing.md,
     fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
   },
   footer: {
     flexDirection: 'row',
@@ -265,11 +272,12 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: theme.typography.fontSize.base,
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
   },
   linkText: {
     fontSize: theme.typography.fontSize.base,
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: theme.typography.fontWeight.semiBold,
   },
 });
+

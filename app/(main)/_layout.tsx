@@ -1,34 +1,41 @@
-console.log("TOP OF FILE")
 import { DrawerSceneWrapper } from "@/components/CustomDrawerLayout";
-import { theme } from "@/constants/theme";
 import { AppointmentProvider } from "@/contexts/AppointmentContext";
 import { ChatbotStorageProvider } from "@/contexts/ChatbotStorage";
-import { GlobalCallProvider } from "@/contexts/GlobalCallContext";
+import { ZegoCallProvider } from "@/contexts/ZegoCallProvider";
 import { NewsProvider } from "@/contexts/NewsContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { authApi } from "@/utils/auth/authApi";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { DrawerContentComponentProps } from "@react-navigation/drawer";
-import Constants from "expo-constants";
+import { BottomTabBar } from "@/components/BottomTabBar";
 import { useRouter } from "expo-router";
 import { Drawer } from "expo-router/drawer";
 import { useEffect, useMemo, useState } from "react";
-import { StyleSheet } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import {
+  heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
+} from "react-native-responsive-screen";
+import { getBackendBaseUrl } from '@/utils/config';
 type DrawerSceneWrapperProps = DrawerContentComponentProps;
 
 export default function MainLayout() {
+    const { colors } = useTheme();
     const router = useRouter();
     const [isDoctor, setIsDoctor] = useState(false);
     const [doctorName, setDoctorName] = useState("");
     const [isPremium, setIsPremium] = useState(false);
     const [loading, setLoading] = useState(true);
-    console.log('Landed in (main)\_Layout', { isDoctor, doctorName, isPremium });
+    const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     
     useEffect(() => {
+      let isActive = true;
+
       const checkAuth = async () => {
         try {
-          const isAuthenticated = await authApi.isAuthenticated();
-          if (!isAuthenticated) {
+          const hasBackendSession = await authApi.isAuthenticated();
+          if (!hasBackendSession) {
             router.replace("/(auth)");
             return;
           }
@@ -56,8 +63,7 @@ export default function MainLayout() {
           try {
             const token = await tokenStorage.getToken();
             if (token) {
-              const ENV = Constants.expoConfig?.extra;
-              const API_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL /*|| (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')*/).replace(/\/api\/?$/, '');
+              const API_URL = getBackendBaseUrl();
               const response = await fetch(`${API_URL}/api/payment/premium-status`, {
                 method: 'GET',
                 headers: {
@@ -67,7 +73,12 @@ export default function MainLayout() {
               });
               const premiumStatus = await response.json();
               console.log('Premium Status Response:', premiumStatus);
-              if (premiumStatus.success && premiumStatus.isPremium && premiumStatus.premiumSubscription?.status === 'active') {
+              const isPremiumActive = Boolean(
+                premiumStatus.success &&
+                (premiumStatus.isPremium || premiumStatus.premiumSubscription?.status === 'active')
+              );
+
+              if (isPremiumActive) {
                 setIsPremium(true);
                 console.log('User is premium');
               } else {
@@ -80,15 +91,21 @@ export default function MainLayout() {
             setIsPremium(false);
             console.log('Premium check error:', error?.message);
           }
+
         } catch (error) {
           console.error('Auth check error:', error);
           router.replace("/(auth)");
         } finally {
-          setLoading(false);
+          if (isActive) {
+            setLoading(false);
+          }
         }
       };
       
       checkAuth();
+      return () => {
+        isActive = false;
+      };
     }, []);
 
     // Memoize drawer options to ensure they update when state changes
@@ -109,68 +126,84 @@ export default function MainLayout() {
       return null; // or a loading screen
     }
     return <GestureHandlerRootView style={{ flex: 1 }}>
-  <GlobalCallProvider>
+  <ZegoCallProvider>
   <AppointmentProvider>
   <ChatbotStorageProvider>
   <NewsProvider>
-  <Drawer
-    detachInactiveScreens={true}
-    drawerContent={(props) => <DrawerSceneWrapper {...props} />}
-    screenOptions={{
-      lazy: true,
-      headerShown: false,
-      drawerActiveBackgroundColor: theme.colors.primary,
-      drawerInactiveBackgroundColor: "transparent",
-      drawerActiveTintColor: "#FFFFFF",
-      drawerInactiveTintColor: "#FFFFFF",
-      overlayColor: "transparent",
-      drawerStyle: {
-        backgroundColor: theme.colors.background,
-        width: "75%",
-        paddingTop: 40,
-      },
-      drawerLabelStyle: {
-        marginLeft: 8,
-        fontSize: 18,
-        fontFamily: "PoppinsMedium500",
-        color: "#FFFFFF",
-      },
-      drawerItemStyle: {
-        marginHorizontal: 12,
-        marginVertical: 1,
-        borderRadius: 25,
-        paddingHorizontal: 20,
-        paddingVertical: 8,
-        minHeight: 45,
-        flexDirection: "row",
-        alignItems: "center",
-      },
-      sceneStyle: { backgroundColor: "#FFFFFF" },
-    }}
-  >
-    <Drawer.Screen name="index" options={{ drawerItemStyle: { height: 0 } }} />
-    <Drawer.Screen name="(tabs)" options={{ drawerItemStyle: { height: 0 } }} />
-    <Drawer.Screen name="(dashboard)" options={{ title: "Dashboard" }} />
-    <Drawer.Screen name="(chatbot)" options={{ title: "Chatbot" }} />
-    <Drawer.Screen 
-      name="(conference)" 
-      options={conferenceOptions}
-    />
-    <Drawer.Screen name="(news)" options={{ title: "📰 News" }} />
-    <Drawer.Screen name="(settings)" options={{ title: "Settings" }} />
-    <Drawer.Screen 
-      name="(exercises)/workout" 
-      options={workoutOptions}
-    />
-    <Drawer.Screen 
-      name="(doctor-portal)" 
-      options={doctorPortalOptions}
-    />
-  </Drawer>
+  <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <Drawer
+      detachInactiveScreens={true}
+      drawerContent={(props) => (
+        <DrawerSceneWrapper
+          {...props}
+          onDrawerStatusChange={setIsDrawerOpen}
+        />
+      )}
+      screenListeners={{
+        state: (event) => {
+          const history = (event.data.state as any)?.history ?? [];
+          const drawerIsOpen = history.some(
+            (entry: any) => entry.type === 'drawer' && entry.status === 'open'
+          );
+          setIsDrawerOpen(drawerIsOpen);
+        },
+      }}
+      screenOptions={{
+        lazy: true,
+        headerShown: false,
+        drawerActiveBackgroundColor: colors.primary,
+        drawerInactiveBackgroundColor: "transparent",
+        drawerActiveTintColor: colors.textOnPrimary,
+        drawerInactiveTintColor: colors.drawerTintColor,
+        overlayColor: "transparent",
+        drawerStyle: {
+          backgroundColor: colors.drawerBackground,
+          width: wp(75),
+          paddingTop: hp(4.9),
+        },
+        drawerLabelStyle: {
+          marginLeft: wp(2),
+          fontSize: Math.min(hp(2.2), wp(4.8)),
+          fontFamily: "PoppinsMedium500",
+          color: colors.drawerTintColor,
+        },
+        drawerItemStyle: {
+          marginHorizontal: wp(3.2),
+          marginVertical: hp(0.2),
+          borderRadius: wp(6.5),
+          paddingHorizontal: wp(5),
+          paddingVertical: hp(1),
+          minHeight: hp(5.6),
+          flexDirection: "row",
+          alignItems: "center",
+        },
+        sceneStyle: { backgroundColor: colors.screenColor },
+      }}
+    >
+      <Drawer.Screen name="index" options={{ drawerItemStyle: { height: 0 } }} />
+      <Drawer.Screen name="(dashboard)" options={{ title: "Dashboard" }} />
+      <Drawer.Screen name="(chatbot)" options={{ title: "Chatbot" }} />
+      <Drawer.Screen 
+        name="(conference)" 
+        options={conferenceOptions}
+      />
+      <Drawer.Screen name="(news)" options={{ title: "📰 News" }} />
+      <Drawer.Screen name="(settings)" options={{ title: "Settings" }} />
+      <Drawer.Screen 
+        name="(exercises)/workout" 
+        options={workoutOptions}
+      />
+      <Drawer.Screen 
+        name="(doctor-portal)" 
+        options={doctorPortalOptions}
+      />
+    </Drawer>
+    {!isDrawerOpen && <BottomTabBar />}
+  </View>
   </NewsProvider>
   </ChatbotStorageProvider>
   </AppointmentProvider>
-  </GlobalCallProvider>
+  </ZegoCallProvider>
 </GestureHandlerRootView>
 
 }

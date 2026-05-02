@@ -307,8 +307,8 @@ const getStyles = (colors: any) => StyleSheet.create({
   content: {
     flex: 1,
     backgroundColor: colors.screenColor,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
+    borderTopLeftRadius: wp(8),
+    borderTopRightRadius: wp(8),
     paddingTop: hp(2),
   },
   spacer: {
