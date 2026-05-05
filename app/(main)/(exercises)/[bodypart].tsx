@@ -177,7 +177,7 @@ export default function ExercisesScreen() {
             style={styles.backButton}
             onPress={handleBackPress}
           >
-            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
           </TouchableOpacity>
           {/* Dynamic title based on selected body part */}
           <Text style={styles.headerTitle}>{(bodypart || name) as string} Exercises</Text>
@@ -205,7 +205,7 @@ export default function ExercisesScreen() {
           style={styles.backButton}
           onPress={handleBackPress}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+          <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
         {/* Dynamic title based on selected body part */}
         <Text style={styles.headerTitle}>{(bodypart || name) as string} Exercises</Text>

@@ -178,7 +178,7 @@ export default function FavoritesScreen() {
             style={styles.backButton}
             onPress={handleBackPress}
           >
-            <Ionicons name="arrow-back" size={24} color={colors.textOnPrimary} />
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>My Favorites ❤️</Text>
           <View style={styles.spacer} />
@@ -199,7 +199,7 @@ export default function FavoritesScreen() {
           style={styles.backButton}
           onPress={handleBackPress}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.textOnPrimary} />
+          <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>My Favorites ❤️</Text>
         <View style={styles.spacer} />

@@ -1,10 +1,10 @@
+import AppHeader from "@/components/AppHeader";
 import { useTheme } from "@/contexts/ThemeContext";
-import { Ionicons } from "@expo/vector-icons";
-import { DrawerActions, useNavigation } from "@react-navigation/native";
+import * as SystemUI from "expo-system-ui";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
-import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Image, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -14,14 +14,9 @@ export default function Index() {
   const { colors } = useTheme();
   const [visibleText, setVisibleText] = useState("");
   const router = useRouter();
-  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   // Increase bottom spacing to account for tab bar height + safe area.
-  const bottomSpace = insets.bottom > 0 ? insets.bottom + hp(4) : hp(12);
-
-  const openDrawer = () => {
-    navigation.dispatch(DrawerActions.openDrawer());
-  };
+  const bottomSpace = insets.bottom > 0 ? insets.bottom + hp(8) : hp(16);
 
   const iRef = useRef(0);
   useEffect(() => {
@@ -40,20 +35,28 @@ export default function Index() {
     }, 100);
     return () => clearInterval(interValId);
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      SystemUI.setBackgroundColorAsync("#FFFFFF").catch(() => {});
+
+      return () => {
+        SystemUI.setBackgroundColorAsync(colors.screenColor).catch(() => {});
+      };
+    }, [colors.screenColor])
+  );
+
   const styles = getStyles(colors);
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.menuButton}
-          onPress={openDrawer}
-        >
-          <Ionicons name="menu" size={24} color={colors.textOnPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>AI Health Assistant</Text>
-        <View style={styles.spacer} />
-      </View>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} />
+      <View style={styles.container}>
+      <AppHeader
+        title="AI Health Assistant"
+        showStepIndicator={false}
+        showBackButton={false}
+        showMenuButton={true}
+      />
 
       {/* Main Content */}
       <View style={styles.content}>
@@ -92,38 +95,23 @@ export default function Index() {
           </TouchableOpacity>
         </View>
       </View>
+      </View>
     </SafeAreaView>
   )
 }
 
 const getStyles = (colors: any) => StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.screenColor,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.primary,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: wp(5),
-    paddingVertical: hp(2),
-    backgroundColor: colors.primary,
-  },
-  menuButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: Math.min(hp(2.5), wp(6)),
-    fontWeight: "bold",
-    color: colors.textOnPrimary,
-    textAlign: "center",
-    flex: 1,
-  },
   content: {
     flex: 1,
     backgroundColor: colors.screenColor,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
     paddingTop: hp(3),
     paddingHorizontal: wp(6),
   },
@@ -191,8 +179,5 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontSize: Math.min(hp(2.2), wp(5.5)),
     fontWeight: "700",
     letterSpacing: 0.5,
-  },
-  spacer: {
-    width: wp(18),
   },
 });

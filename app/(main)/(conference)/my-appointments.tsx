@@ -12,13 +12,14 @@ import {
   Alert,
   Modal,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View
 } from 'react-native';
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const getErrorMessage = (error: any): string => {
   if (typeof error === 'string') return error;
@@ -33,6 +34,11 @@ const isUnauthorizedError = (error: any): boolean => {
 export default function MyAppointmentsScreen() {
   const { colors } = useTheme();
   const styles = getStyles(colors);
+  const insets = useSafeAreaInsets();
+  const appointmentListContainerStyle = [
+    styles.listContainer,
+    { paddingBottom: insets.bottom + hp(2) },
+  ];
   const router = useRouter();
   const [appointments, setAppointments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -180,6 +186,10 @@ export default function MyAppointmentsScreen() {
       
       if (appointmentStatus !== currentStatus) {
         if (currentStatus !== '') {
+          const previousItem = items[items.length - 1] as any;
+          if (previousItem?.type === 'appointment') {
+            previousItem.isBeforeStatusHeader = true;
+          }
           items.push({ type: 'spacer', key: `spacer-${currentStatus}` });
         }
         items.push({ type: 'header', status: appointmentStatus, key: `header-${appointmentStatus}` });
@@ -194,7 +204,7 @@ export default function MyAppointmentsScreen() {
         style={styles.listScroll}
         scrollEnabled={true}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContainer}
+        contentContainerStyle={appointmentListContainerStyle}
       >
         {items.map((item: any) => {
           if (item.type === 'header') {
@@ -204,11 +214,14 @@ export default function MyAppointmentsScreen() {
               </View>
             );
           } else if (item.type === 'spacer') {
-            return <View key={item.key} style={{ height: hp(1) }} />;
+            return <View key={item.key} style={styles.statusGroupSpacer} />;
           } else {
             return (
               <View key={item.key}>
-                {renderAppointmentItem({ item: item.data })}
+                {renderAppointmentItem({
+                  item: item.data,
+                  isBeforeStatusHeader: item.isBeforeStatusHeader,
+                })}
               </View>
             );
           }
@@ -217,7 +230,13 @@ export default function MyAppointmentsScreen() {
     );
   };
 
-  const renderAppointmentItem = ({ item }: { item: any }) => {
+  const renderAppointmentItem = ({
+    item,
+    isBeforeStatusHeader = false,
+  }: {
+    item: any;
+    isBeforeStatusHeader?: boolean;
+  }) => {
     const appointmentDate = new Date(item.date);
     const dateString = appointmentDate.toLocaleDateString('en-GB', {
       day: '2-digit',
@@ -232,6 +251,7 @@ export default function MyAppointmentsScreen() {
       <TouchableOpacity
         style={[
           styles.appointmentCard,
+          isBeforeStatusHeader && styles.appointmentCardBeforeStatusHeader,
           item.status === 'cancelled' && styles.appointmentCardCancelled,
         ]}
         onPress={() => {
@@ -300,43 +320,59 @@ export default function MyAppointmentsScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <AppHeader
-          title="My Appointments"
-          showStepIndicator={false}
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <StatusBar
+          barStyle="dark-content"
+          backgroundColor="#FFFFFF"
+          translucent={false}
         />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
+        <View style={styles.container}>
+          <AppHeader
+            title="My Appointments"
+            showStepIndicator={false}
+          />
+          <View style={styles.content}>
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          </View>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <AppHeader
-        title="My Appointments"
-        showStepIndicator={false}
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="#FFFFFF"
+        translucent={false}
       />
+      <View style={styles.container}>
+        <AppHeader
+          title="My Appointments"
+          showStepIndicator={false}
+        />
 
-      <View style={[styles.content, { backgroundColor: colors.background }]}>
-        {appointments.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="calendar-outline" size={64} color={colors.textSecondary} />
-            <Text style={styles.emptyTitle}>No Appointments</Text>
-            <Text style={styles.emptySubtitle}>
-              You don't have any appointments yet
-            </Text>
-            <TouchableOpacity
-              style={styles.scheduleButton}
-              onPress={() => router.push('/(main)/(conference)/doctor-time-date-selection')}
-            >
-              <Text style={styles.scheduleButtonText}>Schedule Your First Appointment</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          renderAppointmentListByStatus()
-        )}
+        <View style={styles.content}>
+          {appointments.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="calendar-outline" size={64} color={colors.textSecondary} />
+              <Text style={styles.emptyTitle}>No Appointments</Text>
+              <Text style={styles.emptySubtitle}>
+                You don't have any appointments yet
+              </Text>
+              <TouchableOpacity
+                style={styles.scheduleButton}
+                onPress={() => router.push('/(main)/(conference)/doctor-time-date-selection')}
+              >
+                <Text style={styles.scheduleButtonText}>Schedule Your First Appointment</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            renderAppointmentListByStatus()
+          )}
+        </View>
       </View>
 
       {/* Appointment Details Modal */}
@@ -535,15 +571,18 @@ export default function MyAppointmentsScreen() {
 }
 
 const getStyles = (colors: any) => StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.screenColor,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.primary,
   },
   content: {
     flex: 1,
-    borderTopLeftRadius: wp(8),
-    borderTopRightRadius: wp(8),
-    paddingTop: hp(2),
+    paddingTop: hp(0.5),
+    backgroundColor: colors.screenColor,
   },
   loadingContainer: {
     flex: 1,
@@ -583,18 +622,21 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   listContainer: {
     paddingHorizontal: wp(4),
-    paddingVertical: hp(2),
+    paddingTop: hp(0.5),
     paddingBottom: hp(3),
   },
   listScroll: {
     flex: 1,
   },
+  statusGroupSpacer: {
+    height: hp(0.2),
+  },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: hp(1.5),
+    paddingVertical: hp(1),
     paddingHorizontal: wp(2),
-    marginTop: hp(1),
+    marginTop: hp(0.2),
     marginBottom: hp(1),
   },
   sectionHeaderText: {
@@ -610,6 +652,9 @@ const getStyles = (colors: any) => StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: colors.primary,
     ...theme.shadows.medium,
+  },
+  appointmentCardBeforeStatusHeader: {
+    marginBottom: hp(0.5),
   },
   appointmentCardCancelled: {
     opacity: 0.6,
@@ -694,7 +739,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   // Modal Styles
   modalContainer: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.screenColor,
   },
   modalHeader: {
     flexDirection: 'row',

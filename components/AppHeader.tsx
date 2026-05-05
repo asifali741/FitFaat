@@ -92,7 +92,7 @@ export default function AppHeader({
               accessibilityRole="button"
               accessibilityLabel="Go back"
             >
-              <Ionicons name="arrow-back" size={Math.min(hp(3.3), wp(7))} color={colors.textOnPrimary} />
+              <Ionicons name="arrow-back" size={Math.min(hp(3.3), wp(7))} color="#FFFFFF" />
             </TouchableOpacity>
           ) : showMenuButton ? (
             <TouchableOpacity 
@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
     minHeight: hp(7.6),
     paddingHorizontal: wp(5),
   },

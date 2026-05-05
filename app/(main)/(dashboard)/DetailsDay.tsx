@@ -4,9 +4,11 @@ import BackButton from '@/components/BackButton';
 import PatientDietPlanViewer from '@/components/PatientDietPlanViewer';
 import { goalBasedSuggestions, waterIntakeDatabase } from '@/constants/foodDatabase';
 import { HEADER_PADDING_HORIZONTAL } from '@/constants/ui';
+import { useNotifications } from '@/contexts/NotificationContext';
 import { useTheme } from "@/contexts/ThemeContext";
 import { dailyLogsApi } from '@/utils/dailyLogsApi';
 import { customRecipesApi, CustomRecipeData } from '@/utils/customRecipesApi';
+import { recordNutritionProfileEntry, scheduleAdaptiveNutritionNotifications } from '@/utils/nutritionProfile';
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { Audio } from 'expo-av';
 import Constants from 'expo-constants';
@@ -32,6 +34,7 @@ interface ProgressCircleProps {
 const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 export default function DetailsDay () {
     const { colors } = useTheme();
+    const { sendFitFaatNotification, scheduleFitFaatNotification, cancelScheduledNotification } = useNotifications();
     const { selectedDay  } = useLocalSearchParams<{ selectedDay : string }>();
     const router = useRouter();
     const props: typeDay = JSON.parse(selectedDay )
@@ -1466,7 +1469,7 @@ export default function DetailsDay () {
 
         <View style={styles.menuButtons}>
           <TouchableOpacity style={styles.backMenuButton} onPress={closeMenu}>
-            <Ionicons name="arrow-back" size={Math.min(hp(2.2), wp(5))} color={colors.primary} />
+            <Ionicons name="arrow-back" size={Math.min(hp(2.2), wp(5))} color="#FFFFFF" />
             <Text style={styles.backMenuText}>Back</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -1492,6 +1495,8 @@ export default function DetailsDay () {
                 let hasWater = false;
                 let successMessages = [];
                 let updatedDayData: any = { ...dayData };
+                let loggedCalories = 0;
+                let loggedWaterLiters = 0;
 
                 // Log meal if calories are entered
                 if (calorieInput.trim()) {
@@ -1523,6 +1528,7 @@ export default function DetailsDay () {
 
                   if (mealResponse) {
                     hasMeal = true;
+                    loggedCalories = calories;
                     successMessages.push(`${calories} calories logged`);
                     
                     updatedDayData = {
@@ -1540,6 +1546,7 @@ export default function DetailsDay () {
 
                   if (waterResponse) {
                     hasWater = true;
+                    loggedWaterLiters = waterAmount;
                     successMessages.push(`${waterAmount}L of water logged`);
                     
                     // Update with full response data to ensure accuracy
@@ -1563,6 +1570,43 @@ export default function DetailsDay () {
                   setMealQuantity('1');
                   setDescriptionInput('');
                   setWaterInput('0');
+
+                  try {
+                    await recordNutritionProfileEntry({
+                      dayLogId,
+                      dayNo: updatedDayData.dayNo,
+                      dayDate: updatedDayData.date,
+                      timestamp: new Date().toISOString(),
+                      calories: loggedCalories,
+                      waterLiters: loggedWaterLiters,
+                      targetCalories: updatedDayData.targetCalories,
+                      achievedCaloriesAfter: updatedDayData.achievedCalories,
+                      targetHydration: updatedDayData.targetHydration,
+                      achievedHydrationAfter: updatedDayData.achieviedHydration,
+                    });
+
+                    await scheduleAdaptiveNutritionNotifications({
+                      summary: {
+                        dayLogId,
+                        dayNo: updatedDayData.dayNo,
+                        date: updatedDayData.date,
+                        achievedCalories: updatedDayData.achievedCalories,
+                        targetCalories: updatedDayData.targetCalories,
+                        achievedHydration: updatedDayData.achieviedHydration,
+                        targetHydration: updatedDayData.targetHydration,
+                      },
+                      schedule: scheduleFitFaatNotification,
+                      cancel: cancelScheduledNotification,
+                    });
+                  } catch (profileError) {
+                    console.error('Error updating adaptive nutrition notifications:', profileError);
+                  }
+
+                  await sendFitFaatNotification(
+                    hasMeal ? 'meal' : 'health',
+                    hasMeal && hasWater ? 'Food and Water Saved' : hasMeal ? 'Food Saved' : 'Water Saved',
+                    successMessages.join('\n')
+                  );
                   
                   // Use setTimeout to ensure state updates are processed
                   setTimeout(() => {
@@ -1677,7 +1721,7 @@ export default function DetailsDay () {
                   style={[styles.modalButton, styles.modalSuccessButton, { backgroundColor: colors.success }]}
                   onPress={completionModalData.onContinue}
                 >
-                  <Ionicons name="arrow-forward" size={18} color="white" />
+                  <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
                   <Text style={styles.modalSuccessText}>Continue</Text>
                 </Pressable>
               </View>
@@ -1749,7 +1793,7 @@ export default function DetailsDay () {
       <View style={styles.customRecipeModalContainer}>
         <View style={styles.customRecipeModalHeader}>
           <TouchableOpacity onPress={() => setShowCustomRecipeModal(false)}>
-            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
           </TouchableOpacity>
           <Text style={styles.customRecipeModalTitle}>Create Custom Recipe</Text>
           <View style={{ width: 24 }} />

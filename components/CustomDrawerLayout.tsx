@@ -22,6 +22,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { DrawerFonts } from "../app/(main)/(settings)/_ui_elements";
 import { getBackendBaseUrl } from '@/utils/config';
+import { getGmailProfileImageUrl, resolveBackendImageUrl } from "@/utils/profileImage";
 type DrawerSceneWrapperProps = DrawerContentComponentProps & {
   onDrawerStatusChange?: (isOpen: boolean) => void;
 };
@@ -63,8 +64,10 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
   const [userName, setUserName] = useState('User');
   const [userEmail, setUserEmail] = useState('user@example.com');
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const [gmailImageUrl, setGmailImageUrl] = useState<string | null>(null);
   const [isDoctor, setIsDoctor] = useState(false);
   const [doctorName, setDoctorName] = useState('');
+  const displayImageUrl = gmailImageUrl || profileImageUrl;
   
   useEffect(() => {
     fetchUserData();
@@ -127,6 +130,7 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
       if (storedUser) {
         setUserName(storedUser.userInfo?.name || storedUser.name || storedUser.username || 'User');
         setUserEmail(storedUser.email || 'user@example.com');
+        setGmailImageUrl(getGmailProfileImageUrl(storedUser));
       }
       
       if (!token) {
@@ -162,12 +166,15 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
           console.log('Setting user data from backend:', data.username, data.email);
           setUserName(data.userInfo?.name || data.name || data.username || 'User');
           setUserEmail(data.email || 'user@example.com');
+          setGmailImageUrl(getGmailProfileImageUrl(data) || getGmailProfileImageUrl(storedUser));
           
           // Fetch profile image if available
           if (data.profileImage) {
-            const imageUrl = `${baseURL}/uploads/profiles/${data.profileImage}`;
+            const imageUrl = resolveBackendImageUrl(baseURL, data.profileImage);
             console.log('Setting profile image URL:', imageUrl);
             setProfileImageUrl(imageUrl);
+          } else {
+            setProfileImageUrl(null);
           }
         } else {
           console.log('Response does not have success=true or no data.user');
@@ -183,6 +190,14 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
   
   const handleProfilePress = () => {
     props.navigation.navigate('profile');
+  };
+
+  const handleProfileImageError = () => {
+    if (displayImageUrl === gmailImageUrl) {
+      setGmailImageUrl(null);
+    } else {
+      setProfileImageUrl(null);
+    }
   };
 
   // Helper function to check if route is active
@@ -218,10 +233,17 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.drawerBackground }}>
       {/* Top Part */}
       <TouchableOpacity style={styles.userContainer} onPress={handleProfilePress}>
-        <Image 
-          source={profileImageUrl ? { uri: profileImageUrl } : require("../assets/images/Default_Profile.png")} 
-          style={styles.userImage} 
-        />
+        {displayImageUrl ? (
+          <Image
+            source={{ uri: displayImageUrl }}
+            style={styles.userImage}
+            onError={handleProfileImageError}
+          />
+        ) : (
+          <View style={[styles.userImage, styles.userImagePlaceholder]}>
+            <Ionicons name="person" size={Math.min(wp(7.5), hp(3.8))} color={colors.textSecondary} />
+          </View>
+        )}
         <View style={styles.userInfo}>
           <Text
             style={styles.userName}
@@ -390,6 +412,11 @@ userEmail: {
     marginRight: wp(3.2),
     borderWidth: 2,
     borderColor: colors.cardBorder,
+  },
+  userImagePlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primarySoft,
   },
   drawerItems: {
     flex: 1,

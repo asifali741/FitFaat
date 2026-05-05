@@ -163,7 +163,7 @@ export default function NewsModalPopup({
                         <Text style={[styles.newsItemMeta, { color: colors.textSecondary }]}>
                           {item.adminName && `By ${item.adminName}`}
                         </Text>
-                        <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+                        <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
                       </View>
                     </View>
                   </TouchableOpacity>
@@ -191,7 +191,7 @@ export default function NewsModalPopup({
           {/* Header */}
           <View style={[styles.detailModalHeader, { borderBottomColor: colors.border }]}>
             <TouchableOpacity onPress={() => setSelectedNews(null)}>
-              <Ionicons name="chevron-back" size={28} color={colors.text} />
+              <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
             </TouchableOpacity>
             <Text style={[styles.detailModalTitle, { color: colors.text }]}>
               News Details

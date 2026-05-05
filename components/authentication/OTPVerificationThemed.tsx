@@ -6,6 +6,7 @@
 import BackButton from '@/components/BackButton';
 import { KeyboardAwareContainer, ThemedButton } from '@/components/themed';
 import { theme } from '@/constants/theme';
+import { useNotifications } from '@/contexts/NotificationContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,6 +22,7 @@ import { authApi } from '../../utils/auth/authApi';
 
 export default function OTPVerificationThemed() {
   const { colors } = useTheme();
+  const { sendFitFaatNotification, scheduleHourlyMotivation } = useNotifications();
   const styles = getStyles(colors);
   const params = useLocalSearchParams();
   const email = params.email as string;
@@ -96,6 +98,12 @@ export default function OTPVerificationThemed() {
         });
 
         if (registerResponse.success) {
+          await sendFitFaatNotification(
+            'admin',
+            'Welcome to FitFaat',
+            `Congratulations ${username || 'there'}, your FitFaat account is ready.`
+          );
+          await scheduleHourlyMotivation();
           Alert.alert('Success', 'Account created successfully!', [
             { text: 'OK', onPress: () => router.replace('/DietSection') }
           ]);

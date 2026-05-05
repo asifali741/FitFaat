@@ -10,17 +10,20 @@ import {
     ActivityIndicator,
     Alert,
     ScrollView,
+    StatusBar,
     StyleSheet,
     Text,
     TouchableOpacity,
     View
 } from 'react-native';
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function DoctorSelectionScreen() {
   const { colors } = useTheme();
   const styles = getStyles(colors);
+  const insets = useSafeAreaInsets();
+  const bottomButtonPadding = Math.max(insets.bottom + hp(2), hp(4));
   const router = useRouter();
   const [doctors, setDoctors] = useState<any[]>([]);
   const [isLoadingDoctors, setIsLoadingDoctors] = useState(true);
@@ -194,13 +197,15 @@ export default function DoctorSelectionScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <AppHeader
-        title={step === 'doctors' ? 'Select Doctor' : step === 'date' ? 'Select Date' : 'Select Time'}
-        showStepIndicator={false}
-      />
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} />
+      <View style={styles.container}>
+        <AppHeader
+          title={step === 'doctors' ? 'Select Doctor' : step === 'date' ? 'Select Date' : 'Select Time'}
+          showStepIndicator={false}
+        />
 
-      <View style={styles.content}>
+        <View style={styles.content}>
         {/* Step 1: Doctor Selection */}
         {step === 'doctors' && (
           <View style={styles.stepContainer}>
@@ -346,7 +351,7 @@ export default function DoctorSelectionScreen() {
         )}
 
         {/* Navigation Buttons */}
-        <View style={styles.buttonContainer}>
+        <View style={[styles.buttonContainer, { paddingBottom: bottomButtonPadding }]}>
           <TouchableOpacity
             style={styles.backBtn}
             onPress={handleBack}
@@ -358,10 +363,16 @@ export default function DoctorSelectionScreen() {
             onPress={handleNext}
             disabled={isNextDisabled()}
           >
-            <Text style={[styles.nextBtnText, isNextDisabled() && styles.nextBtnTextDisabled]}>
+            <Text
+              style={[styles.nextBtnText, isNextDisabled() && styles.nextBtnTextDisabled]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.78}
+            >
               {step === 'time' ? 'Continue to Summary' : 'Next'}
             </Text>
           </TouchableOpacity>
+        </View>
         </View>
       </View>
     </SafeAreaView>
@@ -369,15 +380,17 @@ export default function DoctorSelectionScreen() {
 }
 
 const getStyles = (colors: any) => StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.screenColor,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.primary,
   },
   content: {
     flex: 1,
-    borderTopLeftRadius: wp(8),
-    borderTopRightRadius: wp(8),
-    backgroundColor: colors.background,
+    backgroundColor: colors.screenColor,
     paddingTop: hp(3),
     paddingHorizontal: wp(5),
   },
@@ -562,15 +575,15 @@ const getStyles = (colors: any) => StyleSheet.create({
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingBottom: hp(2),
     paddingTop: hp(2),
   },
   backBtn: {
     flex: 0.45,
     backgroundColor: colors.border,
-    paddingVertical: hp(2),
+    height: hp(6.4),
     borderRadius: theme.borderRadius.medium,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   backBtnText: {
     fontSize: hp(1.8),
@@ -580,9 +593,10 @@ const getStyles = (colors: any) => StyleSheet.create({
   nextBtn: {
     flex: 0.45,
     backgroundColor: colors.accent,
-    paddingVertical: hp(2),
+    height: hp(6.4),
     borderRadius: theme.borderRadius.medium,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   nextBtnDisabled: {
     backgroundColor: colors.disabled,
@@ -592,6 +606,8 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontSize: hp(1.8),
     fontWeight: theme.typography.fontWeight.semiBold as any,
     color: colors.surface,
+    textAlign: 'center',
+    width: '100%',
   },
   nextBtnTextDisabled: {
     color: colors.textSecondary,

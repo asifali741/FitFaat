@@ -1,10 +1,4 @@
-import { tokenStorage } from '@/utils/auth/tokenStorage';
-import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import { ONE_ON_ONE_VIDEO_CALL_CONFIG, ZegoUIKitPrebuiltCall } from '@zegocloud/zego-uikit-prebuilt-call-rn';
-import Constants from 'expo-constants';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { tokenStorage } from "@/utils/auth/tokenStorage";
 import {
     getCallID,
     getZegoUserID,
@@ -14,6 +8,7 @@ import {
 } from "@/utils/zegoConfig";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import Constants, { AppOwnership } from "expo-constants";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -32,8 +27,6 @@ import {
   widthPercentageToDP as wp,
 } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-import Constants, { AppOwnership } from "expo-constants";
 
 // Try to import ZegoCloud SDK - will fail in Expo Go
 let ZegoUIKitPrebuiltCall: any = null;

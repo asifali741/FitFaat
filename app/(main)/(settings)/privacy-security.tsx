@@ -146,7 +146,7 @@ export default function PrivacySecurity() {
           thumbColor={value ? colors.primary : colors.textSecondary}
         />
       ) : (
-        <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+        <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
       )}
     </TouchableOpacity>
   );

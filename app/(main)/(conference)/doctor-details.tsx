@@ -116,7 +116,7 @@ export default function DoctorDetailsScreen() {
           onPress={handleBookAppointment}
         >
           <Text style={styles.bookButtonText}>Continue to Book Appointment</Text>
-          <Ionicons name="arrow-forward" size={20} color={colors.white} />
+          <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

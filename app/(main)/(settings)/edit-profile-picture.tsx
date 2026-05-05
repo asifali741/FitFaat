@@ -287,7 +287,7 @@ export default function EditProfilePicture() {
                 <Text style={[styles.actionTitle, { color: colors.textPrimary }]}>Take Photo</Text>
                 <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>Use your camera to take a new photo</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+              <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.actionButton} onPress={pickImageFromGallery}>
@@ -298,7 +298,7 @@ export default function EditProfilePicture() {
                 <Text style={[styles.actionTitle, { color: colors.textPrimary }]}>Choose from Gallery</Text>
                 <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>Select a photo from your device</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+              <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
             </TouchableOpacity>
 
             {selectedImage && (
@@ -310,7 +310,7 @@ export default function EditProfilePicture() {
                   <Text style={[styles.actionTitle, { color: colors.error }]}>Remove Photo</Text>
                   <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>Delete your current profile picture</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+                <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
               </TouchableOpacity>
             )}
           </View>

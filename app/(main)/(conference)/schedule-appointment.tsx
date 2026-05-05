@@ -14,7 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ScheduleAppointmentScreen() {
   const router = useRouter();
-  const { scheduleAppointmentReminder } = useNotifications();
+  const { scheduleAppointmentReminder, scheduleVideoCallReminder, sendBookingUpdateNotification } = useNotifications();
   const { addAppointment } = useAppointments();
   const { colors } = useTheme();
   const [currentStep, setCurrentStep] = useState(1);
@@ -153,6 +153,16 @@ export default function ScheduleAppointmentScreen() {
           appointmentId,
           appointmentDateTime,
           selectedDoctor.name
+        );
+        await scheduleVideoCallReminder(
+          appointmentId,
+          appointmentDateTime,
+          selectedDoctor.name
+        );
+        await sendBookingUpdateNotification(
+          'Appointment Scheduled',
+          `Your appointment with ${selectedDoctor.name} is confirmed for ${selectedTime}.`,
+          appointmentId
         );
         if (notificationId) {
           console.log('📅 Appointment reminder scheduled:', notificationId);

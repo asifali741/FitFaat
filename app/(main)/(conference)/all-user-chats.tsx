@@ -4,12 +4,13 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { authApi } from '@/utils/auth/authApi';
 import { tokenStorage } from '@/utils/auth/tokenStorage';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import * as SystemUI from 'expo-system-ui';
+import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  FlatList, RefreshControl, StyleSheet,
+  FlatList, RefreshControl, StatusBar, StyleSheet,
   Text,
   TouchableOpacity,
   View
@@ -82,6 +83,16 @@ export default function AllUserChatsScreen() {
     fetchAppointments();
     fetchUnreadMessages();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      SystemUI.setBackgroundColorAsync('#FFFFFF').catch(() => {});
+
+      return () => {
+        SystemUI.setBackgroundColorAsync(colors.screenColor).catch(() => {});
+      };
+    }, [colors.screenColor])
+  );
 
   // ── Data fetching ──────────────────────────────────────────────────────
 
@@ -365,7 +376,8 @@ export default function AllUserChatsScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} />
         <AppHeader title="Chats" showBackButton />
         <View style={styles.contentSurface}>
           <View style={styles.loadingContainer}>
@@ -378,7 +390,8 @@ export default function AllUserChatsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} />
       <AppHeader title="Chats" showBackButton />
 
       <View style={styles.contentSurface}>
@@ -419,7 +432,7 @@ const AVATAR_SIZE = Math.min(hp(6.9), wp(14.9));
 const getStyles = (colors: any) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.screenColor,
   },
   contentSurface: {
     flex: 1,
@@ -461,7 +474,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   // ── List ────────────────
   listContainer: {
     paddingTop: 4,
-    paddingBottom: 100,
+    paddingBottom: hp(14),
   },
   separator: {
     height: StyleSheet.hairlineWidth,

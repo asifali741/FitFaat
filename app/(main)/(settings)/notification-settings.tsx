@@ -1,5 +1,5 @@
 import AppHeader from "@/components/AppHeader";
-import { useNotifications, NotificationSettings } from "@/contexts/NotificationContext";
+import { useNotifications, NotificationToggleKey } from "@/contexts/NotificationContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -17,12 +17,13 @@ export default function NotificationSettingsScreen() {
     updateNotificationSettings,
     requestPermissions,
     clearAllNotifications,
-    badgeCount
+    badgeCount,
+    sendFitFaatNotification
   } = useNotifications();
 
   const [isClearing, setIsClearing] = useState(false);
 
-  const handleToggle = async (key: keyof NotificationSettings, value: boolean) => {
+  const handleToggle = async (key: NotificationToggleKey, value: boolean) => {
     await updateNotificationSettings({ [key]: value });
   };
 
@@ -83,6 +84,167 @@ export default function NotificationSettingsScreen() {
     }
   };
 
+  const handleSendTestNotification = async () => {
+    if (permissionStatus !== 'granted') {
+      const granted = await requestPermissions();
+      if (!granted) {
+        Alert.alert(
+          "Permission Required",
+          "Please allow notifications for FitFaat before sending a test notification.",
+          [
+            { text: "Cancel", style: "cancel" },
+            { text: "Open Settings", onPress: handleOpenSettings }
+          ]
+        );
+        return;
+      }
+    }
+
+    await sendFitFaatNotification(
+      'general',
+      'FitFaat Notifications',
+      'Your notifications are ready with the FitFaat logo.'
+    );
+  };
+
+  const reminderRows: Array<{
+    key: NotificationToggleKey;
+    icon: string;
+    title: string;
+    description: string;
+  }> = [
+    {
+      key: 'appointmentReminders',
+      icon: 'calendar',
+      title: 'Appointment Reminders',
+      description: 'Get reminded before your appointments',
+    },
+    {
+      key: 'videoCallReminders',
+      icon: 'videocam',
+      title: 'Video Call Reminders',
+      description: 'Upcoming consultation and call alerts',
+    },
+    {
+      key: 'workoutReminders',
+      icon: 'barbell',
+      title: 'Workout Reminders',
+      description: 'Daily and weekly exercise reminders',
+    },
+    {
+      key: 'mealReminders',
+      icon: 'restaurant',
+      title: 'Meal Reminders',
+      description: 'Meal, water, and supplement reminders',
+    },
+    {
+      key: 'healthTracking',
+      icon: 'fitness',
+      title: 'Health Tracking',
+      description: 'Water, sleep, steps, and calorie target alerts',
+    },
+    {
+      key: 'missedActivity',
+      icon: 'alert-circle',
+      title: 'Missed Activity',
+      description: 'Alerts for workouts or logs you missed',
+    },
+    {
+      key: 'motivationalQuotes',
+      icon: 'sparkles',
+      title: 'Motivational Quotes',
+      description: 'Hourly FitFaat motivation notifications',
+    },
+  ];
+
+  const coachingRows: Array<{
+    key: NotificationToggleKey;
+    icon: string;
+    title: string;
+    description: string;
+  }> = [
+    {
+      key: 'chatMessages',
+      icon: 'chatbubbles',
+      title: 'Chat Messages',
+      description: 'Notifications for new appointment chat messages',
+    },
+    {
+      key: 'trainerMessages',
+      icon: 'person',
+      title: 'Trainer Messages',
+      description: 'New feedback from trainers, doctors, or coaches',
+    },
+    {
+      key: 'dietPlanUpdates',
+      icon: 'nutrition',
+      title: 'Diet Plan Updates',
+      description: 'New or changed meal plans',
+    },
+    {
+      key: 'workoutPlanUpdates',
+      icon: 'walk',
+      title: 'Workout Plan Updates',
+      description: 'New exercises and workout schedule changes',
+    },
+    {
+      key: 'goalProgress',
+      icon: 'trophy',
+      title: 'Goal Progress',
+      description: 'Weight, calories, streak, and milestone updates',
+    },
+  ];
+
+  const accountRows: Array<{
+    key: NotificationToggleKey;
+    icon: string;
+    title: string;
+    description: string;
+  }> = [
+    {
+      key: 'bookingUpdates',
+      icon: 'checkmark-circle',
+      title: 'Booking Updates',
+      description: 'Appointment confirmations, changes, and cancellations',
+    },
+    {
+      key: 'subscriptionAlerts',
+      icon: 'card',
+      title: 'Subscription Alerts',
+      description: 'Payment, renewal, and premium status updates',
+    },
+    {
+      key: 'communityActivity',
+      icon: 'people',
+      title: 'Community Activity',
+      description: 'Likes, comments, follows, and invites',
+    },
+    {
+      key: 'challengeUpdates',
+      icon: 'flame',
+      title: 'Challenges and Streaks',
+      description: 'Challenge reminders and leaderboard updates',
+    },
+    {
+      key: 'securityAlerts',
+      icon: 'shield-checkmark',
+      title: 'Security Alerts',
+      description: 'Login, password, and OTP updates',
+    },
+    {
+      key: 'adminAnnouncements',
+      icon: 'megaphone',
+      title: 'Announcements',
+      description: 'Maintenance, offers, and app updates',
+    },
+    {
+      key: 'newsUpdates',
+      icon: 'newspaper',
+      title: 'News Updates',
+      description: 'Health news and article notifications',
+    },
+  ];
+
   const renderSettingRow = (
     icon: string,
     title: string,
@@ -135,38 +297,57 @@ export default function NotificationSettingsScreen() {
                 Tap to enable notifications for reminders and updates
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+            <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
           </TouchableOpacity>
         )}
 
-        {/* Individual Notification Settings */}
         <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
-          NOTIFICATION TYPES
+          REMINDERS
         </Text>
 
-        {renderSettingRow(
-          "calendar",
-          "Appointment Reminders",
-          "Get reminded before your appointments",
-          notificationSettings.appointmentReminders,
-          (value) => handleToggle('appointmentReminders', value)
-        )}
+        {reminderRows.map((row) => (
+          <React.Fragment key={row.key}>
+            {renderSettingRow(
+              row.icon,
+              row.title,
+              row.description,
+              notificationSettings[row.key],
+              (value) => handleToggle(row.key, value)
+            )}
+          </React.Fragment>
+        ))}
 
-        {renderSettingRow(
-          "chatbubbles",
-          "Chat Messages",
-          "Notifications for new messages from doctors",
-          notificationSettings.chatMessages,
-          (value) => handleToggle('chatMessages', value)
-        )}
+        <Text style={[styles.sectionTitle, { color: colors.textSecondary, marginTop: hp(3) }]}>
+          COACHING & PLANS
+        </Text>
 
-        {renderSettingRow(
-          "newspaper",
-          "News Updates",
-          "Health news and article notifications",
-          notificationSettings.newsUpdates,
-          (value) => handleToggle('newsUpdates', value)
-        )}
+        {coachingRows.map((row) => (
+          <React.Fragment key={row.key}>
+            {renderSettingRow(
+              row.icon,
+              row.title,
+              row.description,
+              notificationSettings[row.key],
+              (value) => handleToggle(row.key, value)
+            )}
+          </React.Fragment>
+        ))}
+
+        <Text style={[styles.sectionTitle, { color: colors.textSecondary, marginTop: hp(3) }]}>
+          ACCOUNT & UPDATES
+        </Text>
+
+        {accountRows.map((row) => (
+          <React.Fragment key={row.key}>
+            {renderSettingRow(
+              row.icon,
+              row.title,
+              row.description,
+              notificationSettings[row.key],
+              (value) => handleToggle(row.key, value)
+            )}
+          </React.Fragment>
+        ))}
 
         {/* Reminder Time Setting */}
         <Text style={[styles.sectionTitle, { color: colors.textSecondary, marginTop: hp(3) }]}>
@@ -191,7 +372,7 @@ export default function NotificationSettingsScreen() {
               </Text>
             </View>
           </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+          <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
         </TouchableOpacity>
 
         {/* Badge and Clear Section */}
@@ -217,6 +398,16 @@ export default function NotificationSettingsScreen() {
             <Text style={styles.badgeText}>{badgeCount}</Text>
           </View>
         </View>
+
+        <TouchableOpacity 
+          style={[styles.testButton, { backgroundColor: colors.primary }]}
+          onPress={handleSendTestNotification}
+        >
+          <Ionicons name="notifications" size={22} color={colors.textOnPrimary} />
+          <Text style={[styles.testButtonText, { color: colors.textOnPrimary }]}>
+            Send Test Notification
+          </Text>
+        </TouchableOpacity>
 
         <TouchableOpacity 
           style={[styles.clearButton, { backgroundColor: colors.cardBackground }]}
@@ -275,7 +466,7 @@ const styles = StyleSheet.create({
     marginTop: hp(2),
     marginBottom: hp(1),
     marginLeft: wp(2),
-    letterSpacing: 0.5,
+    letterSpacing: 0,
   },
   settingRow: {
     flexDirection: 'row',
@@ -332,6 +523,20 @@ const styles = StyleSheet.create({
   clearButtonText: {
     fontSize: wp(3.8),
     fontWeight: '500',
+    marginLeft: wp(2),
+  },
+  testButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: wp(4),
+    borderRadius: 12,
+    marginTop: hp(1),
+    marginBottom: hp(1),
+  },
+  testButtonText: {
+    fontSize: wp(3.8),
+    fontWeight: '600',
     marginLeft: wp(2),
   },
   infoSection: {

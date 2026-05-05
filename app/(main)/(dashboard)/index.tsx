@@ -3,10 +3,12 @@ import NewsModalPopup from "@/components/NewsModalPopup";
 import PatientDietPlanViewer from "@/components/PatientDietPlanViewer";
 import StreakDisplay from "@/components/StreakDisplay";
 import { useNews } from "@/contexts/NewsContext";
+import { useNotifications } from "@/contexts/NotificationContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import useStreak from "@/hooks/useStreak";
 import { dailyLogsApi } from "@/utils/dailyLogsApi";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
+import { scheduleAdaptiveNutritionNotifications, type NutritionGoalSummary } from "@/utils/nutritionProfile";
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from "expo-router";
@@ -61,17 +63,74 @@ const checkLocalStorage = async () => {
   }
 };
 
+const parseDashboardDate = (date?: string) => {
+  if (!date) return null;
+  const parsed = new Date(date);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const startOfLocalDay = (date: Date) => {
+  const nextDate = new Date(date);
+  nextDate.setHours(0, 0, 0, 0);
+  return nextDate;
+};
+
+const toGoalSummary = (day: Day): NutritionGoalSummary => ({
+  dayLogId: day._id,
+  dayNo: day.dayNo,
+  date: day.date,
+  achievedCalories: day.achievedCalories,
+  targetCalories: day.targetCalories,
+  achievedHydration: day.achieviedHydration,
+  targetHydration: day.targetHydration,
+});
+
+const getAdaptiveNutritionSummary = (data: jsonResponse): NutritionGoalSummary | null => {
+  const today = startOfLocalDay(new Date());
+  const days = Object.values(data)
+    .filter((day) => day.status !== 'locked' && Number(day.targetCalories) > 0)
+    .sort((a, b) => {
+      const aDate = parseDashboardDate(a.date);
+      const bDate = parseDashboardDate(b.date);
+      const aTime = aDate ? startOfLocalDay(aDate).getTime() : a.dayNo;
+      const bTime = bDate ? startOfLocalDay(bDate).getTime() : b.dayNo;
+      return bTime - aTime;
+    });
+
+  const currentOverTargetDay = days.find((day) => {
+    const dayDate = parseDashboardDate(day.date);
+    const isToday = dayDate
+      ? startOfLocalDay(dayDate).getTime() === today.getTime()
+      : day.status === 'active';
+
+    return isToday && Number(day.achievedCalories) > Number(day.targetCalories) * 1.05;
+  });
+
+  if (currentOverTargetDay) {
+    return toGoalSummary(currentOverTargetDay);
+  }
+
+  const latestPastDay = days.find((day) => {
+    const dayDate = parseDashboardDate(day.date);
+    return dayDate ? startOfLocalDay(dayDate).getTime() < today.getTime() : false;
+  });
+
+  return latestPastDay ? toGoalSummary(latestPastDay) : null;
+};
+
 
 //Main Component
 export default function DayPlan () {
   const router = useRouter();
   const { colors } = useTheme();
   const { news, unreadCount, markNewsAsRead } = useNews();
+  const { scheduleFitFaatNotification, cancelScheduledNotification } = useNotifications();
   const [JsonResponse, setJsonResponse] = useState<null|jsonResponse>(null);
   const [showNewsModal, setShowNewsModal] = useState(false);
   const [showDietPlanViewer, setShowDietPlanViewer] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const hasCheckedForNewCycle = useRef(false);
+  const adaptiveNutritionSignature = useRef<string | null>(null);
   
   // Fetch streak data
   const { streak, loading: streakLoading, refetchStreak } = useStreak(userId);
@@ -144,6 +203,27 @@ export default function DayPlan () {
       refetchStreak();
     }
   }, [JsonResponse, userId]);
+
+  useEffect(() => {
+    if (!JsonResponse) return;
+
+    const summary = getAdaptiveNutritionSummary(JsonResponse);
+    if (!summary) return;
+
+    const signature = JSON.stringify(summary);
+    if (adaptiveNutritionSignature.current === signature) return;
+
+    adaptiveNutritionSignature.current = signature;
+
+    scheduleAdaptiveNutritionNotifications({
+      summary,
+      schedule: scheduleFitFaatNotification,
+      cancel: cancelScheduledNotification,
+    }).catch((error) => {
+      console.error('Error scheduling adaptive nutrition notifications:', error);
+      adaptiveNutritionSignature.current = null;
+    });
+  }, [JsonResponse, scheduleFitFaatNotification, cancelScheduledNotification]);
 
   // Check and create new cycle if needed
   const checkAndCreateNewCycle = async () => {
@@ -317,7 +397,7 @@ export default function DayPlan () {
       <View style={[styles.content, { backgroundColor: colors.screenColor }]}>
         <ScrollView 
           style={styles.list}
-          contentContainerStyle={{ paddingBottom: hp(15), paddingTop: hp(1.5) }}
+          contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false} 
           showsHorizontalScrollIndicator={false}
           scrollEventThrottle={16}
@@ -340,6 +420,7 @@ export default function DayPlan () {
               <Days key={index} props={dayData} onDayPress={navigateToDayDetails}/>
             ))
           }
+          <View style={styles.dietButtonClearance} />
         </ScrollView>
 
         <TouchableOpacity
@@ -366,6 +447,13 @@ const styles = StyleSheet.create({
   list: {
     flex: 1,
     width: "100%",
+  },
+  listContent: {
+    paddingBottom: hp(15),
+    paddingTop: hp(1.5),
+  },
+  dietButtonClearance: {
+    height: hp(5),
   },
   floatingButton: {
     position: 'absolute',

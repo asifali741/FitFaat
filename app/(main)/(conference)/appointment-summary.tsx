@@ -1,4 +1,5 @@
 import { theme } from "@/constants/theme";
+import { useNotifications } from "@/contexts/NotificationContext";
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAppointmentBooking } from "@/hooks/useAppointmentBooking";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
@@ -6,7 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Modal, Platform, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getBackendBaseUrl } from '@/utils/config';
@@ -17,6 +18,7 @@ export default function AppointmentSummaryScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { bookAppointment, isLoading, error } = useAppointmentBooking();
+  const { scheduleAppointmentReminder, scheduleVideoCallReminder, sendBookingUpdateNotification } = useNotifications();
   const [isConfirming, setIsConfirming] = useState(false);
   const [showResultModal, setShowResultModal] = useState(false);
   const [showLimitModal, setShowLimitModal] = useState(false);
@@ -41,6 +43,32 @@ export default function AppointmentSummaryScreen() {
 
   const [isCallReady, setIsCallReady] = useState(false);
   const [bookedAppointmentId, setBookedAppointmentId] = useState<string | null>(null);
+
+  const getAppointmentDateTime = () => {
+    if (!date || !time || typeof date !== 'string' || typeof time !== 'string') {
+      return null;
+    }
+
+    const appointmentDate = new Date(date);
+    if (Number.isNaN(appointmentDate.getTime())) {
+      return null;
+    }
+
+    const timeParts = time.match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (!timeParts) {
+      return appointmentDate;
+    }
+
+    let hours = parseInt(timeParts[1], 10);
+    const minutes = parseInt(timeParts[2], 10);
+    const period = timeParts[3].toUpperCase();
+
+    if (period === 'PM' && hours !== 12) hours += 12;
+    if (period === 'AM' && hours === 12) hours = 0;
+
+    appointmentDate.setHours(hours, minutes, 0, 0);
+    return appointmentDate;
+  };
 
   // Check appointment limit on mount
   useEffect(() => {
@@ -98,10 +126,31 @@ export default function AppointmentSummaryScreen() {
 
       if (response.success) {
         // Store the real appointment ID from backend for video call
-        if (response.appointmentId || response.appointment?._id) {
-          setBookedAppointmentId(response.appointmentId || response.appointment?._id);
+        const appointmentId = response.appointmentId || response.appointment?._id;
+        if (appointmentId) {
+          setBookedAppointmentId(appointmentId);
           setIsCallReady(true);
         }
+
+        const appointmentDateTime = getAppointmentDateTime();
+        if (appointmentId && appointmentDateTime) {
+          await scheduleAppointmentReminder(
+            appointmentId,
+            appointmentDateTime,
+            doctorName || 'your doctor'
+          );
+          await scheduleVideoCallReminder(
+            appointmentId,
+            appointmentDateTime,
+            doctorName || 'your doctor'
+          );
+        }
+
+        await sendBookingUpdateNotification(
+          'Appointment Booked',
+          `Your appointment${doctorName ? ` with ${doctorName}` : ''} is confirmed for ${time}.`,
+          appointmentId
+        );
         
         setBookingResult({
           success: true,
@@ -145,163 +194,168 @@ export default function AppointmentSummaryScreen() {
 
   if (!doctorId || !date || !time) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Missing appointment details</Text>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} />
+        <View style={styles.container}>
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>Missing appointment details</Text>
+          </View>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.replace("/(main)/(conference)")} style={styles.backButton}>
-          <Ionicons name="home" size={24} color={colors.surface} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Appointment Confirmed</Text>
-        <View style={styles.spacer} />
-      </View>
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Success Icon */}
-        <View style={styles.successContainer}>
-          <View style={styles.successIconCircle}>
-            <Ionicons name="checkmark-circle" size={80} color={colors.success} />
-          </View>
-          <Text style={styles.successTitle}>Please Confirm Your Appointment!</Text>
-          <Text style={styles.successSubtitle}>Get a best Consultation Experience</Text>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} />
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.replace("/(main)/(conference)")} style={styles.backButton}>
+            <Ionicons name="home" size={24} color={colors.textOnPrimary} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Appointment Confirmed</Text>
+          <View style={styles.spacer} />
         </View>
 
-        {/* Appointment Summary */}
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Appointment Summary</Text>
-
-          <View style={styles.summaryRow}>
-            <View style={styles.summaryIconContainer}>
-              <Ionicons name="person" size={20} color={colors.primary} />
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Success Icon */}
+          <View style={styles.successContainer}>
+            <View style={styles.successIconCircle}>
+              <Ionicons name="checkmark-circle" size={80} color={colors.success} />
             </View>
-            <View style={styles.summaryTextContainer}>
-              <Text style={styles.summaryLabel}>Doctor</Text>
-              <Text style={styles.summaryValue}>{doctorName}</Text>
-              <Text style={styles.summarySubValue}>{specialty}</Text>
+            <Text style={styles.successTitle}>Please Confirm Your Appointment!</Text>
+            <Text style={styles.successSubtitle}>Get a best Consultation Experience</Text>
+          </View>
+
+          {/* Appointment Summary */}
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryTitle}>Appointment Summary</Text>
+
+            <View style={styles.summaryRow}>
+              <View style={styles.summaryIconContainer}>
+                <Ionicons name="person" size={20} color={colors.primary} />
+              </View>
+              <View style={styles.summaryTextContainer}>
+                <Text style={styles.summaryLabel}>Doctor</Text>
+                <Text style={styles.summaryValue}>{doctorName}</Text>
+                <Text style={styles.summarySubValue}>{specialty}</Text>
+              </View>
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.summaryRow}>
+              <View style={styles.summaryIconContainer}>
+                <Ionicons name="calendar" size={20} color={colors.info} />
+              </View>
+              <View style={styles.summaryTextContainer}>
+                <Text style={styles.summaryLabel}>Date</Text>
+                <Text style={styles.summaryValue}>
+                  {date && typeof date === 'string' ? (
+                    (() => {
+                      try {
+                        const parsedDate = new Date(date);
+                        return isNaN(parsedDate.getTime())
+                          ? date
+                          : parsedDate.toLocaleDateString("en-GB", {
+                              day: "2-digit",
+                              month: "long",
+                              year: "numeric"
+                            });
+                      } catch (error) {
+                        return date;
+                      }
+                    })()
+                  ) : 'N/A'}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.summaryRow}>
+              <View style={styles.summaryIconContainer}>
+                <Ionicons name="time" size={20} color={colors.warning} />
+              </View>
+              <View style={styles.summaryTextContainer}>
+                <Text style={styles.summaryLabel}>Time</Text>
+                <Text style={styles.summaryValue}>{time}</Text>
+              </View>
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.summaryRow}>
+              <View style={styles.summaryIconContainer}>
+                <Ionicons name="document-text" size={20} color={colors.secondary} />
+              </View>
+              <View style={styles.summaryTextContainer}>
+                <Text style={styles.summaryLabel}>Your Concern</Text>
+                <Text style={styles.summaryValue}>{problem}</Text>
+              </View>
             </View>
           </View>
 
-          <View style={styles.divider} />
+          {/* Start Call Button */}
+          <TouchableOpacity
+            style={[styles.callButton, !isCallReady && styles.callButtonDisabled]}
+            disabled={!isCallReady}
+            onPress={() => {
+              if (isCallReady && bookedAppointmentId) {
+                router.push({
+                  pathname: "/(main)/(conference)/video-call" as any,
+                  params: {
+                    callId: bookedAppointmentId,
+                    appointmentId: bookedAppointmentId,
+                    userName: doctorName || "Doctor",
+                  }
+                });
+              }
+            }}
+          >
+            <Ionicons
+              name="videocam"
+              size={24}
+              color={isCallReady ? colors.surface : colors.textTertiary}
+            />
+            <Text style={[styles.callButtonText, !isCallReady && styles.callButtonTextDisabled]}>
+              {isCallReady ? "Start Video Call" : "Start Call (Not Ready)"}
+            </Text>
+          </TouchableOpacity>
 
-          <View style={styles.summaryRow}>
-            <View style={styles.summaryIconContainer}>
-              <Ionicons name="calendar" size={20} color={colors.info} />
+          {/* Confirm Appointment Button */}
+          <TouchableOpacity
+            style={[styles.confirmButton, (isConfirming || isLoading) && styles.confirmButtonDisabled]}
+            disabled={isConfirming || isLoading}
+            onPress={handleConfirmAppointment}
+          >
+            {isConfirming || isLoading ? (
+              <>
+                <ActivityIndicator color={colors.surface} />
+                <Text style={styles.confirmButtonText}>Booking...</Text>
+              </>
+            ) : (
+              <>
+                <Ionicons name="checkmark-circle" size={20} color={colors.surface} />
+                <Text style={styles.confirmButtonText}>Confirm Appointment</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          {error && (
+            <View style={styles.errorAlert}>
+              <Ionicons name="alert-circle" size={20} color={colors.error} />
+              <Text style={styles.errorAlertText}>{error}</Text>
             </View>
-            <View style={styles.summaryTextContainer}>
-              <Text style={styles.summaryLabel}>Date</Text>
-              <Text style={styles.summaryValue}>
-                {date && typeof date === 'string' ? (
-                  (() => {
-                    try {
-                      const parsedDate = new Date(date);
-                      return isNaN(parsedDate.getTime()) 
-                        ? date 
-                        : parsedDate.toLocaleDateString("en-GB", {
-                            day: "2-digit",
-                            month: "long",
-                            year: "numeric"
-                          });
-                    } catch (error) {
-                      return date;
-                    }
-                  })()
-                ) : 'N/A'}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.summaryRow}>
-            <View style={styles.summaryIconContainer}>
-              <Ionicons name="time" size={20} color={colors.warning} />
-            </View>
-            <View style={styles.summaryTextContainer}>
-              <Text style={styles.summaryLabel}>Time</Text>
-              <Text style={styles.summaryValue}>{time}</Text>
-            </View>
-          </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.summaryRow}>
-            <View style={styles.summaryIconContainer}>
-              <Ionicons name="document-text" size={20} color={colors.secondary} />
-            </View>
-            <View style={styles.summaryTextContainer}>
-              <Text style={styles.summaryLabel}>Your Concern</Text>
-              <Text style={styles.summaryValue}>{problem}</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Start Call Button */}
-        <TouchableOpacity 
-          style={[styles.callButton, !isCallReady && styles.callButtonDisabled]}
-          disabled={!isCallReady}
-          onPress={() => {
-            if (isCallReady && bookedAppointmentId) {
-              router.push({
-                pathname: "/(main)/(conference)/video-call" as any,
-                params: {
-                  callId: bookedAppointmentId,
-                  appointmentId: bookedAppointmentId,
-                  userName: doctorName || "Doctor",
-                }
-              });
-            }
-          }}
-        >
-          <Ionicons 
-            name="videocam" 
-            size={24} 
-            color={isCallReady ? colors.surface : colors.textTertiary} 
-          />
-          <Text style={[styles.callButtonText, !isCallReady && styles.callButtonTextDisabled]}>
-            {isCallReady ? "Start Video Call" : "Start Call (Not Ready)"}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Confirm Appointment Button */}
-        <TouchableOpacity 
-          style={[styles.confirmButton, (isConfirming || isLoading) && styles.confirmButtonDisabled]}
-          disabled={isConfirming || isLoading}
-          onPress={handleConfirmAppointment}
-        >
-          {isConfirming || isLoading ? (
-            <>
-              <ActivityIndicator color={colors.surface} />
-              <Text style={styles.confirmButtonText}>Booking...</Text>
-            </>
-          ) : (
-            <>
-              <Ionicons name="checkmark-circle" size={20} color={colors.surface} />
-              <Text style={styles.confirmButtonText}>Confirm Appointment</Text>
-            </>
           )}
-        </TouchableOpacity>
 
-        {error && (
-          <View style={styles.errorAlert}>
-            <Ionicons name="alert-circle" size={20} color={colors.error} />
-            <Text style={styles.errorAlertText}>{error}</Text>
-          </View>
-        )}
-
-        <TouchableOpacity 
-          style={styles.homeButton}
-          onPress={() => router.replace("/(main)/(conference)")}
-        >
-          <Text style={styles.homeButtonText}>Back to Conference</Text>
-        </TouchableOpacity>
-      </ScrollView>
+          <TouchableOpacity
+            style={styles.homeButton}
+            onPress={() => router.replace("/(main)/(conference)")}
+          >
+            <Text style={styles.homeButtonText}>Back to Conference</Text>
+          </TouchableOpacity>
+        </ScrollView>
 
       {/* Booking Result Modal */}
       <Modal
@@ -438,11 +492,16 @@ export default function AppointmentSummaryScreen() {
           </View>
         </View>
       </Modal>
+      </View>
     </SafeAreaView>
   );
 }
 
 const getStyles = (colors: any) => StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.screenColor,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.primary,
@@ -460,7 +519,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   headerTitle: {
     fontSize: hp(2.2),
     fontWeight: theme.typography.fontWeight.bold as any,
-    color: colors.surface,
+    color: colors.textOnPrimary,
     flex: 1,
     textAlign: "center",
   },
@@ -469,9 +528,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: colors.background,
-    borderTopLeftRadius: theme.borderRadius.xl,
-    borderTopRightRadius: theme.borderRadius.xl,
+    backgroundColor: colors.screenColor,
     paddingTop: hp(3),
     paddingHorizontal: wp(6),
   },
@@ -591,7 +648,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     borderRadius: theme.borderRadius.xl,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: hp(3),
+    marginBottom: hp(8),
   },
   homeButtonText: {
     color: colors.primary,

@@ -1,4 +1,5 @@
 import AppHeader from "@/components/AppHeader";
+import { useNotifications } from "@/contexts/NotificationContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
@@ -37,6 +38,7 @@ export default function PremiumScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const { confirmPayment } = useStripe();
+  const { sendSubscriptionAlert } = useNotifications();
   const cardFieldRef = useRef(null);
 
   // Get correct API URL based on platform
@@ -260,6 +262,10 @@ export default function PremiumScreen() {
       setCardDetails(null);
       setUseNewCard(false);
       await fetchPaymentMethods();
+      await sendSubscriptionAlert(
+        'Premium Activated',
+        'Your FitFaat Premium membership is active.'
+      );
 
       Alert.alert(
         "Success! 🎉",
@@ -310,6 +316,10 @@ export default function PremiumScreen() {
               const data = await response.json();
               if (data.success) {
                 setIsPremium(false);
+                await sendSubscriptionAlert(
+                  'Premium Cancelled',
+                  'Your FitFaat Premium subscription has been cancelled.'
+                );
                 Alert.alert("Cancelled", "Premium subscription has been cancelled");
               } else {
                 Alert.alert("Error", data.message);
@@ -527,7 +537,7 @@ export default function PremiumScreen() {
                       <Text style={styles.upgradeButtonText}>Upgrade to Premium</Text>
                       <Text style={styles.upgradeButtonSubtext}>Get exclusive benefits</Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={24} color="white" />
+                    <Ionicons name="chevron-forward" size={24} color="#FFFFFF" />
                   </View>
                 )}
               </TouchableOpacity>

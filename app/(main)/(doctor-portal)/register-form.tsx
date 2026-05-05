@@ -171,7 +171,7 @@ export default function DoctorRegistrationForm() {
           <Ionicons
             name={expandedSection === 'personal' ? 'chevron-up' : 'chevron-down'}
             size={24}
-            color={colors.textSecondary}
+            color="#FFFFFF"
           />
         </TouchableOpacity>
 
@@ -258,7 +258,7 @@ export default function DoctorRegistrationForm() {
           <Ionicons
             name={expandedSection === 'professional' ? 'chevron-up' : 'chevron-down'}
             size={24}
-            color={colors.textSecondary}
+            color="#FFFFFF"
           />
         </TouchableOpacity>
 
@@ -354,7 +354,7 @@ export default function DoctorRegistrationForm() {
           <Ionicons
             name={expandedSection === 'job' ? 'chevron-up' : 'chevron-down'}
             size={24}
-            color={colors.textSecondary}
+            color="#FFFFFF"
           />
         </TouchableOpacity>
 

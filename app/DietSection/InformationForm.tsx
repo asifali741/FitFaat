@@ -469,7 +469,7 @@ export default function Index() {
                 <Text style={{ color: colors.textOnPrimary, fontSize: hp(1.8), fontWeight: "700" }}>
                   Complete Setup
                 </Text>
-                <Ionicons name="arrow-forward" size={hp(2.2)} color={colors.textOnPrimary} />
+                <Ionicons name="arrow-forward" size={hp(2.2)} color="#FFFFFF" />
               </>
             )}
           </TouchableOpacity>

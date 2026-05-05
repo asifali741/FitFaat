@@ -138,7 +138,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   scrollContent: {
     paddingTop: hp(4),
     paddingHorizontal: wp(6),
-    paddingBottom: hp(12),
+    paddingBottom: hp(16),
   },
   welcomeSection: {
     alignItems: "center",

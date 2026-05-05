@@ -58,7 +58,7 @@ export default function CustomDropdown({
         <Ionicons
           name={isOpen ? "chevron-up" : "chevron-down"}
           size={20}
-          color={colors.textSecondary}
+          color="#FFFFFF"
         />
       </TouchableOpacity>
 

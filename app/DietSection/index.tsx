@@ -127,7 +127,7 @@ export default function Index() {
             <Text style={screenStyles.getStartedButtonText}>
               Get Started with Diet Plan
             </Text>
-            <Ionicons name="arrow-forward" size={hp(2.2)} color={colors.textOnPrimary} />
+            <Ionicons name="arrow-forward" size={hp(2.2)} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
 

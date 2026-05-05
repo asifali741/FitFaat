@@ -259,7 +259,7 @@ export default function PatientManagementScreen() {
             <Ionicons name="cash" size={16} color={colors.success} />
             <Text style={styles.feeText}>Rs {item.price}</Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+          <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
         </View>
       </TouchableOpacity>
     );

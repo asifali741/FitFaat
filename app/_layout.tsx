@@ -8,6 +8,7 @@ LogBox.ignoreLogs([
 ]);
 
 import SafeScreen from "@/components/SafeScreen";
+import { NotificationProvider } from "@/contexts/NotificationContext";
 import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
 import { authApi } from "@/utils/auth/authApi";
 import { StripeProvider } from "@stripe/stripe-react-native";
@@ -23,9 +24,11 @@ export default function RootLayout() {
   return (
     <StripeProvider publishableKey={stripePublishableKey}>
       <ThemeProvider>
-        <SafeAreaProvider>
-          <ThemedApp />
-        </SafeAreaProvider>
+        <NotificationProvider>
+          <SafeAreaProvider>
+            <ThemedApp />
+          </SafeAreaProvider>
+        </NotificationProvider>
       </ThemeProvider>
     </StripeProvider>
   );

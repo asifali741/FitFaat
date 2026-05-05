@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { getBackendBaseUrl } from '@/utils/config';
+import { useNotifications } from '@/contexts/NotificationContext';
 
 interface NewsItem {
   _id: string;
@@ -33,12 +34,14 @@ const NewsContext = createContext<NewsContextType | undefined>(undefined);
 const STORAGE_KEY = 'fitfaat_read_news';
 
 export const NewsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { sendFitFaatNotification } = useNotifications();
   const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [readNewsIds, setReadNewsIds] = useState<Set<string>>(new Set());
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const previousIdsRef = useRef<Set<string>>(new Set());
+  const hasLoadedOnceRef = useRef(false);
 
   const API_BASE_URL = getBackendBaseUrl();
 
@@ -87,10 +90,11 @@ export const NewsProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const newsList = response.data?.data || [];
 
-      // Find newly added items
-      const newlyAdded = newsList.filter(
-        (item: NewsItem) => !previousIdsRef.current.has(item._id || item.id || '')
-      );
+      const newlyAdded = hasLoadedOnceRef.current
+        ? newsList.filter(
+            (item: NewsItem) => !previousIdsRef.current.has(item._id || item.id || '')
+          )
+        : [];
 
       // Update tracking
       const currentIds: Set<string> = new Set(
@@ -98,6 +102,20 @@ export const NewsProvider: React.FC<{ children: React.ReactNode }> = ({ children
       );
       previousIdsRef.current = currentIds;
       setNews(newsList);
+
+      if (newlyAdded.length > 0) {
+        const latestItem = newlyAdded[0];
+        sendFitFaatNotification(
+          'news',
+          'New Health Update',
+          latestItem.title,
+          { newsId: latestItem._id || latestItem.id }
+        ).catch((notificationError) => {
+          console.error('Error sending news notification:', notificationError);
+        });
+      }
+
+      hasLoadedOnceRef.current = true;
     } catch (err) {
       const message = axios.isAxiosError(err) ? err.message : 'Failed to fetch';
       setError(message);

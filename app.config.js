@@ -7,6 +7,10 @@ export default {
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/images/fitfaat-icon.png",
+    notification: {
+      icon: "./assets/images/fitfaat-notification-icon.png",
+      color: "#023c69",
+    },
     scheme: "fitfaat",
     userInterfaceStyle: "automatic",
     newArchEnabled: true, // Required by the installed react-native-reanimated version
@@ -30,6 +34,9 @@ export default {
         "android.permission.ACCESS_WIFI_STATE",
         "android.permission.ACCESS_NETWORK_STATE",
         "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
       ],
     },
 
@@ -41,6 +48,14 @@ export default {
 
     plugins: [
       "expo-router",
+      [
+        "expo-notifications",
+        {
+          icon: "./assets/images/fitfaat-notification-icon.png",
+          color: "#023c69",
+          defaultChannel: "default",
+        },
+      ],
       [
         "expo-splash-screen",
         {
@@ -67,10 +82,8 @@ export default {
             usesCleartextTraffic: true,
             // 🔴 CRITICAL: MultiDex required for Zego (exceeds 64K method limit)
             multiDexEnabled: true,
-            // Zego requires minimum SDK 21
-            minSdkVersion: 21,
-            // Zego needs specific compiler options
-            kotlinVersion: "1.9.0",
+            // expo-av requires Android SDK 24+.
+            minSdkVersion: 24,
             extraProguardRules: `
 # Zego ProGuard rules
 -keep class com.zegocloud.** { *; }

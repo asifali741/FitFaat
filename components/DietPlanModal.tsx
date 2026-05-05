@@ -1,4 +1,5 @@
 import { useTheme } from '@/contexts/ThemeContext';
+import { useNotifications } from '@/contexts/NotificationContext';
 import { tokenStorage } from '@/utils/auth/tokenStorage';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
@@ -82,6 +83,7 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
   setLoading
 }) => {
   const { colors } = useTheme();
+  const { sendDietPlanUpdateNotification } = useNotifications();
   const styles = getStyles(colors);
   const [selectedDay, setSelectedDay] = useState('monday');
   const [selectedMealType, setSelectedMealType] = useState('breakfast');
@@ -426,6 +428,11 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
       
       if (data.success) {
         const message = isEditing ? 'Diet plan updated successfully!' : 'Diet plan created successfully!';
+        await sendDietPlanUpdateNotification(
+          isEditing ? 'Diet Plan Updated' : 'New Diet Plan',
+          `${planTitle || 'Diet plan'} is ready for ${patientName || 'your patient'}.`,
+          data.dietPlan?._id || editingPlanId || undefined
+        );
         Alert.alert('Success', message, [
           { text: 'OK', onPress: () => {
             resetForm();
@@ -493,7 +500,7 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
         <View style={styles.container}>
           <View style={styles.header}>
             <TouchableOpacity onPress={() => setShowFoodSelector(false)}>
-              <Ionicons name="arrow-back" size={Math.min(hp(3), wp(6.4))} color={colors.textPrimary} />
+              <Ionicons name="arrow-back" size={Math.min(hp(3), wp(6.4))} color="#FFFFFF" />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Select Food for {selectedMealType}</Text>
             <View style={{ width: wp(6.4) }} />

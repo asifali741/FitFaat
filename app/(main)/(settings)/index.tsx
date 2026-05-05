@@ -48,7 +48,7 @@ export default function Settings() {
           "Contact Support",
           "Get help from our support team.",
           [
-            { text: "Email Support", onPress: () => Linking.openURL('mailto:support@fitfaat.com') },
+            { text: "Email Support", onPress: () => Linking.openURL('mailto:fitfaatpro@gmail.com') },
             { text: "Live Chat", onPress: () => console.log("Open live chat") },
             { text: "Cancel", style: "cancel" }
           ]
@@ -180,7 +180,7 @@ export default function Settings() {
       </View>
       <View style={styles.settingRight}>
         {rightComponent || (showArrow && (
-          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+          <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
         ))}
       </View>
     </TouchableOpacity>
@@ -201,7 +201,10 @@ export default function Settings() {
 
         {/* Main Content */}
         <View style={[styles.content, { backgroundColor: colors.screenColor }]}>
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+          >
           {/* Account Section */}
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Account</Text>
@@ -285,7 +288,7 @@ export default function Settings() {
             <SettingItem
               icon="chatbubble-outline"
               title="Contact Support"
-              subtitle="Reach out to our support team"
+              subtitle="fitfaatpro@gmail.com"
               onPress={() => handleSettingPress("Contact Support")}
             />
             <SettingItem
@@ -336,7 +339,7 @@ export default function Settings() {
             </TouchableOpacity>
         </View>
 
-          <View style={{ height: hp(4) }} />
+          <View style={{ height: hp(12) }} />
           </ScrollView>
         </View>
       </View>
@@ -353,6 +356,9 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: hp(4),
   },
   section: {
     marginTop: hp(2),

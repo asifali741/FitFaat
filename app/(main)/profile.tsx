@@ -7,12 +7,12 @@ import Constants from "expo-constants";
 import { useRouter, useFocusEffect } from "expo-router";
 import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Image, Modal, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Image, Linking, Modal, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import {
     heightPercentageToDP as hp,
     widthPercentageToDP as wp,
 } from "react-native-responsive-screen";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { theme } from "@/constants/theme";
 import { useTheme } from "@/contexts/ThemeContext";
 import { getBackendBaseUrl } from '@/utils/config';
@@ -20,6 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { streakApi } from '@/utils/streakApi';
 import { exerciseApi } from '@/utils/exerciseApi';
 import { dailyLogsApi } from '@/utils/dailyLogsApi';
+import { getGmailProfileImageUrl, resolveBackendImageUrl } from '@/utils/profileImage';
 
 const ENV = Constants.expoConfig?.extra;
 
@@ -143,6 +144,46 @@ const readNumber = (...values: any[]) => {
   return 0;
 };
 
+const readOptionalNumber = (...values: any[]) => {
+  for (const value of values) {
+    if (value === null || value === undefined || value === '') continue;
+    const numberValue = Number(value);
+    if (Number.isFinite(numberValue) && numberValue > 0) return numberValue;
+  }
+  return undefined;
+};
+
+const getMetricSources = (userData: any): any[] => {
+  const roots = Array.isArray(userData) ? userData : [userData];
+
+  return roots.flatMap(source => [
+    source?.userInfo,
+    source?.data?.userInfo,
+    source?.data?.user,
+    source?.user?.userInfo,
+    source?.user,
+    source?.profile,
+    source?.bmiSummary,
+    source?.healthMetrics,
+    source,
+  ]).filter(Boolean);
+};
+
+const readMetric = (sources: any[], keys: string[]) => (
+  readOptionalNumber(...sources.flatMap(source => keys.map(key => source?.[key])))
+);
+
+const normalizeHeightCm = (height?: number) => {
+  if (!height) return undefined;
+  return height < 10 ? height * 30.48 : height;
+};
+
+const formatMetric = (value: number | undefined, unit: string) => {
+  if (!value) return '--';
+  const rounded = Math.round(value * 10) / 10;
+  return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)} ${unit}`;
+};
+
 const getHealthDays = (payload: any): any[] => {
   const source = payload?.data || payload;
   if (!source) return [];
@@ -154,13 +195,13 @@ const getHealthDays = (payload: any): any[] => {
 
 const buildHealthRecordSummary = (payload: any, userData: any): HealthRecordSummary => {
   const days = getHealthDays(payload);
-  const userInfo = userData?.userInfo || userData || {};
+  const metricSources = getMetricSources(userData);
 
   return {
-    height: readNumber(userInfo.height),
-    weight: readNumber(userInfo.weight),
-    goalCalories: readNumber(userInfo.goalCalories, userInfo.targetCalories),
-    hydrationGoal: readNumber(userInfo.hydrationGoal, userInfo.targetHydration),
+    height: normalizeHeightCm(readMetric(metricSources, ['height', 'heightCm', 'heightInCm'])),
+    weight: readMetric(metricSources, ['weight', 'weightKg', 'currentWeight']),
+    goalCalories: readNumber(...metricSources.flatMap(source => [source.goalCalories, source.targetCalories])),
+    hydrationGoal: readNumber(...metricSources.flatMap(source => [source.hydrationGoal, source.targetHydration])),
     completedDays: days.filter((day: any) => ['finished', 'completed'].includes(day?.status)).length,
     activeDays: days.filter((day: any) => day?.status === 'active').length,
     totalCalories: days.reduce((sum, day: any) => sum + readNumber(day?.achievedCalories, day?.achieviedCalories), 0),
@@ -262,10 +303,12 @@ const buildAchievements = ({
 export default function ProfileScreen() {
   const { colors, isDarkMode } = useTheme();
   const styles = getStyles(colors);
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const [selectedTab, setSelectedTab] = useState('overview');
   const [user, setUser] = useState<any>(null);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const [gmailImageUrl, setGmailImageUrl] = useState<string | null>(null);
   const [workoutsCount, setWorkoutsCount] = useState(0);
   const [favoritesCount, setFavoritesCount] = useState(0);
   const [daysActive, setDaysActive] = useState(0);
@@ -278,17 +321,50 @@ export default function ProfileScreen() {
   const [healthRecordsLoading, setHealthRecordsLoading] = useState(false);
   const displayName = getStoredDisplayName(user);
   const displayEmail = user?.email || 'user@example.com';
-  const displayImageUrl = profileImageUrl;
+  const displayImageUrl = gmailImageUrl || profileImageUrl;
+  const handleProfileImageError = () => {
+    if (displayImageUrl === gmailImageUrl) {
+      setGmailImageUrl(null);
+    } else {
+      setProfileImageUrl(null);
+    }
+  };
 
   useEffect(() => {
     const loadUser = async () => {
       try {
         const userData = await tokenStorage.getUser();
         setUser(userData);
+        const storedGmailImageUrl = getGmailProfileImageUrl(userData);
+        setGmailImageUrl(storedGmailImageUrl);
         
         // Fetch profile image from backend
         const token = await SecureStore.getItemAsync('fitfaat_auth_token');
         if (token) {
+          try {
+            const profileResponse = await fetch(`${API_URL}/api/user/profile`, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            });
+
+            if (profileResponse.ok) {
+              const profileData = await profileResponse.json();
+              const backendUser = profileData?.data?.user || profileData?.user;
+              const backendGmailImageUrl = getGmailProfileImageUrl(backendUser || profileData);
+
+              if (backendUser) {
+                setUser({ ...(userData || {}), ...backendUser });
+              }
+
+              setGmailImageUrl(backendGmailImageUrl || storedGmailImageUrl);
+            }
+          } catch {
+            console.log('No Gmail profile image found in backend profile');
+          }
+
           try {
             const response = await fetch(`${API_URL}/api/user/profile-picture`, {
               method: 'GET',
@@ -300,10 +376,13 @@ export default function ProfileScreen() {
 
             const data = await response.json();
             if (data.success && data.data.imageUrl) {
-              setProfileImageUrl(`${API_URL}${data.data.imageUrl}`);
+              setProfileImageUrl(resolveBackendImageUrl(API_URL, data.data.imageUrl));
+            } else {
+              setProfileImageUrl(null);
             }
           } catch {
             console.log('No profile picture found, using default');
+            setProfileImageUrl(null);
           }
         }
       } catch (error) {
@@ -321,11 +400,24 @@ export default function ProfileScreen() {
       const loadHealthRecords = async (userData: any) => {
         setHealthRecordsLoading(true);
         try {
+          const metricSources = [userData];
+          const storedMetrics = await AsyncStorage.getItem('fitfaat_health_metrics');
+          if (storedMetrics) {
+            metricSources.push(JSON.parse(storedMetrics));
+          }
+
+          try {
+            const onboardingStatus = await authApi.getOnboardingStatus();
+            metricSources.push(onboardingStatus);
+          } catch {
+            // Existing stored profile data is enough when this lightweight refresh is unavailable.
+          }
+
           const storedRecords = await AsyncStorage.getItem('JsonResponse');
           if (storedRecords) {
             const parsedRecords = JSON.parse(storedRecords);
             if (isActive) {
-              setHealthRecords(buildHealthRecordSummary(parsedRecords, userData));
+              setHealthRecords(buildHealthRecordSummary(parsedRecords, metricSources));
             }
             return;
           }
@@ -334,13 +426,13 @@ export default function ProfileScreen() {
           if (weeklyTrackingId) {
             const progress = await dailyLogsApi.getWeeklyProgress(weeklyTrackingId);
             if (isActive) {
-              setHealthRecords(buildHealthRecordSummary(progress, userData));
+              setHealthRecords(buildHealthRecordSummary(progress, metricSources));
             }
             return;
           }
 
           if (isActive) {
-            setHealthRecords(buildHealthRecordSummary(null, userData));
+            setHealthRecords(buildHealthRecordSummary(null, metricSources));
           }
         } catch (error) {
           console.log('Error loading health records:', error);
@@ -441,7 +533,15 @@ export default function ProfileScreen() {
   const activeAppointments = profileAppointments
     .filter(apt => normalizeStatus(apt.status) === 'confirmed')
     .slice(0, 2);
-  
+  const hasProfileAppointments = upcomingAppointments.length > 0 || activeAppointments.length > 0;
+  const appointmentsSectionStyle = [
+    styles.appointmentsSection,
+    { marginBottom: insets.bottom + hp(2) },
+  ];
+  const achievementsSectionStyle = [
+    styles.achievementsSection,
+    { marginBottom: insets.bottom + hp(2) },
+  ];
 
   const achievements = buildAchievements({
     appointments: profileAppointments,
@@ -463,11 +563,23 @@ export default function ProfileScreen() {
     healthScore: healthScore,
   };
 
+  const openEmergencyContact = async () => {
+    const whatsappNumber = '923325563373';
+    const whatsappUrl = `whatsapp://send?phone=${whatsappNumber}`;
+    const fallbackUrl = `https://wa.me/${whatsappNumber}`;
+
+    try {
+      await Linking.openURL(whatsappUrl);
+    } catch {
+      await Linking.openURL(fallbackUrl);
+    }
+  };
+
   const quickActions = [
     { title: "Book Appointment", iconName: "calendar", color: colors.primary, action: () => router.push('/(main)/(conference)') },
     { title: "Chat History", iconName: "chatbubbles", color: colors.info, action: () => router.push('/(main)/(chatbot)/chat-history') },
     { title: "Health Records", iconName: "clipboard", color: colors.secondary, action: () => setShowHealthRecords(true) },
-    { title: "Emergency Contact", iconName: "alert-circle", color: colors.error, action: () => console.log("Emergency Contact") },
+    { title: "Emergency Contact", iconName: "alert-circle", color: colors.error, action: openEmergencyContact },
   ];
 
   return (
@@ -489,6 +601,7 @@ export default function ProfileScreen() {
         {/* Profile Picture Section */}
         <View style={{
           alignItems: 'center',
+          marginTop: hp(1),
           marginBottom: hp(4),
         }}>
           <View style={{
@@ -505,18 +618,28 @@ export default function ProfileScreen() {
             elevation: 5,
             marginBottom: hp(2),
           }}>
-            <Image 
-              source={
-                displayImageUrl
-                  ? { uri: displayImageUrl }
-                  : require("../../assets/images/Default_Profile.png")
-              }
-              style={{
+            {displayImageUrl ? (
+              <Image
+                source={{ uri: displayImageUrl }}
+                style={{
+                  width: hp(12),
+                  height: hp(12),
+                  borderRadius: hp(6),
+                }}
+                onError={handleProfileImageError}
+              />
+            ) : (
+              <View style={{
                 width: hp(12),
                 height: hp(12),
                 borderRadius: hp(6),
-              }}
-            />
+                backgroundColor: colors.primary + '20',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}>
+                <Ionicons name="person" size={hp(6.5)} color={colors.textSecondary} />
+              </View>
+            )}
           </View>
           
           <Text style={{
@@ -680,7 +803,7 @@ export default function ProfileScreen() {
         )}
 
         {selectedTab === 'achievements' && (
-          <View style={styles.achievementsSection}>
+          <View style={achievementsSectionStyle}>
             <Text style={styles.sectionTitle}>Achievements & Badges</Text>
             <View style={styles.achievementsGrid}>
               {achievements.map((achievement) => (
@@ -717,8 +840,8 @@ export default function ProfileScreen() {
         )}
 
         {/* Appointments Section */}
-        {(upcomingAppointments.length > 0 || activeAppointments.length > 0) && (
-          <View style={styles.appointmentsSection}>
+        {selectedTab === 'history' && hasProfileAppointments && (
+          <View style={appointmentsSectionStyle}>
             <Text style={styles.sectionTitle}>My Appointments</Text>
             
             {/* Active Appointments */}
@@ -854,12 +977,12 @@ export default function ProfileScreen() {
               <ScrollView showsVerticalScrollIndicator={false}>
                 <View style={styles.recordsGrid}>
                   <View style={styles.recordCard}>
-                    <Text style={styles.recordValue}>{healthRecords?.weight || '--'}</Text>
-                    <Text style={styles.recordLabel}>Weight kg</Text>
+                    <Text style={styles.recordValue}>{formatMetric(healthRecords?.weight, 'kg')}</Text>
+                    <Text style={styles.recordLabel}>Weight</Text>
                   </View>
                   <View style={styles.recordCard}>
-                    <Text style={styles.recordValue}>{healthRecords?.height || '--'}</Text>
-                    <Text style={styles.recordLabel}>Height cm</Text>
+                    <Text style={styles.recordValue}>{formatMetric(healthRecords?.height, 'cm')}</Text>
+                    <Text style={styles.recordLabel}>Height</Text>
                   </View>
                   <View style={styles.recordCard}>
                     <Text style={styles.recordValue}>{healthRecords?.completedDays || 0}</Text>
@@ -1070,6 +1193,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    paddingBottom: hp(2),
   },
   quickActionCard: {
     width: '48%',
@@ -1095,10 +1219,10 @@ const getStyles = (colors: any) => StyleSheet.create({
   // History Styles
   historySection: {
     marginHorizontal: wp(5),
-    marginBottom: hp(3),
+    marginBottom: hp(0.5),
   },
   historyCategory: {
-    marginBottom: hp(3),
+    marginBottom: hp(0.5),
   },
   historyCategoryTitle: {
     fontSize: hp(1.8),
@@ -1327,7 +1451,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   recordCard: {
     width: '48%',
-    backgroundColor: colors.background,
+    backgroundColor: colors.primarySoft,
     borderRadius: hp(1.6),
     paddingVertical: hp(1.8),
     paddingHorizontal: wp(3),
@@ -1348,7 +1472,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     textAlign: 'center',
   },
   recordSummaryCard: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.primarySoft,
     borderRadius: hp(1.6),
     padding: hp(2),
     marginTop: hp(0.5),

@@ -132,7 +132,7 @@ export default function NewsScreen() {
               </Text>
             )}
           </View>
-          <Ionicons name="chevron-forward" size={Math.min(hp(2.5), wp(5.4))} color={colors.textSecondary} />
+          <Ionicons name="chevron-forward" size={Math.min(hp(2.5), wp(5.4))} color="#FFFFFF" />
         </View>
       </View>
     </TouchableOpacity>

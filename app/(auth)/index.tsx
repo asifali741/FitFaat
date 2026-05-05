@@ -9,6 +9,7 @@ import {
   widthPercentageToDP as wp,
   heightPercentageToDP as hp,
 } from "react-native-responsive-screen";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const FULL_TEXT =
   "Your complete fitness companion with personalized diet plans, AI chatbot support, expert video consultations, and structured workouts - all in one app.";
@@ -17,6 +18,7 @@ export default function Index() {
   const router = useRouter();
   const { colors, isDarkMode } = useTheme();
   const [visibleText, setVisibleText] = useState("");
+  const insets = useSafeAreaInsets();
   const [fontsLoaded] = useFonts({
     Pacifico: require("../../assets/fonts/Pacifico-Regular.ttf"),
     LoraItalic: require("../../assets/fonts/static/Lora-Italic.ttf"),
@@ -24,7 +26,7 @@ export default function Index() {
   });
 
   const iRef = useRef(0); // <-- useRef to persist value
-  const styles = getStyles(colors, isDarkMode);
+  const styles = getStyles(colors, isDarkMode, insets.top, insets.bottom);
 
   // Auth navigation is handled in _layout.tsx AuthGate
 
@@ -71,12 +73,12 @@ export default function Index() {
             source={require("../../assets/images/salad.jpg")}
             style={styles.bannerImage}
           />
-          <View style={styles.overlay} />
         </LinearGradient>
         
         <View style={styles.contentContainer}>
           <View style={styles.mainHeading}>
-            <Text style={styles.mainHeadingText}>Welcome To</Text>
+            <Text style={[styles.mainHeadingText, styles.headingWordGap]}>Welcome</Text>
+            <Text style={[styles.mainHeadingText, styles.headingLogoGap]}>To</Text>
             <Image
               source={headingLogoSource}
               style={styles.logoStyle}
@@ -111,12 +113,18 @@ export default function Index() {
             <Text style={styles.signupButtonText}>Create New Account</Text>
           </TouchableOpacity>
         </View>
+
+        <View style={styles.footerContainer}>
+          <Text style={styles.footerText}>
+            {"\u00A9"} 2026 FitFaat. Built with passion for fitness.
+          </Text>
+        </View>
       </ScrollView>
     </View>
   );
 }
 
-const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
+const getStyles = (colors: any, isDarkMode: boolean, topInset: number, bottomInset: number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.screenColor,
@@ -126,6 +134,7 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
+    paddingTop: topInset,
   },
   heroSection: {
     width: wp(100),
@@ -134,20 +143,13 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
     maxHeight: 400,
     position: 'relative',
     overflow: 'hidden',
+    borderBottomLeftRadius: hp(3),
+    borderBottomRightRadius: hp(3),
   },
   bannerImage: {
     width: '100%',
     height: '100%',
     resizeMode: "cover",
-    opacity: 0.9,
-  },
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.7)' : 'rgba(240, 249, 255, 0.6)',
   },
   contentContainer: {
     paddingHorizontal: wp(6),
@@ -165,10 +167,15 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
     fontFamily: "Pacifico",
     color: colors.textPrimary,
   },
+  headingWordGap: {
+    marginRight: wp(1.1),
+  },
+  headingLogoGap: {
+    marginRight: -wp(0.6),
+  },
   logoStyle: {
     width: Math.min(wp(24), 112),
     height: Math.min(hp(8), 82),
-    marginLeft: wp(2),
   },
   paragraphText: {
     textAlign: "center",
@@ -179,8 +186,22 @@ const getStyles = (colors: any, isDarkMode: boolean) => StyleSheet.create({
   },
   buttonContainer: {
     paddingHorizontal: wp(6),
-    paddingBottom: hp(4),
+    paddingBottom: hp(2),
     paddingTop: hp(2),
+  },
+  footerContainer: {
+    marginTop: 'auto',
+    alignItems: 'center',
+    paddingHorizontal: wp(6),
+    paddingTop: hp(1),
+    paddingBottom: Math.max(bottomInset + hp(1), hp(2.5)),
+  },
+  footerText: {
+    color: colors.textSecondary,
+    fontSize: Math.min(hp(1.45), 13),
+    lineHeight: Math.min(hp(2.1), 19),
+    textAlign: 'center',
+    includeFontPadding: false,
   },
   googleButton: {
     flexDirection: "row",

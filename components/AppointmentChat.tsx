@@ -2,6 +2,7 @@ import BackButton from '@/components/BackButton';
 import DietPlanModal from '@/components/DietPlanModal';
 import VideoCallButton from '@/components/VideoCallButton';
 import { theme } from '@/constants/theme';
+import { useNotifications } from '@/contexts/NotificationContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { tokenStorage } from '@/utils/auth/tokenStorage';
 import { Ionicons } from '@expo/vector-icons';
@@ -60,6 +61,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
   const { colors } = useTheme();
   const styles = getStyles(colors);
   const router = useRouter();
+  const { sendFitFaatNotification } = useNotifications();
   const insets = useSafeAreaInsets();
   
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -168,7 +170,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
     useCallback(() => {
       if (Platform.OS !== 'android') return;
 
-      SystemUI.setBackgroundColorAsync(colors.primary).catch(() => {});
+      SystemUI.setBackgroundColorAsync('#FFFFFF').catch(() => {});
 
       return () => {
         SystemUI.setBackgroundColorAsync(colors.screenColor).catch(() => {});
@@ -419,6 +421,22 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
             console.log('⚠️ Duplicate message detected, skipping');
             return prev;
           }
+
+          if (message.senderRole !== accessData.userRole) {
+            sendFitFaatNotification(
+              'chat',
+              `Message from ${message.senderName || otherUserName || 'FitFaat'}`,
+              message.message,
+              {
+                appointmentId,
+                chatId: appointmentId,
+                doctorId: accessData.appointment?.doctorId,
+                patientId: accessData.appointment?.patientId,
+              }
+            ).catch((error) => {
+              console.error('Failed to show chat notification:', error);
+            });
+          }
           
           const newMessages = [...prev, message];
           console.log('✅ Adding message to state. New count:', newMessages.length);
@@ -593,6 +611,20 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
       socketRef.current.emit('send-message', {
         appointmentId,
         message: messageText
+      });
+
+      sendFitFaatNotification(
+        'chat',
+        'Message Sent',
+        `Your message to ${otherUserName || 'the chat'} was sent.`,
+        {
+          appointmentId,
+          chatId: appointmentId,
+          doctorId: appointmentData?.doctorId,
+          patientId: appointmentData?.patientId,
+        }
+      ).catch((error) => {
+        console.error('Failed to show sent-message notification:', error);
       });
       
       setSending(false);
@@ -1061,7 +1093,10 @@ const getStyles = (colors: any) => StyleSheet.create({
     ...theme.shadows.large
   },
   backButton: {
-    padding: theme.spacing.sm,
+    width: Math.min(hp(5.4), wp(11.7)),
+    height: Math.min(hp(5.4), wp(11.7)),
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: theme.spacing.sm
   },
   headerCenter: {
@@ -1071,20 +1106,23 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   profileImageContainer: {
     marginRight: wp(3.7),
-    marginTop: hp(1.6),
     backgroundColor: colors.cardBackground,
-    borderRadius: wp(6.7),
-    padding: wp(0.8),
+    width: Math.min(hp(6.7), wp(14.5)),
+    height: Math.min(hp(6.7), wp(14.5)),
+    borderRadius: Math.min(hp(3.35), wp(7.25)),
+    justifyContent: 'center',
+    alignItems: 'center',
     ...theme.shadows.small
   },
   headerInfo: {
-    flex: 1
+    flex: 1,
+    justifyContent: 'center'
   },
   headerName: {
     fontSize: Math.min(hp(2.3), wp(5.1)),
     fontWeight: theme.typography.fontWeight.bold as any,
     color: colors.textOnPrimary,
-    marginBottom: hp(0.5)
+    includeFontPadding: false
   },
   timerContainer: {
     flexDirection: 'row',
@@ -1102,7 +1140,10 @@ const getStyles = (colors: any) => StyleSheet.create({
     marginLeft: wp(1.3)
   },
   infoButton: {
-    padding: theme.spacing.sm
+    width: Math.min(hp(5.4), wp(11.7)),
+    height: Math.min(hp(5.4), wp(11.7)),
+    justifyContent: 'center',
+    alignItems: 'center'
   },
   messagesList: {
     padding: theme.spacing.lg,
@@ -1220,7 +1261,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   inputContainer: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     padding: wp(3.7),
     paddingHorizontal: theme.spacing.lg,
     backgroundColor: colors.cardBackground,
@@ -1229,11 +1270,11 @@ const getStyles = (colors: any) => StyleSheet.create({
     ...theme.shadows.medium
   },
   androidNavigationBarBackground: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.screenColor,
   },
   input: {
     flex: 1,
-    minHeight: hp(5.4),
+    minHeight: Math.min(hp(5.7), wp(12.3)),
     maxHeight: hp(12.3),
     backgroundColor: colors.backgroundHeader,
     borderRadius: wp(6.4),

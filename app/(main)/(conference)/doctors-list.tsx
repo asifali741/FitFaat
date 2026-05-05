@@ -4,7 +4,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getDoctorsByDate } from "./_doctorsData";
@@ -24,62 +24,69 @@ export default function DoctorsListScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <BackButton style={styles.backButton} testID="doctorslist-back" />
-        <Text style={styles.headerTitle}>Consultants Available</Text>
-        <View style={styles.spacer} />
-      </View>
-
-      <View style={styles.content}>
-        <View style={styles.dateInfoContainer}>
-          <Ionicons name="calendar" size={20} color={colors.primary} />
-          <Text style={styles.dateInfo}>
-            {new Date(date).toLocaleDateString("en-GB", {
-              day: "2-digit",
-              month: "long",
-              year: "numeric"
-            })}
-          </Text>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} />
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <BackButton style={styles.backButton} testID="doctorslist-back" />
+          <Text style={styles.headerTitle}>Consultants Available</Text>
+          <View style={styles.spacer} />
         </View>
 
-        <Text style={styles.sectionTitle}>Consultants Available on this Date:</Text>
+        <View style={styles.content}>
+          <View style={styles.dateInfoContainer}>
+            <Ionicons name="calendar" size={20} color={colors.primary} />
+            <Text style={styles.dateInfo}>
+              {new Date(date).toLocaleDateString("en-GB", {
+                day: "2-digit",
+                month: "long",
+                year: "numeric"
+              })}
+            </Text>
+          </View>
 
-        <ScrollView 
-          style={styles.doctorsList}
-          showsVerticalScrollIndicator={false}
-        >
-          {doctors.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="calendar-outline" size={60} color={colors.textSecondary} />
-              <Text style={styles.emptyText}>No consultants available on this date</Text>
-              <Text style={styles.emptySubtext}>Please select a different date</Text>
-            </View>
-          ) : (
-            doctors.map((doctor) => (
-              <TouchableOpacity
-                key={doctor.id}
-                style={styles.doctorCard}
-                onPress={() => handleDoctorSelect(doctor.id)}
-              >
-                <View style={styles.avatarContainer}>
-                  <Ionicons name="person-circle" size={50} color={colors.primary} />
-                </View>
-                <View style={styles.doctorInfo}>
-                  <Text style={styles.doctorName}>{doctor.name}</Text>
-                  <Text style={styles.doctorEmail}>{doctor.email}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={24} color={colors.textSecondary} />
-              </TouchableOpacity>
-            ))
-          )}
-        </ScrollView>
+          <Text style={styles.sectionTitle}>Consultants Available on this Date:</Text>
+
+          <ScrollView
+            style={styles.doctorsList}
+            showsVerticalScrollIndicator={false}
+          >
+            {doctors.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="calendar-outline" size={60} color={colors.textSecondary} />
+                <Text style={styles.emptyText}>No consultants available on this date</Text>
+                <Text style={styles.emptySubtext}>Please select a different date</Text>
+              </View>
+            ) : (
+              doctors.map((doctor) => (
+                <TouchableOpacity
+                  key={doctor.id}
+                  style={styles.doctorCard}
+                  onPress={() => handleDoctorSelect(doctor.id)}
+                >
+                  <View style={styles.avatarContainer}>
+                    <Ionicons name="person-circle" size={50} color={colors.primary} />
+                  </View>
+                  <View style={styles.doctorInfo}>
+                    <Text style={styles.doctorName}>{doctor.name}</Text>
+                    <Text style={styles.doctorEmail}>{doctor.email}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={24} color="#FFFFFF" />
+                </TouchableOpacity>
+              ))
+            )}
+          </ScrollView>
+        </View>
       </View>
     </SafeAreaView>
   );
 }
 
 const getStyles = (colors: any) => StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.screenColor,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.primary,
