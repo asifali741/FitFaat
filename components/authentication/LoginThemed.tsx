@@ -10,7 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import {
   heightPercentageToDP as hp,
   widthPercentageToDP as wp,
@@ -77,6 +77,12 @@ export default function LoginThemed() {
         end={{ x: 1, y: 1 }}
         style={styles.headerGradient}
       >
+        <Image
+          source={require('../../assets/images/sal1.jpg')}
+          style={styles.headerImage}
+          resizeMode="cover"
+        />
+        <View style={styles.headerImageOverlay} />
         <View style={styles.decorativeHeader}>
           <View style={[styles.circle, styles.circle1]} />
           <View style={[styles.circle, styles.circle2]} />
@@ -171,6 +177,16 @@ const getStyles = (colors: any) => StyleSheet.create({
     height: hp(27),
     position: 'relative',
     overflow: 'hidden',
+  },
+  headerImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+  },
+  headerImageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.primary,
+    opacity: 0.18,
   },
   decorativeHeader: {
     position: 'absolute',
@@ -269,6 +285,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: theme.spacing.md,
+    marginBottom: hp(2),
   },
   footerText: {
     fontSize: theme.typography.fontSize.base,
