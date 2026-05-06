@@ -47,6 +47,15 @@ export default function AuthLayout() {
           focus: () => console.log('Signup screen focused'),
         }}
       />
+      <Stack.Screen
+        name="forgot-password"
+        options={{
+          headerShown: true,
+          title: 'Forgot Password',
+          headerTintColor: '#007AFF',
+          headerBackTitle: 'Back',
+        }}
+      />
     </Stack>
   );
 }

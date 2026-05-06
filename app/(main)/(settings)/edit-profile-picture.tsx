@@ -1,5 +1,6 @@
 import AppHeader from "@/components/AppHeader";
 import { useTheme } from "@/contexts/ThemeContext";
+import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import * as ImagePicker from 'expo-image-picker';
@@ -39,6 +40,7 @@ export default function EditProfilePicture() {
   const [isLoading, setIsLoading] = useState(true);
   const [userName, setUserName] = useState<string>("");
   const [userEmail, setUserEmail] = useState<string>("");
+  const [hasPendingImageChange, setHasPendingImageChange] = useState(false);
 
   useEffect(() => {
     loadUserData();
@@ -71,6 +73,7 @@ export default function EditProfilePicture() {
           if (data.success && data.data.imageUrl) {
             const imageUrl = `${API_URL}${data.data.imageUrl}`;
             setSelectedImage(imageUrl);
+            setHasPendingImageChange(false);
           }
         } catch (error) {
           console.log('No profile picture found, using default');
@@ -107,6 +110,7 @@ export default function EditProfilePicture() {
 
     if (!result.canceled) {
       setSelectedImage(result.assets[0].uri);
+      setHasPendingImageChange(true);
     }
   };
 
@@ -122,6 +126,7 @@ export default function EditProfilePicture() {
 
     if (!result.canceled) {
       setSelectedImage(result.assets[0].uri);
+      setHasPendingImageChange(true);
     }
   };
 
@@ -154,6 +159,16 @@ export default function EditProfilePicture() {
                   console.error('Failed to delete from server:', data.message);
                 }
               }
+
+              const storedUser = await tokenStorage.getUser();
+              if (storedUser) {
+                await tokenStorage.saveUser({
+                  ...storedUser,
+                  profileImage: null,
+                  profileImageUrl: null,
+                });
+              }
+              setHasPendingImageChange(false);
               
               Alert.alert("Success", "Profile picture removed");
             } catch (error) {
@@ -202,6 +217,17 @@ export default function EditProfilePicture() {
       const data = await response.json();
 
       if (data.success) {
+        const imageUrl = data.data?.imageUrl ? `${API_URL}${data.data.imageUrl}` : selectedImage;
+        const storedUser = await tokenStorage.getUser();
+        if (storedUser) {
+          await tokenStorage.saveUser({
+            ...storedUser,
+            profileImage: data.data?.profileImage || null,
+            profileImageUrl: data.data?.imageUrl || null,
+          });
+        }
+        setSelectedImage(imageUrl);
+        setHasPendingImageChange(false);
         Alert.alert(
           "Success", 
           "Profile picture uploaded successfully!",
@@ -337,7 +363,7 @@ export default function EditProfilePicture() {
           </View>
 
           {/* Upload Button */}
-          {selectedImage && (
+          {selectedImage && hasPendingImageChange && (
             <TouchableOpacity 
               style={[styles.uploadButton, { backgroundColor: colors.primary }, isUploading && styles.uploadButtonDisabled]}
               onPress={uploadImage}

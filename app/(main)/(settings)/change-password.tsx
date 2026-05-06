@@ -1,7 +1,10 @@
 import AppHeader from "@/components/AppHeader";
 import { useTheme } from "@/contexts/ThemeContext";
+import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from "expo-constants";
+import { useRouter } from "expo-router";
 import * as SecureStore from 'expo-secure-store';
 import React, { useState } from "react";
 import {
@@ -33,6 +36,7 @@ const API_URL = getAPIURL();
 
 export default function ChangePassword() {
   const { colors } = useTheme();
+  const router = useRouter();
   
   const [formData, setFormData] = useState({
     currentPassword: "",
@@ -127,13 +131,14 @@ export default function ChangePassword() {
           [{
             text: "OK",
             onPress: async () => {
-              await SecureStore.deleteItemAsync('fitfaat_auth_token');
-              await SecureStore.deleteItemAsync('fitfaat_user');
+              await tokenStorage.clearAll();
+              await AsyncStorage.removeItem('weeklyTrackingId');
               setFormData({
                 currentPassword: "",
                 newPassword: "",
                 confirmPassword: "",
               });
+              router.replace('/(auth)/email-login');
             }
           }]
         );
@@ -145,6 +150,24 @@ export default function ChangePassword() {
     } finally {
       setIsChanging(false);
     }
+  };
+
+  const handleForgotCurrentPassword = () => {
+    Alert.alert(
+      "Reset Password",
+      "You will be signed out so you can reset your password using your email.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Continue",
+          onPress: async () => {
+            await tokenStorage.clearAll();
+            await AsyncStorage.removeItem('weeklyTrackingId');
+            router.replace('/forgot-password');
+          }
+        }
+      ]
+    );
   };
 
   const getPasswordStrengthColor = () => {
@@ -387,7 +410,7 @@ export default function ChangePassword() {
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.forgotButton}>
+            <TouchableOpacity style={styles.forgotButton} onPress={handleForgotCurrentPassword}>
               <Text style={styles.forgotButtonText}>Forgot your current password?</Text>
             </TouchableOpacity>
 

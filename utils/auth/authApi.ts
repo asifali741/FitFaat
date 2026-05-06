@@ -132,9 +132,39 @@ export const authApi = {
     }
   },
 
+  // Send forgot-password OTP to email
+  requestPasswordResetOTP: async (email: string) => {
+    try {
+      const response = await api.post('/auth/forgot-password/send-otp', { email });
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Reset password with OTP
+  resetPassword: async (data: { email: string; otp: string; newPassword: string }) => {
+    try {
+      const response = await api.post('/auth/forgot-password/reset', data);
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || error.message;
+    }
+  },
+
   // Logout user
   logout: async () => {
     await tokenStorage.clearAll();
+  },
+
+  // Permanently delete current user account
+  deleteAccount: async () => {
+    try {
+      const response = await api.delete('/user/account');
+      return response.data;
+    } catch (error: any) {
+      throw error.response?.data || error.message;
+    }
   },
 
   // Check if user is authenticated
