@@ -2,8 +2,10 @@ import AppHeader from "@/components/AppHeader";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
+import * as NavigationBar from 'expo-navigation-bar';
 import * as SecureStore from 'expo-secure-store';
-import React, { useState } from "react";
+import { StatusBar } from 'expo-status-bar';
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -54,6 +56,15 @@ export default function ChangePassword() {
   
   const [isChanging, setIsChanging] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
+
+  useEffect(() => {
+    // Set Android navigation bar to white
+    if (Platform.OS === 'android') {
+      NavigationBar.setBackgroundColorAsync('#FFFFFF').catch(() => {});
+      NavigationBar.setButtonStyleAsync('dark').catch(() => {});
+      NavigationBar.setStyle('light');
+    }
+  }, []);
 
   const checkPasswordStrength = (password: string) => {
     let strength = 0;
@@ -164,6 +175,7 @@ export default function ChangePassword() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
       <AppHeader 
         title="Change Password"
         showStepIndicator={false}
@@ -402,13 +414,11 @@ export default function ChangePassword() {
 const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.screenColor || '#FFFFFF',
   },
   content: {
     flex: 1,
     backgroundColor: colors.screenColor,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
   },
   authBadgeContainer: {
     alignItems: 'center',

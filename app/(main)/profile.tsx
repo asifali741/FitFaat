@@ -1,6 +1,16 @@
 import AppHeader from "@/components/AppHeader";
 import { ScreenSceneWrapper } from "@/components/common/ScreenTiltAnimation";
+import {
+  calculateAchievementBadges,
+  type AchievementBadge,
+  type AchievementLocalStats,
+} from "@/constants/achievementBadges";
 import { authApi } from "@/utils/auth/authApi";
+import {
+  applyAdaptiveGoalsToDays,
+  loadAdaptiveGoalCarryForward,
+  type AdaptiveGoalCarryForward,
+} from "@/utils/adaptiveGoals";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
@@ -13,14 +23,15 @@ import {
     widthPercentageToDP as wp,
 } from "react-native-responsive-screen";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { theme } from "@/constants/theme";
 import { useTheme } from "@/contexts/ThemeContext";
 import { getBackendBaseUrl } from '@/utils/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { streakApi } from '@/utils/streakApi';
 import { exerciseApi } from '@/utils/exerciseApi';
 import { dailyLogsApi } from '@/utils/dailyLogsApi';
+import { loadAchievementLocalStats } from '@/utils/achievementStorage';
 import { getGmailProfileImageUrl, resolveBackendImageUrl } from '@/utils/profileImage';
+import { profileImageEvents } from '@/utils/profileImageEvents';
 
 const ENV = Constants.expoConfig?.extra;
 
@@ -43,6 +54,29 @@ const getStoredDisplayName = (storedUser: any) => (
   'User'
 );
 
+// --- Streak Logic from Dashboard ---
+const computeProfileStreak = (data: any) => {
+  if (!data) return 0;
+  const allDaysSorted = Object.values(data)
+    .filter((day): day is any => Boolean(day && typeof day === 'object' && (day as any).status))
+    .sort((a: any, b: any) => (a.dayNo || 0) - (b.dayNo || 0));
+  
+  let currentStreak = 0;
+  for (let i = allDaysSorted.length - 1; i >= 0; i--) {
+    const day: any = allDaysSorted[i];
+    if (day.status === 'finished' || day.status === 'completed') {
+      currentStreak++;
+    } else if (day.status === 'active') {
+      const hasProgress = Number(day.achievedCalories) > 0 || Number(day.achieviedHydration) > 0 || Number(day.achievedHydration) > 0;
+      if (hasProgress) currentStreak++;
+      continue;
+    } else {
+      break;
+    }
+  }
+  return currentStreak;
+};
+// -----------------------------------
 type HealthRecordSummary = {
   height?: number;
   weight?: number;
@@ -55,15 +89,6 @@ type HealthRecordSummary = {
   totalHydration: number;
   targetHydration: number;
   days: any[];
-};
-
-type ProfileAchievement = {
-  id: string;
-  title: string;
-  iconName: string;
-  description: string;
-  earned: boolean;
-  progress: string;
 };
 
 const getAppointmentId = (appointment: any) => (
@@ -184,17 +209,25 @@ const formatMetric = (value: number | undefined, unit: string) => {
   return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)} ${unit}`;
 };
 
-const getHealthDays = (payload: any): any[] => {
+const getHealthDays = (payload: any, carryForward?: AdaptiveGoalCarryForward | null): any[] => {
   const source = payload?.data || payload;
   if (!source) return [];
-  if (Array.isArray(source)) return source;
-  if (Array.isArray(source.dailyLogs)) return source.dailyLogs;
+  if (Array.isArray(source)) return applyAdaptiveGoalsToDays(source, undefined, carryForward);
+  if (Array.isArray(source.dailyLogs)) return applyAdaptiveGoalsToDays(source.dailyLogs, undefined, carryForward);
 
-  return Object.values(source).filter((entry: any) => entry && typeof entry === 'object');
+  const sourceDays = Object.values(source).filter(
+    (entry: any) => entry && typeof entry === 'object'
+  ) as any[];
+
+  return applyAdaptiveGoalsToDays(sourceDays, undefined, carryForward);
 };
 
-const buildHealthRecordSummary = (payload: any, userData: any): HealthRecordSummary => {
-  const days = getHealthDays(payload);
+const buildHealthRecordSummary = (
+  payload: any,
+  userData: any,
+  carryForward?: AdaptiveGoalCarryForward | null
+): HealthRecordSummary => {
+  const days = getHealthDays(payload, carryForward);
   const metricSources = getMetricSources(userData);
 
   return {
@@ -212,94 +245,6 @@ const buildHealthRecordSummary = (payload: any, userData: any): HealthRecordSumm
   };
 };
 
-const buildAchievements = ({
-  appointments,
-  workoutsCount,
-  favoritesCount,
-  daysActive,
-  healthScore,
-  healthRecords,
-}: {
-  appointments: any[];
-  workoutsCount: number;
-  favoritesCount: number;
-  daysActive: number;
-  healthScore: number;
-  healthRecords: HealthRecordSummary | null;
-}): ProfileAchievement[] => {
-  const completedCount = appointments.filter(appointment => normalizeStatus(appointment.status) === 'completed').length;
-  const totalAppointments = appointments.length;
-  const completedHealthDays = healthRecords?.completedDays || 0;
-
-  const targets = [
-    {
-      id: 'first-consultation',
-      title: 'First Consultation',
-      iconName: 'medkit',
-      description: 'Complete your first doctor consultation',
-      current: completedCount,
-      target: 1,
-    },
-    {
-      id: 'health-explorer',
-      title: 'Health Explorer',
-      iconName: 'search',
-      description: 'Book 5 appointments',
-      current: totalAppointments,
-      target: 5,
-    },
-    {
-      id: 'workout-starter',
-      title: 'Workout Starter',
-      iconName: 'barbell',
-      description: 'Complete your first workout',
-      current: workoutsCount,
-      target: 1,
-    },
-    {
-      id: 'streak-builder',
-      title: 'Streak Builder',
-      iconName: 'flame',
-      description: 'Stay active for 7 days',
-      current: daysActive,
-      target: 7,
-    },
-    {
-      id: 'collector',
-      title: 'Exercise Collector',
-      iconName: 'heart',
-      description: 'Save 5 favorite exercises',
-      current: favoritesCount,
-      target: 5,
-    },
-    {
-      id: 'health-score',
-      title: 'Health Score 80',
-      iconName: 'pulse',
-      description: 'Reach an 80% health score',
-      current: healthScore,
-      target: 80,
-    },
-    {
-      id: 'weekly-tracker',
-      title: 'Weekly Tracker',
-      iconName: 'calendar',
-      description: 'Complete 3 daily health logs',
-      current: completedHealthDays,
-      target: 3,
-    },
-  ];
-
-  return targets.map(item => ({
-    id: item.id,
-    title: item.title,
-    iconName: item.iconName,
-    description: item.description,
-    earned: item.current >= item.target,
-    progress: `${Math.min(item.current, item.target)}/${item.target}`,
-  }));
-};
-
 export default function ProfileScreen() {
   const { colors, isDarkMode } = useTheme();
   const styles = getStyles(colors);
@@ -309,9 +254,6 @@ export default function ProfileScreen() {
   const [user, setUser] = useState<any>(null);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const [gmailImageUrl, setGmailImageUrl] = useState<string | null>(null);
-  const [workoutsCount, setWorkoutsCount] = useState(0);
-  const [favoritesCount, setFavoritesCount] = useState(0);
-  const [daysActive, setDaysActive] = useState(0);
   const [healthScore, setHealthScore] = useState(85);
   const [profileAppointments, setProfileAppointments] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -319,6 +261,8 @@ export default function ProfileScreen() {
   const [showHealthRecords, setShowHealthRecords] = useState(false);
   const [healthRecords, setHealthRecords] = useState<HealthRecordSummary | null>(null);
   const [healthRecordsLoading, setHealthRecordsLoading] = useState(false);
+  const [achievementLocalStats, setAchievementLocalStats] = useState<AchievementLocalStats>({});
+  const [doctorStatus, setDoctorStatus] = useState<string | null>(null);
   const displayName = getStoredDisplayName(user);
   const displayEmail = user?.email || 'user@example.com';
   const displayImageUrl = gmailImageUrl || profileImageUrl;
@@ -330,66 +274,75 @@ export default function ProfileScreen() {
     }
   };
 
-  useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const userData = await tokenStorage.getUser();
-        setUser(userData);
-        const storedGmailImageUrl = getGmailProfileImageUrl(userData);
-        setGmailImageUrl(storedGmailImageUrl);
-        
-        // Fetch profile image from backend
-        const token = await SecureStore.getItemAsync('fitfaat_auth_token');
-        if (token) {
-          try {
-            const profileResponse = await fetch(`${API_URL}/api/user/profile`, {
-              method: 'GET',
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-              },
-            });
+  const loadProfileImage = async () => {
+    try {
+      const userData = await tokenStorage.getUser();
+      setUser(userData);
+      const storedGmailImageUrl = getGmailProfileImageUrl(userData);
+      setGmailImageUrl(storedGmailImageUrl);
+      
+      // Fetch profile image from backend
+      const token = await SecureStore.getItemAsync('fitfaat_auth_token');
+      if (token) {
+        try {
+          const profileResponse = await fetch(`${API_URL}/api/user/profile`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
 
-            if (profileResponse.ok) {
-              const profileData = await profileResponse.json();
-              const backendUser = profileData?.data?.user || profileData?.user;
-              const backendGmailImageUrl = getGmailProfileImageUrl(backendUser || profileData);
+          if (profileResponse.ok) {
+            const profileData = await profileResponse.json();
+            const backendUser = profileData?.data?.user || profileData?.user;
+            const backendGmailImageUrl = getGmailProfileImageUrl(backendUser || profileData);
 
-              if (backendUser) {
-                setUser({ ...(userData || {}), ...backendUser });
-              }
-
-              setGmailImageUrl(backendGmailImageUrl || storedGmailImageUrl);
+            if (backendUser) {
+              setUser({ ...(userData || {}), ...backendUser });
             }
-          } catch {
-            console.log('No Gmail profile image found in backend profile');
+
+            setGmailImageUrl(backendGmailImageUrl || storedGmailImageUrl);
           }
+        } catch {
+          console.log('No Gmail profile image found in backend profile');
+        }
 
-          try {
-            const response = await fetch(`${API_URL}/api/user/profile-picture`, {
-              method: 'GET',
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-              },
-            });
+        try {
+          const response = await fetch(`${API_URL}/api/user/profile-picture`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
 
-            const data = await response.json();
-            if (data.success && data.data.imageUrl) {
-              setProfileImageUrl(resolveBackendImageUrl(API_URL, data.data.imageUrl));
-            } else {
-              setProfileImageUrl(null);
-            }
-          } catch {
-            console.log('No profile picture found, using default');
+          const data = await response.json();
+          if (data.success && data.data.imageUrl) {
+            setProfileImageUrl(resolveBackendImageUrl(API_URL, data.data.imageUrl));
+          } else {
             setProfileImageUrl(null);
           }
+        } catch {
+          console.log('No profile picture found, using default');
+          setProfileImageUrl(null);
         }
-      } catch (error) {
-        console.error('Error loading user:', error);
       }
-    };
-    loadUser();
+    } catch (error) {
+      console.error('Error loading user:', error);
+    }
+  };
+
+  useEffect(() => {
+    loadProfileImage();
+  }, []);
+
+  // Re-fetch profile image when it changes from Edit Profile Picture screen
+  useEffect(() => {
+    const unsubscribe = profileImageEvents.subscribe(() => {
+      loadProfileImage();
+    });
+    return unsubscribe;
   }, []);
 
   // Update stats when screen comes into focus
@@ -413,20 +366,25 @@ export default function ProfileScreen() {
             // Existing stored profile data is enough when this lightweight refresh is unavailable.
           }
 
+          const weeklyTrackingId = await AsyncStorage.getItem('weeklyTrackingId') || userData?.weeklyTrackingId;
+          const carryForward = await loadAdaptiveGoalCarryForward({
+            userId: userData?.id,
+            currentWeeklyTrackingId: weeklyTrackingId,
+          });
+
           const storedRecords = await AsyncStorage.getItem('JsonResponse');
           if (storedRecords) {
             const parsedRecords = JSON.parse(storedRecords);
             if (isActive) {
-              setHealthRecords(buildHealthRecordSummary(parsedRecords, metricSources));
+              setHealthRecords(buildHealthRecordSummary(parsedRecords, metricSources, carryForward));
             }
             return;
           }
 
-          const weeklyTrackingId = await AsyncStorage.getItem('weeklyTrackingId') || userData?.weeklyTrackingId;
           if (weeklyTrackingId) {
             const progress = await dailyLogsApi.getWeeklyProgress(weeklyTrackingId);
             if (isActive) {
-              setHealthRecords(buildHealthRecordSummary(progress, metricSources));
+              setHealthRecords(buildHealthRecordSummary(progress, metricSources, carryForward));
             }
             return;
           }
@@ -452,18 +410,39 @@ export default function ProfileScreen() {
           if (!userData || !userData.id) return;
           setUser(userData);
 
-          setHistoryLoading(true);
           try {
+            const doctorStatusResponse = await authApi.getDoctorStatus();
+            if (isActive) {
+              setDoctorStatus(doctorStatusResponse?.doctor?.status || null);
+            }
+          } catch {
+            if (isActive) {
+              setDoctorStatus(null);
+            }
+          }
+
+          setHistoryLoading(true);
+          let hasCachedAppointments = false;
+          try {
+
+            // Load appointments from local cache first for instant UI updates
+            const cachedAppointments = await AsyncStorage.getItem('profileAppointments');
+            if (cachedAppointments && isActive) {
+              hasCachedAppointments = true;
+              setProfileAppointments(JSON.parse(cachedAppointments));
+            }
+
             const appointmentsResponse = await authApi.getUserAppointments();
             if (isActive) {
               const appointmentList = Array.isArray(appointmentsResponse)
                 ? appointmentsResponse
                 : appointmentsResponse?.appointments || appointmentsResponse?.data?.appointments || [];
               setProfileAppointments(appointmentList);
+              await AsyncStorage.setItem('profileAppointments', JSON.stringify(appointmentList));
             }
           } catch (error) {
             console.log('Error fetching profile appointments:', error);
-            if (isActive) {
+            if (isActive && !hasCachedAppointments) {
               setProfileAppointments([]);
             }
           } finally {
@@ -472,35 +451,64 @@ export default function ProfileScreen() {
             }
           }
 
-          // 1. Fetch Favorites count
-          const favorites = await AsyncStorage.getItem('favoriteExercises');
-          if (favorites && isActive) {
-            setFavoritesCount(JSON.parse(favorites).length);
-          } else if (isActive) {
-            setFavoritesCount(0);
-          }
-
-          // 2. Fetch Streak / Days Active
+          // Fetch streak for health score
           try {
-            const streakData = await streakApi.getUserStreak(userData.id);
-            if (streakData && isActive) {
-              setDaysActive(streakData.streakCount || 0);
+            // Priority 1: robust local streak calculation
+            const localJsonResponseStr = await AsyncStorage.getItem('JsonResponse');
+            let streakCount = 0;
+            if (localJsonResponseStr) {
+              const jsonResponse = JSON.parse(localJsonResponseStr);
+              streakCount = computeProfileStreak(jsonResponse);
+            } else {
+               // Fallback: API
+               const streakData = await streakApi.getUserStreak(userData.id);
+               if (streakData) streakCount = streakData.streakCount || 0;
+            }
+            
+            if (isActive) {
               // Calculate health score: base 70 + streak bonus (up to 30)
-              const score = Math.min(70 + (streakData.streakCount * 2), 100);
+              const score = Math.min(70 + (streakCount * 2), 100);
               setHealthScore(score);
             }
           } catch (e) {
-            console.log('Error fetching streak:', e);
+            console.log('Error calculating dynamic streak:', e);
           }
 
-          // 3. Fetch Workouts count
+          // Fetch completed exercise total for achievement badges.
           try {
-            const stats = await exerciseApi.getExerciseStats(userData.id);
-            if (stats && stats.success && isActive) {
-              setWorkoutsCount(stats.data.totalExercises || 0);
+            // Local workouts
+            let localWorkoutsCount = 0;
+            const completed = await AsyncStorage.getItem('completedWorkouts');
+            if (completed) {
+              localWorkoutsCount = JSON.parse(completed).length;
+            }
+
+            const localAchievementStats = await loadAchievementLocalStats();
+            localWorkoutsCount = Math.max(
+              localWorkoutsCount,
+              localAchievementStats.completedWorkouts || 0
+            );
+
+            // Backend workouts
+            let backendWorkoutsCount = 0;
+            try {
+              const stats = await exerciseApi.getExerciseStats(userData.id);
+              if (stats && stats.success) {
+                backendWorkoutsCount = stats.data.totalExercises || 0;
+              }
+            } catch (e) {
+               console.log('Error fetching exercise stats from backend:', e);
+            }
+
+            if (isActive) {
+              const totalWorkouts = Math.max(localWorkoutsCount, backendWorkoutsCount);
+              setAchievementLocalStats({
+                ...localAchievementStats,
+                completedWorkouts: totalWorkouts,
+              });
             }
           } catch (e) {
-            console.log('Error fetching exercise stats:', e);
+            console.log('Error processing workouts stats:', e);
           }
 
           await loadHealthRecords(userData);
@@ -543,14 +551,16 @@ export default function ProfileScreen() {
     { marginBottom: insets.bottom + hp(2) },
   ];
 
-  const achievements = buildAchievements({
-    appointments: profileAppointments,
-    workoutsCount,
-    favoritesCount,
-    daysActive,
-    healthScore,
-    healthRecords,
-  });
+  const achievements = calculateAchievementBadges(
+    healthRecords?.days || null,
+    achievementLocalStats
+  );
+  const earnedAchievementsCount = achievements.filter(
+    (achievement) => achievement.unlocked
+  ).length;
+  const achievementsCompletionPercent = achievements.length
+    ? Math.round((earnedAchievementsCount / achievements.length) * 100)
+    : 0;
 
   const healthStats = {
     totalConsultations: completedAppointments.length,
@@ -562,6 +572,7 @@ export default function ProfileScreen() {
     }).length,
     healthScore: healthScore,
   };
+  const isApprovedDoctor = normalizeStatus(doctorStatus || undefined) === 'approved';
 
   const openEmergencyContact = async () => {
     const whatsappNumber = '923325563373';
@@ -575,10 +586,33 @@ export default function ProfileScreen() {
     }
   };
 
+  const openDoctorPortal = () => {
+    router.push('/(main)/(doctor-portal)');
+  };
+
+  const openAppointmentManagement = () => {
+    router.push('/(main)/(doctor-portal)/patient-management');
+  };
+
+  const profileDoctorAction = isApprovedDoctor
+    ? {
+        title: 'Appointment Management',
+        subtitle: 'Review, approve, and manage patient appointment requests',
+        iconName: 'calendar-outline',
+        action: openAppointmentManagement,
+      }
+    : {
+        title: 'Join as Doctor',
+        subtitle: 'Register or manage your verified doctor profile',
+        iconName: 'medkit-outline',
+        action: openDoctorPortal,
+      };
+
   const quickActions = [
     { title: "Book Appointment", iconName: "calendar", color: colors.primary, action: () => router.push('/(main)/(conference)') },
     { title: "Chat History", iconName: "chatbubbles", color: colors.info, action: () => router.push('/(main)/(chatbot)/chat-history') },
     { title: "Health Records", iconName: "clipboard", color: colors.secondary, action: () => setShowHealthRecords(true) },
+    { title: "Achievement Badges", iconName: "trophy", color: colors.warning, action: () => setSelectedTab('achievements') },
     { title: "Emergency Contact", iconName: "alert-circle", color: colors.error, action: openEmergencyContact },
   ];
 
@@ -659,26 +693,22 @@ export default function ProfileScreen() {
           </Text>
         </View>
 
-        {/* Profile Stats */}
-        <View style={{
-          flexDirection: 'row',
-          justifyContent: 'space-around',
-          marginHorizontal: wp(8),
-          marginBottom: hp(4),
-        }}>
-          <View style={{ alignItems: 'center' }}>
-            <Text style={{ fontSize: hp(2.5), fontWeight: 'bold', color: colors.error }}>{workoutsCount}</Text>
-            <Text style={{ fontSize: hp(1.6), color: colors.textSecondary }}>Workouts</Text>
+        <TouchableOpacity
+          style={styles.doctorAccessCard}
+          onPress={profileDoctorAction.action}
+          activeOpacity={0.85}
+        >
+          <View style={styles.doctorAccessIcon}>
+            <Ionicons name={profileDoctorAction.iconName as any} size={Math.min(hp(3.1), wp(7))} color={colors.textOnPrimary} />
           </View>
-          <View style={{ alignItems: 'center' }}>
-            <Text style={{ fontSize: hp(2.5), fontWeight: 'bold', color: colors.error }}>{favoritesCount}</Text>
-            <Text style={{ fontSize: hp(1.6), color: colors.textSecondary }}>Favorites</Text>
+          <View style={styles.doctorAccessCopy}>
+            <Text style={styles.doctorAccessTitle}>{profileDoctorAction.title}</Text>
+            <Text style={styles.doctorAccessSubtitle}>
+              {profileDoctorAction.subtitle}
+            </Text>
           </View>
-          <View style={{ alignItems: 'center' }}>
-            <Text style={{ fontSize: hp(2.5), fontWeight: 'bold', color: colors.error }}>{daysActive}</Text>
-            <Text style={{ fontSize: hp(1.6), color: colors.textSecondary }}>Days Active</Text>
-          </View>
-        </View>
+          <Ionicons name="chevron-forward" size={Math.min(hp(2.4), wp(5.4))} color={colors.primary} />
+        </TouchableOpacity>
 
         {/* Tab Navigation */}
         <View style={styles.tabContainer}>
@@ -804,37 +834,65 @@ export default function ProfileScreen() {
 
         {selectedTab === 'achievements' && (
           <View style={achievementsSectionStyle}>
-            <Text style={styles.sectionTitle}>Achievements & Badges</Text>
+            <View style={styles.achievementsHeaderRow}>
+              <View style={styles.achievementsHeaderText}>
+                <Text style={styles.sectionTitle}>Achievements & Badges</Text>
+                <Text style={styles.achievementSummaryText}>
+                  {earnedAchievementsCount}/{achievements.length} badges unlocked
+                </Text>
+              </View>
+              <View style={styles.achievementSummaryPill}>
+                <Ionicons name="trophy-outline" size={Math.min(hp(2.1), wp(4.8))} color={colors.primary} />
+                <Text style={styles.achievementSummaryPillText}>{achievementsCompletionPercent}%</Text>
+              </View>
+            </View>
             <View style={styles.achievementsGrid}>
-              {achievements.map((achievement) => (
-                <View
-                  key={achievement.id}
-                  style={[
-                    styles.achievementCard,
-                    achievement.earned ? styles.achievementEarned : styles.achievementLocked
-                  ]}
-                >
-                  <Ionicons
-                    name={achievement.iconName as any}
-                    size={Math.min(hp(4), wp(8.5))}
-                    color={achievement.earned ? colors.success : colors.textTertiary}
-                    style={styles.achievementIcon}
-                  />
-                  <Text style={[
-                    styles.achievementTitle,
-                    achievement.earned ? styles.achievementTitleEarned : styles.achievementTitleLocked
-                  ]}>
-                    {achievement.title}
-                  </Text>
-                  <Text style={styles.achievementDescription}>{achievement.description}</Text>
-                  <Text style={styles.achievementProgress}>{achievement.progress}</Text>
-                  {achievement.earned && (
-                    <View style={styles.achievementBadge}>
-                      <Ionicons name="checkmark" size={16} color={colors.textOnPrimary} />
+              {achievements.map((achievement: AchievementBadge) => {
+                const badgeColor = achievement.unlocked ? achievement.color : achievement.lockedColor;
+                const progressPercent = Math.round(achievement.progress * 100);
+
+                return (
+                  <View
+                    key={achievement.id}
+                    style={[
+                      styles.achievementCard,
+                      achievement.unlocked ? styles.achievementEarned : styles.achievementLocked,
+                      { borderColor: achievement.unlocked ? badgeColor : colors.border },
+                    ]}
+                  >
+                    <View style={[styles.achievementIconWrap, { backgroundColor: `${badgeColor}18` }]}>
+                      <Ionicons
+                        name={achievement.icon as any}
+                        size={Math.min(hp(3.2), wp(7.2))}
+                        color={badgeColor}
+                      />
                     </View>
-                  )}
-                </View>
-              ))}
+                    <Text style={[
+                      styles.achievementTitle,
+                      achievement.unlocked ? styles.achievementTitleEarned : styles.achievementTitleLocked
+                    ]}>
+                      {achievement.title}
+                    </Text>
+                    <Text style={styles.achievementDescription}>{achievement.description}</Text>
+                    <View style={styles.achievementProgressTrack}>
+                      <View
+                        style={[
+                          styles.achievementProgressFill,
+                          { width: `${progressPercent}%`, backgroundColor: badgeColor },
+                        ]}
+                      />
+                    </View>
+                    <Text style={[styles.achievementProgress, { color: badgeColor }]}>
+                      {achievement.unlocked ? 'Unlocked' : achievement.progressLabel}
+                    </Text>
+                    {achievement.unlocked && (
+                      <View style={[styles.achievementBadge, { backgroundColor: badgeColor }]}>
+                        <Ionicons name="checkmark" size={Math.min(hp(1.55), wp(3.5))} color={colors.textOnPrimary} />
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
             </View>
           </View>
         )}
@@ -1120,6 +1178,48 @@ const getStyles = (colors: any) => StyleSheet.create({
     color: colors.primary,
     fontWeight: '500',
   },
+  doctorAccessCard: {
+    marginHorizontal: wp(5),
+    marginBottom: hp(3),
+    backgroundColor: colors.cardBackground,
+    borderRadius: hp(1.8),
+    paddingVertical: hp(1.8),
+    paddingHorizontal: wp(4),
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.primary + '28',
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  doctorAccessIcon: {
+    width: Math.min(hp(5.6), wp(12.5)),
+    height: Math.min(hp(5.6), wp(12.5)),
+    borderRadius: Math.min(hp(2.8), wp(6.25)),
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: wp(3.2),
+  },
+  doctorAccessCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  doctorAccessTitle: {
+    fontSize: hp(1.8),
+    fontWeight: '800',
+    color: colors.textPrimary,
+    marginBottom: hp(0.35),
+  },
+  doctorAccessSubtitle: {
+    fontSize: hp(1.35),
+    fontWeight: '600',
+    color: colors.textSecondary,
+    lineHeight: hp(1.9),
+  },
   // Tab Navigation Styles
   tabContainer: {
     flexDirection: 'row',
@@ -1325,6 +1425,37 @@ const getStyles = (colors: any) => StyleSheet.create({
     marginHorizontal: wp(5),
     marginBottom: hp(3),
   },
+  achievementsHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: wp(3),
+    marginBottom: hp(1.6),
+  },
+  achievementsHeaderText: {
+    flex: 1,
+  },
+  achievementSummaryText: {
+    marginTop: hp(0.25),
+    fontSize: hp(1.35),
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
+  achievementSummaryPill: {
+    minHeight: hp(3.5),
+    paddingHorizontal: wp(2.8),
+    borderRadius: hp(2),
+    backgroundColor: colors.primary + '14',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: wp(1),
+  },
+  achievementSummaryPillText: {
+    fontSize: hp(1.35),
+    fontWeight: '900',
+    color: colors.primary,
+  },
   achievementsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1333,59 +1464,77 @@ const getStyles = (colors: any) => StyleSheet.create({
   achievementCard: {
     width: '48%',
     backgroundColor: colors.cardBackground,
-    borderRadius: hp(2),
-    padding: hp(2),
+    borderRadius: hp(1.4),
+    padding: hp(1.55),
     marginBottom: hp(1.5),
-    alignItems: 'center',
+    alignItems: 'flex-start',
     shadowColor: colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
     position: 'relative',
+    borderWidth: 1,
+    minHeight: hp(22),
   },
   achievementEarned: {
-    borderWidth: 2,
-    borderColor: colors.success,
+    borderWidth: 1.5,
   },
   achievementLocked: {
-    opacity: 0.6,
+    borderWidth: 1,
   },
-  achievementIcon: {
+  achievementIconWrap: {
+    width: Math.min(hp(5.2), wp(11.5)),
+    height: Math.min(hp(5.2), wp(11.5)),
+    borderRadius: Math.min(hp(2.6), wp(5.75)),
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: hp(1),
   },
   achievementTitle: {
-    fontSize: hp(1.6),
-    fontWeight: 'bold',
-    textAlign: 'center',
+    fontSize: hp(1.5),
+    fontWeight: '800',
+    textAlign: 'left',
     marginBottom: hp(0.5),
+    lineHeight: hp(1.9),
   },
   achievementTitleEarned: {
     color: colors.textPrimary,
   },
   achievementTitleLocked: {
-    color: colors.textTertiary,
+    color: colors.textSecondary,
   },
   achievementDescription: {
-    fontSize: hp(1.3),
+    fontSize: hp(1.2),
     color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: hp(1.8),
+    textAlign: 'left',
+    lineHeight: hp(1.65),
+    minHeight: hp(5),
+  },
+  achievementProgressTrack: {
+    width: '100%',
+    height: hp(0.65),
+    borderRadius: hp(0.4),
+    backgroundColor: colors.border,
+    overflow: 'hidden',
+    marginTop: 'auto',
+  },
+  achievementProgressFill: {
+    height: '100%',
+    borderRadius: hp(0.4),
   },
   achievementProgress: {
-    marginTop: hp(1),
-    fontSize: hp(1.3),
-    fontWeight: '700',
-    color: colors.primary,
+    marginTop: hp(0.75),
+    fontSize: hp(1.2),
+    fontWeight: '800',
   },
   achievementBadge: {
     position: 'absolute',
-    top: hp(1),
-    right: hp(1),
-    backgroundColor: colors.success,
-    borderRadius: hp(1),
-    width: hp(2),
-    height: hp(2),
+    top: hp(0.9),
+    right: hp(0.9),
+    borderRadius: hp(1.05),
+    width: hp(2.1),
+    height: hp(2.1),
     alignItems: 'center',
     justifyContent: 'center',
   },

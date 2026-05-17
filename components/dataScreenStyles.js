@@ -135,19 +135,29 @@ export const createDataScreenStyles = (themeColors = fallbackColors) => {
 
   // Gender Selection
   genderSelection: {
-    height: hp(7),
-    width: hp(8),
+    height: hp(8.4),
+    width: hp(8.8),
     backgroundColor: colors.backgroundHeader,
     borderWidth: 1.5,
     borderColor: colors.border,
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
+    paddingVertical: hp(0.7),
+    gap: hp(0.25),
     shadowColor: colors.shadowLight,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
+  },
+  genderLabel: {
+    fontSize: hp(1.15),
+    fontWeight: "700",
+    fontFamily: "LoraRegular",
+    textAlign: "center",
+    includeFontPadding: false,
+    maxWidth: "100%",
   },
 
   // Date of Birth

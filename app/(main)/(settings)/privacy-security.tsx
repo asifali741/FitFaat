@@ -1,4 +1,5 @@
 import AppHeader from "@/components/AppHeader";
+import { legalDocuments } from "@/constants/legalContent";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from "react";
@@ -60,6 +61,10 @@ export default function PrivacySecurity() {
     const newSettings = { ...privacySettings, [key]: value };
     setPrivacySettings(newSettings);
     saveSettings(newSettings);
+  };
+
+  const showLegalDocument = (document: typeof legalDocuments[keyof typeof legalDocuments]) => {
+    Alert.alert(document.title, document.body, [{ text: "OK" }]);
   };
 
   const handleManageData = () => {
@@ -314,18 +319,27 @@ export default function PrivacySecurity() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Legal</Text>
             
-            <TouchableOpacity style={styles.legalButton}>
+            <TouchableOpacity
+              style={styles.legalButton}
+              onPress={() => showLegalDocument(legalDocuments.privacy)}
+            >
               <Text style={styles.legalButtonText}>Privacy Policy</Text>
               <Ionicons name="open-outline" size={18} color={colors.primary} />
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.legalButton}>
+            <TouchableOpacity
+              style={styles.legalButton}
+              onPress={() => showLegalDocument(legalDocuments.terms)}
+            >
               <Text style={styles.legalButtonText}>Terms of Service</Text>
               <Ionicons name="open-outline" size={18} color={colors.primary} />
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.legalButton}>
-              <Text style={styles.legalButtonText}>Cookie Policy</Text>
+            <TouchableOpacity
+              style={styles.legalButton}
+              onPress={() => showLegalDocument(legalDocuments.licenses)}
+            >
+              <Text style={styles.legalButtonText}>Licenses</Text>
               <Ionicons name="open-outline" size={18} color={colors.primary} />
             </TouchableOpacity>
           </View>

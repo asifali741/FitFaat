@@ -3,6 +3,7 @@ import { useNotifications } from '@/contexts/NotificationContext';
 import { tokenStorage } from '@/utils/auth/tokenStorage';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
+import * as NavigationBar from 'expo-navigation-bar';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -12,6 +13,7 @@ import {
   Modal,
   Platform,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -112,6 +114,21 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
   const [weeklyMeals, setWeeklyMeals] = useState<WeeklyMeals>(() => getInitialWeeklyMeals());
 
   const [showFoodSelector, setShowFoodSelector] = useState(false);
+
+  useEffect(() => {
+    if (!visible) return;
+
+    const systemBarColor = colors.screenColor || '#FFFFFF';
+    StatusBar.setBarStyle('dark-content');
+
+    if (Platform.OS === 'android') {
+      StatusBar.setBackgroundColor(systemBarColor);
+      StatusBar.setTranslucent(false);
+      NavigationBar.setBackgroundColorAsync(systemBarColor).catch(() => {});
+      NavigationBar.setButtonStyleAsync('dark').catch(() => {});
+      NavigationBar.setStyle('light');
+    }
+  }, [colors.screenColor, visible]);
 
   // Debug useEffect to track state changes
   useEffect(() => {
@@ -498,6 +515,11 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
     return (
       <Modal visible={visible} animationType="slide" transparent={false}>
         <View style={styles.container}>
+          <StatusBar
+            barStyle="dark-content"
+            backgroundColor={colors.screenColor || '#FFFFFF'}
+            translucent={false}
+          />
           <View style={styles.header}>
             <TouchableOpacity onPress={() => setShowFoodSelector(false)}>
               <Ionicons name="arrow-back" size={Math.min(hp(3), wp(6.4))} color="#FFFFFF" />
@@ -531,6 +553,11 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
 
   return (
     <Modal visible={visible} animationType="slide" transparent={true}>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={colors.screenColor || '#FFFFFF'}
+        translucent={false}
+      />
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
@@ -811,10 +838,16 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
 };
 
 
-const getStyles = (colors: any) => StyleSheet.create({
+const getStyles = (colors: any) => {
+  const screenSurface = colors.screenColor || colors.surface || '#FFFFFF';
+  const cardSurface = colors.cardBackground || colors.surface || '#FFFFFF';
+  const softSurface = colors.backgroundHeader || colors.offWhite || '#F8FAFC';
+  const inputSurface = colors.inputBackground || softSurface;
+
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: screenSurface,
   },
   modalOverlay: {
     flex: 1,
@@ -822,7 +855,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: colors.surface,
+    backgroundColor: cardSurface,
     borderTopLeftRadius: wp(6.4),
     borderTopRightRadius: wp(6.4),
     height: '90%',
@@ -842,6 +875,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   modalBody: {
     flex: 1,
+    backgroundColor: cardSurface,
   },
   header: {
     flexDirection: 'row',
@@ -849,12 +883,15 @@ const getStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'space-between',
     padding: wp(5.3),
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.primaryDark,
+    backgroundColor: colors.primary,
   },
   headerTitle: {
     fontSize: Math.min(hp(2.2), wp(4.8)),
     fontWeight: 'bold',
-    color: colors.textPrimary,
+    color: colors.textOnPrimary,
+    flex: 1,
+    textAlign: 'center',
   },
   section: {
     marginBottom: hp(3),
@@ -873,6 +910,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     marginBottom: hp(1.5),
     fontSize: Math.min(hp(2), wp(4.3)),
     color: colors.textPrimary,
+    backgroundColor: inputSurface,
   },
   notesInput: {
     height: hp(9.9),
@@ -885,7 +923,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     padding: wp(3.2),
     marginRight: wp(3.2),
     borderRadius: wp(3.2),
-    backgroundColor: colors.background,
+    backgroundColor: softSurface,
     borderWidth: 1,
     borderColor: colors.border,
     minWidth: wp(16),
@@ -919,7 +957,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     paddingVertical: hp(1),
     marginRight: wp(3.2),
     borderRadius: wp(5.3),
-    backgroundColor: colors.background,
+    backgroundColor: softSurface,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -961,7 +999,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   emptyMeal: {
     alignItems: 'center',
     padding: wp(8.5),
-    backgroundColor: colors.background,
+    backgroundColor: softSurface,
     borderRadius: wp(3.2),
     borderStyle: 'dashed',
     borderWidth: 1,
@@ -987,7 +1025,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: wp(3.2),
-    backgroundColor: colors.background,
+    backgroundColor: softSurface,
     borderRadius: wp(3.2),
     marginBottom: hp(1),
   },
@@ -1027,7 +1065,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: inputSurface,
     margin: wp(5.3),
     paddingHorizontal: wp(4.3),
     paddingVertical: hp(1.5),
@@ -1042,12 +1080,13 @@ const getStyles = (colors: any) => StyleSheet.create({
   foodList: {
     flex: 1,
     paddingHorizontal: wp(5.3),
+    backgroundColor: screenSurface,
   },
   foodItem: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: wp(4.3),
-    backgroundColor: colors.surface,
+    backgroundColor: cardSurface,
     borderRadius: wp(3.2),
     marginBottom: hp(1),
     borderWidth: 1,
@@ -1077,6 +1116,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     padding: wp(5.3),
     borderTopWidth: 1,
     borderTopColor: colors.border,
+    backgroundColor: cardSurface,
   },
   saveButton: {
     flexDirection: 'row',
@@ -1110,7 +1150,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     marginVertical: hp(1.2),
   },
   existingPlanCard: {
-    backgroundColor: colors.background,
+    backgroundColor: softSurface,
     padding: wp(4.3),
     borderRadius: wp(3.2),
     marginBottom: hp(1.5),
@@ -1185,7 +1225,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   planMealsPreview: {
     marginBottom: hp(1.5),
     padding: wp(3.2),
-    backgroundColor: colors.surface,
+    backgroundColor: cardSurface,
     borderRadius: wp(2.1),
     borderWidth: 1,
     borderColor: colors.border,
@@ -1218,6 +1258,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontStyle: 'italic',
   },
 });
+};
 
 export default DietPlanModal;
 

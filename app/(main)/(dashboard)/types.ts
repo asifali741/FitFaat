@@ -4,8 +4,12 @@ export type Day = {
   date: string,
   achievedCalories : number,
   achieviedHydration: number,
+  baseTargetCalories?: number,
+  baseTargetHydration?: number,
   targetCalories: number,
   targetHydration: number,
+  adaptiveCaloriesAdjustment?: number,
+  adaptiveHydrationAdjustment?: number,
   remarks: string | null, 
   duration: number, // in seconds, sync with API //determines when to refresh data 
   status?: "locked" | "active" | "finished" // using to detemine if finished or active or locked

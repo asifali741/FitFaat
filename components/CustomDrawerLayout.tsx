@@ -7,9 +7,9 @@ import {
 } from "@react-navigation/drawer";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
-import { useRouter } from "expo-router";
+import { usePathname, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Image, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Animated, {
     useAnimatedStyle,
     useSharedValue,
@@ -20,9 +20,9 @@ import {
   widthPercentageToDP as wp,
 } from "react-native-responsive-screen";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { DrawerFonts } from "../app/(main)/(settings)/_ui_elements";
 import { getBackendBaseUrl } from '@/utils/config';
 import { getGmailProfileImageUrl, resolveBackendImageUrl } from "@/utils/profileImage";
+import { profileImageEvents } from '@/utils/profileImageEvents';
 type DrawerSceneWrapperProps = DrawerContentComponentProps & {
   onDrawerStatusChange?: (isOpen: boolean) => void;
 };
@@ -61,12 +61,13 @@ const AnimatedLogoutLetter = ({
 export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const pathname = usePathname();
   const [userName, setUserName] = useState('User');
   const [userEmail, setUserEmail] = useState('user@example.com');
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const [gmailImageUrl, setGmailImageUrl] = useState<string | null>(null);
   const [isDoctor, setIsDoctor] = useState(false);
-  const [doctorName, setDoctorName] = useState('');
   const displayImageUrl = gmailImageUrl || profileImageUrl;
   
   useEffect(() => {
@@ -89,6 +90,14 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
     };
   }, [props.navigation, props.onDrawerStatusChange]);
 
+  // Re-fetch user data (including profile image) when it changes
+  useEffect(() => {
+    const unsubscribe = profileImageEvents.subscribe(() => {
+      fetchUserData();
+    });
+    return unsubscribe;
+  }, []);
+
   const checkDoctorStatus = async () => {
     try {
       const token = await SecureStore.getItemAsync('fitfaat_auth_token');
@@ -110,7 +119,6 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
         console.log('Drawer - Doctor Status:', result);
         if (result.success && result.doctor) {
           setIsDoctor(true);
-          setDoctorName(result.doctor.name || 'Doctor');
           console.log('Drawer - User is doctor:', result.doctor.name);
         }
       }
@@ -212,21 +220,25 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
     return currentRoute === '(exercises)/workout' || currentRoute.startsWith('(exercises)');
   };
 
+  const isChartsActive = () => pathname.includes('/charts');
+
   const styles = getStyles(colors, insets.bottom);
   const drawerLabelStyle = {
-    marginLeft: wp(2),
-    fontSize: Math.min(hp(2.05), wp(4.6)),
+    marginLeft: wp(1.8),
+    fontSize: Math.min(hp(1.95), wp(4.35)),
     fontFamily: "PoppinsMedium500",
     color: colors.textOnPrimary,
+    lineHeight: Math.min(hp(2.55), wp(5.7)),
   };
   const drawerItemStyle = (isActive: boolean) => ({
-    marginHorizontal: wp(3.2),
-    marginVertical: hp(0.05),
-    borderRadius: wp(6.5),
-    paddingHorizontal: wp(5),
-    paddingVertical: hp(0.45),
-    minHeight: hp(4.9),
+    marginHorizontal: wp(3),
+    marginVertical: hp(0.12),
+    borderRadius: Math.min(wp(6), hp(3)),
+    paddingHorizontal: wp(4.2),
+    paddingVertical: hp(0.28),
+    minHeight: Math.min(hp(5.2), wp(12)),
     backgroundColor: isActive ? colors.drawerActiveTabColor : 'transparent',
+    justifyContent: 'center' as const,
   });
 
   return (
@@ -263,16 +275,18 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
       </TouchableOpacity>
 
       {/* Drawer Items */}
-      <ScrollView
-        style={styles.drawerItems}
-        contentContainerStyle={styles.drawerItemsContent}
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={styles.drawerItems}>
         <DrawerItem
           label="Dashboard"
           onPress={() => props.navigation.navigate('(dashboard)')}
           labelStyle={drawerLabelStyle}
-          style={drawerItemStyle(isRouteActive('(dashboard)'))}
+          style={drawerItemStyle(isRouteActive('(dashboard)') && !isChartsActive())}
+        />
+        <DrawerItem
+          label="Progress Charts"
+          onPress={() => router.push('/(main)/(dashboard)/charts')}
+          labelStyle={drawerLabelStyle}
+          style={drawerItemStyle(isChartsActive())}
         />
         <DrawerItem
           label="Chatbot"
@@ -295,18 +309,12 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
           style={drawerItemStyle(isExercisesActive())}
         />
         <DrawerItem
-          label={isDoctor && doctorName ? `Dr. ${doctorName} 👨‍⚕️` : "Join as Doctor 👨‍⚕️"}
-          onPress={() => props.navigation.navigate('(doctor-portal)')}
-          labelStyle={drawerLabelStyle}
-          style={drawerItemStyle(isRouteActive('(doctor-portal)'))}
-        />
-        <DrawerItem
           label="Settings"
           onPress={() => props.navigation.navigate('(settings)')}
           labelStyle={drawerLabelStyle}
           style={drawerItemStyle(isRouteActive('(settings)'))}
         />
-      </ScrollView>
+      </View>
 
       {/* Bottom Part */}
       <Logout_Button/>
@@ -379,37 +387,42 @@ const getStyles = (colors: any, bottomInset = 0) => StyleSheet.create({
   userContainer: {
   flexDirection: "row",
   alignItems: "center",
-  padding: wp(4),
-  marginHorizontal: wp(3.2),
+  paddingVertical: hp(1.25),
+  paddingHorizontal: wp(3.4),
+  marginHorizontal: wp(3),
+  marginTop: hp(0.35),
   backgroundColor: colors.cardBackground,
   borderBottomWidth: 1,
   borderBottomColor: colors.cardBorder,
-  borderRadius: wp(6.5),
-  marginBottom: hp(1.4),
+  borderRadius: Math.min(wp(6), hp(3)),
+  marginBottom: Math.min(hp(2.4), wp(5.4)),
+  minHeight: Math.min(hp(10.8), wp(23)),
 },
 
 userInfo: {
-  flex: 1,              // take up remaining space
-  minWidth: 0,          // 🔑 allows text to shrink
+  flex: 1,
+  minWidth: 0,
 },
 
 userName: {
-  fontSize: DrawerFonts.body,
+  fontSize: Math.min(hp(1.95), wp(4.25)),
+  lineHeight: Math.min(hp(2.55), wp(5.5)),
   fontWeight: "600",
   color: colors.textPrimary,
 },
 
 userEmail: {
-  fontSize: DrawerFonts.drawerEmail,
+  fontSize: Math.min(hp(1.55), wp(3.5)),
+  lineHeight: Math.min(hp(2.1), wp(4.6)),
   color: colors.textSecondary,
-  marginTop: hp(0.25),
+  marginTop: hp(0.15),
 },
 
   userImage: {
-    width: Math.min(wp(15), hp(7.4)),
-    height: Math.min(wp(15), hp(7.4)),
-    borderRadius: Math.min(wp(7.5), hp(3.7)),
-    marginRight: wp(3.2),
+    width: Math.min(wp(13.5), hp(6.8)),
+    height: Math.min(wp(13.5), hp(6.8)),
+    borderRadius: Math.min(wp(6.75), hp(3.4)),
+    marginRight: wp(2.8),
     borderWidth: 2,
     borderColor: colors.cardBorder,
   },
@@ -420,21 +433,20 @@ userEmail: {
   },
   drawerItems: {
     flex: 1,
-  },
-  drawerItemsContent: {
-    paddingVertical: hp(0.4),
-    paddingBottom: hp(0.6),
+    paddingTop: hp(0.35),
+    paddingBottom: hp(0.4),
   },
   logoutButton: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: hp(1.45),
-    paddingHorizontal: wp(4),
-    marginHorizontal: wp(3.2),
-    marginTop: hp(0.5),
-    marginBottom: bottomInset + hp(2.2),
+    minHeight: Math.min(hp(5.5), wp(12.5)),
+    paddingVertical: hp(0.9),
+    paddingHorizontal: wp(3.6),
+    marginHorizontal: wp(3),
+    marginTop: hp(0.45),
+    marginBottom: bottomInset + hp(1.6),
     backgroundColor: colors.error,
-    borderRadius: wp(6.5),
+    borderRadius: Math.min(wp(6), hp(3)),
     justifyContent: "center",
     alignSelf: 'stretch',
   },

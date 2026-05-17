@@ -135,14 +135,6 @@ export default function LoginThemed() {
           required
         />
 
-        {/* Forgot Password Link */}
-        <TouchableOpacity 
-          style={styles.forgotContainer}
-          onPress={() => router.push("/forgot-password")}
-        >
-          <Text style={styles.forgotText}>Forgot password?</Text>
-        </TouchableOpacity>
-
         {/* Login Button */}
         <ThemedButton
           title="Sign In"
@@ -254,16 +246,6 @@ const getStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: hp(2.7),
-  },
-  forgotContainer: {
-    alignSelf: 'flex-end',
-    marginBottom: theme.spacing.xl,
-    marginTop: -theme.spacing.xs,
-  },
-  forgotText: {
-    fontSize: theme.typography.fontSize.sm,
-    color: colors.primary,
-    fontWeight: theme.typography.fontWeight.medium,
   },
   dividerContainer: {
     flexDirection: 'row',

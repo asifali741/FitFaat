@@ -43,6 +43,8 @@ export const useCustomOnboarding = () => {
       await AsyncStorage.setItem('fitfaat_health_metrics', JSON.stringify({
         height: heightInCmRounded,
         weight: weightInKg,
+        selectedGoal: userInfo.selectedGoal,
+        fitnessGoal: userInfo.selectedGoal,
       }));
 
       const savedUser = await tokenStorage.getUser();
@@ -57,6 +59,7 @@ export const useCustomOnboarding = () => {
             name: userInfo.name.trim(),
             height: heightInCmRounded,
             weight: weightInKg,
+            fitnessGoal: userInfo.selectedGoal,
           },
         });
       }

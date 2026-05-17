@@ -6,13 +6,18 @@ import { useNews } from "@/contexts/NewsContext";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import useStreak from "@/hooks/useStreak";
+import {
+  applyAdaptiveGoalsToJsonResponse,
+  loadAdaptiveGoalCarryForward,
+  saveAdaptiveGoalCarryForward,
+} from "@/utils/adaptiveGoals";
 import { dailyLogsApi } from "@/utils/dailyLogsApi";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { scheduleAdaptiveNutritionNotifications, type NutritionGoalSummary } from "@/utils/nutritionProfile";
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -35,6 +40,8 @@ const convertToJsonResponse = (weeklyTracking: any): jsonResponse => {
       date: dailyLog.date,
       achievedCalories: dailyLog.achievedCalories,
       achieviedHydration: dailyLog.achievedHydration,
+      baseTargetCalories: dailyLog.baseTargetCalories || dailyLog.defaultTargetCalories || dailyLog.targetCalories,
+      baseTargetHydration: dailyLog.baseTargetHydration || dailyLog.defaultTargetHydration || dailyLog.targetHydration,
       targetCalories: dailyLog.targetCalories,
       targetHydration: dailyLog.targetHydration,
       remarks: dailyLog.remarks || null,
@@ -73,6 +80,78 @@ const startOfLocalDay = (date: Date) => {
   const nextDate = new Date(date);
   nextDate.setHours(0, 0, 0, 0);
   return nextDate;
+};
+
+const getHydrationValue = (day: Day) =>
+  Number(day.achieviedHydration ?? (day as any).achievedHydration ?? 0);
+
+const hasDayProgress = (day: Day) =>
+  Number(day.achievedCalories || 0) > 0 || getHydrationValue(day) > 0;
+
+const isStreakProgressDay = (day: Day) =>
+  day.status === 'finished' || (day.status === 'active' && hasDayProgress(day));
+
+const sortByDayDate = (a: Day, b: Day) => {
+  const aDate = parseDashboardDate(a.date);
+  const bDate = parseDashboardDate(b.date);
+  if (aDate && bDate) return aDate.getTime() - bDate.getTime();
+  return a.dayNo - b.dayNo;
+};
+
+/**
+ * Compute streak data dynamically from the local day data.
+ * Counts from the latest unlocked day so future locked days do not reset progress.
+ */
+const computeStreakFromDays = (data: jsonResponse) => {
+  const allDaysSorted = Object.values(data).sort(sortByDayDate);
+  const unlockedDaysSorted = allDaysSorted.filter((day) => day.status !== 'locked');
+  
+  let currentStreak = 0;
+  for (let i = unlockedDaysSorted.length - 1; i >= 0; i--) {
+    const day = unlockedDaysSorted[i];
+    if (isStreakProgressDay(day)) {
+      currentStreak++;
+    } else {
+      break;
+    }
+  }
+
+  let longestStreak = 0;
+  let tempStreak = 0;
+  for (const day of allDaysSorted) {
+    if (isStreakProgressDay(day)) {
+      tempStreak++;
+      longestStreak = Math.max(longestStreak, tempStreak);
+    } else {
+      tempStreak = 0;
+    }
+  }
+
+  longestStreak = Math.max(longestStreak, currentStreak);
+
+  const weeklyGoal = 7;
+  const streakPercentage = Math.round((currentStreak / weeklyGoal) * 100);
+
+  // Generate message
+  let message = '';
+  if (currentStreak === 0) {
+    message = 'Start logging to build your streak! 💪';
+  } else if (currentStreak === 1) {
+    message = "You're on a 1 day streak! 🔥";
+  } else if (currentStreak < weeklyGoal) {
+    message = `You're on a ${currentStreak} day streak! 🔥`;
+  } else {
+    message = 'Weekly goal achieved! Amazing! 🏆';
+  }
+
+  return {
+    streakCount: currentStreak,
+    longestStreak,
+    message,
+    streakPercentage,
+    weeklyGoalDays: weeklyGoal,
+    shouldSendReminder: currentStreak === 0,
+  };
 };
 
 const toGoalSummary = (day: Day): NutritionGoalSummary => ({
@@ -131,9 +210,30 @@ export default function DayPlan () {
   const [userId, setUserId] = useState<string | null>(null);
   const hasCheckedForNewCycle = useRef(false);
   const adaptiveNutritionSignature = useRef<string | null>(null);
+  const hasCompletedInitialLoad = useRef(false);
+
+  const saveAdaptiveGoalCarryForwardFromCurrentData = async (
+    ownerUserId?: string | null,
+    weeklyTrackingId?: string | null
+  ) => {
+    const latestUser = ownerUserId ? null : await tokenStorage.getUser();
+    const latestWeeklyTrackingId = weeklyTrackingId ?? await AsyncStorage.getItem('weeklyTrackingId');
+    const currentData = JsonResponse || (await checkLocalStorage())?.data;
+
+    await saveAdaptiveGoalCarryForward(currentData, {
+      userId: ownerUserId || latestUser?.id,
+      weeklyTrackingId: latestWeeklyTrackingId,
+    });
+  };
   
-  // Fetch streak data
-  const { streak, loading: streakLoading, refetchStreak } = useStreak(userId);
+  // Fetch streak data from API (used as fallback/enrichment)
+  const { streak: apiStreak, loading: streakLoading, refetchStreak } = useStreak(userId);
+
+  // Compute streak dynamically from local day data
+  const computedStreak = JsonResponse ? computeStreakFromDays(JsonResponse) : null;
+
+  // Use locally computed streak (always accurate) — falls back to API data if no local data
+  const streak = computedStreak || apiStreak;
 
   //Get Data from API or Local Storage
   useEffect( () => { 
@@ -156,6 +256,7 @@ export default function DayPlan () {
     // If weeklyTrackingIds don't match or user doesn't have one, fetch fresh from backend
     if (!storedWeeklyId || !userWeeklyId || storedWeeklyId !== userWeeklyId) {
       console.log('📋 WeeklyTrackingId mismatch or missing - fetching fresh data');
+      await saveAdaptiveGoalCarryForwardFromCurrentData(user?.id, storedWeeklyId);
       await AsyncStorage.removeItem('JsonResponse');
       await callApi();
       return;
@@ -185,6 +286,7 @@ export default function DayPlan () {
         if (allFinished) {
           console.log('🔄 All days finished, checking for new cycle...');
           hasCheckedForNewCycle.current = true; // Prevent infinite loop
+          await saveAdaptiveGoalCarryForwardFromCurrentData();
           // Wait a moment then check/create new cycle
           setTimeout(async () => {
             await checkAndCreateNewCycle();
@@ -238,6 +340,7 @@ export default function DayPlan () {
       }
 
       const weeklyTrackingId = await AsyncStorage.getItem('weeklyTrackingId');
+      await saveAdaptiveGoalCarryForwardFromCurrentData(user.id, weeklyTrackingId);
       
       // Call the check-cycle endpoint
       const result = await dailyLogsApi.checkAndCreateCycle(
@@ -250,7 +353,15 @@ export default function DayPlan () {
       console.log('Cycle check result:', result.message, 'New cycle created:', result.newCycleCreated);
 
       // Convert to jsonResponse format
-      const data = convertToJsonResponse(result.data);
+      const carryForward = await loadAdaptiveGoalCarryForward({
+        userId: user.id,
+        currentWeeklyTrackingId: result.newWeeklyTrackingId || weeklyTrackingId,
+      });
+      const data = applyAdaptiveGoalsToJsonResponse(
+        convertToJsonResponse(result.data),
+        undefined,
+        carryForward
+      );
       
       // Reset the cycle check flag if a new cycle was created
       if (result.newCycleCreated) {
@@ -278,6 +389,13 @@ export default function DayPlan () {
   };
 
   const loadJson = async ({data, timestamp} : {data:jsonResponse, timestamp: Date}) =>{
+    const user = await tokenStorage.getUser();
+    const weeklyTrackingId = await AsyncStorage.getItem('weeklyTrackingId');
+    const carryForward = await loadAdaptiveGoalCarryForward({
+      userId: user?.id,
+      currentWeeklyTrackingId: weeklyTrackingId,
+    });
+    data = applyAdaptiveGoalsToJsonResponse(data, undefined, carryForward);
     let entry : keyof jsonResponse
     let foundActive = false;
     for (const key in data)
@@ -295,6 +413,7 @@ export default function DayPlan () {
           //yes local stored is valid and i am updating data variable with its remaining time and break
           data[entry].duration = timeLeft;
           setJsonResponse(data)
+          await AsyncStorage.setItem('JsonResponse', JSON.stringify({ data, timestamp: new Date() }));
           break;
         }
         else{
@@ -307,6 +426,7 @@ export default function DayPlan () {
     // If no active day found (all finished), check and create new cycle
     if (!foundActive) {
       console.log('No active day found in local storage, checking for new cycle...');
+      await saveAdaptiveGoalCarryForwardFromCurrentData();
       await checkAndCreateNewCycle();
     }
   }
@@ -314,6 +434,36 @@ export default function DayPlan () {
     // Delegate to the new checkAndCreateNewCycle function
     await checkAndCreateNewCycle();
   };
+  const refreshHandlers = useRef({ loadJson, callApi });
+  refreshHandlers.current = { loadJson, callApi };
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasCompletedInitialLoad.current) {
+        hasCompletedInitialLoad.current = true;
+        return;
+      }
+
+      let isActive = true;
+
+      const refreshFromCacheOrApi = async () => {
+        const stored = await checkLocalStorage();
+        if (!isActive) return;
+
+        if (stored && stored.data) {
+          await refreshHandlers.current.loadJson(stored);
+        } else {
+          await refreshHandlers.current.callApi();
+        }
+      };
+
+      refreshFromCacheOrApi();
+
+      return () => {
+        isActive = false;
+      };
+    }, [])
+  );
   //function called by child component to navigate to detailed day view
   const navigateToDayDetails = (dayNo: number) : void => {
     const key = `day0${dayNo.toString()}` as keyof jsonResponse
@@ -368,6 +518,8 @@ export default function DayPlan () {
     await markNewsAsRead(newsId);
   };
 
+  const floatingButtonIconSize = Math.min(hp(2.2), wp(4.8));
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.screenColor }]} edges={['top']}>
       <AppHeader 
@@ -413,7 +565,7 @@ export default function DayPlan () {
               loading={streakLoading}
             />
           )}
-          
+
           {
             //calling 7 <Day> components with jsonResponse useState data
             daysArray.map((dayData, index) => (
@@ -424,12 +576,33 @@ export default function DayPlan () {
         </ScrollView>
 
         <TouchableOpacity
+          style={[styles.floatingButtonLeft, { backgroundColor: colors.secondary, shadowColor: colors.secondary }]}
+          onPress={() => router.push('/(main)/(dashboard)/charts')}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="bar-chart" size={floatingButtonIconSize} color={colors.textOnPrimary} />
+          <Text
+            style={[styles.floatingButtonText, { color: colors.textOnPrimary }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            VIEW CHARTS
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
           style={[styles.floatingButton, { backgroundColor: colors.primary, shadowColor: colors.primary }]}
           onPress={() => setShowDietPlanViewer(true)}
           activeOpacity={0.8}
         >
-          <Ionicons name="fast-food" size={18} color={colors.textOnPrimary} />
-          <Text style={[styles.floatingButtonText, { color: colors.textOnPrimary }]}>VIEW DIET</Text>
+          <Ionicons name="fast-food" size={floatingButtonIconSize} color={colors.textOnPrimary} />
+          <Text
+            style={[styles.floatingButtonText, { color: colors.textOnPrimary }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            VIEW DIET
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -459,7 +632,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: hp(15),
     right: wp(4),
-    paddingHorizontal: wp(4),
+    maxWidth: wp(42),
+    minHeight: hp(4.8),
+    paddingHorizontal: wp(3.5),
     paddingVertical: hp(1.2),
     borderRadius: hp(4),
     flexDirection: 'row',
@@ -468,18 +643,41 @@ const styles = StyleSheet.create({
     elevation: 12,
     shadowOffset: {
       width: 0,
-      height: 6,
+      height: hp(0.75),
     },
     shadowOpacity: 0.4,
-    shadowRadius: 8,
-    borderWidth: 1.5,
+    shadowRadius: wp(2.1),
+    borderWidth: wp(0.4),
     borderColor: 'rgba(255, 255, 255, 0.4)',
   },
   floatingButtonText: {
     fontSize: hp(1.5),
     fontWeight: '900',
-    marginLeft: wp(2),
-    letterSpacing: 1,
+    marginLeft: wp(1.6),
+    letterSpacing: wp(0.15),
+    flexShrink: 1,
+  },
+  floatingButtonLeft: {
+    position: 'absolute',
+    bottom: hp(15),
+    left: wp(4),
+    maxWidth: wp(44),
+    minHeight: hp(4.8),
+    paddingHorizontal: wp(3.5),
+    paddingVertical: hp(1.2),
+    borderRadius: hp(4),
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 12,
+    shadowOffset: {
+      width: 0,
+      height: hp(0.75),
+    },
+    shadowOpacity: 0.4,
+    shadowRadius: wp(2.1),
+    borderWidth: wp(0.4),
+    borderColor: 'rgba(255, 255, 255, 0.4)',
   },
 });
 

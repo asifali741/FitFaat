@@ -271,22 +271,6 @@ export function BottomTabBar() {
         bottom: insets.bottom > 0 ? insets.bottom + hp(1) : hp(2),
       }
     ]}>
-      {/* Home Tab */}
-      <TouchableOpacity
-        style={[styles.tabItem, activeTab === 'dashboard' && styles.activeTabItem]}
-        onPress={() => router.push('/(main)/(dashboard)')}
-        activeOpacity={0.6}
-      >
-        <View style={[styles.pill, activeTab === 'dashboard' && styles.activePill]}>
-          <Ionicons
-            name={activeTab === 'dashboard' ? "home" : "home-outline"}
-            size={22}
-            color={activeTab === 'dashboard' ? colors.primary : colors.textSecondary}
-          />
-          {activeTab === 'dashboard' && <Text style={styles.pillText} numberOfLines={1}>Home</Text>}
-        </View>
-      </TouchableOpacity>
-
       {/* Chatbot Tab */}
       <TouchableOpacity
         style={[styles.tabItem, activeTab === 'chatbot' && styles.activeTabItem]}
@@ -322,6 +306,22 @@ export function BottomTabBar() {
             color={activeTab === 'conference' || (activeTab === 'doctor-portal' && !isOnChatTab()) ? colors.primary : colors.textSecondary}
           />
           {(activeTab === 'conference' || (activeTab === 'doctor-portal' && !isOnChatTab())) && <Text style={styles.pillText} numberOfLines={1}>Booking</Text>}
+        </View>
+      </TouchableOpacity>
+
+      {/* Home Tab */}
+      <TouchableOpacity
+        style={[styles.tabItem, activeTab === 'dashboard' && styles.activeTabItem]}
+        onPress={() => router.push('/(main)/(dashboard)')}
+        activeOpacity={0.6}
+      >
+        <View style={[styles.pill, activeTab === 'dashboard' && styles.activePill]}>
+          <Ionicons
+            name={activeTab === 'dashboard' ? "home" : "home-outline"}
+            size={22}
+            color={activeTab === 'dashboard' ? colors.primary : colors.textSecondary}
+          />
+          {activeTab === 'dashboard' && <Text style={styles.pillText} numberOfLines={1}>Home</Text>}
         </View>
       </TouchableOpacity>
 

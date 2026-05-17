@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import type { ChatAccessGrantedNotificationPayload } from '../chatAccessNotifications';
 import { tokenStorage } from './tokenStorage';
 import { getBackendUrl } from '../config';
 
@@ -274,9 +275,15 @@ export const authApi = {
   },
 
   // Grant chat access to user (Doctor only)
-  grantChatAccess: async (appointmentId: string) => {
+  grantChatAccess: async (
+    appointmentId: string,
+    notification?: ChatAccessGrantedNotificationPayload
+  ) => {
     try {
-      const response = await api.post(`/chat/appointment/${appointmentId}/grant-access`);
+      const response = await api.post(
+        `/chat/appointment/${appointmentId}/grant-access`,
+        notification ? { notification } : {}
+      );
       return response.data;
     } catch (error: any) {
       throw error.response?.data || error.message;

@@ -63,18 +63,10 @@ export default function DoctorPortal() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Professional Header with Gradient */}
-      <LinearGradient
-        colors={[colors.primary, colors.accent]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.headerGradient}
-      >
-        <AppHeader 
-          title="Doctor Portal"
-          showStepIndicator={false}
-        />
-      </LinearGradient>
+      <AppHeader
+        title="Doctor Portal"
+        showStepIndicator={false}
+      />
 
       {/* Main Content */}
       <ScrollView 
@@ -256,13 +248,9 @@ const getStyles = (colors: any) => StyleSheet.create({
     flex: 1,
     backgroundColor: colors.screenColor,
   },
-  headerGradient: {
-    paddingBottom: hp(2),
-  },
   content: {
     flex: 1,
     backgroundColor: colors.screenColor,
-    ...theme.shadows.large,
   },
   scrollContent: {
     paddingTop: hp(3),

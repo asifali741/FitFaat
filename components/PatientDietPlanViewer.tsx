@@ -1,13 +1,23 @@
 import { useTheme } from '@/contexts/ThemeContext';
+import {
+  dietPreferenceOptions,
+  DIET_PREFERENCE_STORAGE_KEY,
+  filterFoodsByDietPreference,
+  getDietPreferenceLabel,
+  type DietPreference,
+} from '@/constants/foodDatabase';
 import { tokenStorage } from '@/utils/auth/tokenStorage';
 import { getBackendBaseUrl } from '@/utils/config';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as NavigationBar from 'expo-navigation-bar';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -16,6 +26,7 @@ import {
   View
 } from 'react-native';
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const BACKEND_URL = getBackendBaseUrl().replace(/\/api\/?$/, '');
 
@@ -65,6 +76,9 @@ interface PatientDietPlanViewerProps {
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snacks'];
 
+const isDietPreference = (value: string | null): value is DietPreference =>
+  value === 'all' || value === 'vegetarian' || value === 'nonVegetarian';
+
 const PatientDietPlanViewer: React.FC<PatientDietPlanViewerProps> = ({
   visible,
   onClose,
@@ -72,20 +86,57 @@ const PatientDietPlanViewer: React.FC<PatientDietPlanViewerProps> = ({
 }) => {
   const router = useRouter();
   const { colors } = useTheme();
-  const styles = getStyles(colors);
+  const insets = useSafeAreaInsets();
+  const styles = getStyles(colors, insets.bottom);
   const [dietPlans, setDietPlans] = useState<DietPlan[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<DietPlan | null>(null);
   const [selectedDay, setSelectedDay] = useState('monday');
   const [refreshing, setRefreshing] = useState(false);
+  const [dietPreference, setDietPreference] = useState<DietPreference>('all');
 
   useEffect(() => {
     if (visible) {
       console.log('=== Diet Plan Viewer Opened ===');
       console.log('PatientId prop:', patientId);
+      loadDietPreference();
       fetchDietPlans();
     }
   }, [visible]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+
+    if (visible) {
+      NavigationBar.setBackgroundColorAsync('#FFFFFF').catch(() => {});
+      NavigationBar.setButtonStyleAsync('dark').catch(() => {});
+      NavigationBar.setStyle('light');
+    } else {
+      NavigationBar.setBackgroundColorAsync(colors.screenColor || '#FFFFFF').catch(() => {});
+      NavigationBar.setButtonStyleAsync('dark').catch(() => {});
+    }
+  }, [colors.screenColor, visible]);
+
+  const loadDietPreference = async () => {
+    try {
+      const savedPreference = await AsyncStorage.getItem(DIET_PREFERENCE_STORAGE_KEY);
+      if (isDietPreference(savedPreference)) {
+        setDietPreference(savedPreference);
+      }
+    } catch (error) {
+      console.error('Error loading diet preference:', error);
+    }
+  };
+
+  const handleDietPreferenceChange = async (preference: DietPreference) => {
+    setDietPreference(preference);
+
+    try {
+      await AsyncStorage.setItem(DIET_PREFERENCE_STORAGE_KEY, preference);
+    } catch (error) {
+      console.error('Error saving diet preference:', error);
+    }
+  };
 
   const fetchDietPlans = async () => {
     try {
@@ -172,12 +223,15 @@ const PatientDietPlanViewer: React.FC<PatientDietPlanViewerProps> = ({
     fetchDietPlans();
   };
 
+  const getFilteredFoods = (foods?: MealFood[]) =>
+    filterFoodsByDietPreference(foods || [], dietPreference);
+
   const getTotalCaloriesForDay = (plan: DietPlan, day: string) => {
     let total = 0;
     if (plan.weeklyMeals && plan.weeklyMeals[day]) {
       MEAL_TYPES.forEach(meal => {
         if (Array.isArray(plan.weeklyMeals[day][meal])) {
-          plan.weeklyMeals[day][meal].forEach((food: MealFood) => {
+          getFilteredFoods(plan.weeklyMeals[day][meal]).forEach((food: MealFood) => {
             total += food.calories || 0;
           });
         }
@@ -191,7 +245,7 @@ const PatientDietPlanViewer: React.FC<PatientDietPlanViewerProps> = ({
     if (plan.weeklyMeals && plan.weeklyMeals[day]) {
       MEAL_TYPES.forEach(meal => {
         if (Array.isArray(plan.weeklyMeals[day][meal])) {
-          plan.weeklyMeals[day][meal].forEach((food: MealFood) => {
+          getFilteredFoods(plan.weeklyMeals[day][meal]).forEach((food: MealFood) => {
             protein += food.protein || 0;
             carbs += food.carbs || 0;
             fats += food.fats || 0;
@@ -211,7 +265,8 @@ const PatientDietPlanViewer: React.FC<PatientDietPlanViewerProps> = ({
   };
 
   const renderMealSection = (mealType: string, foods: MealFood[]) => {
-    if (!foods || foods.length === 0) return null;
+    const visibleFoods = getFilteredFoods(foods);
+    if (!visibleFoods.length) return null;
 
     return (
       <View key={mealType} style={styles.mealSection}>
@@ -230,7 +285,7 @@ const PatientDietPlanViewer: React.FC<PatientDietPlanViewerProps> = ({
           </Text>
         </View>
         
-        {foods.map((food, index) => (
+        {visibleFoods.map((food, index) => (
           <View key={index} style={styles.foodItem}>
             <View style={styles.foodInfo}>
               <Text style={styles.foodName}>{food.foodName}</Text>
@@ -283,6 +338,7 @@ const PatientDietPlanViewer: React.FC<PatientDietPlanViewerProps> = ({
           ) : (
             <ScrollView 
               style={styles.contentContainer}
+              contentContainerStyle={styles.contentScrollContent}
               refreshControl={
                 <RefreshControl
                   refreshing={refreshing}
@@ -351,7 +407,6 @@ const PatientDietPlanViewer: React.FC<PatientDietPlanViewerProps> = ({
                     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                       {DAYS.map((day) => {
                         const dayCalories = getTotalCaloriesForDay(selectedPlan, day);
-                        const nutrients = getTotalNutrientsForDay(selectedPlan, day);
                         
                         return (
                           <TouchableOpacity
@@ -378,6 +433,50 @@ const PatientDietPlanViewer: React.FC<PatientDietPlanViewerProps> = ({
                         );
                       })}
                     </ScrollView>
+                  </View>
+
+                  {/* Food Preference Filter */}
+                  <View style={styles.dietFilterSection}>
+                    <View style={styles.sectionHeaderRow}>
+                      <Text style={styles.sectionTitle}>Food Preference</Text>
+                      <Text style={styles.dietFilterSummary}>{getDietPreferenceLabel(dietPreference)}</Text>
+                    </View>
+                    <View style={styles.dietFilterContainer}>
+                      {dietPreferenceOptions.map((option) => {
+                        const isActive = dietPreference === option.value;
+
+                        return (
+                          <TouchableOpacity
+                            key={option.value}
+                            style={[
+                              styles.dietFilterButton,
+                              isActive && {
+                                backgroundColor: colors.primary,
+                                borderColor: colors.primary,
+                              },
+                            ]}
+                            onPress={() => handleDietPreferenceChange(option.value)}
+                            activeOpacity={0.8}
+                          >
+                            <Ionicons
+                              name={option.icon}
+                              size={Math.min(hp(2), wp(4.5))}
+                              color={isActive ? colors.textOnPrimary : colors.textSecondary}
+                            />
+                            <Text
+                              style={[
+                                styles.dietFilterText,
+                                { color: isActive ? colors.textOnPrimary : colors.textSecondary },
+                              ]}
+                              numberOfLines={1}
+                              adjustsFontSizeToFit
+                            >
+                              {option.label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
                   </View>
 
                   {/* Daily Summary */}
@@ -417,8 +516,18 @@ const PatientDietPlanViewer: React.FC<PatientDietPlanViewerProps> = ({
                   <View style={styles.mealsContainer}>
                     <Text style={styles.sectionTitle}>Today's Meals</Text>
                     {selectedPlan.weeklyMeals && selectedPlan.weeklyMeals[selectedDay] ? (
-                      MEAL_TYPES.map(mealType => 
-                        renderMealSection(mealType, selectedPlan.weeklyMeals[selectedDay][mealType])
+                      MEAL_TYPES.some(mealType => getFilteredFoods(selectedPlan.weeklyMeals[selectedDay][mealType]).length > 0) ? (
+                        MEAL_TYPES.map(mealType =>
+                          renderMealSection(mealType, selectedPlan.weeklyMeals[selectedDay][mealType])
+                        )
+                      ) : (
+                        <View style={styles.emptyDay}>
+                          <Text style={styles.emptyDayText}>
+                            {dietPreference === 'all'
+                              ? 'No meals planned for this day'
+                              : `No ${getDietPreferenceLabel(dietPreference).toLowerCase()} meals planned for this day`}
+                          </Text>
+                        </View>
                       )
                     ) : (
                       <View style={styles.emptyDay}>
@@ -436,7 +545,7 @@ const PatientDietPlanViewer: React.FC<PatientDietPlanViewerProps> = ({
   );
 };
 
-const getStyles = (colors: any) => StyleSheet.create({
+const getStyles = (colors: any, bottomInset: number) => StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -446,8 +555,10 @@ const getStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.surface,
     borderTopLeftRadius: wp(6),
     borderTopRightRadius: wp(6),
-    height: '90%',
-    padding: wp(5),
+    height: '95%',
+    paddingTop: wp(5),
+    paddingHorizontal: wp(5),
+    paddingBottom: Math.max(wp(5), bottomInset + hp(1.5)),
   },
   modalHeader: {
     flexDirection: 'row',
@@ -475,6 +586,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: wp(10),
+    paddingBottom: Math.max(hp(5), bottomInset + hp(3)),
   },
   emptyTitle: {
     fontSize: hp(2.2),
@@ -492,10 +604,25 @@ const getStyles = (colors: any) => StyleSheet.create({
   contentContainer: {
     flex: 1,
   },
+  contentScrollContent: {
+    paddingBottom: Math.max(hp(4), bottomInset + hp(3)),
+  },
   sectionTitle: {
     fontSize: hp(2),
     fontWeight: 'bold',
     color: colors.textPrimary,
+    marginBottom: hp(1.5),
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: wp(2),
+  },
+  dietFilterSummary: {
+    fontSize: Math.min(hp(1.35), wp(3.2)),
+    fontWeight: '700',
+    color: colors.primary,
     marginBottom: hp(1.5),
   },
   planSelector: {
@@ -559,6 +686,32 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   daySelector: {
     marginBottom: hp(3),
+  },
+  dietFilterSection: {
+    marginBottom: hp(3),
+  },
+  dietFilterContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2),
+  },
+  dietFilterButton: {
+    flex: 1,
+    minHeight: hp(4.8),
+    borderRadius: wp(3),
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: wp(1.2),
+    paddingHorizontal: wp(2),
+    paddingVertical: hp(0.9),
+  },
+  dietFilterText: {
+    fontSize: Math.min(hp(1.45), wp(3.3)),
+    fontWeight: '800',
   },
   dayButton: {
     padding: wp(3),

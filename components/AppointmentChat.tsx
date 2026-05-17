@@ -5,6 +5,11 @@ import { theme } from '@/constants/theme';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { tokenStorage } from '@/utils/auth/tokenStorage';
+import {
+  buildChatAccessGrantedNotificationPayload,
+  CHAT_ACCESS_GRANTED_BODY,
+  CHAT_ACCESS_GRANTED_TITLE,
+} from '@/utils/chatAccessNotifications';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import Constants from 'expo-constants';
@@ -96,6 +101,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
   const typingTimeoutRef = useRef<number | null>(null);
   const timerIntervalRef = useRef<number | null>(null);
   const isInVideoCall = useRef<boolean>(false);
+  const accessGrantNotifiedRef = useRef(false);
   const androidNavigationBarHeight = Platform.OS === 'android' && !isKeyboardVisible ? insets.bottom : 0;
   const inputBottomPadding = isKeyboardVisible
     ? hp(0.6)
@@ -492,7 +498,25 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
         
         // Use accessData.userRole instead of state userRole (avoid closure issue)
         if (accessData.userRole === 'user' && data.canSend) {
-          Alert.alert('Access Granted', 'Doctor has granted you chat access! You can now send messages.');
+          if (!accessGrantNotifiedRef.current) {
+            accessGrantNotifiedRef.current = true;
+            const notificationPayload = buildChatAccessGrantedNotificationPayload(
+              appointmentId,
+              accessData.appointment
+            );
+            sendFitFaatNotification(
+              'chat',
+              notificationPayload.title,
+              notificationPayload.body,
+              notificationPayload.data
+            ).catch((error) => {
+              console.error('Failed to show chat access notification:', error);
+            });
+            Alert.alert(
+              CHAT_ACCESS_GRANTED_TITLE,
+              CHAT_ACCESS_GRANTED_BODY
+            );
+          }
         }
         
         console.log('🔓 Updated canSend to:', data.canSend);
@@ -560,7 +584,13 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
-          }
+          },
+          body: JSON.stringify({
+            notification: buildChatAccessGrantedNotificationPayload(
+              appointmentId,
+              appointmentData
+            ),
+          }),
         }
       );
 

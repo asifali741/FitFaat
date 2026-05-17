@@ -4,7 +4,9 @@ import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import Constants from "expo-constants";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState, useEffect } from "react";
+import { StatusBar } from 'expo-status-bar';
+import * as NavigationBar from 'expo-navigation-bar';
 import {
     ActivityIndicator,
     Alert,
@@ -51,6 +53,14 @@ export default function PaymentMethods() {
 
   const ENV = Constants.expoConfig?.extra;
   const API_URL = getBackendBaseUrl();
+
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      NavigationBar.setBackgroundColorAsync('#FFFFFF').catch(() => {});
+      NavigationBar.setButtonStyleAsync('dark').catch(() => {});
+      NavigationBar.setStyle('light');
+    }
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -305,6 +315,7 @@ export default function PaymentMethods() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
       <AppHeader title="Payment Methods" />
 
       <View style={styles.content}>
@@ -501,11 +512,11 @@ const getStyles = (colors: any) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: colors.screenColor || '#FFFFFF',
     },
     content: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: colors.screenColor || '#FFFFFF',
     },
     centerContent: {
       flex: 1,

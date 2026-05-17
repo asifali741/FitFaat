@@ -1,4 +1,5 @@
 import AppHeader from "@/components/AppHeader";
+import { legalDocuments } from "@/constants/legalContent";
 import { useTheme } from "@/contexts/ThemeContext";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
@@ -12,8 +13,19 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function Settings() {
   const router = useRouter();
   const { isDarkMode, toggleDarkMode, colors } = useTheme();
+  const legalSettingMap = {
+    "Terms of Service": legalDocuments.terms,
+    "Privacy Policy": legalDocuments.privacy,
+    "Licenses": legalDocuments.licenses,
+  } as const;
 
   const handleSettingPress = (setting: string) => {
+    const legalDocument = legalSettingMap[setting as keyof typeof legalSettingMap];
+    if (legalDocument) {
+      Alert.alert(legalDocument.title, legalDocument.body, [{ text: "OK" }]);
+      return;
+    }
+
     switch (setting) {
       case "Profile Information":
         router.push("/profile-information");
@@ -66,7 +78,7 @@ export default function Settings() {
       case "Terms of Service":
         Alert.alert(
           "Terms of Service",
-          "FITFAAT TERMS OF SERVICE\n\nLast Updated: January 2024\n\n1. ACCEPTANCE OF TERMS\nBy using FitFaat, you agree to be bound by these Terms of Service.\n\n2. DESCRIPTION OF SERVICE\nFitFaat provides AI-powered health and fitness guidance, personalized meal plans, workout routines, and telemedicine consultations.\n\n3. USER ACCOUNTS\nYou must provide accurate information and maintain account security.\n\n4. HEALTH DISCLAIMER\nFitFaat provides general health information only. Always consult healthcare professionals for medical advice.\n\n5. PRIVACY\nYour privacy is important to us. See our Privacy Policy for details.\n\n6. PROHIBITED USES\nYou may not use FitFaat for illegal activities or to harm others.\n\n7. INTELLECTUAL PROPERTY\nAll content is owned by FitFaat or licensed to us.\n\n8. LIMITATION OF LIABILITY\nFitFaat is not liable for any health outcomes or damages.\n\n9. TERMINATION\nWe may terminate accounts that violate these terms.\n\n10. CHANGES TO TERMS\nWe may update these terms with notice to users.\n\nFor full terms, visit: https://fitfaat.com/terms",
+          legalDocuments.terms.body,
           [{ text: "OK" }]
         );
         break;
@@ -112,41 +124,6 @@ export default function Settings() {
             } catch (error) {
               Alert.alert("Error", "Failed to sign out. Please try again.");
             }
-          }
-        }
-      ]
-    );
-  };
-
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      "Delete Account",
-      "This action cannot be undone. All your data will be permanently deleted. Are you sure?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Delete Account", 
-          style: "destructive",
-          onPress: () => {
-            Alert.alert(
-              "Final Confirmation",
-              "This will permanently delete your account and all associated data. Type 'DELETE' to confirm.",
-              [
-                { text: "Cancel", style: "cancel" },
-                { 
-                  text: "Delete Forever", 
-                  style: "destructive",
-                  onPress: () => {
-                    // In a real app, this would call an API to delete the account
-                    Alert.alert(
-                      "Account Deletion",
-                      "Account deletion request submitted. You will receive a confirmation email.",
-                      [{ text: "OK" }]
-                    );
-                  }
-                }
-              ]
-            );
           }
         }
       ]
@@ -237,6 +214,17 @@ export default function Settings() {
               title="Premium"
               subtitle="Upgrade to unlock premium features"
               onPress={() => handleSettingPress("Premium")}
+            />
+          </View>
+
+          {/* Professional Access Section */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Professional Access</Text>
+            <SettingItem
+              icon="medkit-outline"
+              title="Join as Doctor"
+              subtitle="Register or manage your doctor profile"
+              onPress={() => router.push("/(main)/(doctor-portal)")}
             />
           </View>
 
@@ -331,14 +319,6 @@ export default function Settings() {
             </TouchableOpacity>
           </View>
 
-          {/* Delete Account Section */}
-          <View style={styles.section}>
-            <TouchableOpacity style={[styles.deleteAccountButton, { backgroundColor: colors.cardBackground, borderColor: colors.error + '40' }]} onPress={handleDeleteAccount}>
-              <Ionicons name="trash-outline" size={24} color={colors.error} />
-              <Text style={[styles.deleteAccountText, { color: colors.error }]}>Delete Account</Text>
-            </TouchableOpacity>
-        </View>
-
           <View style={{ height: hp(12) }} />
           </ScrollView>
         </View>
@@ -428,26 +408,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   logoutText: {
-    fontSize: hp(1.8),
-    fontWeight: '600',
-    marginLeft: wp(2),
-  },
-  deleteAccountButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: hp(2),
-    paddingHorizontal: wp(4),
-    marginBottom: hp(0.5),
-    borderRadius: hp(1.5),
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-    borderWidth: 1,
-  },
-  deleteAccountText: {
     fontSize: hp(1.8),
     fontWeight: '600',
     marginLeft: wp(2),

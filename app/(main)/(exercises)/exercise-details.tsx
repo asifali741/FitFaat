@@ -11,6 +11,7 @@ import {
   widthPercentageToDP as wp,
 } from "react-native-responsive-screen";
 import { useTheme } from "@/contexts/ThemeContext";
+import { recordCompletedWorkoutLocally } from "@/utils/achievementStorage";
 import { exerciseApi } from "@/utils/exerciseApi";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
 
@@ -183,6 +184,12 @@ export default function ExerciseDetails() {
       );
 
       if (response.success) {
+        await recordCompletedWorkoutLocally({
+          exerciseName: exerciseData.name,
+          durationSeconds: totalTime,
+          completedAt: new Date().toISOString(),
+        });
+
         // Build success message with calorie info
         let successMessage = `Exercise "${exerciseData.name}" saved!\n`;
         successMessage += `⏱️  Duration: ${formatTime(totalTime)}\n`;

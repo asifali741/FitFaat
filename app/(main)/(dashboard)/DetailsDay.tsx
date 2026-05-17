@@ -2,17 +2,33 @@ import { pakistaniDishes } from '@/app/Dataset/dataSet';
 import { drinksDataSet } from '@/app/Dataset/waterDataSet';
 import BackButton from '@/components/BackButton';
 import PatientDietPlanViewer from '@/components/PatientDietPlanViewer';
-import { goalBasedSuggestions, waterIntakeDatabase } from '@/constants/foodDatabase';
+import {
+    dietPreferenceOptions,
+    DIET_PREFERENCE_STORAGE_KEY,
+    filterFoodsByDietPreference,
+    getDietPreferenceLabel,
+    getDietTypeForFood,
+    type DietPreference,
+    waterIntakeDatabase,
+} from '@/constants/foodDatabase';
 import { HEADER_PADDING_HORIZONTAL } from '@/constants/ui';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { useTheme } from "@/contexts/ThemeContext";
+import { recordEarlyLogLocally } from '@/utils/achievementStorage';
+import {
+    applyAdaptiveGoalsToJsonResponse,
+    loadAdaptiveGoalCarryForward,
+    saveAdaptiveGoalCarryForward,
+} from '@/utils/adaptiveGoals';
 import { dailyLogsApi } from '@/utils/dailyLogsApi';
 import { customRecipesApi, CustomRecipeData } from '@/utils/customRecipesApi';
 import { recordNutritionProfileEntry, scheduleAdaptiveNutritionNotifications } from '@/utils/nutritionProfile';
+import { tokenStorage } from '@/utils/auth/tokenStorage';
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { Audio } from 'expo-av';
 import Constants from 'expo-constants';
 import * as ImagePicker from 'expo-image-picker';
+import * as NavigationBar from 'expo-navigation-bar';
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Modal } from "react-native";
@@ -23,12 +39,228 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Day as typeDay } from "./types";
-import { getBackendBaseUrl } from '@/utils/config';
+import { getBackendBaseUrl, getConfigValue } from '@/utils/config';
 interface ProgressCircleProps {
   achievedCalories: number;
   targetCalories: number;
   achieviedHydration: number;
   targetHydration: number;
+};
+
+const isDietPreference = (value: string | null): value is DietPreference =>
+    value === 'all' || value === 'vegetarian' || value === 'nonVegetarian';
+
+const normalizeFoodSearchText = (value: unknown) =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const foodDetectionStopWords = new Set([
+  'food',
+  'dish',
+  'plate',
+  'meal',
+  'cuisine',
+  'lunch',
+  'dinner',
+  'breakfast',
+  'cooked',
+  'prepared',
+]);
+
+const getFoodTitle = (food: any) =>
+  String(food?.food_name || food?.name || food?.foodName || food?.recipeName || '');
+
+const getDetectionTokens = (value: unknown) =>
+  normalizeFoodSearchText(value)
+    .split(' ')
+    .filter((token) => token.length > 2 && !foodDetectionStopWords.has(token));
+
+const collectDetectionTerms = (payload: any): string[] => {
+  const terms: string[] = [];
+  const addTerm = (value: any) => {
+    if (typeof value === 'string' && normalizeFoodSearchText(value).length > 1) {
+      terms.push(value);
+    }
+  };
+  const visitPrediction = (prediction: any) => {
+    if (!prediction || typeof prediction !== 'object') return;
+    addTerm(prediction.foodName);
+    addTerm(prediction.food_name);
+    addTerm(prediction.detectedFood);
+    addTerm(prediction.detected_food);
+    addTerm(prediction.label);
+    addTerm(prediction.name);
+    addTerm(prediction.class);
+    addTerm(prediction.tag);
+    addTerm(prediction.prediction);
+  };
+
+  visitPrediction(payload);
+
+  ['labels', 'foods', 'foodItems', 'predictions', 'concepts', 'results', 'tags'].forEach((key) => {
+    const value = payload?.[key];
+    if (Array.isArray(value)) {
+      value.forEach((item) => {
+        if (typeof item === 'string') {
+          addTerm(item);
+        } else {
+          visitPrediction(item);
+        }
+      });
+    }
+  });
+
+  if (Array.isArray(payload?.outputs)) {
+    payload.outputs.forEach((output: any) => {
+      output?.data?.concepts?.forEach(visitPrediction);
+    });
+  }
+
+  return Array.from(new Set(terms.map(normalizeFoodSearchText))).filter(Boolean);
+};
+
+const detectFoodWithOpenRouterFallback = async (imageBase64?: string | null) => {
+  const apiKey = getConfigValue('OPENROUTER_API_KEY');
+  if (!apiKey) {
+    throw new Error('Food detection is not configured. Missing OpenRouter API key.');
+  }
+  if (!imageBase64) {
+    throw new Error('Selected image data was not available for AI detection.');
+  }
+
+  const modelId = 'meta-llama/llama-4-scout-17b-16e-instruct';
+
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://fitfaat.com',
+      'X-Title': 'FitFaat',
+    },
+    body: JSON.stringify({
+      model: modelId,
+      response_format: { type: 'json_object' },
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: 'Analyze this image and identify the main food dish. Respond ONLY with a JSON object containing a single key "foodName" with the most specific name of the dish (e.g. "Chicken Biryani", "Daal Chana", "Apple"). If it is not food, return "Unknown".',
+            },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:image/jpeg;base64,${imageBase64}`,
+              },
+            },
+          ],
+        },
+      ],
+    }),
+  });
+
+  const responseText = await response.text();
+  let data: any = {};
+  try {
+    data = JSON.parse(responseText);
+  } catch {
+    throw new Error('Invalid response from AI detection service.');
+  }
+
+  if (!response.ok) {
+    throw new Error(data?.error?.message || 'Failed to detect food in the image');
+  }
+
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) {
+    throw new Error('AI returned an empty response.');
+  }
+
+  let parsedContent: any = {};
+  try {
+    parsedContent = JSON.parse(content);
+  } catch {
+    // Fallback if AI didn't return strict JSON
+    parsedContent = { foodName: content.replace(/```json|```/g, '').trim() };
+  }
+
+  if (parsedContent.foodName && parsedContent.foodName !== 'Unknown') {
+    return {
+      success: true,
+      foodName: parsedContent.foodName,
+      confidence: 1.0,
+      source: `openrouter-${modelId}`,
+    };
+  }
+
+  throw new Error('Could not confidently identify food in this image.');
+};
+
+
+const findBestPakistaniDishMatch = (terms: string[], preference: DietPreference) => {
+  const filteredDishes = filterFoodsByDietPreference(pakistaniDishes, preference) as any[];
+  const allTokens = new Set(terms.flatMap(getDetectionTokens));
+  const hasChicken = allTokens.has('chicken') || allTokens.has('murgh');
+  const hasRice = allTokens.has('rice') || allTokens.has('biryani') || allTokens.has('pulao');
+
+  const fallbackNames = hasChicken && hasRice
+    ? ['Chicken Biryani', 'Chicken Pulao', 'Chicken Pulao (Plain)', 'Chicken Fried Rice']
+    : hasRice
+      ? ['Boiled White Rice', 'Chicken Biryani', 'Chicken Pulao']
+      : hasChicken
+        ? ['Chicken Tikka Boti (Grilled)', 'Chicken Karahi', 'Chicken Biryani']
+        : [];
+
+  let bestMatch: any = null;
+  let bestScore = 0;
+
+  filteredDishes.forEach((dish) => {
+    const title = normalizeFoodSearchText(getFoodTitle(dish));
+    const category = normalizeFoodSearchText(dish?.category);
+    const titleTokens = new Set(getDetectionTokens(title));
+    let score = 0;
+
+    terms.forEach((term) => {
+      const normalizedTerm = normalizeFoodSearchText(term);
+      if (!normalizedTerm) return;
+
+      if (title === normalizedTerm) score += 180;
+      if (title.includes(normalizedTerm)) score += 120;
+      if (normalizedTerm.includes(title)) score += 100;
+
+      getDetectionTokens(normalizedTerm).forEach((token) => {
+        if (titleTokens.has(token)) score += 24;
+        if (category.includes(token)) score += 8;
+      });
+    });
+
+    if (hasChicken && hasRice && title.includes('chicken')) {
+      if (title.includes('biryani')) score += 90;
+      if (title.includes('pulao')) score += 75;
+      if (title.includes('fried rice')) score += 65;
+      if (category.includes('rice')) score += 45;
+    }
+
+    if (hasChicken && title.includes('chicken')) score += 24;
+    if (hasRice && (title.includes('rice') || category.includes('rice'))) score += 24;
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestMatch = dish;
+    }
+  });
+
+  if (bestMatch && bestScore >= 32) return bestMatch;
+
+  return fallbackNames
+    .map((name) => filteredDishes.find((dish) => normalizeFoodSearchText(getFoodTitle(dish)) === normalizeFoodSearchText(name)))
+    .find(Boolean) || null;
 };
 
 const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
@@ -140,7 +372,26 @@ export default function DetailsDay () {
             }
 
             console.log(`🚀 Completing Day ${dayData.dayNo}...`);
+            if (Number(dayData.dayNo) >= 7) {
+              const cached = await AsyncStorage.getItem('JsonResponse');
+              const parsed = cached ? JSON.parse(cached) : null;
+              const cachedData = parsed?.data || parsed || {};
+              const dayKey = `day0${dayData.dayNo}`;
+
+              await saveAdaptiveGoalCarryForward(
+                {
+                  ...cachedData,
+                  [dayKey]: {
+                    ...(cachedData?.[dayKey] || {}),
+                    ...dayData,
+                    status: 'finished',
+                  },
+                },
+                { weeklyTrackingId }
+              );
+            }
             const result = await dailyLogsApi.completeDay(weeklyTrackingId, dayData.dayNo);
+            await AsyncStorage.removeItem('JsonResponse');
             
             if (result.cycleRestarted) {
               setCompletionModalType('weekComplete');
@@ -195,11 +446,11 @@ export default function DetailsDay () {
     const [foodSearch, setFoodSearch] = useState<string>('');
     const [filteredFoods, setFilteredFoods] = useState<any[]>([]);
     const [showFoodSearch, setShowFoodSearch] = useState(false);
-    const [suggestedFoods, setSuggestedFoods] = useState<any[]>([]);
     const [mealQuantity, setMealQuantity] = useState<string>('1');
     const [waterInput, setWaterInput] = useState<string>('0'); // Default to 0
     const [showWaterTab, setShowWaterTab] = useState(false);
     const [trackingMode, setTrackingMode] = useState<'meal' | 'hydration'>('meal');
+    const [dietPreference, setDietPreference] = useState<DietPreference>('all');
     
     // Drink search states
     const [drinkSearch, setDrinkSearch] = useState<string>('');
@@ -207,6 +458,54 @@ export default function DetailsDay () {
     const [showDrinkSearch, setShowDrinkSearch] = useState(false);
     const [selectedDrink, setSelectedDrink] = useState<any>(null);
     const [drinkQuantity, setDrinkQuantity] = useState<string>('1');
+
+    const syncUpdatedDayToLocalCache = async (updatedDayData: any) => {
+      try {
+        const cached = await AsyncStorage.getItem('JsonResponse');
+        if (!cached) return updatedDayData;
+
+        const parsed = JSON.parse(cached);
+        const cachedData = parsed?.data || parsed;
+        const dayKey = `day0${updatedDayData.dayNo}`;
+
+        if (!cachedData?.[dayKey]) return updatedDayData;
+
+        const weeklyTrackingId = await AsyncStorage.getItem('weeklyTrackingId');
+        const carryForward = await loadAdaptiveGoalCarryForward({
+          currentWeeklyTrackingId: weeklyTrackingId,
+        });
+        const nextData = applyAdaptiveGoalsToJsonResponse(
+          {
+            ...cachedData,
+            [dayKey]: {
+              ...cachedData[dayKey],
+              ...updatedDayData,
+            },
+          },
+          undefined,
+          carryForward
+        );
+        const nextDayData = nextData[dayKey] || updatedDayData;
+        const nextStore = parsed?.data
+          ? { ...parsed, data: nextData, timestamp: new Date() }
+          : { data: nextData, timestamp: new Date() };
+
+        await AsyncStorage.setItem('JsonResponse', JSON.stringify(nextStore));
+
+        return {
+          ...updatedDayData,
+          baseTargetCalories: nextDayData.baseTargetCalories,
+          baseTargetHydration: nextDayData.baseTargetHydration,
+          targetCalories: nextDayData.targetCalories,
+          targetHydration: nextDayData.targetHydration,
+          adaptiveCaloriesAdjustment: nextDayData.adaptiveCaloriesAdjustment,
+          adaptiveHydrationAdjustment: nextDayData.adaptiveHydrationAdjustment,
+        };
+      } catch (cacheError) {
+        console.error('Error syncing adaptive goals cache:', cacheError);
+        return updatedDayData;
+      }
+    };
     
     // Image detection states
     const [isDetectingDish, setIsDetectingDish] = useState(false);
@@ -239,6 +538,21 @@ export default function DetailsDay () {
       carbs_g: '',
       fat_g: ''
     });
+
+    useEffect(() => {
+      const loadDietPreference = async () => {
+        try {
+          const savedPreference = await AsyncStorage.getItem(DIET_PREFERENCE_STORAGE_KEY);
+          if (isDietPreference(savedPreference)) {
+            setDietPreference(savedPreference);
+          }
+        } catch (error) {
+          console.error('Error loading diet preference:', error);
+        }
+      };
+
+      loadDietPreference();
+    }, []);
     
     // Fetch user's custom recipes on mount
     useEffect(() => {
@@ -254,35 +568,41 @@ export default function DetailsDay () {
       fetchCustomRecipes();
     }, []);
     
-    // Extract userGoal to avoid infinite loop with props dependency
-    const userGoal = (props as any).userGoal || 3;
-    
-    // Memoize suggested foods to prevent infinite re-renders
-    const combinedSuggestedFoods = useMemo(() => {
-      const suggestions = goalBasedSuggestions[userGoal as keyof typeof goalBasedSuggestions];
-      
-      // Convert custom recipes to food format
-      const customRecipesAsFoods = userCustomRecipes.map(recipe => ({
-        food_name: recipe.recipeName,
-        serving_size: recipe.servingSize,
-        calories_kcal: recipe.calories_kcal,
-        calories: recipe.calories_kcal,
-        protein_g: recipe.protein_g,
-        carbs_g: recipe.carbs_g,
-        fat_g: recipe.fat_g,
-        category: 'Custom Recipe',
-        isCustomRecipe: true,
-        _id: recipe._id
-      }));
-      
-      // Custom recipes first, then goal-based suggestions
-      return [...customRecipesAsFoods, ...(suggestions?.foods || [])];
-    }, [userGoal, userCustomRecipes]);
-    
-    // Update suggested foods when combined suggestions change
-    useEffect(() => {
-      setSuggestedFoods(combinedSuggestedFoods);
-    }, [combinedSuggestedFoods]);
+    const handleDietPreferenceChange = async (preference: DietPreference) => {
+      setDietPreference(preference);
+      setSelectedFoodItem(null);
+      setFoodSearch('');
+      setFilteredFoods([]);
+      setShowFoodSearch(false);
+
+      try {
+        await AsyncStorage.setItem(DIET_PREFERENCE_STORAGE_KEY, preference);
+      } catch (error) {
+        console.error('Error saving diet preference:', error);
+      }
+    };
+
+    const quickPickFoods = useMemo<any[]>(() => {
+      const getFoodTitle = (food: any) => String(food?.food_name || food?.name || '').toLowerCase();
+      const uniquePakistaniDishes = pakistaniDishes.filter((food: any, index: number, foods: any[]) => {
+        const title = getFoodTitle(food);
+        return title.length > 0 && foods.findIndex((item: any) => getFoodTitle(item) === title) === index;
+      });
+      const preferredByPreference: Record<DietPreference, string[]> = {
+        all: ['Chicken Biryani', 'Daal Chana', 'Chicken Tikka Boti (Grilled)'],
+        vegetarian: ['Chana Chaat', 'Daal Chana', 'Palak Paneer (Spinach with Cheese)'],
+        nonVegetarian: ['Chicken Biryani', 'Chicken Tikka Boti (Grilled)', 'Mutton Karahi'],
+      };
+      const preferredNames = preferredByPreference[dietPreference].map((name) => name.toLowerCase());
+      const preferredFoods = preferredNames
+        .map((name) => uniquePakistaniDishes.find((food: any) => getFoodTitle(food) === name))
+        .filter((food): food is any => Boolean(food))
+        .filter((food) => dietPreference === 'all' || getDietTypeForFood(food) === dietPreference);
+      const fallbackFoods = filterFoodsByDietPreference(uniquePakistaniDishes, dietPreference)
+        .filter((food: any) => !preferredNames.includes(getFoodTitle(food))) as any[];
+
+      return [...preferredFoods, ...fallbackFoods].slice(0, 3);
+    }, [dietPreference]);
     
     // Handle food search with custom recipes and Pakistani dishes dataset
     useEffect(() => {
@@ -300,17 +620,22 @@ export default function DetailsDay () {
             protein_g: recipe.protein_g,
             carbs_g: recipe.carbs_g,
             fat_g: recipe.fat_g,
+            ingredients: recipe.ingredients,
             category: '⭐ My Recipe',
             isCustomRecipe: true,
             _id: recipe._id
-          }));
+          }))
+          .filter(recipe => dietPreference === 'all' || getDietTypeForFood(recipe) === dietPreference);
         
         // Search Pakistani dishes
-        const dishMatches = pakistaniDishes.filter((dish: any) => {
-          const name = dish.food_name || dish.name || '';
-          const category = dish.category || '';
-          return name.toLowerCase().includes(query) || category.toLowerCase().includes(query);
-        }).slice(0, 10);
+        const dishMatches = filterFoodsByDietPreference(
+          pakistaniDishes.filter((dish: any) => {
+            const name = dish.food_name || dish.name || '';
+            const category = dish.category || '';
+            return name.toLowerCase().includes(query) || category.toLowerCase().includes(query);
+          }),
+          dietPreference
+        ).slice(0, 10);
         
         // Combine: custom recipes first, then database dishes
         const results = [...customRecipeMatches, ...dishMatches].slice(0, 15);
@@ -320,7 +645,7 @@ export default function DetailsDay () {
         setShowFoodSearch(false);
         setFilteredFoods([]);
       }
-    }, [foodSearch, userCustomRecipes]);
+    }, [dietPreference, foodSearch, userCustomRecipes]);
 
     // Handle drink search with drinks dataset
     useEffect(() => {
@@ -338,7 +663,7 @@ export default function DetailsDay () {
       }
     }, [drinkSearch]);
 
-    // Detect dish from image using Google Vision API
+    // Detect dish from image using backend AI food detection.
     const detectDishFromImage = async () => {
       try {
         // Request permission
@@ -350,10 +675,11 @@ export default function DetailsDay () {
 
         // Pick image
         const result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          mediaTypes: ['images'],
           allowsEditing: true,
           aspect: [4, 3],
           quality: 0.8,
+          base64: true,
         });
 
         if (result.canceled || !result.assets || result.assets.length === 0) {
@@ -361,13 +687,20 @@ export default function DetailsDay () {
         }
 
         setIsDetectingDish(true);
-        const imageUri = result.assets[0].uri;
+        const asset = result.assets[0];
+        const imageUri = asset.uri;
 
         // Prepare FormData
         const formData = new FormData();
-        const filename = imageUri.split('/').pop() || 'image.jpg';
-        const match = /\.(\w+)$/.exec(filename);
-        const type = match ? `image/${match[1]}` : 'image/jpeg';
+        const originalFilename = asset.fileName || imageUri.split('/').pop() || '';
+        const detectedMimeType = asset.mimeType?.startsWith('image/')
+          ? asset.mimeType
+          : 'image/jpeg';
+        const type = detectedMimeType === 'image/jpg' ? 'image/jpeg' : detectedMimeType;
+        const fallbackExtension = type.split('/')[1] === 'jpeg' ? 'jpg' : type.split('/')[1] || 'jpg';
+        const filename = /\.[a-z0-9]+$/i.test(originalFilename)
+          ? originalFilename
+          : `dish-${Date.now()}.${fallbackExtension}`;
 
         formData.append('image', {
           uri: imageUri,
@@ -378,35 +711,72 @@ export default function DetailsDay () {
         // Get backend URL
         const base = getBackendBaseUrl();
         const apiUrl = base.replace(/\/api\/?$/, '') + '/api/food-detect/upload';
+        const token = await tokenStorage.getToken();
+        const headers: Record<string, string> = {
+          Accept: 'application/json',
+        };
 
-        // Upload to backend (Clarifai food detection)
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          body: formData,
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
 
-        const data = await response.json();
+        let data: any = {};
+        let backendFailureMessage = '';
 
-        if (data.success && data.foodName) {
-          const dishName = data.foodName;
+        try {
+          // Upload to backend first; direct Clarifai fallback below keeps detection working if backend misses.
+          const response = await fetch(apiUrl, {
+            method: 'POST',
+            body: formData,
+            headers,
+          });
+
+          const responseText = await response.text();
+          try {
+            data = responseText ? JSON.parse(responseText) : {};
+          } catch {
+            data = { message: responseText };
+          }
+
+          if (!response.ok || !data.success) {
+            backendFailureMessage = data.message || `Food detection request failed (${response.status})`;
+          }
+        } catch (backendError) {
+          backendFailureMessage = backendError instanceof Error
+            ? backendError.message
+            : 'Backend food detection failed';
+        }
+
+        if (!data.success) {
+          console.log('Backend food detection failed, trying direct OpenRouter fallback:', backendFailureMessage);
+          try {
+            data = await detectFoodWithOpenRouterFallback(asset.base64);
+          } catch (fallbackError) {
+            throw new Error(
+              fallbackError instanceof Error
+                ? fallbackError.message
+                : backendFailureMessage || 'Failed to detect food in the image'
+            );
+          }
+        }
+
+        const detectionTerms = collectDetectionTerms(data);
+        const bestMatch = findBestPakistaniDishMatch(detectionTerms, dietPreference);
+        const dishName = data.foodName || data.food_name || detectionTerms[0] || '';
+        const confidence = Number(data.confidence ?? data.score ?? data.probability ?? 0);
+        const confidencePercent = confidence > 1 ? confidence : confidence * 100;
+        const confidenceLine = confidencePercent > 0
+          ? `\nConfidence: ${Math.round(confidencePercent)}%`
+          : '';
+
+        if ((data.success && dishName) || bestMatch) {
           setDetectedDishName(dishName);
           
           // Auto-search in the food database
-          setFoodSearch(dishName);
-          
-          // Try to find exact or partial match
-          const query = dishName.toLowerCase();
-          const matches = pakistaniDishes.filter((dish: any) => {
-            const name = (dish.food_name || dish.name || '').toLowerCase();
-            return name.includes(query) || query.includes(name);
-          });
+          setFoodSearch(dishName || getFoodTitle(bestMatch));
 
-          if (matches.length > 0) {
+          if (bestMatch) {
             // Auto-select the best match
-            const bestMatch = matches[0];
             setSelectedFoodItem(bestMatch);
             const calories = bestMatch.calories_kcal || 0;
             setCalorieInput(String(Math.round(calories * parseFloat(mealQuantity || '1'))));
@@ -414,7 +784,7 @@ export default function DetailsDay () {
             
             Alert.alert(
               'Food Detected! 🎯',
-              `Found: ${bestMatch.food_name || bestMatch.name}\nCalories: ${calories} kcal\nConfidence: ${Math.round(data.confidence * 100)}%\n\nYou can adjust the quantity and add the meal.`,
+              `Found: ${getFoodTitle(bestMatch)}\nCalories: ${calories} kcal${confidenceLine}\n\nYou can adjust the quantity and add the meal.`,
               [{ text: 'OK' }]
             );
           } else {
@@ -422,7 +792,7 @@ export default function DetailsDay () {
             setShowFoodSearch(true);
             Alert.alert(
               'Food Detected',
-              `Detected: ${dishName}\nConfidence: ${Math.round(data.confidence * 100)}%\n\nPlease select from the search results or enter details manually.`,
+              `Detected: ${dishName}${confidenceLine}\n\nPlease select from the search results or enter details manually.`,
               [{ text: 'OK' }]
             );
           }
@@ -431,7 +801,12 @@ export default function DetailsDay () {
         }
       } catch (error) {
         console.error('Image detection error:', error);
-        Alert.alert('Error', 'Failed to process the image. Please try again.');
+        Alert.alert(
+          'Detection Failed',
+          error instanceof Error
+            ? error.message
+            : 'Failed to process the image. Please try again.'
+        );
       } finally {
         setIsDetectingDish(false);
       }
@@ -445,6 +820,20 @@ export default function DetailsDay () {
 
     const fade = useSharedValue(1);
     const insets = useSafeAreaInsets();
+
+    useEffect(() => {
+      if (Platform.OS !== 'android') return;
+
+      if (showCustomRecipeModal) {
+        NavigationBar.setBackgroundColorAsync('#FFFFFF').catch(() => {});
+        NavigationBar.setButtonStyleAsync('dark').catch(() => {});
+        NavigationBar.setStyle('light');
+      } else {
+        NavigationBar.setBackgroundColorAsync(colors.screenColor || '#FFFFFF').catch(() => {});
+        NavigationBar.setButtonStyleAsync('dark').catch(() => {});
+      }
+    }, [colors.screenColor, showCustomRecipeModal]);
+
     // trigger fade-out + menu
     const openMenu = () => {
     fade.value = withTiming(
@@ -477,7 +866,7 @@ export default function DetailsDay () {
     // Image picker functions
     const pickImage = async () => {
         const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            mediaTypes: ['images'],
             allowsEditing: true,
             aspect: [4, 3],
             quality: 0.8,
@@ -490,7 +879,7 @@ export default function DetailsDay () {
 
     const takePhoto = async () => {
         const result = await ImagePicker.launchCameraAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            mediaTypes: ['images'],
             allowsEditing: true,
             aspect: [4, 3],
             quality: 0.8,
@@ -559,7 +948,7 @@ export default function DetailsDay () {
             ]
         );
     };
-    const styles = useMemo(() => getStyles(colors), [colors]);
+    const styles = useMemo(() => getStyles(colors, insets.bottom), [colors, insets.bottom]);
     //output
     return (
   <View style={{ flex: 1, paddingTop: insets.top, backgroundColor: colors.screenColor }}>
@@ -569,7 +958,7 @@ export default function DetailsDay () {
       >
         <View style={styles.heading}>
           <View style={styles.headerContent}>
-            <BackButton style={styles.backButton} testID="detailsday-back" />
+            <BackButton style={styles.backButton} testID="detailsday-back" color="#000000" />
             <View style={styles.dayDateWrapper}>
               <View style={styles.dayBadge}>
                 <Text style={styles.dayNumber}>0{props.dayNo}</Text>
@@ -623,12 +1012,12 @@ export default function DetailsDay () {
                     </View>
                     <View style={styles.goalRowContainer}>
                       <View style={styles.goalItem}>
-                        <Text style={styles.statValue}>{dayData.targetCalories}</Text>
+                        <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{dayData.targetCalories}</Text>
                         <Text style={styles.statUnit}>cals</Text>
                       </View>
                       <View style={styles.goalDivider} />
                       <View style={styles.goalItem}>
-                        <Text style={styles.statValue}>{dayData.targetHydration}</Text>
+                        <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{dayData.targetHydration}</Text>
                         <Text style={styles.statUnit}>liters</Text>
                       </View>
                     </View>
@@ -639,7 +1028,7 @@ export default function DetailsDay () {
                       <Ionicons name="flame" size={Math.min(hp(2.2), wp(5.5))} color="#F97316" />
                       <Text style={styles.statLabel}>Calories</Text>
                     </View>
-                    <Text style={styles.statValue}>{dayData.achievedCalories}</Text>
+                    <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{dayData.achievedCalories}</Text>
                     <Text style={styles.statUnit}>cals</Text>
                   </View>
 
@@ -648,7 +1037,7 @@ export default function DetailsDay () {
                       <Ionicons name="water" size={Math.min(hp(2.2), wp(5.5))} color="#2E86AB" />
                       <Text style={styles.statLabel}>Hydration</Text>
                     </View>
-                    <Text style={styles.statValue}>{dayData.achieviedHydration}</Text>
+                    <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{dayData.achieviedHydration}</Text>
                     <Text style={styles.statUnit}>liters</Text>
                   </View>
 
@@ -747,12 +1136,12 @@ export default function DetailsDay () {
                     </View>
                     <View style={styles.goalRowContainer}>
                       <View style={styles.goalItem}>
-                        <Text style={styles.statValue}>{dayData.targetCalories}</Text>
+                        <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{dayData.targetCalories}</Text>
                         <Text style={styles.statUnit}>cals</Text>
                       </View>
                       <View style={styles.goalDivider} />
                       <View style={styles.goalItem}>
-                        <Text style={styles.statValue}>{dayData.targetHydration}</Text>
+                        <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{dayData.targetHydration}</Text>
                         <Text style={styles.statUnit}>liters</Text>
                       </View>
                     </View>
@@ -763,7 +1152,7 @@ export default function DetailsDay () {
                       <Ionicons name="flame" size={Math.min(hp(2.2), wp(5.5))} color="#F97316" />
                       <Text style={styles.statLabel}>Calories</Text>
                     </View>
-                    <Text style={styles.statValue}>{dayData.achievedCalories}</Text>
+                    <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{dayData.achievedCalories}</Text>
                     <Text style={styles.statUnit}>cals</Text>
                   </View>
 
@@ -772,7 +1161,7 @@ export default function DetailsDay () {
                       <Ionicons name="water" size={Math.min(hp(2.2), wp(5.5))} color="#2E86AB" />
                       <Text style={styles.statLabel}>Hydration</Text>
                     </View>
-                    <Text style={styles.statValue}>{dayData.achieviedHydration}</Text>
+                    <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{dayData.achieviedHydration}</Text>
                     <Text style={styles.statUnit}>liters</Text>
                   </View>
 
@@ -894,33 +1283,203 @@ export default function DetailsDay () {
           {/* MEAL TRACKING MODE */}
           {trackingMode === 'meal' && (
             <>
+              {/* Food Preference Filter */}
+              <View style={styles.sectionContainer}>
+                <Text style={styles.sectionLabel}>Food Preference</Text>
+                <View style={styles.dietFilterContainer}>
+                  {dietPreferenceOptions.map((option) => {
+                    const isActive = dietPreference === option.value;
+
+                    return (
+                      <TouchableOpacity
+                        key={option.value}
+                        style={[
+                          styles.dietFilterButton,
+                          isActive && {
+                            backgroundColor: colors.primary,
+                            borderColor: colors.primary,
+                          },
+                        ]}
+                        onPress={() => handleDietPreferenceChange(option.value)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons
+                          name={option.icon}
+                          size={Math.min(hp(2), wp(4.5))}
+                          color={isActive ? '#FFFFFF' : colors.textSecondary}
+                        />
+                        <Text
+                          style={[
+                            styles.dietFilterText,
+                            { color: isActive ? '#FFFFFF' : colors.textSecondary },
+                          ]}
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                        >
+                          {option.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Search Food Field */}
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>
+                  <Ionicons name="search" size={16} color={colors.primary} /> Search Food
+                </Text>
+                <View style={styles.searchInputContainer}>
+                  <Ionicons name="search-outline" size={20} color={colors.textSecondary} style={styles.searchIconLeft} />
+                  <TextInput
+                    style={styles.searchInputField}
+                    placeholder={`Search ${getDietPreferenceLabel(dietPreference).toLowerCase()} foods...`}
+                    placeholderTextColor={colors.textSecondary}
+                    value={foodSearch}
+                    onChangeText={setFoodSearch}
+                  />
+                  {foodSearch.length > 0 && (
+                    <TouchableOpacity onPress={() => { setFoodSearch(''); setShowFoodSearch(false); }} style={styles.searchClearButton}>
+                      <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
+              {/* Search Results with Better Spacing */}
+              {showFoodSearch && filteredFoods.length > 0 && (
+                <View style={styles.searchResultsContainer}>
+                  <Text style={styles.searchResultsHeader}>
+                    Found {filteredFoods.length} {getDietPreferenceLabel(dietPreference).toLowerCase()} items - Select one
+                  </Text>
+                  <ScrollView style={styles.searchResultsScroll} nestedScrollEnabled showsVerticalScrollIndicator={true}>
+                    {filteredFoods.slice(0, 10).map((food, index) => {
+                      const foodDietType = getDietTypeForFood(food);
+
+                      return (
+                        <TouchableOpacity
+                          key={index}
+                          style={styles.searchResultCard}
+                          onPress={() => {
+                            setSelectedFoodItem(food);
+                            const calories = food.calories_kcal || food.calories || 0;
+                            setCalorieInput(String(Math.round(calories * parseFloat(mealQuantity || '1'))));
+                            setFoodSearch('');
+                            setShowFoodSearch(false);
+                          }}
+                          activeOpacity={0.6}
+                        >
+                          <View style={styles.searchResultLeft}>
+                            <View style={styles.searchResultIconBg}>
+                              <Ionicons name="fast-food" size={18} color={colors.primary} />
+                            </View>
+                            <View style={styles.searchResultInfo}>
+                              <Text style={styles.searchResultTitle}>{food.food_name || food.name}</Text>
+                              <Text style={styles.searchResultMeta}>
+                                {food.serving_size || food.category || '100g'}
+                              </Text>
+                              <View
+                                style={[
+                                  styles.searchDietBadge,
+                                  {
+                                    backgroundColor:
+                                      foodDietType === 'vegetarian' ? colors.success + '18' : colors.warning + '18',
+                                  },
+                                ]}
+                              >
+                                <Ionicons
+                                  name={foodDietType === 'vegetarian' ? 'leaf-outline' : 'flame-outline'}
+                                  size={Math.min(hp(1.2), wp(2.7))}
+                                  color={foodDietType === 'vegetarian' ? colors.success : colors.warning}
+                                />
+                                <Text
+                                  style={[
+                                    styles.searchDietBadgeText,
+                                    { color: foodDietType === 'vegetarian' ? colors.success : colors.warning },
+                                  ]}
+                                >
+                                  {foodDietType === 'vegetarian' ? 'Veg' : 'Non-Veg'}
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+                          <View style={styles.searchResultRight}>
+                            <Text style={styles.searchResultCalValue}>{food.calories_kcal || food.calories}</Text>
+                            <Text style={styles.searchResultCalLabel}>cal</Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              )}
+
               {/* Quick Pick Suggestions */}
               <View style={styles.sectionContainer}>
-                <Text style={styles.sectionLabel}>Quick Pick Favorites</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickPickScroll}>
-                  {suggestedFoods.slice(0, 6).map((food, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={styles.quickPickItem}
-                      onPress={() => {
-                        setSelectedFoodItem(food);
-                        setCalorieInput(String(food.calories_kcal || food.calories));
-                        setFoodSearch('');
-                        setShowFoodSearch(false);
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.quickPickIcon}>
-                        <Ionicons name="restaurant" size={20} color={colors.primary} />
-                      </View>
-                      <Text style={styles.quickPickName} numberOfLines={2}>{food.food_name || food.name}</Text>
-                      <View style={styles.quickPickCalories}>
-                        <Ionicons name="flame" size={12} color="#F97316" />
-                        <Text style={styles.quickPickCalText}>{food.calories_kcal || food.calories}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={styles.sectionLabel}>Quick Pick Favorites</Text>
+                  <Text style={styles.dietFilterSummary}>{getDietPreferenceLabel(dietPreference)}</Text>
+                </View>
+                {quickPickFoods.length > 0 ? (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickPickScroll}>
+                    {quickPickFoods.map((food, index) => {
+                      const foodDietType = getDietTypeForFood(food);
+
+                      return (
+                        <TouchableOpacity
+                          key={index}
+                          style={styles.quickPickItem}
+                          onPress={() => {
+                            setSelectedFoodItem(food);
+                            setCalorieInput(String(food.calories_kcal || food.calories));
+                            setFoodSearch('');
+                            setShowFoodSearch(false);
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <View style={styles.quickPickIcon}>
+                            <Ionicons name="restaurant" size={20} color={colors.primary} />
+                          </View>
+                          <Text style={styles.quickPickName} numberOfLines={2}>{food.food_name || food.name}</Text>
+                          <View style={styles.quickPickCalories}>
+                            <Ionicons name="flame" size={12} color="#F97316" />
+                            <Text style={styles.quickPickCalText}>{food.calories_kcal || food.calories}</Text>
+                          </View>
+                          <View
+                            style={[
+                              styles.foodTypeBadge,
+                              {
+                                backgroundColor:
+                                  foodDietType === 'vegetarian' ? colors.success + '18' : colors.warning + '18',
+                              },
+                            ]}
+                          >
+                            <Ionicons
+                              name={foodDietType === 'vegetarian' ? 'leaf-outline' : 'flame-outline'}
+                              size={Math.min(hp(1.25), wp(2.9))}
+                              color={foodDietType === 'vegetarian' ? colors.success : colors.warning}
+                            />
+                            <Text
+                              style={[
+                                styles.foodTypeBadgeText,
+                                { color: foodDietType === 'vegetarian' ? colors.success : colors.warning },
+                              ]}
+                            >
+                              {foodDietType === 'vegetarian' ? 'Veg' : 'Non-Veg'}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                ) : (
+                  <View style={styles.emptyDietFilterCard}>
+                    <Ionicons name="search-outline" size={Math.min(hp(2.2), wp(4.8))} color={colors.textSecondary} />
+                    <Text style={styles.emptyDietFilterText}>
+                      No {getDietPreferenceLabel(dietPreference).toLowerCase()} quick picks found.
+                    </Text>
+                  </View>
+                )}
               </View>
 
               {/* View Diet Plan Button */}
@@ -986,68 +1545,6 @@ export default function DetailsDay () {
                 </TouchableOpacity>
               </View>
 
-              {/* Search Food Field */}
-              <View style={styles.fieldContainer}>
-                <Text style={styles.fieldLabel}>
-                  <Ionicons name="search" size={16} color={colors.primary} /> Search Food
-                </Text>
-                <View style={styles.searchInputContainer}>
-                  <Ionicons name="search-outline" size={20} color={colors.textSecondary} style={styles.searchIconLeft} />
-                  <TextInput 
-                    style={styles.searchInputField}
-                    placeholder="Search Pakistani dishes, rice, chicken..."
-                    placeholderTextColor={colors.textSecondary}
-                    value={foodSearch}
-                    onChangeText={setFoodSearch}
-                  />
-                  {foodSearch.length > 0 && (
-                    <TouchableOpacity onPress={() => { setFoodSearch(''); setShowFoodSearch(false); }} style={styles.searchClearButton}>
-                      <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-
-              {/* Search Results with Better Spacing */}
-              {showFoodSearch && filteredFoods.length > 0 && (
-                <View style={styles.searchResultsContainer}>
-                  <Text style={styles.searchResultsHeader}>
-                    Found {filteredFoods.length} items - Select one
-                  </Text>
-                  <ScrollView style={styles.searchResultsScroll} nestedScrollEnabled showsVerticalScrollIndicator={true}>
-                    {filteredFoods.slice(0, 10).map((food, index) => (
-                      <TouchableOpacity
-                        key={index}
-                        style={styles.searchResultCard}
-                        onPress={() => {
-                          setSelectedFoodItem(food);
-                          const calories = food.calories_kcal || food.calories || 0;
-                          setCalorieInput(String(Math.round(calories * parseFloat(mealQuantity || '1'))));
-                          setFoodSearch('');
-                          setShowFoodSearch(false);
-                        }}
-                        activeOpacity={0.6}
-                      >
-                        <View style={styles.searchResultLeft}>
-                          <View style={styles.searchResultIconBg}>
-                            <Ionicons name="fast-food" size={18} color={colors.primary} />
-                          </View>
-                          <View style={styles.searchResultInfo}>
-                            <Text style={styles.searchResultTitle}>{food.food_name || food.name}</Text>
-                            <Text style={styles.searchResultMeta}>
-                              {food.serving_size || food.category || '100g'}
-                            </Text>
-                          </View>
-                        </View>
-                        <View style={styles.searchResultRight}>
-                          <Text style={styles.searchResultCalValue}>{food.calories_kcal || food.calories}</Text>
-                          <Text style={styles.searchResultCalLabel}>cal</Text>
-                        </View>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
             </>
           )}
 
@@ -1469,7 +1966,6 @@ export default function DetailsDay () {
 
         <View style={styles.menuButtons}>
           <TouchableOpacity style={styles.backMenuButton} onPress={closeMenu}>
-            <Ionicons name="arrow-back" size={Math.min(hp(2.2), wp(5))} color="#FFFFFF" />
             <Text style={styles.backMenuText}>Back</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -1560,8 +2056,13 @@ export default function DetailsDay () {
 
                 // Show combined success message
                 if (hasMeal || hasWater) {
-                  // Update state once with all changes
+                  // Update local cache so charts/dashboard use the latest adaptive targets.
+                  updatedDayData = await syncUpdatedDayToLocalCache(updatedDayData);
                   setDayData(updatedDayData);
+                  await recordEarlyLogLocally({
+                    dayLogId,
+                    type: hasMeal && hasWater ? 'mixed' : hasMeal ? 'meal' : 'hydration',
+                  });
                   
                   // Reset forms immediately
                   setFoodSearch('');
@@ -1791,7 +2292,7 @@ export default function DetailsDay () {
       onRequestClose={() => setShowCustomRecipeModal(false)}
     >
       <View style={styles.customRecipeModalContainer}>
-        <View style={styles.customRecipeModalHeader}>
+        <View style={[styles.customRecipeModalHeader, { paddingTop: insets.top + 10 }]}>
           <TouchableOpacity onPress={() => setShowCustomRecipeModal(false)}>
             <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
           </TouchableOpacity>
@@ -1801,8 +2302,10 @@ export default function DetailsDay () {
 
         <KeyboardAwareScrollView
           style={styles.customRecipeModalContent}
+          contentContainerStyle={styles.customRecipeModalScrollContent}
           showsVerticalScrollIndicator={false}
           enableOnAndroid={true}
+          extraScrollHeight={Math.max(insets.bottom, hp(3))}
         >
           {/* Recipe Name */}
           <View style={styles.customRecipeSection}>
@@ -2193,7 +2696,7 @@ export default function DetailsDay () {
 );
 
 }
-const getStyles = (colors: any) => StyleSheet.create({
+const getStyles = (colors: any, bottomInset = 0) => StyleSheet.create({
     heading: {
         paddingHorizontal: HEADER_PADDING_HORIZONTAL,
         paddingVertical: hp(1.2),
@@ -3238,6 +3741,18 @@ const getStyles = (colors: any) => StyleSheet.create({
         marginBottom: hp(1.2),
         letterSpacing: 0.3,
     },
+    sectionHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: wp(2),
+    },
+    dietFilterSummary: {
+        fontSize: Math.min(hp(1.25), wp(3)),
+        fontWeight: '700',
+        color: colors.primary,
+        marginBottom: hp(1.2),
+    },
     fieldContainer: {
         marginBottom: hp(2.5),
     },
@@ -3285,6 +3800,47 @@ const getStyles = (colors: any) => StyleSheet.create({
         fontSize: Math.min(hp(1.3), wp(3)),
         color: 'rgba(255, 255, 255, 0.85)',
     },
+    dietFilterContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(2),
+    },
+    dietFilterButton: {
+        flex: 1,
+        minHeight: hp(4.8),
+        borderRadius: wp(3),
+        borderWidth: 2,
+        borderColor: colors.borderColor || '#E5E7EB',
+        backgroundColor: colors.cardBackground,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        gap: wp(1.2),
+        paddingHorizontal: wp(2),
+        paddingVertical: hp(0.9),
+    },
+    dietFilterText: {
+        fontSize: Math.min(hp(1.45), wp(3.3)),
+        fontWeight: '800',
+    },
+    emptyDietFilterCard: {
+        minHeight: hp(7),
+        borderRadius: wp(3),
+        borderWidth: 1,
+        borderColor: colors.borderColor || '#E5E7EB',
+        backgroundColor: colors.cardBackground,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        gap: wp(2),
+        paddingHorizontal: wp(3),
+    },
+    emptyDietFilterText: {
+        flex: 1,
+        fontSize: Math.min(hp(1.4), wp(3.3)),
+        color: colors.textSecondary,
+        fontWeight: '600',
+    },
     // Quick Pick Styles
     quickPickScroll: {
         marginTop: hp(0.5),
@@ -3330,6 +3886,19 @@ const getStyles = (colors: any) => StyleSheet.create({
         fontSize: Math.min(hp(1.3), wp(3)),
         fontWeight: '700',
         color: '#F97316',
+    },
+    foodTypeBadge: {
+        marginTop: hp(0.7),
+        borderRadius: hp(1.4),
+        paddingHorizontal: wp(1.6),
+        paddingVertical: hp(0.25),
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(0.6),
+    },
+    foodTypeBadgeText: {
+        fontSize: Math.min(hp(1), wp(2.4)),
+        fontWeight: '800',
     },
     // Search Input Styles
     searchInputContainer: {
@@ -3421,6 +3990,20 @@ const getStyles = (colors: any) => StyleSheet.create({
     searchResultMeta: {
         fontSize: Math.min(hp(1.3), wp(3)),
         color: colors.textSecondary,
+    },
+    searchDietBadge: {
+        alignSelf: 'flex-start',
+        marginTop: hp(0.6),
+        borderRadius: hp(1.2),
+        paddingHorizontal: wp(1.5),
+        paddingVertical: hp(0.25),
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(0.5),
+    },
+    searchDietBadgeText: {
+        fontSize: Math.min(hp(1), wp(2.35)),
+        fontWeight: '800',
     },
     searchResultRight: {
         alignItems: 'flex-end',
@@ -4164,6 +4747,9 @@ const getStyles = (colors: any) => StyleSheet.create({
         flex: 1,
         padding: 20,
     },
+    customRecipeModalScrollContent: {
+        paddingBottom: Math.max(hp(5), bottomInset + hp(4)),
+    },
     customRecipeSection: {
         marginBottom: 24,
     },
@@ -4355,7 +4941,7 @@ const getStyles = (colors: any) => StyleSheet.create({
         flexDirection: 'row',
         gap: 12,
         marginTop: 24,
-        marginBottom: 20,
+        marginBottom: Math.max(hp(4), bottomInset + hp(2)),
     },
     customRecipeCancelButton: {
         flex: 1,
@@ -4531,6 +5117,11 @@ const getStyles = (colors: any) => StyleSheet.create({
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 
+const getClampedCircleProgress = (achieved: number, target: number) => {
+    if (!target || target <= 0) return 0;
+    return Math.min(1, Math.max(0, achieved / target));
+};
+
 const ProgressCircle = (CircleProps: ProgressCircleProps) =>{
     const { colors } = useTheme();
     const outerRadius = 55;
@@ -4543,30 +5134,32 @@ const ProgressCircle = (CircleProps: ProgressCircleProps) =>{
     /**ANIMATED PROPS */
     //Animated props for Calories circle
     const animatedCalProps = useAnimatedProps(()=>{
+        const progress = Math.min(1, Math.max(0, calProgress.value));
         return {
-            strokeDashoffset: outerCircumference * (1 - calProgress.value),
+            strokeDashoffset: progress >= 0.999 ? 0 : outerCircumference * (1 - progress),
         }
-    },[CircleProps.achievedCalories])
+    },[CircleProps.achievedCalories, CircleProps.targetCalories])
     //Animated props for Hydration circle
     const animatedHydrationProps = useAnimatedProps(()=>{
+        const progress = Math.min(1, Math.max(0, hydProgress.value));
         return {
-            strokeDashoffset: innerCircumference * (1 - hydProgress.value),
+            strokeDashoffset: progress >= 0.999 ? 0 : innerCircumference * (1 - progress),
         }
-    },[CircleProps.achievedCalories])
+    },[CircleProps.achieviedHydration, CircleProps.targetHydration])
     /**USE EFFECTS */
     // calories updater
     useEffect(()=>{
         //const target = props.achievedCalories/props.targetCalories
-        calProgress.value = withTiming((CircleProps.achievedCalories/CircleProps.targetCalories),{  
+        calProgress.value = withTiming(getClampedCircleProgress(CircleProps.achievedCalories, CircleProps.targetCalories),{  
                                         duration:1000,
                                         easing: Easing.inOut(Easing.ease)})
-    },[CircleProps.achievedCalories])
+    },[CircleProps.achievedCalories, CircleProps.targetCalories, calProgress])
     //hydration updater
     useEffect(()=>{
-        hydProgress.value = withTiming((CircleProps.achieviedHydration/CircleProps.targetHydration),{  
+        hydProgress.value = withTiming(getClampedCircleProgress(CircleProps.achieviedHydration, CircleProps.targetHydration),{  
                                         duration:1000,
                                         easing: Easing.inOut(Easing.ease)})
-    },[CircleProps.achieviedHydration])
+    },[CircleProps.achieviedHydration, CircleProps.targetHydration, hydProgress])
     /**---------------------------------------------------------------------------------------- */
     
     return(
@@ -4578,16 +5171,21 @@ const ProgressCircle = (CircleProps: ProgressCircleProps) =>{
         {/* Calories progress */}
         <AnimatedCircle  cx="60" cy="60" r={outerRadius}
             stroke={colors.primary}  strokeWidth="10"  fill="transparent"
-            strokeDasharray={outerCircumference} //total
+            strokeDasharray={`${outerCircumference} ${outerCircumference}`} //total
             animatedProps={animatedCalProps}
-            strokeLinecap="round"transform= "rotate(-90 60 60)" />
+            strokeLinecap="round" transform="rotate(-90 60 60)" />
+        <Circle cx="60" cy="60" r={innerRadius}
+            stroke="#E5E7EB" strokeWidth="10" fill="transparent"/>
         {/* Hydration Circcle */}
         <AnimatedCircle cx="60" cy="60" r={innerRadius}
             stroke="#3B82F6"  strokeWidth="10" fill="transparent"
-            strokeDasharray={innerCircumference} 
+            strokeDasharray={`${innerCircumference} ${innerCircumference}`} 
             animatedProps={animatedHydrationProps}
             strokeLinecap="round" transform="rotate(-90 60 60)"/> 
         </Svg>
             //</View>
     )
 }
+
+
+

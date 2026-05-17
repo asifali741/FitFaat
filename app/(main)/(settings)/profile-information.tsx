@@ -2,6 +2,7 @@ import AppHeader from "@/components/AppHeader";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import * as SecureStore from 'expo-secure-store';
+import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -13,11 +14,14 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
+  Image
 } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getBackendBaseUrl } from '@/utils/config';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as NavigationBar from 'expo-navigation-bar';
 
 const API_URL = getBackendBaseUrl();
 
@@ -39,9 +43,62 @@ const [formData, setFormData] = useState({
 const [isEditing, setIsEditing] = useState(false);
 const [isSaving, setIsSaving] = useState(false);
 
+// Computed weekly stats from local day data
+const [computedWeeklyStats, setComputedWeeklyStats] = useState<{
+  totalCalories: number;
+  averageHydration: number;
+  daysTracked: number;
+} | null>(null);
+
 useEffect(() => {
   fetchBackendUserData();
+  computeWeeklyStatsFromLocal();
+
+  // Set Android navigation bar to white
+  if (Platform.OS === 'android') {
+    NavigationBar.setBackgroundColorAsync('#FFFFFF').catch(() => {});
+    NavigationBar.setButtonStyleAsync('dark').catch(() => {});
+    NavigationBar.setStyle('light');
+  }
 }, []);
+
+const computeWeeklyStatsFromLocal = async () => {
+  try {
+    const jsonValue = await AsyncStorage.getItem('JsonResponse');
+    if (!jsonValue) return;
+
+    const parsed = JSON.parse(jsonValue);
+    const data = parsed?.data;
+    if (!data) return;
+
+    const days = Object.values(data) as any[];
+    let totalCalories = 0;
+    let totalHydration = 0;
+    let daysTracked = 0;
+
+    for (const day of days) {
+      if (day.status === 'finished' || day.status === 'active') {
+        const achieved = Number(day.achievedCalories) || 0;
+        const hydration = Number(day.achieviedHydration) || 0;
+        if (achieved > 0 || hydration > 0) {
+          totalCalories += achieved;
+          totalHydration += hydration;
+          daysTracked++;
+        }
+      }
+    }
+
+    const averageHydration = daysTracked > 0 ? totalHydration / daysTracked : 0;
+
+    setComputedWeeklyStats({
+      totalCalories: Math.round(totalCalories),
+      averageHydration,
+      daysTracked,
+    });
+  } catch (error) {
+    console.error('Error computing weekly stats from local data:', error);
+  }
+};
 
 const fetchBackendUserData = async () => {
   try {
@@ -149,6 +206,7 @@ const styles = getStyles(colors);
 
 return (
   <SafeAreaView style={styles.container}>
+    <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
     <AppHeader
       title="Profile Information"
       showStepIndicator={false}
@@ -179,9 +237,16 @@ return (
           {/* Profile Picture Section */}
           <View style={styles.profileSection}>
             <View style={styles.profileImageContainer}>
-              <View style={styles.profileImage}>
-                <Ionicons name="person" size={50} color={colors.primary} />
-              </View>
+              {backendUserData?.user?.profileImageUrl ? (
+                <Image 
+                  source={{ uri: `${API_URL}${backendUserData.user.profileImageUrl}` }} 
+                  style={styles.profileImage} 
+                />
+              ) : (
+                <View style={styles.profileImage}>
+                  <Ionicons name="person" size={50} color={colors.primary} />
+                </View>
+              )}
             </View>
             <Text style={styles.profileName}>
               {backendUserData?.user?.userInfo?.name || backendUserData?.user?.username || "User"}
@@ -437,30 +502,28 @@ return (
                     </View>
                   )}
 
-                  {/* Weekly Statistics */}
-                  {backendUserData.weeklyStats && backendUserData.weeklyStats.length > 0 && (
+                  {/* Weekly Statistics - Dynamic from local data */}
+                  {computedWeeklyStats && computedWeeklyStats.daysTracked > 0 && (
                     <View style={styles.section}>
                       <Text style={styles.sectionTitle}>Recent Weekly Stats</Text>
 
-                      {backendUserData.weeklyStats.map((week: any, index: number) => (
-                        <View key={index} style={styles.weekCard}>
-                          <Text style={styles.weekTitle}>Week {week.week}, {week.year}</Text>
-                          <View style={styles.weekStats}>
-                            <View style={styles.weekStat}>
-                              <Text style={styles.weekStatLabel}>Total Calories</Text>
-                              <Text style={styles.weekStatValue}>{week.totalCalories || 0} kcal</Text>
-                            </View>
-                            <View style={styles.weekStat}>
-                              <Text style={styles.weekStatLabel}>Avg Hydration</Text>
-                              <Text style={styles.weekStatValue}>{week.averageHydration ? week.averageHydration.toFixed(1) : '0.0'} L</Text>
-                            </View>
-                            <View style={styles.weekStat}>
-                              <Text style={styles.weekStatLabel}>Days Tracked</Text>
-                              <Text style={styles.weekStatValue}>{week.daysTracked || 0} days</Text>
-                            </View>
+                      <View style={styles.weekCard}>
+                        <Text style={styles.weekTitle}>Current Week</Text>
+                        <View style={styles.weekStats}>
+                          <View style={styles.weekStat}>
+                            <Text style={styles.weekStatLabel}>Total Calories</Text>
+                            <Text style={styles.weekStatValue}>{computedWeeklyStats.totalCalories} kcal</Text>
+                          </View>
+                          <View style={styles.weekStat}>
+                            <Text style={styles.weekStatLabel}>Avg Hydration</Text>
+                            <Text style={styles.weekStatValue}>{computedWeeklyStats.averageHydration.toFixed(1)} L</Text>
+                          </View>
+                          <View style={styles.weekStat}>
+                            <Text style={styles.weekStatLabel}>Days Tracked</Text>
+                            <Text style={styles.weekStatValue}>{computedWeeklyStats.daysTracked} days</Text>
                           </View>
                         </View>
-                      ))}
+                      </View>
                     </View>
                   )}
                 </>
@@ -479,7 +542,7 @@ return (
 const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.screenColor || '#FFFFFF',
   },
   authBadgeContainer: {
     alignItems: 'center',
@@ -507,8 +570,6 @@ const getStyles = (colors: any) => StyleSheet.create({
   content: {
     flex: 1,
     backgroundColor: colors.screenColor,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
   },
   profileSection: {
     alignItems: 'center',

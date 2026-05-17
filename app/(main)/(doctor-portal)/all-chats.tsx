@@ -350,7 +350,7 @@ export default function AllChatsScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <AppHeader title="Patient Chats" showBackButton />
-        <View style={styles.loadingContainer}>
+        <View style={[styles.loadingContainer, styles.content]}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading chats...</Text>
         </View>
@@ -362,7 +362,8 @@ export default function AllChatsScreen() {
     <SafeAreaView style={styles.container}>
       <AppHeader title="Patient Chats" showBackButton />
 
-      {appointments.length === 0 ? (
+      <View style={styles.content}>
+        {appointments.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="chatbubbles-outline" size={Math.min(hp(8.9), wp(19.2))} color={colors.border} />
           <Text style={styles.emptyTitle}>No Chats Yet</Text>
@@ -386,6 +387,7 @@ export default function AllChatsScreen() {
           }
         />
       )}
+      </View>
     </SafeAreaView>
   );
 }
@@ -397,7 +399,11 @@ const AVATAR_SIZE = Math.min(hp(6.9), wp(14.9));
 const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.screenColor,
+  },
+  content: {
+    flex: 1,
+    backgroundColor: colors.screenColor,
   },
   loadingContainer: {
     flex: 1,
@@ -430,21 +436,30 @@ const getStyles = (colors: any) => StyleSheet.create({
 
   // ── List ────────────────
   listContainer: {
-    paddingTop: 4,
-    paddingBottom: 100,
+    paddingTop: hp(1.4),
+    paddingHorizontal: wp(3.6),
+    paddingBottom: hp(17),
   },
   separator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.border,
-    marginLeft: AVATAR_SIZE + wp(7.5),
+    height: hp(1.1),
   },
 
   // ── Chat Row (WhatsApp-style) ────────────────
   chatRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: hp(1.5),
-    paddingHorizontal: wp(4.3),
+    minHeight: hp(9.4),
+    paddingVertical: hp(1.35),
+    paddingHorizontal: wp(3.5),
+    backgroundColor: colors.cardBackground,
+    borderRadius: wp(3.4),
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    shadowColor: colors.shadowLight || '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: wp(2),
+    shadowOffset: { width: 0, height: hp(0.25) },
+    elevation: 2,
   },
 
   // Avatar
@@ -467,7 +482,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     height: Math.min(hp(1.7), wp(3.7)),
     borderRadius: Math.min(hp(0.85), wp(1.85)),
     borderWidth: 2,
-    borderColor: colors.background,
+    borderColor: colors.cardBackground,
   },
 
   // Content
@@ -484,7 +499,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   chatName: {
     flex: 1,
-    fontSize: wp(4.2),
+    fontSize: Math.min(hp(2), wp(4.35)),
     fontWeight: theme.typography.fontWeight.medium as any,
     color: colors.textPrimary,
     marginRight: wp(2.1),
@@ -493,7 +508,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontWeight: theme.typography.fontWeight.bold as any,
   },
   chatTime: {
-    fontSize: wp(3),
+    fontSize: Math.min(hp(1.45), wp(3.15)),
     color: colors.textTertiary,
   },
   chatTimeUnread: {
@@ -508,8 +523,8 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   chatPreview: {
     flex: 1,
-    fontSize: wp(3.4),
-    color: colors.textTertiary,
+    fontSize: Math.min(hp(1.65), wp(3.6)),
+    color: colors.textSecondary,
     marginRight: wp(2.1),
   },
   chatPreviewUnread: {

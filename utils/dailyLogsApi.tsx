@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { tokenStorage } from '@/utils/auth/tokenStorage';
+import { saveAdaptiveGoalCarryForwardFromStorage } from '@/utils/adaptiveGoals';
 import { getBackendUrl } from './config';
 
 const API_BASE_URL = getBackendUrl();
@@ -29,6 +30,7 @@ export const dailyLogsApi = {
       
       // If a new cycle was created, update AsyncStorage and tokenStorage
       if (data.newCycleCreated && data.newWeeklyTrackingId) {
+        await saveAdaptiveGoalCarryForwardFromStorage({ userId, weeklyTrackingId });
         await AsyncStorage.setItem('weeklyTrackingId', data.newWeeklyTrackingId);
         // Clear old cached data
         await AsyncStorage.removeItem('JsonResponse');
@@ -282,6 +284,7 @@ export const dailyLogsApi = {
       if (data.data && data.data.weekCompleted && data.data.newWeeklyTrackingId) {
         // Update AsyncStorage with new weekly tracking ID
         try {
+          await saveAdaptiveGoalCarryForwardFromStorage({ weeklyTrackingId });
           await AsyncStorage.setItem('weeklyTrackingId', data.data.newWeeklyTrackingId);
           console.log('🔄 New weekly cycle started! Updated weeklyTrackingId:', data.data.newWeeklyTrackingId);
           

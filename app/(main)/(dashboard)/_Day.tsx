@@ -1,37 +1,30 @@
 import { useTheme } from "@/contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
-import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, {
+  Easing,
   useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
-  withSpring
+  withSpring,
+  withTiming
 } from "react-native-reanimated";
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
-import Svg, { Circle, Defs, LinearGradient, Stop, Text as SvgText } from "react-native-svg";
-import { DashFonts, rs } from "../(settings)/_ui_elements";
+import Svg, { Circle, Defs, LinearGradient, Stop } from "react-native-svg";
+import { rs } from "../(settings)/_ui_elements";
 import { Day } from "./types";
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-interface ProgressCircleProps {
-  progress: number;
-}
 
-//const finalProgress = 55; // percent
-const { width,height } = Dimensions.get("window");
-function clamp(min: number, preferred: number, max: number) {
-  const scaled = width * preferred; // e.g., 0.05 = 5% of width
-  return Math.min(Math.max(scaled, min), max);
-}
+const getCombinedProgress = (day: Day) => {
+  const achieved = Number(day.achievedCalories || 0) + Number(day.achieviedHydration || 0);
+  const target = Number(day.targetCalories || 0) + Number(day.targetHydration || 0);
 
-const radius = clamp(20, 0.07, 50);
-const circumference = 2 * Math.PI * radius;
-const strokeWidth= (radius/100)*20
-const ProgressStrokeWidth= (radius/100)*30
+  if (target <= 0) return 0;
+  return Math.min(100, Math.max(0, Math.round((achieved / target) * 100)));
+};
 
 export const Days = ({props, onDayPress}: {props: Day, onDayPress: (dayNo : number) => void}) => {
-  const { colors } = useTheme();
-  
   if(props.status === 'locked'){ //props false = locked day
     return <LockedDay info={props} />;
   }
@@ -39,7 +32,6 @@ export const Days = ({props, onDayPress}: {props: Day, onDayPress: (dayNo : numb
     return <FinishedDay info={props} Press={onDayPress}/>;
   }
   else{
-    //console.log("Radius: " + radius + " Width of Window: " + width + ' Hieght: ' + height )
     return <ActiveDay info={props} Press={onDayPress}/>;
   }
 }
@@ -47,14 +39,14 @@ export const Days = ({props, onDayPress}: {props: Day, onDayPress: (dayNo : numb
 const ActiveDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}) => {
   const { colors } = useTheme();
   const scale = useSharedValue(1);
-  const finalProgress : number = Math.min(100, Math.round(((info.achievedCalories + info.achieviedHydration) / (info.targetCalories + info.targetHydration)) * 100))
+  const finalProgress : number = getCombinedProgress(info)
   const animatedContainerStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
   const styles = getStyles(colors);
   useEffect(() => {
     scale.value = withSpring(1, { damping: 8, stiffness: 150 });
-  }, [finalProgress]);
+  }, [finalProgress, scale]);
   return (
     <Animated.View style={[styles.modernActiveItem, animatedContainerStyle]}>
       {/* Header Section */}
@@ -107,7 +99,14 @@ const ActiveDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}) 
           onPress={() => Press(info.dayNo)} 
           style={styles.modernViewButton}
         >
-          <Text style={styles.modernViewButtonText}>View Details</Text>
+          <Text
+            style={styles.modernViewButtonText}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.72}
+          >
+            View Details
+          </Text>
           <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
         </Pressable>
       </View>
@@ -118,12 +117,12 @@ const ActiveDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}) 
 const FinishedDay = ({info, Press}: {info: Day, Press: (dayNo : number) => void}) => {
   const { colors } = useTheme();
   const scale = useSharedValue(1);
-  const finalProgress : number = Math.min(100, Math.round((info.achievedCalories / info.targetCalories) * 100));
+  const finalProgress : number = getCombinedProgress(info);
   const styles = getStyles(colors);
   
   useEffect(() => {
     scale.value = withSpring(1, { damping: 10, stiffness: 150 });
-  }, []);
+  }, [scale]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -188,11 +187,26 @@ const ProgressCircle = React.memo(({finalProgress}: {finalProgress: number})=>{
   const { colors } = useTheme();
   const styles = getStyles(colors);
   const progress = useSharedValue(0);
+  const circleSize = Math.min(wp(18.6), hp(8.8));
+  const circleRadius = 30;
+  const circleCircumference = 2 * Math.PI * circleRadius;
+  const progressText = `${finalProgress}%`;
+  const progressTextSize = finalProgress >= 100
+    ? Math.min(hp(1.45), wp(3.15))
+    : Math.min(hp(1.65), wp(3.6));
+
   useEffect(() => {
-    progress.value = withSpring(finalProgress, { damping: 12, stiffness: 100 });
-  }, [finalProgress]);
+    progress.value = withTiming(finalProgress, {
+      duration: 700,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [finalProgress, progress]);
   const animatedprops = useAnimatedProps(() => {
-    const strokeDashoffset = circumference - (circumference * progress.value) / 100;
+    const clampedProgress = Math.min(100, Math.max(0, progress.value));
+    const strokeDashoffset =
+      clampedProgress >= 99.9
+        ? 0
+        : circleCircumference - (circleCircumference * clampedProgress) / 100;
     return { strokeDashoffset };
   });
   
@@ -203,29 +217,40 @@ const ProgressCircle = React.memo(({finalProgress}: {finalProgress: number})=>{
     return colors.error; // Red
   };
   return<>
-  <View style={styles.modernProgressWrapper}>
-          <Svg height={70} width={70} viewBox="0 0 70 70">
+  <View style={[styles.modernProgressWrapper, { width: circleSize, height: circleSize }]}>
+          <Svg height={circleSize} width={circleSize} viewBox="0 0 70 70">
             <Defs>
               <LinearGradient id="progressGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                 <Stop offset="0%" stopColor={getProgressColor()} stopOpacity="1" />
                 <Stop offset="100%" stopColor={getProgressColor()} stopOpacity="0.7" />
               </LinearGradient>
             </Defs>
-            <Circle cx="35" cy="35" r="30" stroke="#E5E7EB" strokeWidth="6" fill="none" />
+            <Circle cx="35" cy="35" r={circleRadius} stroke="#E5E7EB" strokeWidth="6" fill="none" />
             <AnimatedCircle
-              cx="35" cy="35" r="30"
+              cx="35" cy="35" r={circleRadius}
               stroke="url(#progressGrad)"
               strokeWidth="6"
-              strokeDasharray={circumference}
+              strokeDasharray={`${circleCircumference} ${circleCircumference}`}
               animatedProps={animatedprops}
               strokeLinecap="round"
               fill="none"
               transform="rotate(-90 35 35)"
             />
-            <SvgText x="35" y="35" textAnchor="middle" dy=".3em" fontSize="14" fontWeight="bold" fill={getProgressColor()}>
-              {finalProgress}%
-            </SvgText>
           </Svg>
+          <Text
+            style={[
+              styles.progressCircleText,
+              {
+                color: getProgressColor(),
+                fontSize: progressTextSize,
+              },
+            ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.65}
+          >
+            {progressText}
+          </Text>
         </View>
   </>
 });
@@ -259,28 +284,40 @@ const InfoTray = React.memo(({ duration }: { duration: number }) => {
   };
 
   useEffect(() => {
-    // Set initial time
-    setTimeRemaining(formatDuration(calculateTimeUntilEndOfDay()));
+    let secondsRemaining = Number.isFinite(Number(duration))
+      ? Math.max(0, Math.floor(Number(duration)))
+      : calculateTimeUntilEndOfDay();
 
-    // Update every second
+    setTimeRemaining(formatDuration(secondsRemaining));
+
     const interval = setInterval(() => {
-      const secondsLeft = calculateTimeUntilEndOfDay();
-      setTimeRemaining(formatDuration(secondsLeft));
+      secondsRemaining = Math.max(0, secondsRemaining - 1);
+      setTimeRemaining(formatDuration(secondsRemaining));
       
-      // Optional: trigger refresh when day ends (optional enhancement)
-      if (secondsLeft === 0) {
+      if (secondsRemaining === 0) {
         clearInterval(interval);
-        // Could trigger a day refresh here
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [duration]);
 
   return (
     <View style={styles.modernNextMeal}>
-          <Ionicons name="time" size={16} color={colors.primary} />
-          <Text style={styles.modernNextMealText}>Time left: {timeRemaining}</Text>
+      <Ionicons name="time" size={Math.min(hp(2), wp(4.5))} color={colors.primary} style={styles.modernNextMealIcon} />
+      <View style={styles.modernNextMealCopy}>
+        <Text style={styles.modernNextMealLabel} numberOfLines={1} adjustsFontSizeToFit>
+          Time left
+        </Text>
+        <Text
+          style={styles.modernNextMealText}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.68}
+        >
+          {timeRemaining}
+        </Text>
+      </View>
     </View>
     
   );
@@ -508,6 +545,17 @@ const getStyles = (colors: any) => StyleSheet.create({
   modernProgressWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
+    flexShrink: 0,
+  },
+
+  progressCircleText: {
+    position: 'absolute',
+    left: '14%',
+    right: '14%',
+    textAlign: 'center',
+    fontWeight: '800',
+    includeFontPadding: false,
   },
   
   modernStatusSection: {
@@ -613,8 +661,8 @@ const getStyles = (colors: any) => StyleSheet.create({
   modernActionSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: wp(2.7),
+    alignItems: 'stretch',
+    gap: wp(2.2),
   },
   
   modernNextMeal: {
@@ -622,9 +670,11 @@ const getStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.primarySoft,
     borderRadius: wp(3.2),
-    paddingHorizontal: wp(3.7),
-    paddingVertical: hp(1.2),
-    flex: 1,
+    paddingHorizontal: wp(2.9),
+    paddingVertical: hp(0.85),
+    flex: 1.08,
+    minWidth: 0,
+    minHeight: hp(6),
     borderWidth: 1.5,
     borderColor: colors.primary + '30',
     shadowColor: colors.primary,
@@ -633,13 +683,33 @@ const getStyles = (colors: any) => StyleSheet.create({
     shadowRadius: wp(1.3),
     elevation: 3,
   },
+
+  modernNextMealIcon: {
+    flexShrink: 0,
+  },
+
+  modernNextMealCopy: {
+    flex: 1,
+    minWidth: 0,
+    marginLeft: wp(1.6),
+    justifyContent: 'center',
+  },
+
+  modernNextMealLabel: {
+    fontSize: Math.min(hp(1.2), wp(2.9)),
+    color: colors.primary,
+    fontWeight: '800',
+    letterSpacing: 0,
+    textTransform: 'uppercase',
+  },
   
   modernNextMealText: {
-    fontSize: hp(1.6),
+    fontSize: Math.min(hp(1.75), wp(4.1)),
     color: colors.primary,
-    fontWeight: '700',
-    marginLeft: wp(2.1),
-    letterSpacing: 0.3,
+    fontWeight: '900',
+    letterSpacing: 0,
+    includeFontPadding: false,
+    marginTop: hp(0.15),
   },
   
   modernViewButton: {
@@ -648,8 +718,11 @@ const getStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.primary,
     borderRadius: wp(3.2),
-    paddingHorizontal: wp(4.3),
-    paddingVertical: hp(1.5),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(1),
+    flex: 0.92,
+    minWidth: 0,
+    minHeight: hp(6),
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.4,
@@ -659,9 +732,11 @@ const getStyles = (colors: any) => StyleSheet.create({
   
   modernViewButtonText: {
     color: '#FFFFFF',
-    fontSize: hp(1.7),
+    fontSize: Math.min(hp(1.65), wp(3.8)),
     fontWeight: '700',
-    letterSpacing: 0.4,
+    letterSpacing: 0,
+    marginRight: wp(1),
+    flexShrink: 1,
   },
   
   // Modern Finished Day Styles

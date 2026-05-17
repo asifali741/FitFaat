@@ -297,9 +297,19 @@ export default function Index() {
               >
                 <Ionicons 
                   name="male-outline" 
-                  size={hp(3.5)} 
+                  size={hp(3.2)} 
                   color={selectedGender === 'male' ? colors.info : colors.textTertiary} 
                 />
+                <Text
+                  style={[
+                    screenStyles.genderLabel,
+                    { color: selectedGender === 'male' ? colors.info : colors.textTertiary }
+                  ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                >
+                  Male
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[
@@ -314,9 +324,19 @@ export default function Index() {
               >
                 <Ionicons 
                   name="female-outline" 
-                  size={hp(3.5)} 
+                  size={hp(3.2)} 
                   color={selectedGender === 'female' ? colors.error : colors.textTertiary} 
                 />
+                <Text
+                  style={[
+                    screenStyles.genderLabel,
+                    { color: selectedGender === 'female' ? colors.error : colors.textTertiary }
+                  ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                >
+                  Female
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[
@@ -331,9 +351,19 @@ export default function Index() {
               >
                 <Ionicons 
                   name="male-female-outline" 
-                  size={hp(3.5)} 
+                  size={hp(3.2)} 
                   color={selectedGender === 'other' ? colors.primary : colors.textTertiary} 
                 />
+                <Text
+                  style={[
+                    screenStyles.genderLabel,
+                    { color: selectedGender === 'other' ? colors.primary : colors.textTertiary }
+                  ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                >
+                  Mix
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

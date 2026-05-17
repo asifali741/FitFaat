@@ -3,6 +3,9 @@ import ChatButton from '@/components/ChatButton';
 import { theme } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import { authApi } from '@/utils/auth/authApi';
+import { tokenStorage } from '@/utils/auth/tokenStorage';
+import { buildChatAccessGrantedNotificationPayload } from '@/utils/chatAccessNotifications';
+import { getBackendBaseUrl } from '@/utils/config';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -12,20 +15,74 @@ import {
     Dimensions,
     FlatList,
     Modal,
+    Platform,
     ScrollView,
     StyleSheet,
+    StatusBar,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
+import * as NavigationBar from 'expo-navigation-bar';
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { io } from 'socket.io-client';
 
 const { width } = Dimensions.get('window');
 
+const emitChatAccessGrantedToPatient = async (appointmentId: string) => {
+  const token = await tokenStorage.getToken();
+  if (!token) return;
+
+  await new Promise<void>((resolve) => {
+    const socket = io(getBackendBaseUrl(), {
+      auth: { token },
+      forceNew: true,
+      timeout: 5000,
+      transports: ['websocket'],
+    });
+    let finished = false;
+    let accessEventSent = false;
+    let closeTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      if (closeTimer) clearTimeout(closeTimer);
+      socket.disconnect();
+      resolve();
+    };
+
+    const sendAccessEvent = () => {
+      if (accessEventSent) return;
+      accessEventSent = true;
+      socket.emit('access-granted', { appointmentId });
+      closeTimer = setTimeout(finish, 350);
+    };
+
+    const fallbackTimer = setTimeout(finish, 5000);
+
+    socket.on('connect', () => {
+      socket.emit('join-appointment', { appointmentId });
+      setTimeout(sendAccessEvent, 500);
+    });
+
+    socket.on('joined', sendAccessEvent);
+    socket.on('connect_error', (error) => {
+      console.warn('Unable to emit chat access notification:', error.message);
+      clearTimeout(fallbackTimer);
+      finish();
+    });
+    socket.on('disconnect', () => {
+      clearTimeout(fallbackTimer);
+    });
+  });
+};
+
 export default function PatientManagementScreen() {
   const { colors } = useTheme();
-  const styles = getStyles(colors);
+  const insets = useSafeAreaInsets();
+  const styles = getStyles(colors, insets.top, insets.bottom);
   const router = useRouter();
   const [appointments, setAppointments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -39,6 +96,18 @@ export default function PatientManagementScreen() {
 
   useEffect(() => {
     fetchDoctorAppointments();
+  }, []);
+
+  useEffect(() => {
+    StatusBar.setBarStyle('dark-content');
+
+    if (Platform.OS !== 'android') return;
+
+    StatusBar.setBackgroundColor('#FFFFFF');
+    StatusBar.setTranslucent(false);
+    NavigationBar.setBackgroundColorAsync('#FFFFFF').catch(() => {});
+    NavigationBar.setButtonStyleAsync('dark').catch(() => {});
+    NavigationBar.setStyle('light');
   }, []);
 
   const fetchDoctorAppointments = async () => {
@@ -151,10 +220,17 @@ export default function PatientManagementScreen() {
 
   const grantChatAccess = async (appointmentId: string) => {
     try {
-      const response = await authApi.grantChatAccess(appointmentId);
+      const notificationPayload = buildChatAccessGrantedNotificationPayload(
+        appointmentId,
+        selectedAppointment
+      );
+      const response = await authApi.grantChatAccess(appointmentId, notificationPayload);
       
       if (response.success) {
         Alert.alert('Success', 'Chat access granted to user');
+        emitChatAccessGrantedToPatient(appointmentId).catch((error) => {
+          console.warn('Failed to emit chat access socket event:', error);
+        });
         fetchDoctorAppointments();
         if (selectedAppointment && selectedAppointment._id === appointmentId) {
           setSelectedAppointment({
@@ -269,11 +345,14 @@ export default function PatientManagementScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <AppHeader
-          title="Appointment Management"
-          showStepIndicator={false}
-        />
+      <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} />
+        <View style={styles.headerSafeArea}>
+          <AppHeader
+            title="Appointment Management"
+            showStepIndicator={false}
+          />
+        </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
@@ -282,11 +361,14 @@ export default function PatientManagementScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <AppHeader
-        title="Appointment Management"
-        showStepIndicator={false}
-      />
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} />
+      <View style={styles.headerSafeArea}>
+        <AppHeader
+          title="Appointment Management"
+          showStepIndicator={false}
+        />
+      </View>
 
       <View style={styles.content}>
         {/* Filter Buttons */}
@@ -693,17 +775,19 @@ export default function PatientManagementScreen() {
   );
 }
 
-const getStyles = (colors: any) =>
+const getStyles = (colors: any, topInset = 0, bottomInset = 0) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.primary,
+      backgroundColor: colors.screenColor,
+    },
+    headerSafeArea: {
+      paddingTop: topInset,
+      backgroundColor: '#FFFFFF',
     },
     content: {
       flex: 1,
       backgroundColor: '#F8F9FB',
-      borderTopLeftRadius: 30,
-      borderTopRightRadius: 30,
       paddingTop: hp(2),
     },
     filterContainer: {
@@ -758,7 +842,7 @@ const getStyles = (colors: any) =>
     listContainer: {
       paddingHorizontal: wp(4),
       paddingVertical: hp(1),
-      paddingBottom: hp(3),
+      paddingBottom: Math.max(hp(3), bottomInset + hp(2)),
     },
     // Card Styles
     requestCard: {

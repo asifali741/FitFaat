@@ -1,5 +1,5 @@
 import { useTheme } from '@/contexts/ThemeContext';
-import { Ionicons, FontAwesome } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,6 +13,7 @@ interface StreakDisplayProps {
   longestStreak: number;
   message: string;
   streakPercentage: number;
+  weeklyGoalDays?: number;
   shouldSendReminder?: boolean;
   loading?: boolean;
 }
@@ -22,10 +23,13 @@ export const StreakDisplay: React.FC<StreakDisplayProps> = ({
   longestStreak,
   message,
   streakPercentage,
+  weeklyGoalDays = 7,
   shouldSendReminder = false,
   loading = false,
 }) => {
-  const { colors, isDarkMode } = useTheme();
+  const { isDarkMode } = useTheme();
+  const weeklyGoalProgress = Math.min(Math.max(streakCount, 0), weeklyGoalDays);
+  const boundedStreakPercentage = Math.min(Math.max(streakPercentage, 0), 100);
 
   // Determine if streak is active (has entries)
   const isStreakActive = streakCount > 0;
@@ -136,7 +140,7 @@ export const StreakDisplay: React.FC<StreakDisplayProps> = ({
               style={[
                 styles.progressBar,
                 {
-                  width: `${Math.min(streakPercentage, 100)}%`,
+                  width: `${boundedStreakPercentage}%`,
                   backgroundColor: isStreakActive ? '#FF6B35' : '#CCCCCC',
                 },
               ]}
@@ -146,10 +150,20 @@ export const StreakDisplay: React.FC<StreakDisplayProps> = ({
           {/* Bottom Row: Stats */}
           <View style={styles.bottomRow}>
             <View style={styles.statItem}>
-              <Text style={[styles.statLabel, { color: isDarkMode ? '#AAAAAA' : '#999999' }]}>
+              <Text
+                style={[styles.statLabel, { color: isDarkMode ? '#AAAAAA' : '#999999' }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.76}
+              >
                 Current
               </Text>
-              <Text style={[styles.statValue, { color: isDarkMode ? '#FFFFFF' : '#333333' }]}>
+              <Text
+                style={[styles.statValue, { color: isDarkMode ? '#FFFFFF' : '#333333' }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.72}
+              >
                 {streakCount}
               </Text>
             </View>
@@ -157,10 +171,20 @@ export const StreakDisplay: React.FC<StreakDisplayProps> = ({
             <View style={styles.divider} />
 
             <View style={styles.statItem}>
-              <Text style={[styles.statLabel, { color: isDarkMode ? '#AAAAAA' : '#999999' }]}>
+              <Text
+                style={[styles.statLabel, { color: isDarkMode ? '#AAAAAA' : '#999999' }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.76}
+              >
                 Longest
               </Text>
-              <Text style={[styles.statValue, { color: isDarkMode ? '#FFFFFF' : '#333333' }]}>
+              <Text
+                style={[styles.statValue, { color: isDarkMode ? '#FFFFFF' : '#333333' }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.72}
+              >
                 {longestStreak}
               </Text>
             </View>
@@ -168,11 +192,21 @@ export const StreakDisplay: React.FC<StreakDisplayProps> = ({
             <View style={styles.divider} />
 
             <View style={styles.statItem}>
-              <Text style={[styles.statLabel, { color: isDarkMode ? '#AAAAAA' : '#999999' }]}>
+              <Text
+                style={[styles.statLabel, { color: isDarkMode ? '#AAAAAA' : '#999999' }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.76}
+              >
                 Weekly Goal
               </Text>
-              <Text style={[styles.statValue, { color: isDarkMode ? '#FFFFFF' : '#333333' }]}>
-                7 days
+              <Text
+                style={[styles.statValue, { color: isDarkMode ? '#FFFFFF' : '#333333' }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.68}
+              >
+                {weeklyGoalProgress}/{weeklyGoalDays} days
               </Text>
             </View>
           </View>
@@ -244,6 +278,8 @@ const styles = StyleSheet.create({
   statItem: {
     flex: 1,
     alignItems: 'center',
+    minWidth: 0,
+    paddingHorizontal: wp(0.8),
   },
   statLabel: {
     fontSize: Math.min(hp(1.35), wp(3)),
@@ -255,6 +291,7 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: Math.min(hp(2.2), wp(4.8)),
     fontWeight: '700',
+    textAlign: 'center',
   },
   divider: {
     width: wp(0.25),

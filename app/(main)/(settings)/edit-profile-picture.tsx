@@ -3,7 +3,9 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import * as ImagePicker from 'expo-image-picker';
+import * as NavigationBar from 'expo-navigation-bar';
 import * as SecureStore from 'expo-secure-store';
+import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -19,6 +21,7 @@ import {
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getBackendBaseUrl } from '@/utils/config';
+import { profileImageEvents } from '@/utils/profileImageEvents';
 
 const ENV = Constants.expoConfig?.extra;
 
@@ -42,6 +45,13 @@ export default function EditProfilePicture() {
 
   useEffect(() => {
     loadUserData();
+
+    // Set Android navigation bar to white
+    if (Platform.OS === 'android') {
+      NavigationBar.setBackgroundColorAsync('#FFFFFF').catch(() => {});
+      NavigationBar.setButtonStyleAsync('dark').catch(() => {});
+      NavigationBar.setStyle('light');
+    }
   }, []);
 
   const loadUserData = async () => {
@@ -155,6 +165,7 @@ export default function EditProfilePicture() {
                 }
               }
               
+              profileImageEvents.emit();
               Alert.alert("Success", "Profile picture removed");
             } catch (error) {
               console.error('Error removing profile picture:', error);
@@ -202,6 +213,7 @@ export default function EditProfilePicture() {
       const data = await response.json();
 
       if (data.success) {
+        profileImageEvents.emit();
         Alert.alert(
           "Success", 
           "Profile picture uploaded successfully!",
@@ -225,6 +237,7 @@ export default function EditProfilePicture() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
       <AppHeader 
         title="Edit Profile Picture"
         showStepIndicator={false}
@@ -315,6 +328,24 @@ export default function EditProfilePicture() {
             )}
           </View>
 
+          {/* Upload Button */}
+          {selectedImage && (
+            <TouchableOpacity 
+              style={[styles.uploadButton, { backgroundColor: colors.primary }, isUploading && styles.uploadButtonDisabled]}
+              onPress={uploadImage}
+              disabled={isUploading}
+            >
+              {isUploading ? (
+                <Text style={styles.uploadButtonText}>Uploading...</Text>
+              ) : (
+                <>
+                  <Ionicons name="cloud-upload-outline" size={24} color="white" />
+                  <Text style={styles.uploadButtonText}>Save Profile Picture</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+
           {/* Guidelines */}
           <View style={styles.guidelinesSection}>
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Photo Guidelines</Text>
@@ -336,24 +367,6 @@ export default function EditProfilePicture() {
             </View>
           </View>
 
-          {/* Upload Button */}
-          {selectedImage && (
-            <TouchableOpacity 
-              style={[styles.uploadButton, { backgroundColor: colors.primary }, isUploading && styles.uploadButtonDisabled]}
-              onPress={uploadImage}
-              disabled={isUploading}
-            >
-              {isUploading ? (
-                <Text style={styles.uploadButtonText}>Uploading...</Text>
-              ) : (
-                <>
-                  <Ionicons name="cloud-upload-outline" size={24} color="white" />
-                  <Text style={styles.uploadButtonText}>Save Profile Picture</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          )}
-
           <View style={{ height: hp(4) }} />
         </ScrollView>
         )}
@@ -365,13 +378,11 @@ export default function EditProfilePicture() {
 const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.screenColor || '#FFFFFF',
   },
   content: {
     flex: 1,
     backgroundColor: colors.screenColor,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
   },
   loadingContainer: {
     flex: 1,

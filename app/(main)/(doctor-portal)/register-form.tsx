@@ -9,12 +9,14 @@ import {
   Animated,
   ScrollView,
   StyleSheet,
+  StatusBar,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const specializations = [
   'Nutrition',
@@ -35,6 +37,7 @@ const genders = ['male', 'female', 'other'];
 
 export default function DoctorRegistrationForm() {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const { submitDoctorRegistration, isLoading, error, successMessage } = useDoctorRegistration();
 
   const [formData, setFormData] = useState({
@@ -52,7 +55,7 @@ export default function DoctorRegistrationForm() {
     consultationMode: [] as string[]
   });
 
-  const [expandedSection, setExpandedSection] = useState<string | null>('personal');
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -123,10 +126,16 @@ export default function DoctorRegistrationForm() {
       duration: 600,
       useNativeDriver: true,
     }).start();
-  }, []);
+  }, [fadeAnim]);
 
   return (
     <View style={styles.container}>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={colors.white || '#FFFFFF'}
+        translucent={false}
+      />
+      <View style={[styles.statusBarSpacer, { height: insets.top }]} />
       <LinearGradient
         colors={[colors.primary, colors.primary + 'DD', colors.primary + '99']}
         style={styles.header}
@@ -171,7 +180,8 @@ export default function DoctorRegistrationForm() {
           <Ionicons
             name={expandedSection === 'personal' ? 'chevron-up' : 'chevron-down'}
             size={24}
-            color="#FFFFFF"
+            color={colors.textSecondary}
+            style={styles.sectionChevron}
           />
         </TouchableOpacity>
 
@@ -258,7 +268,8 @@ export default function DoctorRegistrationForm() {
           <Ionicons
             name={expandedSection === 'professional' ? 'chevron-up' : 'chevron-down'}
             size={24}
-            color="#FFFFFF"
+            color={colors.textSecondary}
+            style={styles.sectionChevron}
           />
         </TouchableOpacity>
 
@@ -354,7 +365,8 @@ export default function DoctorRegistrationForm() {
           <Ionicons
             name={expandedSection === 'job' ? 'chevron-up' : 'chevron-down'}
             size={24}
-            color="#FFFFFF"
+            color={colors.textSecondary}
+            style={styles.sectionChevron}
           />
         </TouchableOpacity>
 
@@ -418,10 +430,13 @@ const getStyles = (colors: any) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.primary,
+      backgroundColor: colors.screenColor,
+    },
+    statusBarSpacer: {
+      backgroundColor: colors.white || '#FFFFFF',
     },
     header: {
-      paddingTop: hp(6),
+      paddingTop: hp(3),
       paddingBottom: hp(4),
       paddingHorizontal: wp(5),
     },
@@ -501,9 +516,9 @@ const getStyles = (colors: any) =>
     scrollView: {
       flex: 1,
       backgroundColor: colors.screenColor,
-      borderTopLeftRadius: hp(4),
-      borderTopRightRadius: hp(4),
-      marginTop: hp(2),
+      borderTopLeftRadius: 0,
+      borderTopRightRadius: 0,
+      marginTop: 0,
     },
     scrollContent: {
       paddingHorizontal: wp(5),
@@ -514,7 +529,7 @@ const getStyles = (colors: any) =>
       alignItems: 'center',
       backgroundColor: colors.cardBackground,
       padding: wp(4),
-      borderRadius: hp(2),
+      borderRadius: 8,
       marginBottom: hp(2),
       elevation: 3,
       shadowColor: '#000',
@@ -523,6 +538,9 @@ const getStyles = (colors: any) =>
       shadowRadius: 6,
       borderLeftWidth: 4,
       borderLeftColor: colors.primary,
+    },
+    sectionChevron: {
+      marginLeft: wp(2),
     },
     sectionTitle: {
       fontSize: hp(2.2),

@@ -8,6 +8,8 @@ import { CardField, useStripe } from "@stripe/stripe-react-native";
 import Constants from "expo-constants";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { StatusBar } from 'expo-status-bar';
+import * as NavigationBar from 'expo-navigation-bar';
 import {
   ActivityIndicator,
   Alert,
@@ -62,6 +64,11 @@ export default function PremiumScreen() {
   useEffect(() => {
     checkPremiumStatus();
     fetchPaymentMethods();
+    if (Platform.OS === 'android') {
+      NavigationBar.setBackgroundColorAsync('#FFFFFF').catch(() => {});
+      NavigationBar.setButtonStyleAsync('dark').catch(() => {});
+      NavigationBar.setStyle('light');
+    }
   }, []);
 
   useFocusEffect(
@@ -341,6 +348,7 @@ export default function PremiumScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
+        <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
         <AppHeader title="Premium" />
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -351,6 +359,7 @@ export default function PremiumScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
       <AppHeader title="Premium Membership" />
 
       <ScrollView showsVerticalScrollIndicator={false} style={styles.content}>
@@ -632,7 +641,7 @@ const getStyles = (colors: any) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: colors.screenColor || '#FFFFFF',
     },
     content: {
       flex: 1,
