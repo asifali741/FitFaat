@@ -36,18 +36,30 @@ export function getConfigValue(key: string): string {
   return FALLBACKS[key] || "";
 }
 
+const trimTrailingSlashes = (value: string): string => value.replace(/\/+$/, "");
+
+const getConfiguredBackendRoot = (): string => {
+  const configuredUrl = trimTrailingSlashes(getConfigValue("EXPO_PUBLIC_BACKEND_API_URL"));
+  return configuredUrl.replace(/\/api$/i, "");
+};
+
 /**
  * Get the backend API URL, guaranteed to return a valid string.
  */
 export function getBackendUrl(): string {
-  return getConfigValue("EXPO_PUBLIC_BACKEND_API_URL");
+  const backendRoot = getConfiguredBackendRoot();
+  return backendRoot ? `${backendRoot}/api` : "";
 }
 
 /**
  * Get the backend base URL (without /api suffix), for socket connections etc.
  */
 export function getBackendBaseUrl(): string {
-  return getBackendUrl().replace(/\/api\/?$/, "");
+  return getConfiguredBackendRoot();
+}
+
+export function isRealtimeSocketEnabled(): boolean {
+  return Boolean(getBackendBaseUrl());
 }
 
 /**
