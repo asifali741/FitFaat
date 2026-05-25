@@ -3,6 +3,7 @@ import Message from "@/components/Message";
 import { useChatbotStorage } from "@/contexts/ChatbotStorage";
 import { useTheme } from "@/contexts/ThemeContext";
 import Controls from "@/Control/controls";
+import * as NavigationBar from 'expo-navigation-bar';
 import * as SystemUI from 'expo-system-ui';
 import { useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -125,12 +126,18 @@ export default function Baat() {
     useCallback(() => {
       if (Platform.OS !== 'android') return;
 
-      SystemUI.setBackgroundColorAsync(colors.primary).catch(() => {});
+      SystemUI.setBackgroundColorAsync('#FFFFFF').catch(() => {});
+      NavigationBar.setBackgroundColorAsync('#FFFFFF').catch(() => {});
+      NavigationBar.setButtonStyleAsync('dark').catch(() => {});
+      NavigationBar.setStyle('light');
 
       return () => {
-        SystemUI.setBackgroundColorAsync(colors.screenColor).catch(() => {});
+        SystemUI.setBackgroundColorAsync('#FFFFFF').catch(() => {});
+        NavigationBar.setBackgroundColorAsync('#FFFFFF').catch(() => {});
+        NavigationBar.setButtonStyleAsync('dark').catch(() => {});
+        NavigationBar.setStyle('light');
       };
-    }, [colors.primary, colors.screenColor])
+    }, [])
   );
 
   return (
@@ -274,7 +281,7 @@ const getStyles = (colors: any, insets: any, isKeyboardVisible: boolean, keyboar
   },
   androidNavigationBarBackground: {
     height: insets.bottom,
-    backgroundColor: colors.primary,
+    backgroundColor: '#FFFFFF',
   },
 });
 

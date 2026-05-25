@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleProp, StyleSheet, Text, TextStyle, TouchableOpacity, View } from 'react-native';
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
 
 interface AppHeaderProps {
@@ -17,6 +17,9 @@ interface AppHeaderProps {
   showNotificationBell?: boolean;
   notificationCount?: number;
   onNotificationPress?: () => void;
+  titleStyle?: StyleProp<TextStyle>;
+  titleMinimumFontScale?: number;
+  compactTitleSpacing?: boolean;
 }
 export default function AppHeader({
   title,
@@ -29,6 +32,9 @@ export default function AppHeader({
   showNotificationBell = false,
   notificationCount = 0,
   onNotificationPress,
+  titleStyle,
+  titleMinimumFontScale = 0.82,
+  compactTitleSpacing = false,
 }: AppHeaderProps) {
   const navigation = useNavigation();
   const router = useRouter();
@@ -83,8 +89,8 @@ export default function AppHeader({
 
   return (
     <View style={[styles.container, { backgroundColor: colors.primary }]}>
-      <View style={[styles.topBar, { backgroundColor: colors.primary }]}>
-        <View style={styles.sideSlot}>
+      <View style={[styles.topBar, compactTitleSpacing && styles.topBarCompact, { backgroundColor: colors.primary }]}>
+        <View style={[styles.sideSlot, compactTitleSpacing && styles.sideSlotCompact]}>
           {showBackButton ? (
             <TouchableOpacity
               style={styles.iconButton}
@@ -109,14 +115,15 @@ export default function AppHeader({
         </View>
         
         <Text
-          style={[styles.title, { color: colors.textOnPrimary }]}
+          style={[styles.title, { color: colors.textOnPrimary }, titleStyle]}
           numberOfLines={1}
           adjustsFontSizeToFit
+          minimumFontScale={titleMinimumFontScale}
         >
           {title}
         </Text>
         
-        <View style={[styles.sideSlot, styles.rightSlot]}>
+        <View style={[styles.sideSlot, compactTitleSpacing && styles.sideSlotCompact, styles.rightSlot]}>
           {showNotificationBell && (
             <TouchableOpacity 
               style={styles.iconButton}
@@ -173,6 +180,9 @@ const styles = StyleSheet.create({
     minHeight: hp(7.6),
     paddingHorizontal: wp(5),
   },
+  topBarCompact: {
+    paddingHorizontal: wp(3.5),
+  },
   title: {
     fontSize: Math.min(hp(3.1), wp(7.2)),
     fontWeight: '800',
@@ -182,9 +192,12 @@ const styles = StyleSheet.create({
   },
   sideSlot: {
     width: wp(13),
-    minWidth: 44,
+    minWidth: Math.min(hp(5.4), wp(11.8)),
     alignItems: 'flex-start',
     justifyContent: 'center',
+  },
+  sideSlotCompact: {
+    width: wp(11.8),
   },
   rightSlot: {
     alignItems: 'flex-end',

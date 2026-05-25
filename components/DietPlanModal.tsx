@@ -1,15 +1,18 @@
 import { useTheme } from '@/contexts/ThemeContext';
 import { useNotifications } from '@/contexts/NotificationContext';
+import {
+  cachedRequestJson,
+  clearRequestJsonCachesWithPrefix,
+  requestJson,
+} from '@/utils/apiHelper';
 import { tokenStorage } from '@/utils/auth/tokenStorage';
 import { Ionicons } from '@expo/vector-icons';
-import Constants from 'expo-constants';
 import * as NavigationBar from 'expo-navigation-bar';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Keyboard,
   Modal,
   Platform,
   ScrollView,
@@ -24,6 +27,7 @@ import {
   heightPercentageToDP as hp,
   widthPercentageToDP as wp,
 } from 'react-native-responsive-screen';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getBackendBaseUrl } from '@/utils/config';
 
@@ -74,6 +78,17 @@ interface DietPlanModalProps {
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snacks'];
+const DIET_PLAN_CACHE_PREFIX = 'diet-plans:';
+const DIET_PLAN_READ_CONFIG = {
+  timeoutMs: 7000,
+  retries: 1,
+  retryDelayMs: 500,
+  cacheTtlMs: 5 * 60 * 1000,
+  maxStaleMs: 24 * 60 * 60 * 1000,
+  allowStaleOnError: true,
+  maxWaitForFreshMs: 1800,
+  refreshCacheInBackground: true,
+};
 
 const DietPlanModal: React.FC<DietPlanModalProps> = ({
   visible,
@@ -85,6 +100,7 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
   setLoading
 }) => {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const { sendDietPlanUpdateNotification } = useNotifications();
   const styles = getStyles(colors);
   const [selectedDay, setSelectedDay] = useState('monday');
@@ -148,28 +164,23 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
       console.log('- existingPlans:', existingPlans.length, 'plans');
       console.log('- editingPlanId:', editingPlanId);
     }
-  }, [visible]);
+  }, [editingPlanId, existingPlans.length, showExistingPlans, visible]);
 
-  // Fetch food items when modal opens
-  useEffect(() => {
-    if (visible) {
-      console.log('Modal opened, fetching data...');
-      fetchFoodItems();
-      fetchExistingDietPlans();
-    }
-  }, [visible]);
-
-  const fetchFoodItems = async () => {
+  const fetchFoodItems = useCallback(async () => {
     try {
       const token = await tokenStorage.getToken();
-      const response = await fetch(`${BACKEND_URL}/api/diet-plans/foods`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      const data = await response.json();
+      const data = await cachedRequestJson<any>(
+        `${DIET_PLAN_CACHE_PREFIX}foods`,
+        `${BACKEND_URL}/api/diet-plans/foods`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        },
+        DIET_PLAN_READ_CONFIG
+      );
       if (data.success) {
         setFoodItems(data.foods);
       }
@@ -177,19 +188,23 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
       console.error('Error fetching food items:', error);
       Alert.alert('Error', 'Failed to load food items');
     }
-  };
+  }, []);
 
-  const fetchExistingDietPlans = async () => {
+  const fetchExistingDietPlans = useCallback(async () => {
     try {
       const token = await tokenStorage.getToken();
-      const response = await fetch(`${BACKEND_URL}/api/diet-plans/appointment/${appointmentId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      const data = await response.json();
+      const data = await cachedRequestJson<any>(
+        `${DIET_PLAN_CACHE_PREFIX}appointment:${appointmentId}`,
+        `${BACKEND_URL}/api/diet-plans/appointment/${appointmentId}`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        },
+        DIET_PLAN_READ_CONFIG
+      );
       console.log('Existing diet plans:', data);
       if (data.success) {
         console.log('Setting existing plans:', data.dietPlans?.length || 0, 'plans');
@@ -201,7 +216,16 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
     } catch (error) {
       console.error('Error fetching existing diet plans:', error);
     }
-  };
+  }, [appointmentId]);
+
+  // Fetch food items when modal opens
+  useEffect(() => {
+    if (visible) {
+      console.log('Modal opened, fetching data...');
+      fetchFoodItems();
+      fetchExistingDietPlans();
+    }
+  }, [fetchExistingDietPlans, fetchFoodItems, visible]);
 
   const addFoodToMeal = (food: FoodItem) => {
     const foodWithQuantity: MealFood = {
@@ -360,16 +384,16 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
           onPress: async () => {
             try {
               const token = await tokenStorage.getToken();
-              const response = await fetch(`${BACKEND_URL}/api/diet-plans/${planId}`, {
+              const data = await requestJson<any>(`${BACKEND_URL}/api/diet-plans/${planId}`, {
                 method: 'DELETE',
                 headers: {
                   'Authorization': `Bearer ${token}`,
                   'Content-Type': 'application/json'
                 }
-              });
+              }, { timeoutMs: 12000, retries: 0 });
 
-              const data = await response.json();
               if (data.success) {
+                await clearRequestJsonCachesWithPrefix(DIET_PLAN_CACHE_PREFIX);
                 Alert.alert('Success', 'Diet plan deleted successfully!');
                 fetchExistingDietPlans(); // Refresh the list
               } else {
@@ -428,22 +452,18 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
       
       console.log('Making API call to:', apiUrl, 'Method:', method);
       
-      const response = await fetch(apiUrl, {
+      const data = await requestJson<any>(apiUrl, {
         method,
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(requestBody)
-      });
-
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
-      
-      const data = await response.json();
+      }, { timeoutMs: 15000, retries: 0 });
       console.log('Response data:', data);
       
       if (data.success) {
+        await clearRequestJsonCachesWithPrefix(DIET_PLAN_CACHE_PREFIX);
         const message = isEditing ? 'Diet plan updated successfully!' : 'Diet plan created successfully!';
         await sendDietPlanUpdateNotification(
           isEditing ? 'Diet Plan Updated' : 'New Diet Plan',
@@ -520,7 +540,7 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
             backgroundColor={colors.screenColor || '#FFFFFF'}
             translucent={false}
           />
-          <View style={styles.header}>
+          <View style={[styles.header, { paddingTop: insets.top + hp(1.4) }]}>
             <TouchableOpacity onPress={() => setShowFoodSelector(false)}>
               <Ionicons name="arrow-back" size={Math.min(hp(3), wp(6.4))} color="#FFFFFF" />
             </TouchableOpacity>

@@ -43,6 +43,13 @@ export const useCustomOnboarding = () => {
       await AsyncStorage.setItem('fitfaat_health_metrics', JSON.stringify({
         height: heightInCmRounded,
         weight: weightInKg,
+        gender: userInfo.selectedGender,
+        birthDate: {
+          day: parseInt(userInfo.birthDate.day, 10),
+          month: parseInt(userInfo.birthDate.month, 10),
+          year: parseInt(userInfo.birthDate.year, 10)
+        },
+        age: userInfo.age,
         selectedGoal: userInfo.selectedGoal,
         fitnessGoal: userInfo.selectedGoal,
       }));
@@ -59,6 +66,13 @@ export const useCustomOnboarding = () => {
             name: userInfo.name.trim(),
             height: heightInCmRounded,
             weight: weightInKg,
+            gender: userInfo.selectedGender,
+            birthDate: {
+              day: parseInt(userInfo.birthDate.day, 10),
+              month: parseInt(userInfo.birthDate.month, 10),
+              year: parseInt(userInfo.birthDate.year, 10)
+            },
+            age: userInfo.age,
             fitnessGoal: userInfo.selectedGoal,
           },
         });

@@ -1,5 +1,9 @@
 import AppHeader from "@/components/AppHeader";
+import AnimatedPressable from "@/components/common/AnimatedPressable";
+import ProgressRing from "@/components/common/ProgressRing";
 import { ScreenSceneWrapper } from "@/components/common/ScreenTiltAnimation";
+import SmartEmptyState from "@/components/common/SmartEmptyState";
+import ProgressPhotoGallery from "@/components/profile/ProgressPhotoGallery";
 import {
   calculateAchievementBadges,
   type AchievementBadge,
@@ -7,17 +11,21 @@ import {
 } from "@/constants/achievementBadges";
 import { authApi } from "@/utils/auth/authApi";
 import {
+  applyAdaptiveGoalsToJsonResponse,
   applyAdaptiveGoalsToDays,
+  buildAdaptiveGoalMetrics,
+  HEALTH_METRICS_STORAGE_KEY,
   loadAdaptiveGoalCarryForward,
+  loadWeeklyWeightTrendCalibration,
+  recordWeightTrendSnapshot,
   type AdaptiveGoalCarryForward,
 } from "@/utils/adaptiveGoals";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import { useRouter, useFocusEffect } from "expo-router";
-import * as SecureStore from 'expo-secure-store';
-import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Image, Linking, Modal, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Alert, Image, Linking, Modal, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import {
     heightPercentageToDP as hp,
     widthPercentageToDP as wp,
@@ -29,9 +37,25 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { streakApi } from '@/utils/streakApi';
 import { exerciseApi } from '@/utils/exerciseApi';
 import { dailyLogsApi } from '@/utils/dailyLogsApi';
+import {
+  getStoredDashboardCache,
+  getStoredWeeklyTrackingId,
+  setStoredDashboardCache,
+} from '@/utils/dashboardStorage';
+import { cachedRequestJson } from '@/utils/apiHelper';
 import { loadAchievementLocalStats } from '@/utils/achievementStorage';
-import { getGmailProfileImageUrl, resolveBackendImageUrl } from '@/utils/profileImage';
-import { profileImageEvents } from '@/utils/profileImageEvents';
+import {
+  clearCachedProfileImage,
+  buildStableBackendProfileImageUrl,
+  getBackendProfileImageUrl,
+  getGmailProfileImageUrl,
+  getProfileImageUserKey,
+  readCachedProfileImage,
+  resolveBackendImageUrl,
+  writeCachedProfileImage,
+} from '@/utils/profileImage';
+import { profileImageEvents, type ProfileImageUpdateEvent } from '@/utils/profileImageEvents';
+import { queueHealthDataCloudSync, syncLatestHealthData } from '@/utils/healthDataSync';
 
 const ENV = Constants.expoConfig?.extra;
 
@@ -44,6 +68,16 @@ const getAPIURL = () => {
 };
 
 const API_URL = getAPIURL();
+const PROFILE_READ_CONFIG = {
+  timeoutMs: 6500,
+  retries: 1,
+  retryDelayMs: 500,
+  cacheTtlMs: 5 * 60 * 1000,
+  maxStaleMs: 24 * 60 * 60 * 1000,
+  allowStaleOnError: true,
+  maxWaitForFreshMs: 1800,
+  refreshCacheInBackground: true,
+};
 
 const getStoredDisplayName = (storedUser: any) => (
   storedUser?.userInfo?.name ||
@@ -209,17 +243,49 @@ const formatMetric = (value: number | undefined, unit: string) => {
   return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)} ${unit}`;
 };
 
-const getHealthDays = (payload: any, carryForward?: AdaptiveGoalCarryForward | null): any[] => {
+const formatGoalLabel = (value?: any) => {
+  if (!value) return 'Build Consistency';
+  return String(value)
+    .replace(/[_-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+const readTextMetric = (sources: any[], keys: string[]) => {
+  for (const source of sources) {
+    for (const key of keys) {
+      const value = source?.[key];
+      if (typeof value === 'string' && value.trim()) return value.trim();
+    }
+  }
+  return undefined;
+};
+
+const getBmiCategory = (bmi?: number) => {
+  if (!bmi) return 'Add height and weight';
+  if (bmi < 18.5) return 'Below range';
+  if (bmi < 25) return 'Healthy range';
+  if (bmi < 30) return 'Above range';
+  return 'High range';
+};
+
+const getHealthDays = (
+  payload: any,
+  userData: any,
+  carryForward?: AdaptiveGoalCarryForward | null
+): any[] => {
   const source = payload?.data || payload;
+  const metrics = buildAdaptiveGoalMetrics(userData);
   if (!source) return [];
-  if (Array.isArray(source)) return applyAdaptiveGoalsToDays(source, undefined, carryForward);
-  if (Array.isArray(source.dailyLogs)) return applyAdaptiveGoalsToDays(source.dailyLogs, undefined, carryForward);
+  if (Array.isArray(source)) return applyAdaptiveGoalsToDays(source, metrics, carryForward);
+  if (Array.isArray(source.dailyLogs)) return applyAdaptiveGoalsToDays(source.dailyLogs, metrics, carryForward);
 
   const sourceDays = Object.values(source).filter(
     (entry: any) => entry && typeof entry === 'object'
   ) as any[];
 
-  return applyAdaptiveGoalsToDays(sourceDays, undefined, carryForward);
+  return applyAdaptiveGoalsToDays(sourceDays, metrics, carryForward);
 };
 
 const buildHealthRecordSummary = (
@@ -227,7 +293,7 @@ const buildHealthRecordSummary = (
   userData: any,
   carryForward?: AdaptiveGoalCarryForward | null
 ): HealthRecordSummary => {
-  const days = getHealthDays(payload, carryForward);
+  const days = getHealthDays(payload, userData, carryForward);
   const metricSources = getMetricSources(userData);
 
   return {
@@ -247,13 +313,20 @@ const buildHealthRecordSummary = (
 
 export default function ProfileScreen() {
   const { colors, isDarkMode } = useTheme();
-  const styles = getStyles(colors);
+  const styles = useMemo(() => getStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const latestProfileImageEvent = profileImageEvents.getLatest();
+  const initialProfileImageUrl =
+    latestProfileImageEvent && !latestProfileImageEvent.removed
+      ? latestProfileImageEvent.displayImageUrl || latestProfileImageEvent.backendImageUrl || null
+      : null;
   const [selectedTab, setSelectedTab] = useState('overview');
   const [user, setUser] = useState<any>(null);
-  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
-  const [gmailImageUrl, setGmailImageUrl] = useState<string | null>(null);
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(initialProfileImageUrl);
+  const [gmailImageUrl, setGmailImageUrl] = useState<string | null>(
+    latestProfileImageEvent?.gmailImageUrl || null
+  );
   const [healthScore, setHealthScore] = useState(85);
   const [profileAppointments, setProfileAppointments] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -261,89 +334,201 @@ export default function ProfileScreen() {
   const [showHealthRecords, setShowHealthRecords] = useState(false);
   const [healthRecords, setHealthRecords] = useState<HealthRecordSummary | null>(null);
   const [healthRecordsLoading, setHealthRecordsLoading] = useState(false);
+  const [showWeightLogModal, setShowWeightLogModal] = useState(false);
+  const [weightInput, setWeightInput] = useState('');
+  const [isSavingWeightLog, setIsSavingWeightLog] = useState(false);
   const [achievementLocalStats, setAchievementLocalStats] = useState<AchievementLocalStats>({});
   const [doctorStatus, setDoctorStatus] = useState<string | null>(null);
+  const profileImageLoadId = React.useRef(0);
+  const profileImageUserKeyRef = React.useRef<string | null>(null);
   const displayName = getStoredDisplayName(user);
   const displayEmail = user?.email || 'user@example.com';
-  const displayImageUrl = gmailImageUrl || profileImageUrl;
+  const displayImageUrl = profileImageUrl || gmailImageUrl;
   const handleProfileImageError = () => {
     if (displayImageUrl === gmailImageUrl) {
       setGmailImageUrl(null);
     } else {
       setProfileImageUrl(null);
+      if (user) {
+        clearCachedProfileImage(user);
+      }
     }
   };
 
-  const loadProfileImage = async () => {
+  const refreshProfileImageFromBackend = React.useCallback(async (
+    userData: any,
+    token: string,
+    fallbackGmailImageUrl: string | null,
+    requestId: number
+  ) => {
+    try {
+      const cacheUserKey = getProfileImageUserKey(userData) || userData?._id || userData?.id || userData?.email || 'current';
+      const [profileResult, pictureResult] = await Promise.allSettled([
+        cachedRequestJson<any>(`profile:user:${cacheUserKey}`, `${API_URL}/api/user/profile`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }, PROFILE_READ_CONFIG),
+        cachedRequestJson<any>(`profile:picture:${cacheUserKey}`, `${API_URL}/api/user/profile-picture`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }, PROFILE_READ_CONFIG),
+      ]);
+
+      if (profileImageLoadId.current !== requestId) return;
+
+      let nextUser = userData;
+      let nextGmailImageUrl = fallbackGmailImageUrl;
+      let nextBackendImageUrl: string | null = null;
+      let backendVersionSeed: string | number | null = null;
+
+      if (profileResult.status === 'fulfilled') {
+        const profileData = profileResult.value;
+        const backendUser = profileData?.data?.user || profileData?.user;
+        const backendGmailImageUrl = getGmailProfileImageUrl(backendUser || profileData);
+
+        if (backendUser) {
+          nextUser = { ...(userData || {}), ...backendUser };
+          setUser(nextUser);
+        }
+
+        nextGmailImageUrl = backendGmailImageUrl || fallbackGmailImageUrl;
+        nextBackendImageUrl = getBackendProfileImageUrl(API_URL, backendUser || profileData);
+        backendVersionSeed =
+          backendUser?.profileImageUpdatedAt ||
+          backendUser?.profilePictureUpdatedAt ||
+          backendUser?.updatedAt ||
+          backendUser?.updated_at ||
+          profileData?.updatedAt ||
+          profileData?.updated_at ||
+          null;
+      }
+
+      if (pictureResult.status === 'fulfilled') {
+        const pictureData = pictureResult.value;
+        if (pictureData.success && pictureData.data?.imageUrl) {
+          nextBackendImageUrl = resolveBackendImageUrl(API_URL, pictureData.data.imageUrl);
+          backendVersionSeed =
+            pictureData.data.updatedAt ||
+            pictureData.data.updated_at ||
+            pictureData.data.profileImageUpdatedAt ||
+            pictureData.data.profilePictureUpdatedAt ||
+            backendVersionSeed;
+        }
+      }
+
+      const latestCachedImage = await readCachedProfileImage(nextUser || userData);
+      if (profileImageLoadId.current !== requestId) return;
+
+      const versionedBackendImageUrl = buildStableBackendProfileImageUrl(
+        API_URL,
+        nextBackendImageUrl,
+        latestCachedImage,
+        backendVersionSeed
+      );
+      const cacheUpdatedAt =
+        versionedBackendImageUrl === latestCachedImage?.backendImageUrl
+          ? latestCachedImage.updatedAt
+          : String(backendVersionSeed || new Date().toISOString());
+
+      setProfileImageUrl(versionedBackendImageUrl);
+      setGmailImageUrl(nextGmailImageUrl);
+      await writeCachedProfileImage(nextUser || userData, {
+        backendImageUrl: versionedBackendImageUrl,
+        gmailImageUrl: nextGmailImageUrl,
+      }, cacheUpdatedAt);
+    } catch (error) {
+      console.log('No fresh profile picture found, using cached image:', error);
+    }
+  }, []);
+
+  const loadProfileImage = React.useCallback(async () => {
+    const requestId = profileImageLoadId.current + 1;
+    profileImageLoadId.current = requestId;
+
     try {
       const userData = await tokenStorage.getUser();
-      setUser(userData);
+
+      if (profileImageLoadId.current !== requestId) return;
+
+      if (userData) {
+        profileImageUserKeyRef.current = getProfileImageUserKey(userData);
+        setUser(userData);
+      }
+
       const storedGmailImageUrl = getGmailProfileImageUrl(userData);
-      setGmailImageUrl(storedGmailImageUrl);
-      
-      // Fetch profile image from backend
-      const token = await SecureStore.getItemAsync('fitfaat_auth_token');
+      const cachedImage = await readCachedProfileImage(userData);
+
+      if (profileImageLoadId.current !== requestId) return;
+
+      if (cachedImage?.backendImageUrl) {
+        setProfileImageUrl(cachedImage.backendImageUrl);
+      } else {
+        setProfileImageUrl(
+          buildStableBackendProfileImageUrl(
+            API_URL,
+            getBackendProfileImageUrl(API_URL, userData),
+            cachedImage,
+            userData?.profileImageUpdatedAt ||
+            userData?.profilePictureUpdatedAt ||
+            userData?.updatedAt ||
+            userData?.updated_at
+          )
+        );
+      }
+
+      setGmailImageUrl(cachedImage?.gmailImageUrl || storedGmailImageUrl);
+
+      const token = await tokenStorage.getToken();
+      if (profileImageLoadId.current !== requestId) return;
+
       if (token) {
-        try {
-          const profileResponse = await fetch(`${API_URL}/api/user/profile`, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          });
-
-          if (profileResponse.ok) {
-            const profileData = await profileResponse.json();
-            const backendUser = profileData?.data?.user || profileData?.user;
-            const backendGmailImageUrl = getGmailProfileImageUrl(backendUser || profileData);
-
-            if (backendUser) {
-              setUser({ ...(userData || {}), ...backendUser });
-            }
-
-            setGmailImageUrl(backendGmailImageUrl || storedGmailImageUrl);
-          }
-        } catch {
-          console.log('No Gmail profile image found in backend profile');
-        }
-
-        try {
-          const response = await fetch(`${API_URL}/api/user/profile-picture`, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          });
-
-          const data = await response.json();
-          if (data.success && data.data.imageUrl) {
-            setProfileImageUrl(resolveBackendImageUrl(API_URL, data.data.imageUrl));
-          } else {
-            setProfileImageUrl(null);
-          }
-        } catch {
-          console.log('No profile picture found, using default');
-          setProfileImageUrl(null);
-        }
+        void refreshProfileImageFromBackend(userData, token, storedGmailImageUrl, requestId);
       }
     } catch (error) {
       console.error('Error loading user:', error);
     }
-  };
+  }, [refreshProfileImageFromBackend]);
 
   useEffect(() => {
     loadProfileImage();
-  }, []);
+  }, [loadProfileImage]);
 
   // Re-fetch profile image when it changes from Edit Profile Picture screen
   useEffect(() => {
-    const unsubscribe = profileImageEvents.subscribe(() => {
-      loadProfileImage();
-    });
+    const handleProfileImageUpdate = (event?: ProfileImageUpdateEvent) => {
+      if (!event) {
+        loadProfileImage();
+        return;
+      }
+
+      profileImageLoadId.current += 1;
+      if (
+        event.userKey &&
+        profileImageUserKeyRef.current &&
+        event.userKey !== profileImageUserKeyRef.current
+      ) {
+        return;
+      }
+
+      if (event.removed) {
+        setProfileImageUrl(null);
+        setGmailImageUrl(event.gmailImageUrl || null);
+        return;
+      }
+
+      setProfileImageUrl(event.displayImageUrl || event.backendImageUrl || null);
+      setGmailImageUrl(event.gmailImageUrl || null);
+    };
+
+    const unsubscribe = profileImageEvents.subscribe(handleProfileImageUpdate);
     return unsubscribe;
-  }, []);
+  }, [loadProfileImage]);
 
   // Update stats when screen comes into focus
   useFocusEffect(
@@ -354,9 +539,42 @@ export default function ProfileScreen() {
         setHealthRecordsLoading(true);
         try {
           const metricSources = [userData];
-          const storedMetrics = await AsyncStorage.getItem('fitfaat_health_metrics');
+          const [storedMetrics, storedRecords] = await Promise.all([
+            AsyncStorage.getItem(HEALTH_METRICS_STORAGE_KEY),
+            getStoredDashboardCache(),
+          ]);
+
           if (storedMetrics) {
             metricSources.push(JSON.parse(storedMetrics));
+          }
+
+          const weeklyTrackingId = await getStoredWeeklyTrackingId(userData);
+          const carryForward = await loadAdaptiveGoalCarryForward({
+            userId: userData?.id,
+            currentWeeklyTrackingId: weeklyTrackingId,
+          });
+
+          if (storedRecords?.data) {
+            const parsedRecords = { data: storedRecords.data };
+            if (isActive) {
+              setHealthRecords(buildHealthRecordSummary(parsedRecords, metricSources, carryForward));
+              setHealthRecordsLoading(false);
+            }
+
+            authApi.getOnboardingStatus()
+              .then((onboardingStatus) => {
+                if (isActive) {
+                  setHealthRecords(buildHealthRecordSummary(
+                    parsedRecords,
+                    [...metricSources, onboardingStatus],
+                    carryForward
+                  ));
+                }
+              })
+              .catch(() => {
+                // Existing stored profile data is enough when this lightweight refresh is unavailable.
+              });
+            return;
           }
 
           try {
@@ -364,21 +582,6 @@ export default function ProfileScreen() {
             metricSources.push(onboardingStatus);
           } catch {
             // Existing stored profile data is enough when this lightweight refresh is unavailable.
-          }
-
-          const weeklyTrackingId = await AsyncStorage.getItem('weeklyTrackingId') || userData?.weeklyTrackingId;
-          const carryForward = await loadAdaptiveGoalCarryForward({
-            userId: userData?.id,
-            currentWeeklyTrackingId: weeklyTrackingId,
-          });
-
-          const storedRecords = await AsyncStorage.getItem('JsonResponse');
-          if (storedRecords) {
-            const parsedRecords = JSON.parse(storedRecords);
-            if (isActive) {
-              setHealthRecords(buildHealthRecordSummary(parsedRecords, metricSources, carryForward));
-            }
-            return;
           }
 
           if (weeklyTrackingId) {
@@ -406,63 +609,74 @@ export default function ProfileScreen() {
 
       const fetchStats = async () => {
         try {
+          syncLatestHealthData().catch((error) => {
+            console.log('Health data sync unavailable on profile load:', error);
+          });
+
           const userData = await tokenStorage.getUser();
           if (!userData || !userData.id) return;
           setUser(userData);
 
-          try {
-            const doctorStatusResponse = await authApi.getDoctorStatus();
-            if (isActive) {
-              setDoctorStatus(doctorStatusResponse?.doctor?.status || null);
-            }
-          } catch {
-            if (isActive) {
-              setDoctorStatus(null);
-            }
-          }
+          authApi.getDoctorStatus()
+            .then((doctorStatusResponse) => {
+              if (isActive) {
+                setDoctorStatus(doctorStatusResponse?.doctor?.status || null);
+              }
+            })
+            .catch(() => {
+              if (isActive) {
+                setDoctorStatus(null);
+              }
+            });
 
-          setHistoryLoading(true);
           let hasCachedAppointments = false;
           try {
-
-            // Load appointments from local cache first for instant UI updates
             const cachedAppointments = await AsyncStorage.getItem('profileAppointments');
             if (cachedAppointments && isActive) {
               hasCachedAppointments = true;
               setProfileAppointments(JSON.parse(cachedAppointments));
             }
-
-            const appointmentsResponse = await authApi.getUserAppointments();
-            if (isActive) {
-              const appointmentList = Array.isArray(appointmentsResponse)
-                ? appointmentsResponse
-                : appointmentsResponse?.appointments || appointmentsResponse?.data?.appointments || [];
-              setProfileAppointments(appointmentList);
-              await AsyncStorage.setItem('profileAppointments', JSON.stringify(appointmentList));
-            }
-          } catch (error) {
-            console.log('Error fetching profile appointments:', error);
-            if (isActive && !hasCachedAppointments) {
-              setProfileAppointments([]);
-            }
-          } finally {
-            if (isActive) {
-              setHistoryLoading(false);
-            }
+          } catch {
+            hasCachedAppointments = false;
           }
+
+          if (isActive) {
+            setHistoryLoading(!hasCachedAppointments);
+          }
+
+          authApi.getUserAppointments()
+            .then(async (appointmentsResponse) => {
+              if (isActive) {
+                const appointmentList = Array.isArray(appointmentsResponse)
+                  ? appointmentsResponse
+                  : appointmentsResponse?.appointments || appointmentsResponse?.data?.appointments || [];
+                setProfileAppointments(appointmentList);
+                await AsyncStorage.setItem('profileAppointments', JSON.stringify(appointmentList));
+              }
+            })
+            .catch((error) => {
+              console.log('Error fetching profile appointments:', error);
+              if (isActive && !hasCachedAppointments) {
+                setProfileAppointments([]);
+              }
+            })
+            .finally(() => {
+              if (isActive) {
+                setHistoryLoading(false);
+              }
+            });
 
           // Fetch streak for health score
           try {
             // Priority 1: robust local streak calculation
-            const localJsonResponseStr = await AsyncStorage.getItem('JsonResponse');
+            const localJsonResponse = await getStoredDashboardCache();
             let streakCount = 0;
-            if (localJsonResponseStr) {
-              const jsonResponse = JSON.parse(localJsonResponseStr);
-              streakCount = computeProfileStreak(jsonResponse);
+            if (localJsonResponse?.data) {
+              streakCount = computeProfileStreak({ data: localJsonResponse.data });
             } else {
-               // Fallback: API
-               const streakData = await streakApi.getUserStreak(userData.id);
-               if (streakData) streakCount = streakData.streakCount || 0;
+              // Fallback: API
+              const streakData = await streakApi.getUserStreak(userData.id);
+              if (streakData) streakCount = streakData.streakCount || 0;
             }
             
             if (isActive) {
@@ -489,24 +703,29 @@ export default function ProfileScreen() {
               localAchievementStats.completedWorkouts || 0
             );
 
-            // Backend workouts
-            let backendWorkoutsCount = 0;
-            try {
-              const stats = await exerciseApi.getExerciseStats(userData.id);
-              if (stats && stats.success) {
-                backendWorkoutsCount = stats.data.totalExercises || 0;
-              }
-            } catch (e) {
-               console.log('Error fetching exercise stats from backend:', e);
-            }
-
             if (isActive) {
-              const totalWorkouts = Math.max(localWorkoutsCount, backendWorkoutsCount);
               setAchievementLocalStats({
                 ...localAchievementStats,
-                completedWorkouts: totalWorkouts,
+                completedWorkouts: localWorkoutsCount,
               });
             }
+
+            exerciseApi.getExerciseStats(userData.id)
+              .then((stats) => {
+                if (stats && stats.success && isActive) {
+                  const backendWorkoutsCount = stats.data.totalExercises || 0;
+                  setAchievementLocalStats((previous) => ({
+                    ...previous,
+                    completedWorkouts: Math.max(
+                      previous.completedWorkouts || 0,
+                      backendWorkoutsCount
+                    ),
+                  }));
+                }
+              })
+              .catch((e) => {
+                console.log('Error fetching exercise stats from backend:', e);
+              });
           } catch (e) {
             console.log('Error processing workouts stats:', e);
           }
@@ -526,21 +745,24 @@ export default function ProfileScreen() {
   );
 
   // Mock data for additional features
-  const completedAppointments = profileAppointments.filter(apt => normalizeStatus(apt.status) === 'completed');
-  const historyAppointments = [...profileAppointments].sort((a, b) => {
+  const completedAppointments = useMemo(
+    () => profileAppointments.filter(apt => normalizeStatus(apt.status) === 'completed'),
+    [profileAppointments]
+  );
+  const historyAppointments = useMemo(() => [...profileAppointments].sort((a, b) => {
     const dateA = getAppointmentDate(a)?.getTime() || 0;
     const dateB = getAppointmentDate(b)?.getTime() || 0;
     return dateB - dateA;
-  });
-  const upcomingAppointments = profileAppointments
+  }), [profileAppointments]);
+  const upcomingAppointments = useMemo(() => profileAppointments
     .filter(apt => {
       const date = getAppointmentDate(apt);
       return date && date > new Date() && !['cancelled', 'completed'].includes(normalizeStatus(apt.status));
     })
-    .slice(0, 3);
-  const activeAppointments = profileAppointments
+    .slice(0, 3), [profileAppointments]);
+  const activeAppointments = useMemo(() => profileAppointments
     .filter(apt => normalizeStatus(apt.status) === 'confirmed')
-    .slice(0, 2);
+    .slice(0, 2), [profileAppointments]);
   const hasProfileAppointments = upcomingAppointments.length > 0 || activeAppointments.length > 0;
   const appointmentsSectionStyle = [
     styles.appointmentsSection,
@@ -551,9 +773,12 @@ export default function ProfileScreen() {
     { marginBottom: insets.bottom + hp(2) },
   ];
 
-  const achievements = calculateAchievementBadges(
-    healthRecords?.days || null,
-    achievementLocalStats
+  const achievements = useMemo(
+    () => calculateAchievementBadges(
+      healthRecords?.days || null,
+      achievementLocalStats
+    ),
+    [achievementLocalStats, healthRecords?.days]
   );
   const earnedAchievementsCount = achievements.filter(
     (achievement) => achievement.unlocked
@@ -572,7 +797,71 @@ export default function ProfileScreen() {
     }).length,
     healthScore: healthScore,
   };
+  const profileMetricSources = useMemo(() => getMetricSources(user), [user]);
+  const heightMeters = healthRecords?.height ? healthRecords.height / 100 : undefined;
+  const derivedBmi = healthRecords?.weight && heightMeters
+    ? healthRecords.weight / (heightMeters * heightMeters)
+    : undefined;
+  const bmiValue = derivedBmi || readMetric(profileMetricSources, ['bmi', 'bodyMassIndex']);
+  const bmiDisplay = bmiValue ? bmiValue.toFixed(1) : '--';
+  const weeklyLoggedDays = healthRecords?.days.length || 0;
+  const weeklyCompletedDays = healthRecords?.completedDays || 0;
+  const hydrationAverage = weeklyLoggedDays ? (healthRecords?.totalHydration || 0) / weeklyLoggedDays : 0;
+  const hydrationTargetAverage = weeklyLoggedDays && healthRecords?.targetHydration
+    ? healthRecords.targetHydration / weeklyLoggedDays
+    : healthRecords?.hydrationGoal || 0;
+  const dailyGoalCalories = healthRecords?.goalCalories
+    || (weeklyLoggedDays && healthRecords?.targetCalories
+      ? Math.round(healthRecords.targetCalories / weeklyLoggedDays)
+      : 0);
+  const goalLabel = formatGoalLabel(
+    readTextMetric(profileMetricSources, [
+      'fitnessGoal',
+      'goal',
+      'healthGoal',
+      'targetGoal',
+      'selectedGoal',
+      'goalType',
+    ])
+  );
+  const completedWorkoutCount = achievementLocalStats.completedWorkouts || 0;
+  const latestAppointment = historyAppointments[0];
+  const latestAppointmentLabel = latestAppointment
+    ? `${(normalizeStatus(latestAppointment.status) || 'scheduled').toUpperCase()} - ${getAppointmentDateLabel(latestAppointment)}`
+    : 'No history yet';
+  const hasSnapshotData = Boolean(
+    bmiValue ||
+    dailyGoalCalories ||
+    weeklyLoggedDays ||
+    completedWorkoutCount ||
+    profileAppointments.length ||
+    healthRecords?.height ||
+    healthRecords?.weight
+  );
   const isApprovedDoctor = normalizeStatus(doctorStatus || undefined) === 'approved';
+  const snapshotStatCards = [
+    {
+      label: 'Weekly stats',
+      value: `${weeklyCompletedDays}/7`,
+      detail: `${weeklyLoggedDays} days logged`,
+      icon: 'calendar-number-outline',
+      color: colors.primary,
+    },
+    {
+      label: 'Workouts',
+      value: String(completedWorkoutCount),
+      detail: 'completed sessions',
+      icon: 'barbell-outline',
+      color: colors.secondary || colors.primary,
+    },
+    {
+      label: 'Hydration avg',
+      value: hydrationAverage ? `${hydrationAverage.toFixed(1)} L` : '--',
+      detail: hydrationTargetAverage ? `${hydrationTargetAverage.toFixed(1)} L target` : 'track water daily',
+      icon: 'water-outline',
+      color: colors.info || colors.primary,
+    },
+  ];
 
   const openEmergencyContact = async () => {
     const whatsappNumber = '923325563373';
@@ -608,10 +897,122 @@ export default function ProfileScreen() {
         action: openDoctorPortal,
       };
 
+  const openWeightLogModal = () => {
+    const currentWeight = healthRecords?.weight || user?.userInfo?.weight || user?.weight;
+    setWeightInput(currentWeight ? String(Math.round(Number(currentWeight) * 10) / 10) : '');
+    setShowWeightLogModal(true);
+  };
+
+  const saveWeightLog = async () => {
+    const nextWeight = Number(weightInput);
+
+    if (!Number.isFinite(nextWeight) || nextWeight < 20 || nextWeight > 350) {
+      Alert.alert('Invalid Weight', 'Enter a weight between 20 kg and 350 kg.');
+      return;
+    }
+
+    setIsSavingWeightLog(true);
+    try {
+      const storedMetricsRaw = await AsyncStorage.getItem(HEALTH_METRICS_STORAGE_KEY);
+      const storedMetrics = storedMetricsRaw ? JSON.parse(storedMetricsRaw) : {};
+      const nextMetrics = {
+        ...storedMetrics,
+        weight: Math.round(nextWeight * 10) / 10,
+        currentWeight: Math.round(nextWeight * 10) / 10,
+        updatedAt: new Date().toISOString(),
+      };
+      await AsyncStorage.setItem(HEALTH_METRICS_STORAGE_KEY, JSON.stringify(nextMetrics));
+
+      const latestUser = await tokenStorage.getUser();
+      const updatedUser = latestUser
+        ? {
+            ...latestUser,
+            userInfo: {
+              ...(latestUser.userInfo || {}),
+              weight: nextMetrics.weight,
+            },
+          }
+        : user
+          ? {
+              ...user,
+              userInfo: {
+                ...(user.userInfo || {}),
+                weight: nextMetrics.weight,
+              },
+            }
+          : null;
+
+      if (updatedUser) {
+        await tokenStorage.saveUser(updatedUser);
+        setUser(updatedUser);
+      }
+
+      const weeklyTrackingId = await getStoredWeeklyTrackingId(updatedUser);
+      const adaptiveMetrics = buildAdaptiveGoalMetrics(updatedUser, nextMetrics);
+      const userId = updatedUser?.id || updatedUser?._id;
+      await recordWeightTrendSnapshot(adaptiveMetrics || { weight: nextMetrics.weight }, {
+        userId,
+        weeklyTrackingId,
+      });
+
+      const cachedRecords = await getStoredDashboardCache(undefined, weeklyTrackingId);
+      if (cachedRecords?.data) {
+        const recordsData = cachedRecords.data;
+        const carryForward = await loadAdaptiveGoalCarryForward({
+          userId,
+          currentWeeklyTrackingId: weeklyTrackingId,
+        });
+        const weightTrendCalibration = await loadWeeklyWeightTrendCalibration(
+          adaptiveMetrics,
+          recordsData,
+          {
+            userId,
+            weeklyTrackingId,
+          }
+        );
+        const adjustedRecords = applyAdaptiveGoalsToJsonResponse(
+          recordsData,
+          adaptiveMetrics,
+          carryForward,
+          { weightTrendCalibration }
+        );
+
+        await setStoredDashboardCache(
+          { data: adjustedRecords, timestamp: new Date() },
+          updatedUser,
+          weeklyTrackingId
+        );
+        setHealthRecords(buildHealthRecordSummary(
+          { data: adjustedRecords },
+          [updatedUser, nextMetrics],
+          carryForward
+        ));
+      } else {
+        setHealthRecords((previous) =>
+          previous
+            ? {
+                ...previous,
+                weight: nextMetrics.weight,
+              }
+            : buildHealthRecordSummary(null, [updatedUser, nextMetrics])
+        );
+      }
+
+      queueHealthDataCloudSync();
+      setShowWeightLogModal(false);
+    } catch (error) {
+      console.error('Error saving weight log:', error);
+      Alert.alert('Could Not Save', 'Please try logging your weight again.');
+    } finally {
+      setIsSavingWeightLog(false);
+    }
+  };
+
   const quickActions = [
     { title: "Book Appointment", iconName: "calendar", color: colors.primary, action: () => router.push('/(main)/(conference)') },
     { title: "Chat History", iconName: "chatbubbles", color: colors.info, action: () => router.push('/(main)/(chatbot)/chat-history') },
     { title: "Health Records", iconName: "clipboard", color: colors.secondary, action: () => setShowHealthRecords(true) },
+    { title: "Log Weight", iconName: "scale", color: '#8B5CF6', action: openWeightLogModal },
     { title: "Achievement Badges", iconName: "trophy", color: colors.warning, action: () => setSelectedTab('achievements') },
     { title: "Emergency Contact", iconName: "alert-circle", color: colors.error, action: openEmergencyContact },
   ];
@@ -654,12 +1055,14 @@ export default function ProfileScreen() {
           }}>
             {displayImageUrl ? (
               <Image
-                source={{ uri: displayImageUrl }}
+                key={displayImageUrl}
+                source={{ uri: displayImageUrl, cache: 'force-cache' }}
                 style={{
                   width: hp(12),
                   height: hp(12),
                   borderRadius: hp(6),
                 }}
+                fadeDuration={0}
                 onError={handleProfileImageError}
               />
             ) : (
@@ -693,10 +1096,9 @@ export default function ProfileScreen() {
           </Text>
         </View>
 
-        <TouchableOpacity
+        <AnimatedPressable
           style={styles.doctorAccessCard}
           onPress={profileDoctorAction.action}
-          activeOpacity={0.85}
         >
           <View style={styles.doctorAccessIcon}>
             <Ionicons name={profileDoctorAction.iconName as any} size={Math.min(hp(3.1), wp(7))} color={colors.textOnPrimary} />
@@ -708,33 +1110,141 @@ export default function ProfileScreen() {
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={Math.min(hp(2.4), wp(5.4))} color={colors.primary} />
-        </TouchableOpacity>
+        </AnimatedPressable>
 
         {/* Tab Navigation */}
         <View style={styles.tabContainer}>
-          <TouchableOpacity 
+          <AnimatedPressable 
             style={[styles.tab, selectedTab === 'overview' && styles.activeTab]}
             onPress={() => setSelectedTab('overview')}
           >
             <Text style={[styles.tabText, selectedTab === 'overview' && styles.activeTabText]}>Overview</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
+          </AnimatedPressable>
+          <AnimatedPressable 
             style={[styles.tab, selectedTab === 'history' && styles.activeTab]}
             onPress={() => setSelectedTab('history')}
           >
             <Text style={[styles.tabText, selectedTab === 'history' && styles.activeTabText]}>History</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
+          </AnimatedPressable>
+          <AnimatedPressable 
             style={[styles.tab, selectedTab === 'achievements' && styles.activeTab]}
             onPress={() => setSelectedTab('achievements')}
           >
             <Text style={[styles.tabText, selectedTab === 'achievements' && styles.activeTabText]}>Achievements</Text>
-          </TouchableOpacity>
+          </AnimatedPressable>
         </View>
 
         {/* Content based on selected tab */}
         {selectedTab === 'overview' && (
           <>
+            <View style={styles.snapshotSection}>
+              <View style={styles.snapshotHeaderRow}>
+                <View style={styles.snapshotHeaderCopy}>
+                  <Text style={styles.sectionTitle}>Profile Health Snapshot</Text>
+                  <Text style={styles.snapshotSubtitle}>
+                    Updated from profile records and weekly logs.
+                  </Text>
+                </View>
+                <View style={styles.snapshotHeaderIcon}>
+                  <Ionicons name="pulse-outline" size={Math.min(hp(2.6), wp(5.8))} color={colors.primary} />
+                </View>
+              </View>
+
+              {healthRecordsLoading && !hasSnapshotData ? (
+                <View style={styles.inlineLoading}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={styles.inlineLoadingText}>Loading profile snapshot...</Text>
+                </View>
+              ) : !hasSnapshotData ? (
+                <SmartEmptyState
+                  icon="clipboard-outline"
+                  title="No Snapshot Yet"
+                  message="Complete your health profile and daily tracking to unlock BMI, goals, hydration, workouts, and appointment history."
+                  actionLabel="Open Health Records"
+                  onAction={() => setShowHealthRecords(true)}
+                  colors={colors}
+                  compact
+                  style={styles.snapshotEmpty}
+                />
+              ) : (
+                <>
+                  <View style={styles.snapshotHeroGrid}>
+                    <View style={styles.snapshotBmiCard}>
+                      <ProgressRing
+                        progress={bmiValue ? Math.min(bmiValue / 40, 1) : 0}
+                        size={Math.min(hp(10.6), wp(23.5))}
+                        strokeWidth={Math.min(hp(0.95), wp(2.1))}
+                        color={colors.primary}
+                        trackColor={colors.border}
+                        icon="body-outline"
+                        value={bmiDisplay}
+                        label="BMI"
+                        textColor={colors.textPrimary}
+                        mutedTextColor={colors.textSecondary}
+                      />
+                      <View style={styles.snapshotCardCopy}>
+                        <Text style={styles.snapshotCardTitle}>BMI</Text>
+                        <Text style={styles.snapshotCardValue}>{getBmiCategory(bmiValue)}</Text>
+                        <Text style={styles.snapshotCardMeta}>
+                          {formatMetric(healthRecords?.weight, 'kg')} - {formatMetric(healthRecords?.height, 'cm')}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.snapshotGoalCard}>
+                      <View style={styles.snapshotGoalIcon}>
+                        <Ionicons name="flag-outline" size={Math.min(hp(2.8), wp(6.2))} color={colors.textOnPrimary} />
+                      </View>
+                      <Text style={styles.snapshotCardTitle}>Goal</Text>
+                      <Text style={styles.snapshotGoalTitle} numberOfLines={2} adjustsFontSizeToFit>
+                        {goalLabel}
+                      </Text>
+                      <Text style={styles.snapshotCardMeta}>
+                        {dailyGoalCalories ? `${dailyGoalCalories} kcal daily target` : 'Add a goal to personalize tracking'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.snapshotMetricGrid}>
+                    {snapshotStatCards.map((stat) => (
+                      <View key={stat.label} style={styles.snapshotMetricCard}>
+                        <View style={[styles.snapshotMetricIcon, { backgroundColor: `${stat.color}18` }]}>
+                          <Ionicons name={stat.icon as any} size={Math.min(hp(2.3), wp(5.2))} color={stat.color} />
+                        </View>
+                        <Text style={styles.snapshotMetricValue}>{stat.value}</Text>
+                        <Text style={styles.snapshotMetricLabel}>{stat.label}</Text>
+                        <Text style={styles.snapshotMetricDetail} numberOfLines={1} adjustsFontSizeToFit>
+                          {stat.detail}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  <AnimatedPressable
+                    style={styles.snapshotHistoryCard}
+                    onPress={() => setSelectedTab('history')}
+                  >
+                    <View style={styles.snapshotHistoryIcon}>
+                      <Ionicons name="calendar-outline" size={Math.min(hp(2.5), wp(5.5))} color={colors.primary} />
+                    </View>
+                    <View style={styles.snapshotHistoryCopy}>
+                      <Text style={styles.snapshotCardTitle}>Appointment History</Text>
+                      <Text style={styles.snapshotHistoryText}>
+                        {profileAppointments.length} total - {completedAppointments.length} completed - {upcomingAppointments.length} upcoming
+                      </Text>
+                      <Text style={styles.snapshotCardMeta}>{latestAppointmentLabel}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={Math.min(hp(2.4), wp(5.4))} color={colors.textSecondary} />
+                  </AnimatedPressable>
+                </>
+              )}
+            </View>
+
+            <ProgressPhotoGallery
+              userId={user?.id || user?._id || displayEmail}
+              colors={colors}
+            />
+
             {/* Health Statistics */}
             <View style={styles.statsSection}>
               <Text style={styles.sectionTitle}>Health Statistics</Text>
@@ -759,7 +1269,7 @@ export default function ProfileScreen() {
               <Text style={styles.sectionTitle}>Quick Actions</Text>
               <View style={styles.quickActionsGrid}>
                 {quickActions.map((action, index) => (
-                  <TouchableOpacity
+                  <AnimatedPressable
                     key={index}
                     style={[styles.quickActionCard, { borderLeftColor: action.color }]}
                     onPress={action.action}
@@ -771,7 +1281,7 @@ export default function ProfileScreen() {
                       style={styles.quickActionIcon}
                     />
                     <Text style={styles.quickActionTitle}>{action.title}</Text>
-                  </TouchableOpacity>
+                  </AnimatedPressable>
                 ))}
               </View>
             </View>
@@ -795,7 +1305,7 @@ export default function ProfileScreen() {
                   const statusColor = getStatusColor(appointment.status, colors);
 
                   return (
-                    <TouchableOpacity
+                    <AnimatedPressable
                       key={getAppointmentId(appointment)}
                       style={[styles.historyCard, { borderLeftColor: statusColor }]}
                       onPress={() => setSelectedHistoryAppointment(appointment)}
@@ -816,18 +1326,23 @@ export default function ProfileScreen() {
                         </Text>
                         <Text style={styles.historySpecialty}>{appointment.time || 'Time unavailable'}</Text>
                       </View>
-                    </TouchableOpacity>
+                    </AnimatedPressable>
                   );
                 })}
               </View>
             )}
 
             {!historyLoading && historyAppointments.length === 0 && (
-              <View style={styles.emptyState}>
-                <Ionicons name="document-text-outline" size={48} color={colors.textTertiary} />
-                <Text style={styles.emptyStateTitle}>No History Yet</Text>
-                <Text style={styles.emptyStateSubtitle}>Your appointment history will appear here</Text>
-              </View>
+              <SmartEmptyState
+                icon="document-text-outline"
+                title="No History Yet"
+                message="Completed and cancelled appointments will appear here after your first consultation."
+                actionLabel="Book Appointment"
+                onAction={() => router.push('/(main)/(conference)')}
+                colors={colors}
+                compact
+                style={styles.profileEmptyState}
+              />
             )}
           </View>
         )}
@@ -904,7 +1419,7 @@ export default function ProfileScreen() {
             
             {/* Active Appointments */}
             {activeAppointments.map((appointment) => (
-              <TouchableOpacity
+              <AnimatedPressable
                 key={getAppointmentId(appointment)}
                 style={[styles.appointmentCard, styles.activeAppointmentCard]}
                 onPress={() => setSelectedHistoryAppointment(appointment)}
@@ -925,12 +1440,12 @@ export default function ProfileScreen() {
                   <Text style={styles.doctorName}>{getDoctorName(appointment)}</Text>
                   <Text style={styles.appointmentTime}>{appointment.time} - {getAppointmentDateLabel(appointment)}</Text>
                 </View>
-              </TouchableOpacity>
+              </AnimatedPressable>
             ))}
 
             {/* Upcoming Appointments */}
             {upcomingAppointments.map((appointment) => (
-              <TouchableOpacity
+              <AnimatedPressable
                 key={getAppointmentId(appointment)}
                 style={styles.appointmentCard}
                 onPress={() => setSelectedHistoryAppointment(appointment)}
@@ -952,7 +1467,7 @@ export default function ProfileScreen() {
                   <Text style={styles.appointmentTime}>{appointment.time} - {getAppointmentDateLabel(appointment)}</Text>
                   <Text style={styles.appointmentSpecialty}>{getDoctorSpecialty(appointment)}</Text>
                 </View>
-              </TouchableOpacity>
+              </AnimatedPressable>
             ))}
           </View>
         )}
@@ -1052,6 +1567,15 @@ export default function ProfileScreen() {
                   </View>
                 </View>
 
+                <TouchableOpacity
+                  style={styles.recordActionButton}
+                  onPress={openWeightLogModal}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="scale-outline" size={Math.min(hp(2.2), wp(5))} color={colors.textOnPrimary} />
+                  <Text style={styles.recordActionText}>Log Weight</Text>
+                </TouchableOpacity>
+
                 <View style={styles.recordSummaryCard}>
                   <Text style={styles.recordSummaryTitle}>Weekly Nutrition</Text>
                   <Text style={styles.recordSummaryText}>
@@ -1066,14 +1590,58 @@ export default function ProfileScreen() {
                 </View>
 
                 {(!healthRecords || healthRecords.days.length === 0) && (
-                  <View style={styles.emptyState}>
-                    <Ionicons name="document-text-outline" size={48} color={colors.textTertiary} />
-                    <Text style={styles.emptyStateTitle}>No Health Records Yet</Text>
-                    <Text style={styles.emptyStateSubtitle}>Your daily tracking records will appear here</Text>
-                  </View>
+                  <SmartEmptyState
+                    icon="document-text-outline"
+                    title="No Health Records Yet"
+                    message="Daily calories, hydration, and completed days will appear here once tracking starts."
+                    colors={colors}
+                    compact
+                    style={styles.profileEmptyState}
+                  />
                 )}
               </ScrollView>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showWeightLogModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowWeightLogModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.weightLogModal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Log Weight</Text>
+              <TouchableOpacity onPress={() => setShowWeightLogModal(false)}>
+                <Ionicons name="close" size={24} color={colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.weightLogLabel}>Weight (kg)</Text>
+            <TextInput
+              style={styles.weightLogInput}
+              value={weightInput}
+              onChangeText={setWeightInput}
+              keyboardType="decimal-pad"
+              placeholder="70.0"
+              placeholderTextColor={colors.textSecondary}
+            />
+
+            <TouchableOpacity
+              style={[styles.weightLogButton, isSavingWeightLog && styles.weightLogButtonDisabled]}
+              onPress={saveWeightLog}
+              disabled={isSavingWeightLog}
+              activeOpacity={0.85}
+            >
+              {isSavingWeightLog ? (
+                <ActivityIndicator size="small" color={colors.textOnPrimary} />
+              ) : (
+                <Text style={styles.weightLogButtonText}>Save Weight</Text>
+              )}
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -1103,6 +1671,174 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontWeight: 'bold',
     color: colors.textPrimary,
     marginBottom: hp(2),
+  },
+  snapshotSection: {
+    marginHorizontal: wp(5),
+    marginBottom: hp(3),
+  },
+  snapshotHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: wp(3),
+    marginBottom: hp(1.5),
+  },
+  snapshotHeaderCopy: {
+    flex: 1,
+  },
+  snapshotSubtitle: {
+    marginTop: -hp(1.2),
+    fontSize: hp(1.35),
+    fontWeight: '600',
+    color: colors.textSecondary,
+    lineHeight: hp(1.9),
+  },
+  snapshotHeaderIcon: {
+    width: Math.min(hp(5.2), wp(11.5)),
+    height: Math.min(hp(5.2), wp(11.5)),
+    borderRadius: Math.min(hp(2.6), wp(5.75)),
+    backgroundColor: colors.primary + '14',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  snapshotEmpty: {
+    marginTop: hp(0.4),
+  },
+  snapshotHeroGrid: {
+    gap: hp(1.4),
+    marginBottom: hp(1.4),
+  },
+  snapshotBmiCard: {
+    backgroundColor: colors.cardBackground,
+    borderRadius: hp(1.6),
+    padding: hp(1.6),
+    borderWidth: 1,
+    borderColor: colors.cardBorder || colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(3.2),
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  snapshotGoalCard: {
+    backgroundColor: colors.cardBackground,
+    borderRadius: hp(1.6),
+    padding: hp(1.8),
+    borderWidth: 1,
+    borderColor: colors.cardBorder || colors.border,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  snapshotGoalIcon: {
+    width: Math.min(hp(4.8), wp(10.6)),
+    height: Math.min(hp(4.8), wp(10.6)),
+    borderRadius: Math.min(hp(2.4), wp(5.3)),
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: hp(1.2),
+  },
+  snapshotCardCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  snapshotCardTitle: {
+    fontSize: hp(1.45),
+    fontWeight: '800',
+    color: colors.textSecondary,
+    marginBottom: hp(0.45),
+  },
+  snapshotCardValue: {
+    fontSize: hp(1.95),
+    fontWeight: '900',
+    color: colors.textPrimary,
+    marginBottom: hp(0.45),
+  },
+  snapshotGoalTitle: {
+    fontSize: hp(2.15),
+    fontWeight: '900',
+    color: colors.textPrimary,
+    lineHeight: hp(2.65),
+    marginBottom: hp(0.5),
+  },
+  snapshotCardMeta: {
+    fontSize: hp(1.32),
+    fontWeight: '700',
+    color: colors.textSecondary,
+    lineHeight: hp(1.85),
+  },
+  snapshotMetricGrid: {
+    flexDirection: 'row',
+    gap: wp(2),
+    marginBottom: hp(1.4),
+  },
+  snapshotMetricCard: {
+    flex: 1,
+    minHeight: hp(13.2),
+    backgroundColor: colors.cardBackground,
+    borderRadius: hp(1.5),
+    padding: hp(1.25),
+    borderWidth: 1,
+    borderColor: colors.cardBorder || colors.border,
+  },
+  snapshotMetricIcon: {
+    width: Math.min(hp(4), wp(8.8)),
+    height: Math.min(hp(4), wp(8.8)),
+    borderRadius: Math.min(hp(2), wp(4.4)),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: hp(0.85),
+  },
+  snapshotMetricValue: {
+    fontSize: hp(1.9),
+    fontWeight: '900',
+    color: colors.textPrimary,
+    marginBottom: hp(0.2),
+  },
+  snapshotMetricLabel: {
+    fontSize: hp(1.22),
+    fontWeight: '800',
+    color: colors.textSecondary,
+  },
+  snapshotMetricDetail: {
+    marginTop: hp(0.45),
+    fontSize: hp(1.12),
+    fontWeight: '700',
+    color: colors.textTertiary || colors.textSecondary,
+  },
+  snapshotHistoryCard: {
+    backgroundColor: colors.cardBackground,
+    borderRadius: hp(1.6),
+    padding: hp(1.6),
+    borderWidth: 1,
+    borderColor: colors.cardBorder || colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(3),
+  },
+  snapshotHistoryIcon: {
+    width: Math.min(hp(4.8), wp(10.6)),
+    height: Math.min(hp(4.8), wp(10.6)),
+    borderRadius: Math.min(hp(2.4), wp(5.3)),
+    backgroundColor: colors.primary + '14',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  snapshotHistoryCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  snapshotHistoryText: {
+    fontSize: hp(1.45),
+    fontWeight: '800',
+    color: colors.textPrimary,
+    marginBottom: hp(0.35),
   },
   appointmentCard: {
     backgroundColor: colors.cardBackground,
@@ -1405,6 +2141,9 @@ const getStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     paddingVertical: hp(4),
   },
+  profileEmptyState: {
+    marginTop: hp(1),
+  },
   emptyStateIcon: {
     fontSize: hp(6),
     marginBottom: hp(2),
@@ -1558,6 +2297,12 @@ const getStyles = (colors: any) => StyleSheet.create({
     borderRadius: hp(2),
     padding: hp(2.2),
   },
+  weightLogModal: {
+    width: '100%',
+    backgroundColor: colors.cardBackground,
+    borderRadius: hp(2),
+    padding: hp(2.2),
+  },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1620,6 +2365,21 @@ const getStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
   },
+  recordActionButton: {
+    minHeight: hp(5),
+    borderRadius: hp(1.4),
+    backgroundColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: wp(2),
+    marginBottom: hp(1.5),
+  },
+  recordActionText: {
+    fontSize: hp(1.55),
+    fontWeight: '800',
+    color: colors.textOnPrimary,
+  },
   recordSummaryCard: {
     backgroundColor: colors.primarySoft,
     borderRadius: hp(1.6),
@@ -1638,5 +2398,38 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontSize: hp(1.55),
     color: colors.textSecondary,
     marginBottom: hp(0.6),
+  },
+  weightLogLabel: {
+    fontSize: hp(1.55),
+    color: colors.textSecondary,
+    fontWeight: '700',
+    marginBottom: hp(0.8),
+  },
+  weightLogInput: {
+    minHeight: hp(5.6),
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: hp(1.2),
+    paddingHorizontal: wp(4),
+    color: colors.textPrimary,
+    fontSize: hp(2),
+    fontWeight: '800',
+    backgroundColor: colors.surface || colors.screenColor,
+    marginBottom: hp(1.6),
+  },
+  weightLogButton: {
+    minHeight: hp(5.2),
+    borderRadius: hp(1.4),
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  weightLogButtonDisabled: {
+    opacity: 0.7,
+  },
+  weightLogButtonText: {
+    color: colors.textOnPrimary,
+    fontSize: hp(1.65),
+    fontWeight: '900',
   },
 });

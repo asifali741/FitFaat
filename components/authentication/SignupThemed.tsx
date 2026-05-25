@@ -10,7 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import {
   heightPercentageToDP as hp,
   widthPercentageToDP as wp,
@@ -131,7 +131,10 @@ export default function SignupThemed() {
   };
 
   return (
-    <KeyboardAwareContainer>
+    <KeyboardAwareContainer
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
+      contentContainerStyle={styles.keyboardContent}
+    >
       {/* Professional Header with Gradient */}
       <LinearGradient
         colors={[colors.secondary, colors.primary]}
@@ -302,6 +305,10 @@ export default function SignupThemed() {
 }
 
 const getStyles = (colors: any) => StyleSheet.create({
+  keyboardContent: {
+    flexGrow: 1,
+    paddingBottom: hp(5),
+  },
   headerGradient: {
     height: hp(27),
     position: 'relative',
@@ -343,9 +350,9 @@ const getStyles = (colors: any) => StyleSheet.create({
     left: -wp(13.3),
   },
   formContainer: {
-    flex: 1,
     paddingHorizontal: theme.spacing.xl,
     paddingTop: theme.spacing.xxl,
+    paddingBottom: hp(5),
     backgroundColor: colors.screenColor,
     marginTop: -hp(4.9),
     borderTopLeftRadius: wp(8.5),

@@ -1,7 +1,9 @@
 import AppHeader from "@/components/AppHeader";
 import { useTheme } from "@/contexts/ThemeContext";
+import { authApi } from "@/utils/auth/authApi";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
+import { useRouter } from "expo-router";
 import * as NavigationBar from 'expo-navigation-bar';
 import * as SecureStore from 'expo-secure-store';
 import { StatusBar } from 'expo-status-bar';
@@ -34,6 +36,7 @@ const getAPIURL = () => {
 const API_URL = getAPIURL();
 
 export default function ChangePassword() {
+  const router = useRouter();
   const { colors } = useTheme();
   
   const [formData, setFormData] = useState({
@@ -138,13 +141,13 @@ export default function ChangePassword() {
           [{
             text: "OK",
             onPress: async () => {
-              await SecureStore.deleteItemAsync('fitfaat_auth_token');
-              await SecureStore.deleteItemAsync('fitfaat_user');
+              await authApi.logout();
               setFormData({
                 currentPassword: "",
                 newPassword: "",
                 confirmPassword: "",
               });
+              router.replace('/(auth)/email-login');
             }
           }]
         );

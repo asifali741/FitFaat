@@ -531,7 +531,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         userId,
         expoPushToken: pushToken,
         platform: Platform.OS,
-      });
+      }, { timeout: 6000 });
     } catch (error) {
       console.error('Failed to register push token with backend:', error);
     }

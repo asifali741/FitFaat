@@ -21,6 +21,8 @@ export type NutritionProfileEntry = {
   dayDate?: string;
   timestamp: string;
   calories?: number;
+  proteinGrams?: number;
+  mealCount?: number;
   waterLiters?: number;
   targetCalories?: number;
   achievedCaloriesAfter?: number;
@@ -36,6 +38,13 @@ export type NutritionGoalSummary = {
   targetCalories?: number;
   achievedHydration?: number;
   targetHydration?: number;
+  calorieGoalDirection?: 'missed' | 'exceeded' | 'onTarget' | 'unknown';
+  nutritionGapSeverity?: 'none' | 'low' | 'medium' | 'high' | 'critical';
+  hydrationRiskScore?: number;
+  recoveryNeedScore?: number;
+  goalRiskScore?: number;
+  nudgePriority?: 'silent' | 'low' | 'medium' | 'high';
+  nudgeReason?: string;
 };
 
 export type NutritionProfile = {
@@ -138,6 +147,8 @@ const getStoredEntries = async () => {
   const key = await getEntriesKey();
   return readJson<NutritionProfileEntry[]>(key, []);
 };
+
+export const loadNutritionProfileEntries = async () => getStoredEntries();
 
 const selectHours = (hours: number[], fallback: number[], limit: number) => {
   const selected: number[] = [];
@@ -253,8 +264,10 @@ export const buildNutritionProfile = async (): Promise<NutritionProfile> => {
 export const recordNutritionProfileEntry = async (entry: NutritionProfileEntry) => {
   const calories = Math.max(0, toFiniteNumber(entry.calories));
   const waterLiters = Math.max(0, toFiniteNumber(entry.waterLiters));
+  const proteinGrams = Math.max(0, toFiniteNumber(entry.proteinGrams));
+  const mealCount = Math.max(0, Math.round(toFiniteNumber(entry.mealCount)));
 
-  if (calories <= 0 && waterLiters <= 0) {
+  if (calories <= 0 && waterLiters <= 0 && proteinGrams <= 0) {
     return;
   }
 
@@ -266,6 +279,8 @@ export const recordNutritionProfileEntry = async (entry: NutritionProfileEntry) 
     id: entry.id || `${timestamp}:${entry.dayLogId || 'day'}:${entries.length}`,
     timestamp,
     calories,
+    proteinGrams,
+    mealCount,
     waterLiters,
     targetCalories: toFiniteNumber(entry.targetCalories),
     achievedCaloriesAfter: toFiniteNumber(entry.achievedCaloriesAfter),
@@ -331,12 +346,57 @@ const createPlanKey = (
     targetCalories,
     achievedHydration,
     targetHydration,
+    summary.calorieGoalDirection || 'unknown',
+    summary.nutritionGapSeverity || 'none',
+    summary.nudgePriority || 'silent',
+    Math.round(toFiniteNumber(summary.goalRiskScore)),
+    summary.nudgeReason || '',
     profile.regularMealHours.join('-'),
     profile.highestCalorieHours.join('-'),
     profile.lowestCalorieHours.join('-'),
     profile.hydrationHours.join('-'),
   ].join('|');
 };
+
+const getBehaviorNoticeCopy = (summary: NutritionGoalSummary, outcome: NutritionGoalOutcome) => {
+  const reason = String(summary.nudgeReason || '').toLowerCase();
+
+  if (reason.includes('recovery')) {
+    return {
+      title: 'Recovery window',
+      body: 'Your goals stay fixed. Use this window for water and a recovery-focused meal.',
+    };
+  }
+
+  if (reason.includes('hydration')) {
+    return {
+      title: 'Water check-in',
+      body: 'Your hydration goal stays steady. A small water log now keeps the routine easier.',
+    };
+  }
+
+  if (outcome === 'over' || summary.calorieGoalDirection === 'exceeded') {
+    return {
+      title: 'Pause before eating',
+      body: 'Your calorie goal stays fixed. This is a high-risk window, so try water or protein before another snack.',
+    };
+  }
+
+  if (outcome === 'under' || summary.calorieGoalDirection === 'missed') {
+    return {
+      title: 'Steady goal, better timing',
+      body: 'Your calorie goal is not changing. This is a good eating window to close the gap today.',
+    };
+  }
+
+  return {
+    title: 'Routine checkpoint',
+    body: 'Your ideal goal stays steady. A quick log now helps FitFaat guide your routine.',
+  };
+};
+
+const reasonIncludesHydration = (reason?: string) =>
+  String(reason || '').toLowerCase().includes('hydration');
 
 const cancelStoredPlan = async (plan: StoredNutritionPlan | null, cancel: CancelNotification) => {
   if (!plan?.notificationIds?.length) return;
@@ -387,6 +447,7 @@ export const scheduleAdaptiveNutritionNotifications = async ({
 
   const notificationIds: string[] = [];
   const dashboardData = { route: '/(main)/(dashboard)' };
+  const behaviorCopy = getBehaviorNoticeCopy(summary, outcome);
 
   for (const hour of profile.regularMealHours) {
     await addNotification(notificationIds, schedule, {
@@ -411,8 +472,8 @@ export const scheduleAdaptiveNutritionNotifications = async ({
     for (const hour of targetHours) {
       await addNotification(notificationIds, schedule, {
         type: 'meal',
-        title: 'Calories were low yesterday',
-        body: 'This is usually a good eating window for you. Add a balanced meal and water to stay on track.',
+        title: behaviorCopy.title,
+        body: behaviorCopy.body,
         date: createNextOccurrence(hour, ADAPTIVE_NOTICE_MINUTE),
         data: dashboardData,
       });
@@ -438,12 +499,31 @@ export const scheduleAdaptiveNutritionNotifications = async ({
     for (const hour of profile.highestCalorieHours) {
       await addNotification(notificationIds, schedule, {
         type: 'meal',
-        title: 'Pause before eating',
-        body: 'This is usually a high-calorie window for you. Try waiting 15 minutes or choose water and protein first.',
+        title: behaviorCopy.title,
+        body: behaviorCopy.body,
         date: createNextOccurrence(hour, ADAPTIVE_NOTICE_MINUTE),
         data: dashboardData,
       });
     }
+  }
+
+  if (
+    outcome === 'onTarget' &&
+    (summary.nudgePriority === 'medium' || summary.nudgePriority === 'high')
+  ) {
+    const [hour] = selectHours(
+      reasonIncludesHydration(summary.nudgeReason) ? profile.hydrationHours : profile.regularMealHours,
+      reasonIncludesHydration(summary.nudgeReason) ? DEFAULT_WATER_HOURS : DEFAULT_MEAL_HOURS,
+      1
+    );
+
+    await addNotification(notificationIds, schedule, {
+      type: reasonIncludesHydration(summary.nudgeReason) ? 'health' : 'meal',
+      title: behaviorCopy.title,
+      body: behaviorCopy.body,
+      date: createNextOccurrence(hour, ADAPTIVE_NOTICE_MINUTE),
+      data: dashboardData,
+    });
   }
 
   const nextPlan: StoredNutritionPlan = {

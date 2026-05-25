@@ -1,12 +1,16 @@
 import AppHeader from '@/components/AppHeader';
 import ChatButton from '@/components/ChatButton';
+import AnimatedPressable from '@/components/common/AnimatedPressable';
+import FilterChips from '@/components/common/FilterChips';
+import SmartEmptyState from '@/components/common/SmartEmptyState';
 import { theme } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import { authApi } from '@/utils/auth/authApi';
+import { getApiErrorMessage, isForbiddenRouteError, isSessionExpiredError } from '@/utils/auth/authErrors';
 import { tokenStorage } from '@/utils/auth/tokenStorage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -15,6 +19,7 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
@@ -23,12 +28,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 const getErrorMessage = (error: any): string => {
   if (typeof error === 'string') return error;
-  return error?.message || 'Failed to load appointments';
-};
-
-const isUnauthorizedError = (error: any): boolean => {
-  const status = error?.status || error?.response?.status;
-  return status === 401 || /not authorized|unauthorized|jwt expired|please login/i.test(getErrorMessage(error));
+  return getApiErrorMessage(error, 'Failed to load appointments');
 };
 
 export default function MyAppointmentsScreen() {
@@ -45,13 +45,10 @@ export default function MyAppointmentsScreen() {
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
   const [showModal, setShowModal] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Fetch user's appointments
-  useEffect(() => {
-    fetchAppointments();
-  }, []);
-
-  const fetchAppointments = async () => {
+  const fetchAppointments = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await authApi.getUserAppointments();
@@ -62,13 +59,17 @@ export default function MyAppointmentsScreen() {
       }
     } catch (error) {
       const message = getErrorMessage(error);
-      if (isUnauthorizedError(error)) {
+      if (isSessionExpiredError(error)) {
         console.log('[MyAppointments] Unauthorized appointment fetch:', message);
         setAppointments([]);
         await tokenStorage.clearAll();
         Alert.alert('Session expired', 'Please sign in again.', [
           { text: 'OK', onPress: () => router.replace('/(auth)') },
         ]);
+      } else if (isForbiddenRouteError(error)) {
+        console.log('[MyAppointments] Forbidden appointment fetch:', message);
+        setAppointments([]);
+        Alert.alert('Access denied', message);
       } else {
         console.log('Failed to fetch appointments:', error);
         Alert.alert('Error', 'Failed to load appointments');
@@ -76,7 +77,12 @@ export default function MyAppointmentsScreen() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [router]);
+
+  // Fetch user's appointments
+  useEffect(() => {
+    fetchAppointments();
+  }, [fetchAppointments]);
 
   const handleCancelAppointment = async () => {
     if (!selectedAppointment) return;
@@ -133,13 +139,53 @@ export default function MyAppointmentsScreen() {
     }
   };
 
+  const appointmentCounts = useMemo(() => {
+    const counts = { all: appointments.length, pending: 0, confirmed: 0, completed: 0, cancelled: 0 };
+    appointments.forEach((apt) => {
+      const status = String(apt.status || '').toLowerCase();
+      if (status in counts) {
+        counts[status as keyof typeof counts] += 1;
+      }
+    });
+    return counts;
+  }, [appointments]);
+
+  const filterOptions = useMemo(
+    () => [
+      { label: 'All', value: 'all', icon: 'calendar-outline' as const, badge: appointmentCounts.all },
+      { label: 'Pending', value: 'pending', icon: 'hourglass-outline' as const, badge: appointmentCounts.pending },
+      { label: 'Confirmed', value: 'confirmed', icon: 'checkmark-circle-outline' as const, badge: appointmentCounts.confirmed },
+      { label: 'Completed', value: 'completed', icon: 'checkmark-done-outline' as const, badge: appointmentCounts.completed },
+      { label: 'Cancelled', value: 'cancelled', icon: 'close-circle-outline' as const, badge: appointmentCounts.cancelled },
+    ],
+    [appointmentCounts]
+  );
+
+  const filteredAppointments = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return appointments.filter((apt) => {
+      const status = String(apt.status || '').toLowerCase();
+      const matchesStatus = statusFilter === 'all' || status === statusFilter;
+      const doctorName = `${apt.doctorId?.personalInfo?.firstName || ''} ${apt.doctorId?.personalInfo?.lastName || ''}`;
+      const searchable = [
+        doctorName,
+        apt.doctorId?.professionalInfo?.specialization,
+        apt.time,
+        apt.description,
+        apt.status,
+      ].join(' ').toLowerCase();
+
+      return matchesStatus && (!query || searchable.includes(query));
+    });
+  }, [appointments, searchQuery, statusFilter]);
+
   // Sort appointments by status: confirmed/completed first, then pending, then cancelled
   const getSortedAppointments = () => {
-    const confirmed = appointments.filter(
+    const confirmed = filteredAppointments.filter(
       apt => apt.status === 'confirmed' || apt.status === 'completed'
     );
-    const pending = appointments.filter(apt => apt.status === 'pending');
-    const cancelled = appointments.filter(apt => apt.status === 'cancelled');
+    const pending = filteredAppointments.filter(apt => apt.status === 'pending');
+    const cancelled = filteredAppointments.filter(apt => apt.status === 'cancelled');
     
     return [...confirmed, ...pending, ...cancelled];
   };
@@ -248,7 +294,7 @@ export default function MyAppointmentsScreen() {
     const canCancel = item.status !== 'cancelled' && item.status !== 'completed';
 
     return (
-      <TouchableOpacity
+      <AnimatedPressable
         style={[
           styles.appointmentCard,
           isBeforeStatusHeader && styles.appointmentCardBeforeStatusHeader,
@@ -314,7 +360,7 @@ export default function MyAppointmentsScreen() {
             <Text style={styles.upcomingText}>Upcoming</Text>
           </View>
         )}
-      </TouchableOpacity>
+      </AnimatedPressable>
     );
   };
 
@@ -355,20 +401,59 @@ export default function MyAppointmentsScreen() {
         />
 
         <View style={styles.content}>
-          {appointments.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="calendar-outline" size={64} color={colors.textSecondary} />
-              <Text style={styles.emptyTitle}>No Appointments</Text>
-              <Text style={styles.emptySubtitle}>
-                You don't have any appointments yet
-              </Text>
-              <TouchableOpacity
-                style={styles.scheduleButton}
-                onPress={() => router.push('/(main)/(conference)/doctor-time-date-selection')}
-              >
-                <Text style={styles.scheduleButtonText}>Schedule Your First Appointment</Text>
+          <View style={styles.timelineSummary}>
+            {filterOptions.slice(1).map((option) => (
+              <View key={option.value} style={styles.timelineStep}>
+                <View style={[styles.timelineDot, { backgroundColor: getStatusColor(option.value) }]}>
+                  <Text style={styles.timelineCount}>{option.badge}</Text>
+                </View>
+                <Text style={styles.timelineLabel} numberOfLines={1}>{option.label}</Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.searchWrap}>
+            <Ionicons name="search" size={20} color={colors.textSecondary} />
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search appointments"
+              placeholderTextColor={colors.textSecondary}
+              style={styles.searchInput}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
-            </View>
+            )}
+          </View>
+
+          <FilterChips
+            options={filterOptions}
+            selectedValue={statusFilter}
+            onChange={setStatusFilter}
+            colors={colors}
+            style={styles.filterChips}
+          />
+
+          {appointments.length === 0 ? (
+            <SmartEmptyState
+              icon="calendar-outline"
+              title="No Appointments"
+              message="Book a consultation and your upcoming, pending, completed, and cancelled appointments will appear here."
+              actionLabel="Book Appointment"
+              onAction={() => router.push('/(main)/(conference)/doctor-time-date-selection')}
+              colors={colors}
+              style={styles.emptySmartState}
+            />
+          ) : filteredAppointments.length === 0 ? (
+            <SmartEmptyState
+              icon="filter-outline"
+              title="No Matches"
+              message="Try another status, clear search, or check a different appointment type."
+              colors={colors}
+              style={styles.emptySmartState}
+            />
           ) : (
             renderAppointmentListByStatus()
           )}
@@ -584,6 +669,64 @@ const getStyles = (colors: any) => StyleSheet.create({
     paddingTop: hp(0.5),
     backgroundColor: colors.screenColor,
   },
+  timelineSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: wp(4),
+    paddingTop: hp(1.3),
+    paddingBottom: hp(0.8),
+  },
+  timelineStep: {
+    flex: 1,
+    alignItems: 'center',
+    position: 'relative',
+  },
+  timelineDot: {
+    width: hp(4.5),
+    height: hp(4.5),
+    borderRadius: hp(2.25),
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: colors.screenColor,
+  },
+  timelineCount: {
+    color: colors.textOnPrimary,
+    fontSize: Math.min(hp(1.45), wp(3.2)),
+    fontWeight: '900',
+  },
+  timelineLabel: {
+    marginTop: hp(0.55),
+    color: colors.textSecondary,
+    fontSize: Math.min(hp(1.25), wp(2.8)),
+    fontWeight: '800',
+  },
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: hp(5.5),
+    marginHorizontal: wp(4),
+    marginTop: hp(0.8),
+    marginBottom: hp(0.7),
+    paddingHorizontal: wp(3.5),
+    borderRadius: hp(1.6),
+    borderWidth: 1,
+    borderColor: colors.cardBorder || colors.border,
+    backgroundColor: colors.cardBackground,
+    gap: wp(2),
+  },
+  searchInput: {
+    flex: 1,
+    color: colors.textPrimary,
+    fontSize: Math.min(hp(1.75), wp(3.9)),
+    fontWeight: '600',
+    paddingVertical: hp(1),
+  },
+  filterChips: {
+    paddingTop: hp(0.4),
+    paddingBottom: hp(1),
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -594,6 +737,12 @@ const getStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: wp(6),
+  },
+  emptySmartState: {
+    width: wp(90),
+    alignSelf: 'center',
+    marginTop: hp(2),
+    marginBottom: hp(2),
   },
   emptyTitle: {
     fontSize: hp(2.5),

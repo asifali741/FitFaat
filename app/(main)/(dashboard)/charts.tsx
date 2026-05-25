@@ -1,13 +1,19 @@
 import AppHeader from "@/components/AppHeader";
+import { FeatureLimitBanner } from "@/components/common/FeatureLimitBanner";
+import { PremiumTeaserCard } from "@/components/common/PremiumTeaserCard";
+import { ActivityHeatmap } from "@/components/dashboard/ActivityHeatmap";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
   Easing,
+  Modal,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -19,12 +25,37 @@ import {
   widthPercentageToDP as wp,
 } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Svg, { Circle, Line, Path, Text as SvgText } from "react-native-svg";
+import Svg, { Circle, Line, Path } from "react-native-svg";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
 import {
   applyAdaptiveGoalsToJsonResponse,
+  buildAdaptiveGoalMetrics,
   loadAdaptiveGoalCarryForward,
+  loadWeeklyWeightTrendCalibration,
 } from "@/utils/adaptiveGoals";
+import {
+  getDashboardCalorieSummary,
+  getDashboardCombinedProgress,
+  getDashboardGoalProgress,
+  getDashboardHealthScore,
+  getHealthScorePlanExplanation,
+  getHydrationValue,
+  getPremiumScoreChangeExplanation,
+  getSingleMetricProgress,
+  getWeeklyHealthScoreTrend,
+  HEALTH_SCORE_DISCLAIMER,
+  HEALTH_SCORE_WEIGHTS,
+} from "@/utils/dashboardProgress";
+import { mergeExerciseProgressIntoJsonResponse } from "@/utils/localExerciseProgress";
+import {
+  mergeWalkingProgressIntoJsonResponse,
+} from "@/utils/localWalkingProgress";
+import {
+  getStoredDashboardCache,
+  getStoredWeeklyTrackingId,
+} from "@/utils/dashboardStorage";
+import { FREE_PLAN_LIMITS, getFeatureAccessStatus, type FeatureAccessStatus } from "@/utils/featureAccess";
+import { syncLatestHealthData } from "@/utils/healthDataSync";
 import { Day, jsonResponse } from "./types";
 
 // --------------- Helpers ---------------
@@ -61,11 +92,8 @@ const getGoalIcon = (goalLabel: string) => {
   return "fitness-outline";
 };
 
-const getDayProgressPercent = (day: Day) =>
-  clampPercent(
-    Number(day.achievedCalories || 0) + Number(day.achieviedHydration || 0),
-    Number(day.targetCalories || 0) + Number(day.targetHydration || 0)
-  );
+const getDayProgressPercent = (day: Day, includeExercise = false) =>
+  getDashboardCombinedProgress(day, includeExercise);
 
 const getShortDate = (value?: string) => {
   if (!value) return "";
@@ -89,6 +117,7 @@ const getLatestProgressIndex = (days: Day[]) => {
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 const DRIVER_INPUT_RANGE = [0, 0.2, 0.4, 0.6, 0.8, 1];
+const CHART_FOCUS_RELOAD_TTL_MS = 90 * 1000;
 const responsiveIcon = (heightPercent: number, widthPercent: number) =>
   Math.min(hp(heightPercent), wp(widthPercent));
 
@@ -121,6 +150,9 @@ interface GaugeProps {
   bgColor: string;
   label: string;
   textColor: string;
+  infoColor?: string;
+  infoBackgroundColor?: string;
+  onInfoPress?: () => void;
 }
 
 const Gauge: React.FC<GaugeProps> = ({
@@ -131,15 +163,24 @@ const Gauge: React.FC<GaugeProps> = ({
   bgColor,
   label,
   textColor,
+  infoColor,
+  infoBackgroundColor,
+  onInfoPress,
 }) => {
+  const safePercent = Number.isFinite(percent)
+    ? Math.min(Math.max(Math.round(percent), 0), 100)
+    : 0;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (circumference * percent) / 100;
+  const strokeDashoffset = circumference - (circumference * safePercent) / 100;
   const center = size / 2;
+  const percentFontSize = Math.min(size * 0.2, hp(2.5));
+  const labelFontSize = Math.min(size * 0.1, hp(1.25));
 
   return (
-    <View style={{ alignItems: "center" }}>
-      <Svg width={size} height={size}>
+    <View style={{ flex: 1, minWidth: 0, alignItems: "center", justifyContent: "center", paddingHorizontal: wp(0.8) }}>
+      <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
+      <Svg width={size} height={size} style={StyleSheet.absoluteFillObject}>
         <Circle
           cx={center}
           cy={center}
@@ -160,28 +201,75 @@ const Gauge: React.FC<GaugeProps> = ({
           strokeLinecap="round"
           transform={`rotate(-90 ${center} ${center})`}
         />
-        <SvgText
-          x={center}
-          y={center - 6}
-          textAnchor="middle"
-          dy=".3em"
-          fontSize={size * 0.22}
-          fontWeight="bold"
-          fill={color}
-        >
-          {percent}%
-        </SvgText>
-        <SvgText
-          x={center}
-          y={center + size * 0.16}
-          textAnchor="middle"
-          dy=".3em"
-          fontSize={size * 0.1}
-          fill={textColor}
-        >
-          {label}
-        </SvgText>
       </Svg>
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            left: strokeWidth,
+            right: strokeWidth,
+            top: strokeWidth,
+            bottom: strokeWidth,
+            alignItems: "center",
+            justifyContent: "center",
+            paddingHorizontal: wp(0.8),
+          }}
+        >
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.72}
+            style={{
+              color,
+              fontSize: percentFontSize,
+              fontWeight: "900",
+              includeFontPadding: false,
+              lineHeight: percentFontSize * 1.05,
+              textAlign: "center",
+              width: "100%",
+            }}
+          >
+            {safePercent}%
+          </Text>
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.65}
+            style={{
+              color: textColor,
+              fontSize: labelFontSize,
+              fontWeight: "700",
+              includeFontPadding: false,
+              lineHeight: labelFontSize * 1.12,
+              marginTop: hp(0.35),
+              textAlign: "center",
+              width: "100%",
+            }}
+          >
+            {label}
+          </Text>
+        </View>
+        {onInfoPress ? (
+          <Pressable
+            style={[
+              s.gaugeInfoButton,
+              {
+                backgroundColor: infoBackgroundColor || "#FFFFFF",
+                borderColor: `${infoColor || color}35`,
+              },
+            ]}
+            onPress={onInfoPress}
+            accessibilityRole="button"
+            accessibilityLabel={`Score explained for ${label}`}
+          >
+            <Ionicons
+              name="information-circle-outline"
+              size={Math.min(hp(1.85), wp(4.1))}
+              color={infoColor || color}
+            />
+          </Pressable>
+        ) : null}
+      </View>
     </View>
   );
 };
@@ -193,6 +281,7 @@ interface RailwayProgressChartProps {
   width: number;
   colors: ReturnType<typeof useTheme>["colors"];
   isDarkMode: boolean;
+  includeExercise: boolean;
 }
 
 const RailwayProgressChart: React.FC<RailwayProgressChartProps> = ({
@@ -201,6 +290,7 @@ const RailwayProgressChart: React.FC<RailwayProgressChartProps> = ({
   width,
   colors,
   isDarkMode,
+  includeExercise,
 }) => {
   const drawAnim = useRef(new Animated.Value(0)).current;
   const driverAnim = useRef(new Animated.Value(0)).current;
@@ -214,7 +304,7 @@ const RailwayProgressChart: React.FC<RailwayProgressChartProps> = ({
   const milestoneWidth = Math.max(wp(13.2), hp(5.6));
   const latestT = days.length > 1 ? latestIndex / (days.length - 1) : 0;
   const currentDay = days[latestIndex] ?? days[0];
-  const currentPercent = currentDay ? getDayProgressPercent(currentDay) : 0;
+  const currentPercent = currentDay ? getDayProgressPercent(currentDay, includeExercise) : 0;
   const milestoneAnimations = useRef<Animated.Value[]>([]);
 
   if (milestoneAnimations.current.length !== days.length) {
@@ -232,7 +322,7 @@ const RailwayProgressChart: React.FC<RailwayProgressChartProps> = ({
             day.date,
             day.status,
             day.achievedCalories,
-            day.achieviedHydration,
+            getHydrationValue(day),
             day.targetCalories,
             day.targetHydration,
           ].join(":")
@@ -501,7 +591,7 @@ const RailwayProgressChart: React.FC<RailwayProgressChartProps> = ({
                 {labelForDay(day)}
               </Text>
               <Text style={[s.milestonePercent, { color: statusColor }]}>
-                {getDayProgressPercent(day)}%
+                {getDayProgressPercent(day, includeExercise)}%
               </Text>
               <Text
                 style={[s.milestoneDate, { color: colors.textSecondary }]}
@@ -564,41 +654,136 @@ export default function ChartsScreen() {
   const [data, setData] = useState<jsonResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [goalLabel, setGoalLabel] = useState("Fitness Goal");
+  const [isPremium, setIsPremium] = useState(false);
+  const [advancedChartAccess, setAdvancedChartAccess] = useState<FeatureAccessStatus | null>(null);
+  const [scoreInfoVisible, setScoreInfoVisible] = useState(false);
+  const dataRef = useRef<jsonResponse | null>(null);
+  const lastLoadAt = useRef(0);
+  const lastDataSignature = useRef<string | null>(null);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const [raw, metricsRaw, savedUser] = await Promise.all([
-          AsyncStorage.getItem("JsonResponse"),
-          AsyncStorage.getItem("fitfaat_health_metrics"),
-          tokenStorage.getUser(),
-        ]);
+    dataRef.current = data;
+  }, [data]);
 
-        const metrics = metricsRaw ? JSON.parse(metricsRaw) : null;
-        const savedGoal =
-          savedUser?.userInfo?.fitnessGoal ??
-          savedUser?.fitnessGoal ??
-          metrics?.fitnessGoal ??
-          metrics?.selectedGoal;
-
-        setGoalLabel(getFitnessGoalText(savedGoal));
-
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          const weeklyTrackingId = await AsyncStorage.getItem("weeklyTrackingId");
-          const carryForward = await loadAdaptiveGoalCarryForward({
-            userId: savedUser?.id,
-            currentWeeklyTrackingId: weeklyTrackingId,
-          });
-          setData(applyAdaptiveGoalsToJsonResponse(parsed.data ?? parsed, undefined, carryForward));
-        }
-      } catch (e) {
-        console.log("Charts: Error loading data", e);
-      } finally {
-        setLoading(false);
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+      const now = Date.now();
+      if (dataRef.current && now - lastLoadAt.current < CHART_FOCUS_RELOAD_TTL_MS) {
+        return () => {
+          isActive = false;
+        };
       }
-    })();
-  }, []);
+
+      const loadChartData = async () => {
+        try {
+          if (!dataRef.current) {
+            setLoading(true);
+          }
+          await syncLatestHealthData().catch((error) => {
+            console.log("Charts: Health data sync unavailable", error);
+          });
+
+          const [cachedDashboard, metricsRaw, savedUser] = await Promise.all([
+            getStoredDashboardCache<jsonResponse>(),
+            AsyncStorage.getItem("fitfaat_health_metrics"),
+            tokenStorage.getUser(),
+          ]);
+
+          const metrics = metricsRaw ? JSON.parse(metricsRaw) : null;
+          const savedGoal =
+            savedUser?.userInfo?.fitnessGoal ??
+            savedUser?.fitnessGoal ??
+            metrics?.fitnessGoal ??
+            metrics?.selectedGoal;
+
+          if (!isActive) return;
+
+          setGoalLabel(getFitnessGoalText(savedGoal));
+
+          const featureAccess = await getFeatureAccessStatus("advancedCharts");
+          if (!isActive) return;
+          setAdvancedChartAccess((current) =>
+            current &&
+            current.hasAccess === featureAccess.hasAccess &&
+            current.isPremium === featureAccess.isPremium &&
+            current.statusLabel === featureAccess.statusLabel
+              ? current
+              : featureAccess
+          );
+          const premiumActive = featureAccess.isPremium;
+          setIsPremium(premiumActive);
+
+          if (cachedDashboard) {
+            const weeklyTrackingId = await getStoredWeeklyTrackingId(savedUser);
+            const carryForward = await loadAdaptiveGoalCarryForward({
+              userId: savedUser?.id,
+              currentWeeklyTrackingId: weeklyTrackingId,
+            });
+            const adaptiveMetrics = buildAdaptiveGoalMetrics(savedUser, metrics);
+            let nextData = cachedDashboard.data;
+            nextData = await mergeWalkingProgressIntoJsonResponse(nextData);
+            if (premiumActive) {
+              nextData = await mergeExerciseProgressIntoJsonResponse(nextData);
+            }
+            const adaptivePlan = premiumActive ? "premium" : "free";
+            const weightTrendCalibration = await loadWeeklyWeightTrendCalibration(
+              adaptiveMetrics,
+              nextData,
+              {
+                userId: savedUser?.id,
+                weeklyTrackingId,
+                plan: adaptivePlan,
+              }
+            );
+            nextData = applyAdaptiveGoalsToJsonResponse(nextData, adaptiveMetrics, carryForward, {
+              plan: adaptivePlan,
+              weightTrendCalibration,
+            });
+            if (isActive) {
+              const nextSignature = JSON.stringify({
+                premiumActive,
+                savedGoal,
+                days: Object.values(nextData).map((day: any) => ({
+                  dayNo: day.dayNo,
+                  date: day.date,
+                  status: day.status,
+                  calories: day.achievedCalories,
+                  hydration: day.achieviedHydration ?? day.achievedHydration,
+                  targetCalories: day.targetCalories,
+                  targetHydration: day.targetHydration,
+                  steps: day.walkingSteps ?? day.steps ?? day.stepCount,
+                  workout: day.exerciseCaloriesBurned,
+                })),
+              });
+
+              if (lastDataSignature.current !== nextSignature) {
+                lastDataSignature.current = nextSignature;
+                setData(nextData);
+              }
+              lastLoadAt.current = Date.now();
+            }
+          } else if (isActive) {
+            lastDataSignature.current = null;
+            lastLoadAt.current = Date.now();
+            setData(null);
+          }
+        } catch (e) {
+          console.log("Charts: Error loading data", e);
+        } finally {
+          if (isActive) {
+            setLoading(false);
+          }
+        }
+      };
+
+      loadChartData();
+
+      return () => {
+        isActive = false;
+      };
+    }, [])
+  );
 
   if (loading) {
     return (
@@ -643,28 +828,67 @@ export default function ChartsScreen() {
   // Totals
   const totalAchievedCal = days.reduce((s, d) => s + Number(d.achievedCalories || 0), 0);
   const totalTargetCal = days.reduce((s, d) => s + Number(d.targetCalories || 0), 0);
-  const totalAchievedHyd = days.reduce((s, d) => s + Number(d.achieviedHydration || 0), 0);
+  const totalAchievedHyd = days.reduce((s, d) => s + getHydrationValue(d), 0);
   const totalTargetHyd = days.reduce((s, d) => s + Number(d.targetHydration || 0), 0);
+  const calorieSummaries = days.map((day) => getDashboardCalorieSummary(day, isPremium));
 
   const overallCalPct = clampPercent(totalAchievedCal, totalTargetCal);
   const overallHydPct = clampPercent(totalAchievedHyd, totalTargetHyd);
-  const overallPct = clampPercent(
-    totalAchievedCal + totalAchievedHyd,
-    totalTargetCal + totalTargetHyd
-  );
+  const totalWalkingCal = calorieSummaries.reduce((s, summary) => s + summary.walkingCalories, 0);
+  const totalTargetWalkingCal = calorieSummaries.reduce((s, summary) => s + summary.walkingTarget, 0);
+  const overallWalkingPct = clampPercent(totalWalkingCal, totalTargetWalkingCal);
+  const weeklyScoreTrend = getWeeklyHealthScoreTrend(days, isPremium);
+  const latestHealthScore = days.length
+    ? getDashboardHealthScore(days[getLatestProgressIndex(days)] || days[days.length - 1], isPremium)
+    : null;
+  const overallPct = weeklyScoreTrend.currentAverage || (days.length
+    ? Math.round(days.reduce((sum, day) => sum + getDashboardCombinedProgress(day, isPremium), 0) / days.length)
+    : 0);
+  const scoreInfoTitle = isPremium ? "Full Health Score" : "Basic Score";
+  const freeScoreWeights = HEALTH_SCORE_WEIGHTS.free;
+  const premiumScoreWeights = HEALTH_SCORE_WEIGHTS.premium;
+  const scoreInfoRows = [
+    {
+      icon: "pulse-outline" as keyof typeof Ionicons.glyphMap,
+      label: "Current model",
+      text: getHealthScorePlanExplanation(isPremium),
+    },
+    {
+      icon: "checkmark-circle-outline" as keyof typeof Ionicons.glyphMap,
+      label: "Free weights",
+      text: `calories ${Math.round(freeScoreWeights.calories * 100)}%, hydration ${Math.round(freeScoreWeights.hydration * 100)}%, ${FREE_PLAN_LIMITS.dailyStepCounterPreview}-step preview ${Math.round(freeScoreWeights.stepsPreview * 100)}%`,
+    },
+    {
+      icon: "diamond-outline" as keyof typeof Ionicons.glyphMap,
+      label: "Premium weights",
+      text: `calories ${Math.round(premiumScoreWeights.calories * 100)}%, hydration ${Math.round(premiumScoreWeights.hydration * 100)}%, workouts ${Math.round(premiumScoreWeights.workout * 100)}%, walking/steps ${Math.round(premiumScoreWeights.walking * 100)}%`,
+    },
+    {
+      icon: "swap-horizontal-outline" as keyof typeof Ionicons.glyphMap,
+      label: "Why it changes",
+      text: getPremiumScoreChangeExplanation(),
+    },
+  ];
+  const scoreInfoNote = isPremium
+    ? `Score signal: ${latestHealthScore?.confidenceLabel || weeklyScoreTrend.confidenceLabel}. Weekly trend: ${weeklyScoreTrend.label}. ${HEALTH_SCORE_DISCLAIMER}`
+    : `Score signal: ${latestHealthScore?.confidenceLabel || weeklyScoreTrend.confidenceLabel}. The Free model stays useful with a ${FREE_PLAN_LIMITS.dailyStepCounterPreview}-step preview. ${HEALTH_SCORE_DISCLAIMER}`;
+  const goalCompletionItems = [
+    { label: "Calories", percent: overallCalPct, color: "#F97316" },
+    { label: "Hydration", percent: overallHydPct, color: "#2E86AB" },
+    ...(isPremium
+      ? [{ label: "Walking", percent: overallWalkingPct, color: "#22C55E" }]
+      : []),
+  ];
 
   // Per-day percentages
   const dailyCalPct = days.map((d) =>
-    clampPercent(Number(d.achievedCalories || 0), Number(d.targetCalories || 0))
+    getSingleMetricProgress(d.achievedCalories, d.targetCalories)
   );
   const dailyHydPct = days.map((d) =>
-    clampPercent(Number(d.achieviedHydration || 0), Number(d.targetHydration || 0))
+    getSingleMetricProgress(getHydrationValue(d), d.targetHydration)
   );
   const dailyOverallPct = days.map((d) =>
-    clampPercent(
-      Number(d.achievedCalories || 0) + Number(d.achieviedHydration || 0),
-      Number(d.targetCalories || 0) + Number(d.targetHydration || 0)
-    )
+    getDashboardCombinedProgress(d, isPremium)
   );
 
   // Active / finished / locked
@@ -749,14 +973,30 @@ export default function ChartsScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={s.scroll}
         >
-          {/* ========== 1. Railway Fitness Journey ========== */}
-          <RailwayProgressChart
-            days={days}
-            goalLabel={goalLabel}
-            width={journeyWidth}
-            colors={colors}
-            isDarkMode={isDarkMode}
-          />
+          <FeatureLimitBanner access={advancedChartAccess} />
+
+          {isPremium ? (
+            <>
+              {/* ========== 1. Railway Fitness Journey ========== */}
+              <RailwayProgressChart
+                days={days}
+                goalLabel={goalLabel}
+                width={journeyWidth}
+                colors={colors}
+                isDarkMode={isDarkMode}
+                includeExercise
+              />
+
+              {/* ========== Activity Heatmap ========== */}
+              <ActivityHeatmap
+                days={days}
+                includeExercise
+                enableAdvancedFilters
+                colors={colors}
+                embedded
+              />
+            </>
+          ) : null}
 
           {/* ========== 2. Overall Progress Gauges ========== */}
           <View style={[s.card, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
@@ -792,27 +1032,50 @@ export default function ChartsScreen() {
                 strokeWidth={gaugeStrokeWidth}
                 color={colors.success}
                 bgColor={isDarkMode ? "#1A2E1A" : "#DCFCE7"}
-                label="Combined"
+                label={scoreInfoTitle}
                 textColor={colors.textSecondary}
+                infoColor={colors.primary}
+                infoBackgroundColor={colors.cardBackground}
+                onInfoPress={() => setScoreInfoVisible(true)}
               />
             </View>
 
             {/* Summary row */}
             <View style={[s.summaryRow, { borderTopColor: colors.border }]}>
               <View style={s.summaryItem}>
-                <Text style={[s.summaryValue, { color: "#F97316" }]}>
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.72}
+                  style={[s.summaryValue, { color: "#F97316" }]}
+                >
                   {totalAchievedCal}
                 </Text>
-                <Text style={[s.summaryLabel, { color: colors.textSecondary }]}>
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.75}
+                  style={[s.summaryLabel, { color: colors.textSecondary }]}
+                >
                   / {totalTargetCal} kcal
                 </Text>
               </View>
               <View style={[s.summaryDivider, { backgroundColor: colors.border }]} />
               <View style={s.summaryItem}>
-                <Text style={[s.summaryValue, { color: "#2E86AB" }]}>
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.72}
+                  style={[s.summaryValue, { color: "#2E86AB" }]}
+                >
                   {totalAchievedHyd}
                 </Text>
-                <Text style={[s.summaryLabel, { color: colors.textSecondary }]}>
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.75}
+                  style={[s.summaryLabel, { color: colors.textSecondary }]}
+                >
                   / {totalTargetHyd} L
                 </Text>
               </View>
@@ -875,7 +1138,7 @@ export default function ChartsScreen() {
                 labels,
                 datasets: [
                   {
-                    data: days.map((d) => Number(d.achieviedHydration || 0)),
+                    data: days.map((d) => getHydrationValue(d)),
                     color: () => "#2E86AB",
                     strokeWidth: 3,
                   },
@@ -898,6 +1161,22 @@ export default function ChartsScreen() {
             />
           </View>
 
+          {!isPremium ? (
+            <PremiumTeaserCard
+              title="Unlock Advanced Charts"
+              subtitle="Free includes the basic calorie and hydration charts above. Premium adds modern charts, activity heatmaps, nutrition score history, and PDF-style progress reports."
+              previewTitle="Premium chart studio"
+              icon="analytics-outline"
+              metrics={[
+                { label: "Heatmap", value: "6M", icon: "grid-outline", color: "#22C55E" },
+                { label: "Reports", value: "PDF", icon: "document-text-outline", color: colors.primary },
+                { label: "Trends", value: "+", icon: "trending-up-outline", color: colors.warning },
+              ]}
+              bullets={["Modern charts", "Nutrition history", "PDF reports"]}
+              style={s.premiumTeaser}
+            />
+          ) : (
+            <>
           {/* ========== 5. Combined Progress Line Chart ========== */}
           <View style={[s.card, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
             <View style={s.cardHeader}>
@@ -927,7 +1206,7 @@ export default function ChartsScreen() {
                     strokeWidth: 3,
                   },
                 ],
-                legend: ["Calories %", "Hydration %", "Overall %"],
+                legend: ["Calories %", "Hydration %", `${scoreInfoTitle} %`],
               }}
               width={chartWidth}
               height={tallChartHeight}
@@ -975,8 +1254,9 @@ export default function ChartsScreen() {
 
             <ProgressChart
               data={{
-                labels: ["Calories", "Hydration"],
-                data: [overallCalPct / 100, overallHydPct / 100],
+                labels: goalCompletionItems.map((item) => item.label),
+                data: goalCompletionItems.map((item) => item.percent / 100),
+                colors: goalCompletionItems.map((item) => item.color),
               }}
               width={chartWidth}
               height={compactChartHeight}
@@ -986,9 +1266,34 @@ export default function ChartsScreen() {
                 ...chartConfig,
                 color: (opacity = 1) => `rgba(8, 145, 178, ${opacity})`,
               }}
-              hideLegend={false}
+              hideLegend
+              withCustomBarColorFromData
               style={s.chart}
             />
+
+            <View style={[s.goalCompletionLegend, { borderTopColor: colors.border }]}>
+              {goalCompletionItems.map((item) => (
+                <View key={item.label} style={s.goalCompletionItem}>
+                  <View style={[s.goalCompletionDot, { backgroundColor: item.color }]} />
+                  <Text
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.72}
+                    style={[s.goalCompletionLabel, { color: colors.textSecondary }]}
+                  >
+                    {item.label}
+                  </Text>
+                  <Text
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.68}
+                    style={[s.goalCompletionValue, { color: item.color }]}
+                  >
+                    {item.percent}%
+                  </Text>
+                </View>
+              ))}
+            </View>
           </View>
 
           {/* ========== 8. Daily Breakdown Table ========== */}
@@ -1005,15 +1310,12 @@ export default function ChartsScreen() {
               <Text style={[s.tableCell, s.tableCellHeader, { color: colors.primary }]}>Day</Text>
               <Text style={[s.tableCell, s.tableCellHeader, { color: "#F97316" }]}>Cal</Text>
               <Text style={[s.tableCell, s.tableCellHeader, { color: "#2E86AB" }]}>Hyd</Text>
-              <Text style={[s.tableCell, s.tableCellHeader, { color: colors.success }]}>%</Text>
+              <Text style={[s.tableCell, s.tableCellHeader, { color: colors.success }]}>Goals</Text>
               <Text style={[s.tableCell, s.tableCellHeader, { color: colors.textSecondary }]}>Status</Text>
             </View>
 
             {days.map((day, index) => {
-              const pct = clampPercent(
-                Number(day.achievedCalories || 0) + Number(day.achieviedHydration || 0),
-                Number(day.targetCalories || 0) + Number(day.targetHydration || 0)
-              );
+              const pct = getDashboardGoalProgress(day);
               const statusColor =
                 day.status === "finished"
                   ? colors.success
@@ -1040,7 +1342,7 @@ export default function ChartsScreen() {
                     {day.achievedCalories || 0}
                   </Text>
                   <Text style={[s.tableCell, { color: "#2E86AB" }]}>
-                    {day.achieviedHydration || 0}
+                    {getHydrationValue(day)}
                   </Text>
                   <Text style={[s.tableCell, { color: colors.success, fontWeight: "700" }]}>
                     {pct}%
@@ -1059,9 +1361,93 @@ export default function ChartsScreen() {
             })}
           </View>
 
+            </>
+          )}
+
           <View style={{ height: hp(12) }} />
         </ScrollView>
       </View>
+
+      <Modal
+        visible={scoreInfoVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setScoreInfoVisible(false)}
+      >
+        <Pressable style={s.scoreInfoBackdrop} onPress={() => setScoreInfoVisible(false)}>
+          <Pressable
+            style={[
+              s.scoreInfoCard,
+              {
+                backgroundColor: colors.cardBackground,
+                borderColor: colors.cardBorder || colors.border,
+                shadowColor: colors.black || "#000000",
+              },
+            ]}
+            onPress={(event) => event.stopPropagation()}
+          >
+            <View style={s.scoreInfoHeader}>
+              <View style={[s.scoreInfoIcon, { backgroundColor: `${colors.primary}14` }]}>
+                <Ionicons name="pulse-outline" size={Math.min(hp(2.5), wp(5.5))} color={colors.primary} />
+              </View>
+              <View style={s.scoreInfoTitleWrap}>
+                <Text style={[s.scoreInfoEyebrow, { color: colors.textSecondary }]}>
+                  {scoreInfoTitle}
+                </Text>
+                <Text style={[s.scoreInfoTitle, { color: colors.textPrimary }]}>
+                  Score explained
+                </Text>
+              </View>
+              <Pressable
+                style={[s.scoreInfoClose, { backgroundColor: colors.surface || colors.primarySoft }]}
+                onPress={() => setScoreInfoVisible(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Close score explanation"
+              >
+                <Ionicons name="close" size={Math.min(hp(2.35), wp(5.2))} color={colors.textPrimary} />
+              </Pressable>
+            </View>
+
+            <View style={s.scoreInfoRows}>
+              {scoreInfoRows.map((row) => {
+                const active = row.label === (isPremium ? "Premium" : "Free");
+                return (
+                  <View
+                    key={row.label}
+                    style={[
+                      s.scoreInfoRow,
+                      {
+                        borderTopColor: colors.cardBorder || colors.border,
+                        backgroundColor: active ? `${colors.primary}0F` : "transparent",
+                      },
+                    ]}
+                  >
+                    <View style={[s.scoreInfoRowIcon, { backgroundColor: `${colors.primary}10` }]}>
+                      <Ionicons name={row.icon} size={Math.min(hp(2.1), wp(4.7))} color={colors.primary} />
+                    </View>
+                    <View style={s.scoreInfoRowTextWrap}>
+                      <Text style={[s.scoreInfoRowLabel, { color: colors.textPrimary }]}>{row.label}</Text>
+                      <Text style={[s.scoreInfoRowText, { color: colors.textSecondary }]}>{row.text}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+
+            <Text
+              style={[
+                s.scoreInfoNote,
+                {
+                  color: colors.primary,
+                  backgroundColor: `${colors.primary}10`,
+                },
+              ]}
+            >
+              {scoreInfoNote}
+            </Text>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1073,6 +1459,7 @@ const s = StyleSheet.create({
   center: { flex: 1, justifyContent: "center", alignItems: "center", padding: wp(10) },
   emptyText: { textAlign: "center", marginTop: hp(2), fontSize: hp(1.8), lineHeight: hp(2.8) },
   scroll: { paddingHorizontal: wp(4), paddingTop: hp(1.5), paddingBottom: hp(4) },
+  premiumTeaser: { marginBottom: hp(2) },
 
   // Cards
   card: {
@@ -1238,30 +1625,150 @@ const s = StyleSheet.create({
   // Gauge row
   gaugeRow: {
     flexDirection: "row",
-    justifyContent: "space-around",
+    justifyContent: "center",
     alignItems: "center",
     marginVertical: hp(1),
+    width: "100%",
+  },
+  gaugeInfoButton: {
+    position: "absolute",
+    right: -wp(0.7),
+    top: -hp(0.45),
+    width: Math.min(hp(3), wp(6.7)),
+    height: Math.min(hp(3), wp(6.7)),
+    borderRadius: Math.min(hp(1.5), wp(3.35)),
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: Math.min(wp(0.22), hp(0.12)),
+    elevation: 3,
+    shadowOffset: { width: 0, height: hp(0.22) },
+    shadowOpacity: 0.11,
+    shadowRadius: wp(1.2),
+  },
+
+  // Score explanation
+  scoreInfoBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.5)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: wp(5),
+  },
+  scoreInfoCard: {
+    width: "100%",
+    maxWidth: wp(92),
+    borderRadius: hp(2),
+    borderWidth: Math.min(wp(0.28), hp(0.16)),
+    padding: wp(4),
+    shadowOffset: { width: 0, height: hp(0.8) },
+    shadowOpacity: 0.18,
+    shadowRadius: wp(4),
+    elevation: 8,
+  },
+  scoreInfoHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: wp(2.6),
+    marginBottom: hp(1.6),
+  },
+  scoreInfoIcon: {
+    width: Math.min(hp(4.8), wp(10.6)),
+    height: Math.min(hp(4.8), wp(10.6)),
+    borderRadius: Math.min(hp(2.4), wp(5.3)),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  scoreInfoTitleWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  scoreInfoEyebrow: {
+    fontSize: Math.min(hp(1.12), wp(2.7)),
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  scoreInfoTitle: {
+    fontSize: Math.min(hp(2.15), wp(4.9)),
+    fontWeight: "900",
+    marginTop: hp(0.15),
+  },
+  scoreInfoClose: {
+    width: Math.min(hp(4), wp(9)),
+    height: Math.min(hp(4), wp(9)),
+    borderRadius: Math.min(hp(2), wp(4.5)),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  scoreInfoRows: {
+    gap: hp(1),
+  },
+  scoreInfoRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: wp(2.5),
+    paddingVertical: hp(0.95),
+    paddingHorizontal: wp(2),
+    borderRadius: hp(1.2),
+    borderTopWidth: Math.min(wp(0.2), hp(0.12)),
+  },
+  scoreInfoRowIcon: {
+    width: Math.min(hp(3.8), wp(8.5)),
+    height: Math.min(hp(3.8), wp(8.5)),
+    borderRadius: Math.min(hp(1.9), wp(4.25)),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  scoreInfoRowTextWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  scoreInfoRowLabel: {
+    fontSize: Math.min(hp(1.42), wp(3.35)),
+    fontWeight: "900",
+  },
+  scoreInfoRowText: {
+    fontSize: Math.min(hp(1.18), wp(2.8)),
+    lineHeight: hp(1.75),
+    fontWeight: "700",
+    marginTop: hp(0.25),
+  },
+  scoreInfoNote: {
+    borderRadius: hp(1.2),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(1.1),
+    fontSize: Math.min(hp(1.22), wp(2.9)),
+    lineHeight: hp(1.8),
+    fontWeight: "800",
+    marginTop: hp(1.3),
   },
 
   // Summary
   summaryRow: {
     flexDirection: "row",
-    justifyContent: "space-around",
+    justifyContent: "center",
     alignItems: "center",
     borderTopWidth: 1,
     paddingTop: hp(1.5),
     marginTop: hp(1.5),
   },
   summaryItem: {
+    flex: 1,
+    minWidth: 0,
     alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: wp(1),
   },
   summaryValue: {
     fontSize: hp(2.5),
     fontWeight: "800",
+    textAlign: "center",
+    width: "100%",
   },
   summaryLabel: {
     fontSize: hp(1.4),
     marginTop: hp(0.3),
+    textAlign: "center",
+    width: "100%",
   },
   summaryDivider: {
     width: wp(0.25),
@@ -1290,6 +1797,45 @@ const s = StyleSheet.create({
   targetText: {
     fontSize: hp(1.4),
     fontWeight: "500",
+  },
+
+  // Goal completion
+  goalCompletionLegend: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    justifyContent: "center",
+    borderTopWidth: 1,
+    marginTop: hp(1),
+    paddingTop: hp(1.4),
+    gap: wp(2),
+  },
+  goalCompletionItem: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: wp(1.2),
+  },
+  goalCompletionDot: {
+    width: responsiveIcon(1.15, 2.5),
+    height: responsiveIcon(1.15, 2.5),
+    borderRadius: responsiveIcon(0.58, 1.25),
+    marginBottom: hp(0.55),
+  },
+  goalCompletionLabel: {
+    width: "100%",
+    textAlign: "center",
+    fontSize: hp(1.45),
+    fontWeight: "700",
+    includeFontPadding: false,
+  },
+  goalCompletionValue: {
+    width: "100%",
+    textAlign: "center",
+    fontSize: hp(2.15),
+    fontWeight: "900",
+    includeFontPadding: false,
+    marginTop: hp(0.35),
   },
 
   // Table

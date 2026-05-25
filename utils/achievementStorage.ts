@@ -12,6 +12,10 @@ type CompletedWorkoutEntry = {
   exerciseName: string;
   durationSeconds: number;
   completedAt: string;
+  bodyPart?: string;
+  target?: string;
+  equipment?: string;
+  caloriesBurned?: number;
 };
 
 type EarlyLogEntry = {

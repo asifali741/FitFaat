@@ -1,23 +1,55 @@
 import AppHeader from "@/components/AppHeader";
 import { legalDocuments } from "@/constants/legalContent";
 import { useTheme } from "@/contexts/ThemeContext";
-import { tokenStorage } from "@/utils/auth/tokenStorage";
+import { authApi } from "@/utils/auth/authApi";
+import {
+  loadGoalDisplayMode,
+  saveGoalDisplayMode,
+  type GoalDisplayMode,
+} from "@/utils/goalTargetDisplay";
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from "expo-router";
-import React from "react";
-import { Alert, Linking, ScrollView, StatusBar, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import {
+  Alert,
+  Linking,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+const SUPPORT_EMAIL = "asif1465majid@gmail.com";
 
 export default function Settings() {
   const router = useRouter();
   const { isDarkMode, toggleDarkMode, colors } = useTheme();
+  const [goalDisplayMode, setGoalDisplayMode] = useState<GoalDisplayMode>("simple");
   const legalSettingMap = {
     "Terms of Service": legalDocuments.terms,
     "Privacy Policy": legalDocuments.privacy,
     "Licenses": legalDocuments.licenses,
   } as const;
+
+  useEffect(() => {
+    loadGoalDisplayMode().then(setGoalDisplayMode).catch(() => setGoalDisplayMode("simple"));
+  }, []);
+
+  const handleGoalDisplayToggle = async (showAdvanced: boolean) => {
+    const nextMode: GoalDisplayMode = showAdvanced ? "advanced" : "simple";
+    setGoalDisplayMode(nextMode);
+    try {
+      await saveGoalDisplayMode(nextMode);
+    } catch {
+      setGoalDisplayMode(showAdvanced ? "simple" : "advanced");
+      Alert.alert("Error", "Could not save target display preference. Please try again.");
+    }
+  };
 
   const handleSettingPress = (setting: string) => {
     const legalDocument = legalSettingMap[setting as keyof typeof legalSettingMap];
@@ -51,8 +83,16 @@ export default function Settings() {
         router.push("/(exercises)/workout");
         break;
 
+      case "Step Counter":
+        router.push("/(main)/(steps)" as any);
+        break;
+
+      case "Mindfulness":
+        router.push("/(main)/(mindfulness)" as any);
+        break;
+
       case "Help Center":
-        Linking.openURL('mailto:asif1465majid@gmail.com?subject=FitFaat%20Help%20Center');
+        Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=FitFaat%20Help%20Center`);
         break;
       
       case "Contact Support":
@@ -60,8 +100,7 @@ export default function Settings() {
           "Contact Support",
           "Get help from our support team.",
           [
-            { text: "Email Support", onPress: () => Linking.openURL('mailto:fitfaatpro@gmail.com') },
-            { text: "Live Chat", onPress: () => console.log("Open live chat") },
+            { text: "Email Support", onPress: () => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=FitFaat%20Support`) },
             { text: "Cancel", style: "cancel" }
           ]
         );
@@ -115,13 +154,10 @@ export default function Settings() {
           style: "destructive",
           onPress: async () => {
             try {
-              // Clear all auth data
-              await tokenStorage.removeToken();
-              await tokenStorage.removeUser();
-              await AsyncStorage.removeItem('weeklyTrackingId');
+              await authApi.logout();
               // Navigate to login
               router.replace('/(auth)/email-login');
-            } catch (error) {
+            } catch {
               Alert.alert("Error", "Failed to sign out. Please try again.");
             }
           }
@@ -251,6 +287,41 @@ export default function Settings() {
               }
               showArrow={false}
             />
+            <SettingItem
+              icon="options-outline"
+              title="Advanced Target Ranges"
+              subtitle={
+                goalDisplayMode === "advanced"
+                  ? "Show calories and hydration as estimated ranges"
+                  : "Show calories and hydration as one simple number"
+              }
+              rightComponent={
+                <Switch
+                  value={goalDisplayMode === "advanced"}
+                  onValueChange={handleGoalDisplayToggle}
+                  trackColor={{ false: colors.textSecondary + '40', true: colors.primary + '40' }}
+                  thumbColor={goalDisplayMode === "advanced" ? colors.primary : colors.textSecondary}
+                />
+              }
+              showArrow={false}
+            />
+          </View>
+
+          {/* Local Sync Section */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Local Sync</Text>
+            <SettingItem
+              icon="archive-outline"
+              title="Backup Center"
+              subtitle="Export, preview, test, and restore local FitFaat backups"
+              onPress={() => router.push("/(main)/(settings)/backup-center" as any)}
+            />
+            <SettingItem
+              icon="help-circle-outline"
+              title="How To Backup"
+              subtitle="Export, test, move, preview, and restore backup files"
+              onPress={() => router.push("/(main)/(settings)/local-sync-guide" as any)}
+            />
           </View>
 
           {/* Health & Fitness Section */}
@@ -262,6 +333,24 @@ export default function Settings() {
               subtitle="Customize your workout experience"
               onPress={() => handleSettingPress("Workout Preferences")}
             />
+            <SettingItem
+              icon="basket-outline"
+              title="Meal Planner"
+              subtitle="Premium meal planning and grocery lists"
+              onPress={() => router.push("/(main)/(meal-planner)" as any)}
+            />
+            <SettingItem
+              icon="footsteps-outline"
+              title="Step Counter"
+              subtitle="Basic daily steps; Premium unlocks advanced step insights"
+              onPress={() => handleSettingPress("Step Counter")}
+            />
+              <SettingItem
+                icon="leaf-outline"
+                title="Mindfulness"
+                subtitle="Basic breathing is free; Premium unlocks the full library"
+                onPress={() => handleSettingPress("Mindfulness")}
+              />
           </View>
 
           {/* Support Section */}
@@ -270,13 +359,13 @@ export default function Settings() {
             <SettingItem
               icon="help-circle-outline"
               title="Help Center"
-              subtitle="asif1465majid@gmail.com"
+              subtitle={SUPPORT_EMAIL}
               onPress={() => handleSettingPress("Help Center")}
             />
             <SettingItem
-              icon="chatbubble-outline"
+              icon="mail-outline"
               title="Contact Support"
-              subtitle="fitfaatpro@gmail.com"
+              subtitle={SUPPORT_EMAIL}
               onPress={() => handleSettingPress("Contact Support")}
             />
             <SettingItem

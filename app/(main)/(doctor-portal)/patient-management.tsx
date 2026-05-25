@@ -1,12 +1,15 @@
 import AppHeader from '@/components/AppHeader';
 import ChatButton from '@/components/ChatButton';
+import SmartEmptyState from '@/components/common/SmartEmptyState';
+import StatusNoticeBanner from '@/components/common/StatusNoticeBanner';
 import { theme } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import { authApi } from '@/utils/auth/authApi';
 import { tokenStorage } from '@/utils/auth/tokenStorage';
 import { buildChatAccessGrantedNotificationPayload } from '@/utils/chatAccessNotifications';
-import { getBackendBaseUrl } from '@/utils/config';
+import { getBackendBaseUrl, isRealtimeSocketEnabled } from '@/utils/config';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -29,8 +32,11 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { io } from 'socket.io-client';
 
 const { width } = Dimensions.get('window');
+const DOCTOR_APPOINTMENTS_CACHE_KEY = 'doctorPatientManagementAppointments';
 
 const emitChatAccessGrantedToPatient = async (appointmentId: string) => {
+  if (!isRealtimeSocketEnabled()) return;
+
   const token = await tokenStorage.getToken();
   if (!token) return;
 
@@ -93,6 +99,8 @@ export default function PatientManagementScreen() {
   const [doctorId, setDoctorId] = useState<string | null>(null);
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [confirmationType, setConfirmationType] = useState<'approve' | 'reject' | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [usingCachedAppointments, setUsingCachedAppointments] = useState(false);
 
   useEffect(() => {
     fetchDoctorAppointments();
@@ -112,6 +120,8 @@ export default function PatientManagementScreen() {
 
   const fetchDoctorAppointments = async () => {
     setIsLoading(true);
+    setLoadError(null);
+    setUsingCachedAppointments(false);
     try {
       // First, get the doctor status to get the doctor ID
       const doctorStatusResponse = await authApi.getDoctorStatus();
@@ -128,13 +138,27 @@ export default function PatientManagementScreen() {
       // Then fetch appointments for this doctor
       const appointmentsResponse = await authApi.getDoctorAppointments(doctorIdValue);
       if (appointmentsResponse.success) {
-        setAppointments(appointmentsResponse.appointments || []);
+        const appointmentList = appointmentsResponse.appointments || [];
+        setAppointments(appointmentList);
+        await AsyncStorage.setItem(DOCTOR_APPOINTMENTS_CACHE_KEY, JSON.stringify(appointmentList));
       } else {
-        Alert.alert('Error', 'Failed to load appointment requests');
+        setLoadError('Failed to load appointment requests');
       }
     } catch (error) {
       console.error('Failed to fetch appointments:', error);
-      Alert.alert('Error', 'Failed to load appointment requests');
+      setLoadError('Failed to load appointment requests. Please check your connection and retry.');
+      try {
+        const cached = await AsyncStorage.getItem(DOCTOR_APPOINTMENTS_CACHE_KEY);
+        const parsed = cached ? JSON.parse(cached) : [];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setAppointments(parsed);
+          setUsingCachedAppointments(true);
+        } else {
+          setAppointments([]);
+        }
+      } catch {
+        setAppointments([]);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -351,6 +375,8 @@ export default function PatientManagementScreen() {
           <AppHeader
             title="Appointment Management"
             showStepIndicator={false}
+            titleMinimumFontScale={1}
+            compactTitleSpacing
           />
         </View>
         <View style={styles.loadingContainer}>
@@ -367,10 +393,26 @@ export default function PatientManagementScreen() {
         <AppHeader
           title="Appointment Management"
           showStepIndicator={false}
+          titleMinimumFontScale={1}
+          compactTitleSpacing
         />
       </View>
 
       <View style={styles.content}>
+        {loadError ? (
+          <StatusNoticeBanner
+            tone={usingCachedAppointments ? 'cached' : 'offline'}
+            title={usingCachedAppointments ? 'Showing Cached Requests' : 'Could Not Refresh Requests'}
+            message={usingCachedAppointments
+              ? 'Latest refresh failed, so these appointments are from saved data.'
+              : loadError}
+            actionLabel="Retry"
+            onAction={fetchDoctorAppointments}
+            colors={colors}
+            style={styles.noticeBanner}
+          />
+        ) : null}
+
         {/* Filter Buttons */}
         <View style={styles.filterContainer}>
           {renderFilterButton('all', 'All Requests')}
@@ -380,21 +422,19 @@ export default function PatientManagementScreen() {
 
         {/* Appointments List */}
         {filteredAppointments.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons
-              name="list-outline"
-              size={64}
-              color={colors.textSecondary}
-            />
-            <Text style={styles.emptyTitle}>No Requests</Text>
-            <Text style={styles.emptySubtitle}>
-              {filterStatus === 'all'
-                ? 'You have no patient requests yet'
-                : filterStatus === 'pending'
-                ? 'No pending requests'
-                : 'No approved appointments'}
-            </Text>
-          </View>
+          <SmartEmptyState
+            icon={filterStatus === 'pending' ? 'hourglass-outline' : 'list-outline'}
+            title="No Requests"
+            message={filterStatus === 'all'
+              ? 'New patient appointment requests will appear here when patients book you.'
+              : filterStatus === 'pending'
+              ? 'No pending requests need your review right now.'
+              : 'Approved appointments will appear here after you accept requests.'}
+            actionLabel="Refresh"
+            onAction={fetchDoctorAppointments}
+            colors={colors}
+            style={styles.smartEmptyState}
+          />
         ) : (
           <FlatList
             data={filteredAppointments}
@@ -820,6 +860,16 @@ const getStyles = (colors: any, topInset = 0, bottomInset = 0) =>
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
+    },
+    noticeBanner: {
+      marginHorizontal: wp(4),
+      marginTop: hp(1.2),
+      marginBottom: hp(1),
+    },
+    smartEmptyState: {
+      width: width - wp(8),
+      alignSelf: 'center',
+      marginTop: hp(3),
     },
     emptyContainer: {
       flex: 1,

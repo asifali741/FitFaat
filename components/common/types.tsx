@@ -6,6 +6,8 @@ export type Day = {
   achieviedHydration: number,
   targetCalories: number,
   targetHydration: number,
+  exerciseCaloriesBurned?: number,
+  exerciseDurationSeconds?: number,
   remarks: string | null, //Blank if finished day
   duration: number | null, // in minutes
 }

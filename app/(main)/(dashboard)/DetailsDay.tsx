@@ -1,45 +1,43 @@
-import { pakistaniDishes } from '@/app/Dataset/dataSet';
 import { drinksDataSet } from '@/app/Dataset/waterDataSet';
 import BackButton from '@/components/BackButton';
 import PatientDietPlanViewer from '@/components/PatientDietPlanViewer';
+import { KeyboardAwareModalContent } from '@/components/themed';
 import {
-    dietPreferenceOptions,
-    DIET_PREFERENCE_STORAGE_KEY,
-    filterFoodsByDietPreference,
     getDietPreferenceLabel,
     getDietTypeForFood,
-    type DietPreference,
     waterIntakeDatabase,
 } from '@/constants/foodDatabase';
 import { HEADER_PADDING_HORIZONTAL } from '@/constants/ui';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { useTheme } from "@/contexts/ThemeContext";
-import { recordEarlyLogLocally } from '@/utils/achievementStorage';
 import {
-    applyAdaptiveGoalsToJsonResponse,
-    loadAdaptiveGoalCarryForward,
-    saveAdaptiveGoalCarryForward,
-} from '@/utils/adaptiveGoals';
-import { dailyLogsApi } from '@/utils/dailyLogsApi';
-import { customRecipesApi, CustomRecipeData } from '@/utils/customRecipesApi';
-import { recordNutritionProfileEntry, scheduleAdaptiveNutritionNotifications } from '@/utils/nutritionProfile';
-import { tokenStorage } from '@/utils/auth/tokenStorage';
+    buildMealDraftFromTemplate,
+    getDrinkHydrationLiters,
+    toMealNumber,
+    type MealTemplate,
+} from '@/hooks/detailsDay/detailsDayNutritionUtils';
+import { calculatePercentage, useDetailsDayData } from '@/hooks/detailsDay/useDetailsDayData';
+import { useFoodDetection } from '@/hooks/detailsDay/useFoodDetection';
+import { useMealTemplates } from '@/hooks/detailsDay/useMealTemplates';
+import { useNutritionLogger } from '@/hooks/detailsDay/useNutritionLogger';
+import { customRecipesApi } from '@/utils/customRecipesApi';
+import { getExerciseCaloriesBurned } from '@/utils/localExerciseProgress';
+import { getDashboardCalorieSummary } from '@/utils/dashboardProgress';
+import {
+    formatCalorieTarget,
+    formatHydrationTarget,
+} from '@/utils/goalTargetDisplay';
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
-import { Audio } from 'expo-av';
-import Constants from 'expo-constants';
-import * as ImagePicker from 'expo-image-picker';
 import * as NavigationBar from 'expo-navigation-bar';
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Modal } from "react-native";
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import Animated, { Easing, runOnJS, useAnimatedProps, useSharedValue, withTiming } from "react-native-reanimated";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Day as typeDay } from "./types";
-import { getBackendBaseUrl, getConfigValue } from '@/utils/config';
 interface ProgressCircleProps {
   achievedCalories: number;
   targetCalories: number;
@@ -47,239 +45,27 @@ interface ProgressCircleProps {
   targetHydration: number;
 };
 
-const isDietPreference = (value: string | null): value is DietPreference =>
-    value === 'all' || value === 'vegetarian' || value === 'nonVegetarian';
-
-const normalizeFoodSearchText = (value: unknown) =>
-  String(value || '')
-    .toLowerCase()
-    .replace(/&/g, ' and ')
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-const foodDetectionStopWords = new Set([
-  'food',
-  'dish',
-  'plate',
-  'meal',
-  'cuisine',
-  'lunch',
-  'dinner',
-  'breakfast',
-  'cooked',
-  'prepared',
-]);
-
-const getFoodTitle = (food: any) =>
-  String(food?.food_name || food?.name || food?.foodName || food?.recipeName || '');
-
-const getDetectionTokens = (value: unknown) =>
-  normalizeFoodSearchText(value)
-    .split(' ')
-    .filter((token) => token.length > 2 && !foodDetectionStopWords.has(token));
-
-const collectDetectionTerms = (payload: any): string[] => {
-  const terms: string[] = [];
-  const addTerm = (value: any) => {
-    if (typeof value === 'string' && normalizeFoodSearchText(value).length > 1) {
-      terms.push(value);
-    }
-  };
-  const visitPrediction = (prediction: any) => {
-    if (!prediction || typeof prediction !== 'object') return;
-    addTerm(prediction.foodName);
-    addTerm(prediction.food_name);
-    addTerm(prediction.detectedFood);
-    addTerm(prediction.detected_food);
-    addTerm(prediction.label);
-    addTerm(prediction.name);
-    addTerm(prediction.class);
-    addTerm(prediction.tag);
-    addTerm(prediction.prediction);
-  };
-
-  visitPrediction(payload);
-
-  ['labels', 'foods', 'foodItems', 'predictions', 'concepts', 'results', 'tags'].forEach((key) => {
-    const value = payload?.[key];
-    if (Array.isArray(value)) {
-      value.forEach((item) => {
-        if (typeof item === 'string') {
-          addTerm(item);
-        } else {
-          visitPrediction(item);
-        }
-      });
-    }
-  });
-
-  if (Array.isArray(payload?.outputs)) {
-    payload.outputs.forEach((output: any) => {
-      output?.data?.concepts?.forEach(visitPrediction);
-    });
-  }
-
-  return Array.from(new Set(terms.map(normalizeFoodSearchText))).filter(Boolean);
-};
-
-const detectFoodWithOpenRouterFallback = async (imageBase64?: string | null) => {
-  const apiKey = getConfigValue('OPENROUTER_API_KEY');
-  if (!apiKey) {
-    throw new Error('Food detection is not configured. Missing OpenRouter API key.');
-  }
-  if (!imageBase64) {
-    throw new Error('Selected image data was not available for AI detection.');
-  }
-
-  const modelId = 'meta-llama/llama-4-scout-17b-16e-instruct';
-
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://fitfaat.com',
-      'X-Title': 'FitFaat',
-    },
-    body: JSON.stringify({
-      model: modelId,
-      response_format: { type: 'json_object' },
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: 'Analyze this image and identify the main food dish. Respond ONLY with a JSON object containing a single key "foodName" with the most specific name of the dish (e.g. "Chicken Biryani", "Daal Chana", "Apple"). If it is not food, return "Unknown".',
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: `data:image/jpeg;base64,${imageBase64}`,
-              },
-            },
-          ],
-        },
-      ],
-    }),
-  });
-
-  const responseText = await response.text();
-  let data: any = {};
-  try {
-    data = JSON.parse(responseText);
-  } catch {
-    throw new Error('Invalid response from AI detection service.');
-  }
-
-  if (!response.ok) {
-    throw new Error(data?.error?.message || 'Failed to detect food in the image');
-  }
-
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) {
-    throw new Error('AI returned an empty response.');
-  }
-
-  let parsedContent: any = {};
-  try {
-    parsedContent = JSON.parse(content);
-  } catch {
-    // Fallback if AI didn't return strict JSON
-    parsedContent = { foodName: content.replace(/```json|```/g, '').trim() };
-  }
-
-  if (parsedContent.foodName && parsedContent.foodName !== 'Unknown') {
-    return {
-      success: true,
-      foodName: parsedContent.foodName,
-      confidence: 1.0,
-      source: `openrouter-${modelId}`,
-    };
-  }
-
-  throw new Error('Could not confidently identify food in this image.');
-};
-
-
-const findBestPakistaniDishMatch = (terms: string[], preference: DietPreference) => {
-  const filteredDishes = filterFoodsByDietPreference(pakistaniDishes, preference) as any[];
-  const allTokens = new Set(terms.flatMap(getDetectionTokens));
-  const hasChicken = allTokens.has('chicken') || allTokens.has('murgh');
-  const hasRice = allTokens.has('rice') || allTokens.has('biryani') || allTokens.has('pulao');
-
-  const fallbackNames = hasChicken && hasRice
-    ? ['Chicken Biryani', 'Chicken Pulao', 'Chicken Pulao (Plain)', 'Chicken Fried Rice']
-    : hasRice
-      ? ['Boiled White Rice', 'Chicken Biryani', 'Chicken Pulao']
-      : hasChicken
-        ? ['Chicken Tikka Boti (Grilled)', 'Chicken Karahi', 'Chicken Biryani']
-        : [];
-
-  let bestMatch: any = null;
-  let bestScore = 0;
-
-  filteredDishes.forEach((dish) => {
-    const title = normalizeFoodSearchText(getFoodTitle(dish));
-    const category = normalizeFoodSearchText(dish?.category);
-    const titleTokens = new Set(getDetectionTokens(title));
-    let score = 0;
-
-    terms.forEach((term) => {
-      const normalizedTerm = normalizeFoodSearchText(term);
-      if (!normalizedTerm) return;
-
-      if (title === normalizedTerm) score += 180;
-      if (title.includes(normalizedTerm)) score += 120;
-      if (normalizedTerm.includes(title)) score += 100;
-
-      getDetectionTokens(normalizedTerm).forEach((token) => {
-        if (titleTokens.has(token)) score += 24;
-        if (category.includes(token)) score += 8;
-      });
-    });
-
-    if (hasChicken && hasRice && title.includes('chicken')) {
-      if (title.includes('biryani')) score += 90;
-      if (title.includes('pulao')) score += 75;
-      if (title.includes('fried rice')) score += 65;
-      if (category.includes('rice')) score += 45;
-    }
-
-    if (hasChicken && title.includes('chicken')) score += 24;
-    if (hasRice && (title.includes('rice') || category.includes('rice'))) score += 24;
-
-    if (score > bestScore) {
-      bestScore = score;
-      bestMatch = dish;
-    }
-  });
-
-  if (bestMatch && bestScore >= 32) return bestMatch;
-
-  return fallbackNames
-    .map((name) => filteredDishes.find((dish) => normalizeFoodSearchText(getFoodTitle(dish)) === normalizeFoodSearchText(name)))
-    .find(Boolean) || null;
-};
-
-const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 export default function DetailsDay () {
     const { colors } = useTheme();
     const { sendFitFaatNotification, scheduleFitFaatNotification, cancelScheduledNotification } = useNotifications();
-    const { selectedDay  } = useLocalSearchParams<{ selectedDay : string }>();
+    const { selectedDay, quickMode  } = useLocalSearchParams<{ selectedDay : string; quickMode?: string }>();
     const router = useRouter();
-    const props: typeDay = JSON.parse(selectedDay )
-    
-    // State for fetched day data from backend
-    const [dayData, setDayData] = useState<any>(props);
-    const [isLoading, setIsLoading] = useState(false);
-    const [isCompletingDay, setIsCompletingDay] = useState(false);
-    
-    // Completion popup states
-    const [showCompletionModal, setShowCompletionModal] = useState(false);
-    const [completionModalType, setCompletionModalType] = useState<'confirm' | 'success' | 'weekComplete' | 'error'>('confirm');
-    const [completionModalData, setCompletionModalData] = useState<any>({});
+    const props: typeDay = useMemo(() => JSON.parse(selectedDay), [selectedDay]);
+    const initialTrackingMode: 'meal' | 'hydration' = quickMode === 'hydration' ? 'hydration' : 'meal';
+    const {
+      dayData,
+      setDayData,
+      isLoading,
+      setIsLoading,
+      isCompletingDay,
+      isPremium,
+      goalDisplayMode,
+      showCompletionModal,
+      setShowCompletionModal,
+      completionModalType,
+      completionModalData,
+      syncUpdatedDayToLocalCache,
+    } = useDetailsDayData({ initialDayData: props, router });
     
     // Calculate time remaining in the day (from current time to 11:59:59 PM)
     function getRemainingTime(){
@@ -298,48 +84,6 @@ export default function DetailsDay () {
         return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     }
     
-    // Fetch complete day data from backend
-    useEffect(() => {
-      const fetchDayData = async () => {
-        try {
-          setIsLoading(false);
-          console.log('Day data loaded from props:', props.dayNo);
-          
-          // Use the props data directly since it comes from the weekly API
-          // which already has all the updated calorie and hydration values
-          setDayData({
-            ...props,
-            achievedCalories: props.achievedCalories || 0,
-            achieviedHydration: props.achieviedHydration || 0,
-            targetCalories: props.targetCalories,
-            targetHydration: props.targetHydration,
-            meals: (props as any).meals || [],
-            remarks: props.remarks,
-            status: props.status,
-            isCompleted: (props as any).isCompleted || false,
-            completionPercentage: (props as any).completionPercentage || 0,
-          });
-        } catch (error) {
-          console.error('Error loading day data:', error);
-          setDayData(props);
-        } finally {
-          setIsLoading(false);
-        }
-      };
-      
-      fetchDayData();
-    }, [props.dayNo]);
-    
-    // Helper function to safely calculate percentage
-    const calculatePercentage = (achieved: number, target: number): number => {
-      if (!target || target === 0) return 0;
-      if (!achieved || achieved < 0) return 0;
-      const percent = (achieved / target) * 100;
-      return Math.min(Math.round(percent * 10) / 10, 100); // Round to 1 decimal place, cap at 100
-    };
-
-    //states to track changes
-    const [updateInput, setUpdateInput] = useState<string>('');
     const [timer, setTimer] = useState<string>(getRemainingTime())
     
     // Update timer every second
@@ -351,106 +95,14 @@ export default function DetailsDay () {
       return () => clearInterval(timerInterval);
     }, []);
 
-    // Complete Day functionality
-    const handleCompleteDay = async () => {
-      setCompletionModalType('confirm');
-      setCompletionModalData({
-        dayNumber: dayData.dayNo,
-        onConfirm: async () => {
-          setShowCompletionModal(false);
-          
-          try {
-            setIsCompletingDay(true);
-            
-            // Get weekly tracking ID from storage
-            const weeklyTrackingId = await AsyncStorage.getItem('weeklyTrackingId');
-            if (!weeklyTrackingId) {
-              setCompletionModalType('error');
-              setCompletionModalData({ message: 'Weekly tracking ID not found. Please restart the app.' });
-              setShowCompletionModal(true);
-              return;
-            }
-
-            console.log(`🚀 Completing Day ${dayData.dayNo}...`);
-            if (Number(dayData.dayNo) >= 7) {
-              const cached = await AsyncStorage.getItem('JsonResponse');
-              const parsed = cached ? JSON.parse(cached) : null;
-              const cachedData = parsed?.data || parsed || {};
-              const dayKey = `day0${dayData.dayNo}`;
-
-              await saveAdaptiveGoalCarryForward(
-                {
-                  ...cachedData,
-                  [dayKey]: {
-                    ...(cachedData?.[dayKey] || {}),
-                    ...dayData,
-                    status: 'finished',
-                  },
-                },
-                { weeklyTrackingId }
-              );
-            }
-            const result = await dailyLogsApi.completeDay(weeklyTrackingId, dayData.dayNo);
-            await AsyncStorage.removeItem('JsonResponse');
-            
-            if (result.cycleRestarted) {
-              setCompletionModalType('weekComplete');
-              setCompletionModalData({
-                dayNumber: dayData.dayNo,
-                onContinue: () => {
-                  setShowCompletionModal(false);
-                  router.back();
-                }
-              });
-            } else {
-              setCompletionModalType('success');
-              setCompletionModalData({
-                dayNumber: dayData.dayNo,
-                onContinue: () => {
-                  setShowCompletionModal(false);
-                  router.back();
-                }
-              });
-            }
-            setShowCompletionModal(true);
-            
-          } catch (error) {
-            console.error('Error completing day:', error);
-            setCompletionModalType('error');
-            setCompletionModalData({ 
-              message: error instanceof Error ? error.message : 'Failed to complete day. Please try again.' 
-            });
-            setShowCompletionModal(true);
-          } finally {
-            setIsCompletingDay(false);
-          }
-        },
-        onCancel: () => setShowCompletionModal(false)
-      });
-      setShowCompletionModal(true);
-    };
-    
-    const [showMenu, setShowMenu] = useState<Boolean>(false)
-    const [timeInput, setTimeInput] = useState<string>('');
-    const [selectedTime, setSelectedTime] = useState<Date>(new Date());
-    const [showTimePicker, setShowTimePicker] = useState<boolean>(false);
-    const [foodNameInput, setFoodNameInput] = useState<string>('');
+    const [showMenu, setShowMenu] = useState<boolean>(false)
     const [descriptionInput, setDescriptionInput] = useState<string>('');
-    const [selectedImage, setSelectedImage] = useState<string | null>(null);
-    const [recording, setRecording] = useState<Audio.Recording | undefined>();
-    const [audioUri, setAudioUri] = useState<string | null>(null);
-    const [isRecording, setIsRecording] = useState(false);
-    const [inputMethod, setInputMethod] = useState<'text' | 'audio' | 'photo'>('text');
     const [calorieInput, setCalorieInput] = useState<string>('');
     const [selectedFoodItem, setSelectedFoodItem] = useState<any>(null);
     const [foodSearch, setFoodSearch] = useState<string>('');
-    const [filteredFoods, setFilteredFoods] = useState<any[]>([]);
-    const [showFoodSearch, setShowFoodSearch] = useState(false);
     const [mealQuantity, setMealQuantity] = useState<string>('1');
     const [waterInput, setWaterInput] = useState<string>('0'); // Default to 0
-    const [showWaterTab, setShowWaterTab] = useState(false);
-    const [trackingMode, setTrackingMode] = useState<'meal' | 'hydration'>('meal');
-    const [dietPreference, setDietPreference] = useState<DietPreference>('all');
+    const [trackingMode, setTrackingMode] = useState<'meal' | 'hydration'>(initialTrackingMode);
     
     // Drink search states
     const [drinkSearch, setDrinkSearch] = useState<string>('');
@@ -459,73 +111,18 @@ export default function DetailsDay () {
     const [selectedDrink, setSelectedDrink] = useState<any>(null);
     const [drinkQuantity, setDrinkQuantity] = useState<string>('1');
 
-    const syncUpdatedDayToLocalCache = async (updatedDayData: any) => {
-      try {
-        const cached = await AsyncStorage.getItem('JsonResponse');
-        if (!cached) return updatedDayData;
-
-        const parsed = JSON.parse(cached);
-        const cachedData = parsed?.data || parsed;
-        const dayKey = `day0${updatedDayData.dayNo}`;
-
-        if (!cachedData?.[dayKey]) return updatedDayData;
-
-        const weeklyTrackingId = await AsyncStorage.getItem('weeklyTrackingId');
-        const carryForward = await loadAdaptiveGoalCarryForward({
-          currentWeeklyTrackingId: weeklyTrackingId,
-        });
-        const nextData = applyAdaptiveGoalsToJsonResponse(
-          {
-            ...cachedData,
-            [dayKey]: {
-              ...cachedData[dayKey],
-              ...updatedDayData,
-            },
-          },
-          undefined,
-          carryForward
-        );
-        const nextDayData = nextData[dayKey] || updatedDayData;
-        const nextStore = parsed?.data
-          ? { ...parsed, data: nextData, timestamp: new Date() }
-          : { data: nextData, timestamp: new Date() };
-
-        await AsyncStorage.setItem('JsonResponse', JSON.stringify(nextStore));
-
-        return {
-          ...updatedDayData,
-          baseTargetCalories: nextDayData.baseTargetCalories,
-          baseTargetHydration: nextDayData.baseTargetHydration,
-          targetCalories: nextDayData.targetCalories,
-          targetHydration: nextDayData.targetHydration,
-          adaptiveCaloriesAdjustment: nextDayData.adaptiveCaloriesAdjustment,
-          adaptiveHydrationAdjustment: nextDayData.adaptiveHydrationAdjustment,
-        };
-      } catch (cacheError) {
-        console.error('Error syncing adaptive goals cache:', cacheError);
-        return updatedDayData;
-      }
-    };
-    
-    // Image detection states
-    const [isDetectingDish, setIsDetectingDish] = useState(false);
-    const [detectedDishName, setDetectedDishName] = useState<string>('');
-    
     // Diet plan viewer state
     const [showDietPlanViewer, setShowDietPlanViewer] = useState(false);
-    
-    // Custom recipes list
-    const [userCustomRecipes, setUserCustomRecipes] = useState<CustomRecipeData[]>([]);
     
     // Custom recipe states
     const [showCustomRecipeModal, setShowCustomRecipeModal] = useState(false);
     const [customRecipeName, setCustomRecipeName] = useState<string>('');
-    const [customRecipeIngredients, setCustomRecipeIngredients] = useState<Array<{
+    const [customRecipeIngredients, setCustomRecipeIngredients] = useState<{
       name: string;
       protein_g: number;
       carbs_g: number;
       fat_g: number;
-    }>>([]);
+    }[]>([]);
     const [customRecipeServingSize, setCustomRecipeServingSize] = useState<string>('1 serving');
     const [customRecipeCalories, setCustomRecipeCalories] = useState<string>('');
     const [customRecipeProtein, setCustomRecipeProtein] = useState<string>('');
@@ -538,114 +135,6 @@ export default function DetailsDay () {
       carbs_g: '',
       fat_g: ''
     });
-
-    useEffect(() => {
-      const loadDietPreference = async () => {
-        try {
-          const savedPreference = await AsyncStorage.getItem(DIET_PREFERENCE_STORAGE_KEY);
-          if (isDietPreference(savedPreference)) {
-            setDietPreference(savedPreference);
-          }
-        } catch (error) {
-          console.error('Error loading diet preference:', error);
-        }
-      };
-
-      loadDietPreference();
-    }, []);
-    
-    // Fetch user's custom recipes on mount
-    useEffect(() => {
-      const fetchCustomRecipes = async () => {
-        try {
-          const recipes = await customRecipesApi.getUserRecipes();
-          setUserCustomRecipes(recipes);
-          console.log('✅ Custom recipes loaded:', recipes.length);
-        } catch (error) {
-          console.error('Error loading custom recipes:', error);
-        }
-      };
-      fetchCustomRecipes();
-    }, []);
-    
-    const handleDietPreferenceChange = async (preference: DietPreference) => {
-      setDietPreference(preference);
-      setSelectedFoodItem(null);
-      setFoodSearch('');
-      setFilteredFoods([]);
-      setShowFoodSearch(false);
-
-      try {
-        await AsyncStorage.setItem(DIET_PREFERENCE_STORAGE_KEY, preference);
-      } catch (error) {
-        console.error('Error saving diet preference:', error);
-      }
-    };
-
-    const quickPickFoods = useMemo<any[]>(() => {
-      const getFoodTitle = (food: any) => String(food?.food_name || food?.name || '').toLowerCase();
-      const uniquePakistaniDishes = pakistaniDishes.filter((food: any, index: number, foods: any[]) => {
-        const title = getFoodTitle(food);
-        return title.length > 0 && foods.findIndex((item: any) => getFoodTitle(item) === title) === index;
-      });
-      const preferredByPreference: Record<DietPreference, string[]> = {
-        all: ['Chicken Biryani', 'Daal Chana', 'Chicken Tikka Boti (Grilled)'],
-        vegetarian: ['Chana Chaat', 'Daal Chana', 'Palak Paneer (Spinach with Cheese)'],
-        nonVegetarian: ['Chicken Biryani', 'Chicken Tikka Boti (Grilled)', 'Mutton Karahi'],
-      };
-      const preferredNames = preferredByPreference[dietPreference].map((name) => name.toLowerCase());
-      const preferredFoods = preferredNames
-        .map((name) => uniquePakistaniDishes.find((food: any) => getFoodTitle(food) === name))
-        .filter((food): food is any => Boolean(food))
-        .filter((food) => dietPreference === 'all' || getDietTypeForFood(food) === dietPreference);
-      const fallbackFoods = filterFoodsByDietPreference(uniquePakistaniDishes, dietPreference)
-        .filter((food: any) => !preferredNames.includes(getFoodTitle(food))) as any[];
-
-      return [...preferredFoods, ...fallbackFoods].slice(0, 3);
-    }, [dietPreference]);
-    
-    // Handle food search with custom recipes and Pakistani dishes dataset
-    useEffect(() => {
-      if (foodSearch.trim().length > 1) {
-        const query = foodSearch.toLowerCase();
-        
-        // Search custom recipes first
-        const customRecipeMatches = userCustomRecipes
-          .filter(recipe => recipe.recipeName.toLowerCase().includes(query))
-          .map(recipe => ({
-            food_name: recipe.recipeName,
-            serving_size: recipe.servingSize,
-            calories_kcal: recipe.calories_kcal,
-            calories: recipe.calories_kcal,
-            protein_g: recipe.protein_g,
-            carbs_g: recipe.carbs_g,
-            fat_g: recipe.fat_g,
-            ingredients: recipe.ingredients,
-            category: '⭐ My Recipe',
-            isCustomRecipe: true,
-            _id: recipe._id
-          }))
-          .filter(recipe => dietPreference === 'all' || getDietTypeForFood(recipe) === dietPreference);
-        
-        // Search Pakistani dishes
-        const dishMatches = filterFoodsByDietPreference(
-          pakistaniDishes.filter((dish: any) => {
-            const name = dish.food_name || dish.name || '';
-            const category = dish.category || '';
-            return name.toLowerCase().includes(query) || category.toLowerCase().includes(query);
-          }),
-          dietPreference
-        ).slice(0, 10);
-        
-        // Combine: custom recipes first, then database dishes
-        const results = [...customRecipeMatches, ...dishMatches].slice(0, 15);
-        setFilteredFoods(results);
-        setShowFoodSearch(true);
-      } else {
-        setShowFoodSearch(false);
-        setFilteredFoods([]);
-      }
-    }, [dietPreference, foodSearch, userCustomRecipes]);
 
     // Handle drink search with drinks dataset
     useEffect(() => {
@@ -663,163 +152,16 @@ export default function DetailsDay () {
       }
     }, [drinkSearch]);
 
-    // Detect dish from image using backend AI food detection.
-    const detectDishFromImage = async () => {
-      try {
-        // Request permission
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permission Required', 'Please allow access to your photos to use this feature.');
-          return;
-        }
-
-        // Pick image
-        const result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ['images'],
-          allowsEditing: true,
-          aspect: [4, 3],
-          quality: 0.8,
-          base64: true,
-        });
-
-        if (result.canceled || !result.assets || result.assets.length === 0) {
-          return;
-        }
-
-        setIsDetectingDish(true);
-        const asset = result.assets[0];
-        const imageUri = asset.uri;
-
-        // Prepare FormData
-        const formData = new FormData();
-        const originalFilename = asset.fileName || imageUri.split('/').pop() || '';
-        const detectedMimeType = asset.mimeType?.startsWith('image/')
-          ? asset.mimeType
-          : 'image/jpeg';
-        const type = detectedMimeType === 'image/jpg' ? 'image/jpeg' : detectedMimeType;
-        const fallbackExtension = type.split('/')[1] === 'jpeg' ? 'jpg' : type.split('/')[1] || 'jpg';
-        const filename = /\.[a-z0-9]+$/i.test(originalFilename)
-          ? originalFilename
-          : `dish-${Date.now()}.${fallbackExtension}`;
-
-        formData.append('image', {
-          uri: imageUri,
-          name: filename,
-          type: type,
-        } as any);
-
-        // Get backend URL
-        const base = getBackendBaseUrl();
-        const apiUrl = base.replace(/\/api\/?$/, '') + '/api/food-detect/upload';
-        const token = await tokenStorage.getToken();
-        const headers: Record<string, string> = {
-          Accept: 'application/json',
-        };
-
-        if (token) {
-          headers.Authorization = `Bearer ${token}`;
-        }
-
-        let data: any = {};
-        let backendFailureMessage = '';
-
-        try {
-          // Upload to backend first; direct Clarifai fallback below keeps detection working if backend misses.
-          const response = await fetch(apiUrl, {
-            method: 'POST',
-            body: formData,
-            headers,
-          });
-
-          const responseText = await response.text();
-          try {
-            data = responseText ? JSON.parse(responseText) : {};
-          } catch {
-            data = { message: responseText };
-          }
-
-          if (!response.ok || !data.success) {
-            backendFailureMessage = data.message || `Food detection request failed (${response.status})`;
-          }
-        } catch (backendError) {
-          backendFailureMessage = backendError instanceof Error
-            ? backendError.message
-            : 'Backend food detection failed';
-        }
-
-        if (!data.success) {
-          console.log('Backend food detection failed, trying direct OpenRouter fallback:', backendFailureMessage);
-          try {
-            data = await detectFoodWithOpenRouterFallback(asset.base64);
-          } catch (fallbackError) {
-            throw new Error(
-              fallbackError instanceof Error
-                ? fallbackError.message
-                : backendFailureMessage || 'Failed to detect food in the image'
-            );
-          }
-        }
-
-        const detectionTerms = collectDetectionTerms(data);
-        const bestMatch = findBestPakistaniDishMatch(detectionTerms, dietPreference);
-        const dishName = data.foodName || data.food_name || detectionTerms[0] || '';
-        const confidence = Number(data.confidence ?? data.score ?? data.probability ?? 0);
-        const confidencePercent = confidence > 1 ? confidence : confidence * 100;
-        const confidenceLine = confidencePercent > 0
-          ? `\nConfidence: ${Math.round(confidencePercent)}%`
-          : '';
-
-        if ((data.success && dishName) || bestMatch) {
-          setDetectedDishName(dishName);
-          
-          // Auto-search in the food database
-          setFoodSearch(dishName || getFoodTitle(bestMatch));
-
-          if (bestMatch) {
-            // Auto-select the best match
-            setSelectedFoodItem(bestMatch);
-            const calories = bestMatch.calories_kcal || 0;
-            setCalorieInput(String(Math.round(calories * parseFloat(mealQuantity || '1'))));
-            setShowFoodSearch(false);
-            
-            Alert.alert(
-              'Food Detected! 🎯',
-              `Found: ${getFoodTitle(bestMatch)}\nCalories: ${calories} kcal${confidenceLine}\n\nYou can adjust the quantity and add the meal.`,
-              [{ text: 'OK' }]
-            );
-          } else {
-            // Show search results if no exact match
-            setShowFoodSearch(true);
-            Alert.alert(
-              'Food Detected',
-              `Detected: ${dishName}${confidenceLine}\n\nPlease select from the search results or enter details manually.`,
-              [{ text: 'OK' }]
-            );
-          }
-        } else {
-          Alert.alert('Detection Failed', data.message || 'Could not detect a dish in the image. Please try another image or enter manually.');
-        }
-      } catch (error) {
-        console.error('Image detection error:', error);
-        Alert.alert(
-          'Detection Failed',
-          error instanceof Error
-            ? error.message
-            : 'Failed to process the image. Please try again.'
-        );
-      } finally {
-        setIsDetectingDish(false);
-      }
-    };
-
-    // Ensure UI updates when dayData changes
-    useEffect(() => {
-      // This empty effect serves to notify React that dayData has changed
-      // triggering a full component re-render
-    }, [dayData.achieviedHydration, dayData.achievedCalories]);
-
     const fade = useSharedValue(1);
     const insets = useSafeAreaInsets();
+
+    useEffect(() => {
+      if (quickMode !== 'meal' && quickMode !== 'hydration') return;
+
+      setTrackingMode(quickMode);
+      fade.value = 0;
+      setShowMenu(true);
+    }, [fade, quickMode]);
 
     useEffect(() => {
       if (Platform.OS !== 'android') return;
@@ -834,121 +176,146 @@ export default function DetailsDay () {
       }
     }, [colors.screenColor, showCustomRecipeModal]);
 
-    // trigger fade-out + menu
-    const openMenu = () => {
-    fade.value = withTiming(
-      0,
-      { duration: 800, easing: Easing.inOut(Easing.ease) },
-      (isFinished) => {
-        if (isFinished) {
-          // call setShowMenu(true) on JS thread
-          runOnJS(setShowMenu)(true);
+    const openMenu = useCallback(() => {
+      fade.value = withTiming(
+        0,
+        { duration: 800, easing: Easing.inOut(Easing.ease) },
+        (isFinished) => {
+          if (isFinished) {
+            runOnJS(setShowMenu)(true);
+          }
         }
-      }
-    );
-  };
+      );
+    }, [fade]);
 
-  // closeMenu: set showMenu false first (so menu overlay disappears),
-  // then fade main content back in
-  const closeMenu = () => {
-    // set state on JS thread immediately
-    setShowMenu(false);
-    // animate fade in
-    fade.value = withTiming(1, { duration: 500, easing: Easing.inOut(Easing.ease) });
-  };
+    const closeMenu = useCallback(() => {
+      setShowMenu(false);
+      fade.value = withTiming(1, { duration: 500, easing: Easing.inOut(Easing.ease) });
+    }, [fade]);
 
+    const resetMealForm = useCallback(() => {
+      setFoodSearch('');
+      setSelectedFoodItem(null);
+      setCalorieInput('');
+      setMealQuantity('1');
+      setDescriptionInput('');
+    }, []);
+
+    const resetNutritionForm = useCallback(() => {
+      resetMealForm();
+      setWaterInput('0');
+      setSelectedDrink(null);
+      setDrinkSearch('');
+      setShowDrinkSearch(false);
+      setDrinkQuantity('1');
+    }, [resetMealForm]);
+
+    const { logMealDrafts, handleSubmitNutritionEntry } = useNutritionLogger({
+      dayData,
+      initialDayData: props,
+      router,
+      setDayData,
+      setIsLoading,
+      syncUpdatedDayToLocalCache,
+      closeMenu,
+      resetMealForm,
+      resetNutritionForm,
+      sendFitFaatNotification,
+      scheduleFitFaatNotification,
+      cancelScheduledNotification,
+    });
+
+    const {
+      dietPreference,
+      dietPreferenceOptions,
+      mealTemplates,
+      filteredFoods,
+      showFoodSearch,
+      setShowFoodSearch,
+      isRepeatingYesterday,
+      quickPickFoods,
+      applyTemplateToForm,
+      saveCurrentMealAsTemplate,
+      removeMealTemplate,
+      handleDietPreferenceChange,
+      handleRepeatYesterday,
+      setUserCustomRecipes,
+    } = useMealTemplates({
+      calorieInput,
+      mealQuantity,
+      selectedFoodItem,
+      detectedDishName: '',
+      foodSearch,
+      descriptionInput,
+      dayData,
+      setTrackingMode,
+      setSelectedFoodItem,
+      setMealQuantity,
+      setCalorieInput,
+      setFoodSearch,
+      logMealDrafts,
+    });
+
+    const { isDetectingDish, detectDishFromImage } = useFoodDetection({
+      dietPreference,
+      mealQuantity,
+      setFoodSearch,
+      setSelectedFoodItem,
+      setCalorieInput,
+      setShowFoodSearch,
+    });
+
+    const handleTemplateOneTap = useCallback(async (template: MealTemplate) => {
+      await logMealDrafts([buildMealDraftFromTemplate(template)], {
+        title: 'Template Added',
+      });
+    }, [logMealDrafts]);
 
     //functions
     const handleUpdate = () => {
         //Main api calling
     }
 
-    // Image picker functions
-    const pickImage = async () => {
-        const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ['images'],
-            allowsEditing: true,
-            aspect: [4, 3],
-            quality: 0.8,
-        });
-
-        if (!result.canceled) {
-            setSelectedImage(result.assets[0].uri);
-        }
-    };
-
-    const takePhoto = async () => {
-        const result = await ImagePicker.launchCameraAsync({
-            mediaTypes: ['images'],
-            allowsEditing: true,
-            aspect: [4, 3],
-            quality: 0.8,
-        });
-
-        if (!result.canceled) {
-            setSelectedImage(result.assets[0].uri);
-        }
-    };
-
-    // Audio recording functions
-    const startRecording = async () => {
-        try {
-            // Request permissions properly
-            const { status } = await Audio.requestPermissionsAsync();
-            if (status !== 'granted') {
-                Alert.alert('Permission Denied', 'Audio recording permission is required');
-                return;
-            }
-            
-            await Audio.setAudioModeAsync({
-                allowsRecordingIOS: true,
-                playsInSilentModeIOS: true,
-                staysActiveInBackground: true,
-                shouldDuckAndroid: true,
-                playThroughEarpieceAndroid: false
-            });
-
-            const { recording } = await Audio.Recording.createAsync(
-                Audio.RecordingOptionsPresets.HIGH_QUALITY
-            );
-            setRecording(recording);
-            setIsRecording(true);
-        } catch (err: any) {
-            console.error('Failed to start recording', err);
-            Alert.alert('Failed to start recording', err?.message || 'Unknown error occurred');
-        }
-    };
-
-    const stopRecording = async () => {
-        if (!recording) return;
-        
-        try {
-            setIsRecording(false);
-            await recording.stopAndUnloadAsync();
-            await Audio.setAudioModeAsync({
-                allowsRecordingIOS: false,
-            });
-            const uri = recording.getURI();
-            setAudioUri(uri);
-            setRecording(undefined);
-        } catch (err: any) {
-            console.error('Failed to stop recording', err);
-            Alert.alert('Failed to stop recording', err?.message || 'Unknown error occurred');
-        }
-    };
-
-    const handleMediaAction = () => {
-        Alert.alert(
-            "Add Media",
-            "Choose how you want to add media",
-            [
-                { text: "Take Photo", onPress: takePhoto },
-                { text: "Choose from Gallery", onPress: pickImage },
-                { text: "Cancel", style: "cancel" }
-            ]
-        );
-    };
     const styles = useMemo(() => getStyles(colors, insets.bottom), [colors, insets.bottom]);
+    const workoutAccessUnlocked = isPremium;
+    const calorieSummary = getDashboardCalorieSummary(dayData, isPremium);
+    const exerciseCaloriesBurned = workoutAccessUnlocked ? getExerciseCaloriesBurned(dayData) : 0;
+    const walkingCaloriesBurned = isPremium ? calorieSummary.walkingCalories : 0;
+    const walkingCaloriesTarget = isPremium ? calorieSummary.walkingTarget : 0;
+    const netCalories = workoutAccessUnlocked
+      ? calorieSummary.netCalories
+      : Number(dayData.achievedCalories || 0);
+    const goalPlan = isPremium ? "premium" : "free";
+    const showEstimatedRanges = goalDisplayMode === "advanced";
+    const goalCardLabel = showEstimatedRanges ? "Estimated Ranges" : "Goal";
+    const calorieTargetLabel = formatCalorieTarget(dayData, goalDisplayMode, goalPlan);
+    const hydrationTargetLabel = formatHydrationTarget(dayData, goalDisplayMode, goalPlan);
+    const renderGoalTargetValue = (label: string) => {
+      const shouldStackRange = showEstimatedRanges && label.length > 8 && label.includes('-');
+      if (!shouldStackRange) {
+        return <Text style={styles.statValue} numberOfLines={1}>{label}</Text>;
+      }
+
+      const [minLabel, maxLabel] = label.split('-');
+      return (
+        <View style={styles.goalRangeValue}>
+          <Text style={styles.statValue} numberOfLines={1}>{minLabel}-</Text>
+          <Text style={styles.statValue} numberOfLines={1}>{maxLabel}</Text>
+        </View>
+      );
+    };
+    const mealQuantityValue = Math.max(0.5, toMealNumber(mealQuantity, 1));
+    const drinkQuantityValue = Math.max(0.5, toMealNumber(drinkQuantity, 1));
+    const waterInputValue = Math.max(0, toMealNumber(waterInput, 0));
+    const achievedHydrationValue = Math.max(
+      0,
+      toMealNumber(dayData.achieviedHydration ?? dayData.achievedHydration, 0)
+    );
+    const targetHydrationValue = Math.max(0, toMealNumber(dayData.targetHydration, 0));
+    const projectedHydration = achievedHydrationValue + waterInputValue;
+    const calorieInputValue = Math.max(0, Math.round(toMealNumber(calorieInput, 0)));
+    const targetCaloriesValue = Math.max(0, toMealNumber(dayData.targetCalories, 0));
+    const canSubmitNutritionEntry = calorieInput.trim().length > 0 || waterInputValue > 0;
     //output
     return (
   <View style={{ flex: 1, paddingTop: insets.top, backgroundColor: colors.screenColor }}>
@@ -1008,16 +375,21 @@ export default function DetailsDay () {
                   <View style={styles.statCard}>
                     <View style={styles.statCardHeader}>
                       <Ionicons name="flag" size={Math.min(hp(2.2), wp(5.5))} color={colors.primary} />
-                      <Text style={styles.statLabel}>Goal</Text>
+                      <Text
+                        style={[styles.statLabel, showEstimatedRanges && styles.statLabelRange]}
+                        numberOfLines={showEstimatedRanges ? 2 : 1}
+                      >
+                        {goalCardLabel}
+                      </Text>
                     </View>
                     <View style={styles.goalRowContainer}>
                       <View style={styles.goalItem}>
-                        <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{dayData.targetCalories}</Text>
+                        {renderGoalTargetValue(calorieTargetLabel)}
                         <Text style={styles.statUnit}>cals</Text>
                       </View>
                       <View style={styles.goalDivider} />
                       <View style={styles.goalItem}>
-                        <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{dayData.targetHydration}</Text>
+                        {renderGoalTargetValue(hydrationTargetLabel)}
                         <Text style={styles.statUnit}>liters</Text>
                       </View>
                     </View>
@@ -1032,6 +404,28 @@ export default function DetailsDay () {
                     <Text style={styles.statUnit}>cals</Text>
                   </View>
 
+                  {workoutAccessUnlocked && (
+                    <View style={styles.statCard}>
+                      <View style={styles.statCardContent}>
+                        <Ionicons name="fitness" size={Math.min(hp(2.2), wp(5.5))} color="#10B981" />
+                        <Text style={styles.statLabel}>Burned</Text>
+                      </View>
+                      <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{exerciseCaloriesBurned}</Text>
+                      <Text style={styles.statUnit}>cals</Text>
+                    </View>
+                  )}
+
+                  {isPremium && (
+                    <View style={styles.statCard}>
+                      <View style={styles.statCardContent}>
+                        <Ionicons name="footsteps" size={Math.min(hp(2.2), wp(5.5))} color="#22C55E" />
+                        <Text style={styles.statLabel}>Walking</Text>
+                      </View>
+                      <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{walkingCaloriesBurned}</Text>
+                      <Text style={styles.statUnit}>cals</Text>
+                    </View>
+                  )}
+
                   <View style={styles.statCard}>
                     <View style={styles.statCardContent}>
                       <Ionicons name="water" size={Math.min(hp(2.2), wp(5.5))} color="#2E86AB" />
@@ -1040,6 +434,17 @@ export default function DetailsDay () {
                     <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{dayData.achieviedHydration}</Text>
                     <Text style={styles.statUnit}>liters</Text>
                   </View>
+
+                  {workoutAccessUnlocked && (
+                    <View style={styles.statCard}>
+                      <View style={styles.statCardContent}>
+                        <Ionicons name="analytics" size={Math.min(hp(2.2), wp(5.5))} color="#14B8A6" />
+                        <Text style={styles.statLabel}>Net</Text>
+                      </View>
+                      <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{netCalories}</Text>
+                      <Text style={styles.statUnit}>cals</Text>
+                    </View>
+                  )}
 
                   <View style={styles.statCard}>
                     <View style={styles.statCardContent}>
@@ -1073,7 +478,55 @@ export default function DetailsDay () {
                       {calculatePercentage(dayData.achievedCalories, dayData.targetCalories)}%
                     </Text>
                   </View>
-                  
+
+                  {workoutAccessUnlocked && (
+                    <View style={styles.progressItem}>
+                      <View style={styles.progressHeader}>
+                        <Ionicons name="analytics-outline" size={16} color="#14B8A6" />
+                        <Text style={styles.progressLabel}>Net Calories</Text>
+                      </View>
+                      <View style={styles.progressBarContainer}>
+                        <View
+                          key={`net-active-${netCalories}`}
+                          style={[
+                            styles.progressBar,
+                            {
+                              width: `${calculatePercentage(netCalories, dayData.targetCalories)}%`,
+                              backgroundColor: '#14B8A6'
+                            }
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.progressPercentage}>
+                        {calculatePercentage(netCalories, dayData.targetCalories)}%
+                      </Text>
+                    </View>
+                  )}
+
+                  {isPremium && (
+                    <View style={styles.progressItem}>
+                      <View style={styles.progressHeader}>
+                        <Ionicons name="footsteps-outline" size={16} color="#22C55E" />
+                        <Text style={styles.progressLabel}>Walking Calories</Text>
+                      </View>
+                      <View style={styles.progressBarContainer}>
+                        <View
+                          key={`walking-active-${walkingCaloriesBurned}`}
+                          style={[
+                            styles.progressBar,
+                            {
+                              width: `${calculatePercentage(walkingCaloriesBurned, walkingCaloriesTarget)}%`,
+                              backgroundColor: '#22C55E'
+                            }
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.progressPercentage}>
+                        {calculatePercentage(walkingCaloriesBurned, walkingCaloriesTarget)}%
+                      </Text>
+                    </View>
+                  )}
+                   
                   <View style={styles.progressItem}>
                     <View style={styles.progressHeader}>
                       <Ionicons name="water-outline" size={16} color="#2E86AB" />
@@ -1132,16 +585,21 @@ export default function DetailsDay () {
                   <View style={styles.statCard}>
                     <View style={styles.statCardHeader}>
                       <Ionicons name="flag" size={Math.min(hp(2.2), wp(5.5))} color={colors.primary} />
-                      <Text style={styles.statLabel}>Goal</Text>
+                      <Text
+                        style={[styles.statLabel, showEstimatedRanges && styles.statLabelRange]}
+                        numberOfLines={showEstimatedRanges ? 2 : 1}
+                      >
+                        {goalCardLabel}
+                      </Text>
                     </View>
                     <View style={styles.goalRowContainer}>
                       <View style={styles.goalItem}>
-                        <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{dayData.targetCalories}</Text>
+                        {renderGoalTargetValue(calorieTargetLabel)}
                         <Text style={styles.statUnit}>cals</Text>
                       </View>
                       <View style={styles.goalDivider} />
                       <View style={styles.goalItem}>
-                        <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{dayData.targetHydration}</Text>
+                        {renderGoalTargetValue(hydrationTargetLabel)}
                         <Text style={styles.statUnit}>liters</Text>
                       </View>
                     </View>
@@ -1156,6 +614,28 @@ export default function DetailsDay () {
                     <Text style={styles.statUnit}>cals</Text>
                   </View>
 
+                  {workoutAccessUnlocked && (
+                    <View style={styles.statCard}>
+                      <View style={styles.statCardContent}>
+                        <Ionicons name="fitness" size={Math.min(hp(2.2), wp(5.5))} color="#10B981" />
+                        <Text style={styles.statLabel}>Burned</Text>
+                      </View>
+                      <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{exerciseCaloriesBurned}</Text>
+                      <Text style={styles.statUnit}>cals</Text>
+                    </View>
+                  )}
+
+                  {isPremium && (
+                    <View style={styles.statCard}>
+                      <View style={styles.statCardContent}>
+                        <Ionicons name="footsteps" size={Math.min(hp(2.2), wp(5.5))} color="#22C55E" />
+                        <Text style={styles.statLabel}>Walking</Text>
+                      </View>
+                      <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{walkingCaloriesBurned}</Text>
+                      <Text style={styles.statUnit}>cals</Text>
+                    </View>
+                  )}
+
                   <View style={styles.statCard}>
                     <View style={styles.statCardContent}>
                       <Ionicons name="water" size={Math.min(hp(2.2), wp(5.5))} color="#2E86AB" />
@@ -1164,6 +644,17 @@ export default function DetailsDay () {
                     <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{dayData.achieviedHydration}</Text>
                     <Text style={styles.statUnit}>liters</Text>
                   </View>
+
+                  {workoutAccessUnlocked && (
+                    <View style={styles.statCard}>
+                      <View style={styles.statCardContent}>
+                        <Ionicons name="analytics" size={Math.min(hp(2.2), wp(5.5))} color="#14B8A6" />
+                        <Text style={styles.statLabel}>Net</Text>
+                      </View>
+                      <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{netCalories}</Text>
+                      <Text style={styles.statUnit}>cals</Text>
+                    </View>
+                  )}
 
                   <View style={styles.statCard}>
                     <View style={styles.statCardContent}>
@@ -1197,7 +688,55 @@ export default function DetailsDay () {
                       {calculatePercentage(dayData.achievedCalories, dayData.targetCalories)}%
                     </Text>
                   </View>
-                  
+
+                  {workoutAccessUnlocked && (
+                    <View style={styles.progressItem}>
+                      <View style={styles.progressHeader}>
+                        <Ionicons name="analytics-outline" size={16} color="#14B8A6" />
+                        <Text style={styles.progressLabel}>Net Calories</Text>
+                      </View>
+                      <View style={styles.progressBarContainer}>
+                        <View
+                          key={`net-inactive-${netCalories}`}
+                          style={[
+                            styles.progressBar,
+                            {
+                              width: `${calculatePercentage(netCalories, dayData.targetCalories)}%`,
+                              backgroundColor: '#14B8A6'
+                            }
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.progressPercentage}>
+                        {calculatePercentage(netCalories, dayData.targetCalories)}%
+                      </Text>
+                    </View>
+                  )}
+
+                  {isPremium && (
+                    <View style={styles.progressItem}>
+                      <View style={styles.progressHeader}>
+                        <Ionicons name="footsteps-outline" size={16} color="#22C55E" />
+                        <Text style={styles.progressLabel}>Walking Calories</Text>
+                      </View>
+                      <View style={styles.progressBarContainer}>
+                        <View
+                          key={`walking-inactive-${walkingCaloriesBurned}`}
+                          style={[
+                            styles.progressBar,
+                            {
+                              width: `${calculatePercentage(walkingCaloriesBurned, walkingCaloriesTarget)}%`,
+                              backgroundColor: '#22C55E'
+                            }
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.progressPercentage}>
+                        {calculatePercentage(walkingCaloriesBurned, walkingCaloriesTarget)}%
+                      </Text>
+                    </View>
+                  )}
+                   
                   <View style={styles.progressItem}>
                     <View style={styles.progressHeader}>
                       <Ionicons name="water-outline" size={16} color="#2E86AB" />
@@ -1257,23 +796,37 @@ export default function DetailsDay () {
           </Text>
         </View>
 
-        {/* Tracking Mode Selector - Professional Toggle */}
+        {/* Tracking Mode Selector */}
         <View style={styles.trackingModeSection}>
-          <Text style={styles.trackingModeTitle}>What would you like to track today?</Text>
+          <View style={styles.trackingModeHeaderRow}>
+            <View style={styles.trackingModeIconBadge}>
+              <Ionicons
+                name={trackingMode === 'meal' ? 'restaurant-outline' : 'water-outline'}
+                size={Math.min(hp(2), wp(4.5))}
+                color={colors.primary}
+              />
+            </View>
+            <Text style={styles.trackingModeTitle}>What would you like to track today?</Text>
+          </View>
           <View style={styles.modeToggleContainer}>
             <TouchableOpacity 
               style={[styles.modeButton, trackingMode === 'meal' && styles.modeButtonActive]}
               onPress={() => setTrackingMode('meal')}
+              activeOpacity={0.85}
             >
-              <Ionicons name="fast-food-outline" size={22} color={trackingMode === 'meal' ? '#FFFFFF' : colors.textSecondary} />
+              <View style={[styles.modeIconBadge, trackingMode === 'meal' && styles.modeIconBadgeActive]}>
+                <Ionicons name="fast-food-outline" size={Math.min(hp(2.2), wp(5))} color={trackingMode === 'meal' ? colors.primary : colors.textSecondary} />
+              </View>
               <Text style={[styles.modeButtonText, trackingMode === 'meal' && styles.modeButtonTextActive]}>Meal</Text>
             </TouchableOpacity>
-            <View style={styles.modeButtonDivider} />
             <TouchableOpacity 
               style={[styles.modeButton, trackingMode === 'hydration' && styles.modeButtonActive]}
               onPress={() => setTrackingMode('hydration')}
+              activeOpacity={0.85}
             >
-              <Ionicons name="water-outline" size={22} color={trackingMode === 'hydration' ? '#FFFFFF' : colors.textSecondary} />
+              <View style={[styles.modeIconBadge, trackingMode === 'hydration' && styles.modeIconBadgeActive]}>
+                <Ionicons name="water-outline" size={Math.min(hp(2.2), wp(5))} color={trackingMode === 'hydration' ? colors.primary : colors.textSecondary} />
+              </View>
               <Text style={[styles.modeButtonText, trackingMode === 'hydration' && styles.modeButtonTextActive]}>Hydration</Text>
             </TouchableOpacity>
           </View>
@@ -1324,6 +877,102 @@ export default function DetailsDay () {
                 </View>
               </View>
 
+              <View style={styles.mealTemplateSection}>
+                <View style={styles.sectionHeaderRow}>
+                  <View>
+                    <Text style={styles.sectionLabel}>Meal Templates</Text>
+                    <Text style={styles.templateSubtitle}>Save common meals and log them fast.</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[
+                      styles.saveTemplateButton,
+                      !calorieInput.trim() && styles.saveTemplateButtonDisabled,
+                    ]}
+                    onPress={saveCurrentMealAsTemplate}
+                    disabled={!calorieInput.trim()}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="bookmark-outline" size={Math.min(hp(1.8), wp(4))} color="#FFFFFF" />
+                    <Text style={styles.saveTemplateText}>Save</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.repeatYesterdayButton,
+                    (isRepeatingYesterday || isLoading) && { opacity: 0.65 },
+                  ]}
+                  onPress={handleRepeatYesterday}
+                  disabled={isRepeatingYesterday || isLoading}
+                  activeOpacity={0.82}
+                >
+                  <View style={styles.repeatYesterdayIcon}>
+                    <Ionicons name="refresh" size={Math.min(hp(2.4), wp(5.4))} color={colors.primary} />
+                  </View>
+                  <View style={styles.repeatYesterdayCopy}>
+                    <Text style={styles.repeatYesterdayTitle}>
+                      {isRepeatingYesterday ? 'Repeating meals...' : 'Repeat Yesterday'}
+                    </Text>
+                    <Text style={styles.repeatYesterdaySubtitle}>Add yesterday's saved meals to today</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={Math.min(hp(2.1), wp(4.8))} color={colors.textSecondary} />
+                </TouchableOpacity>
+
+                {mealTemplates.length > 0 ? (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.mealTemplateList}
+                  >
+                    {mealTemplates.map((template) => {
+                      const totalCalories = Math.round(
+                        template.caloriesPerServing * (template.quantity || 1)
+                      );
+
+                      return (
+                        <View key={template.id} style={styles.mealTemplateCard}>
+                          <TouchableOpacity
+                            style={styles.templateRemoveButton}
+                            onPress={() => removeMealTemplate(template.id)}
+                            hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                          >
+                            <Ionicons name="close" size={Math.min(hp(1.7), wp(3.8))} color={colors.textSecondary} />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.mealTemplateBody}
+                            onPress={() => applyTemplateToForm(template)}
+                            activeOpacity={0.78}
+                          >
+                            <View style={styles.mealTemplateIcon}>
+                              <Ionicons name="restaurant-outline" size={Math.min(hp(2.4), wp(5.3))} color={colors.primary} />
+                            </View>
+                            <Text style={styles.mealTemplateName} numberOfLines={2}>{template.name}</Text>
+                            <Text style={styles.mealTemplateMeta} numberOfLines={1}>
+                              {template.quantity}x | {totalCalories} cal
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.templateAddButton}
+                            onPress={() => handleTemplateOneTap(template)}
+                            disabled={isLoading}
+                            activeOpacity={0.82}
+                          >
+                            <Text style={styles.templateAddText}>Add</Text>
+                          </TouchableOpacity>
+                        </View>
+                      );
+                    })}
+                  </ScrollView>
+                ) : (
+                  <View style={styles.emptyTemplateCard}>
+                    <Ionicons name="bookmark-outline" size={Math.min(hp(2.5), wp(5.6))} color={colors.textSecondary} />
+                    <Text style={styles.emptyTemplateText}>
+                      Select any meal, then tap Save to create your first template.
+                    </Text>
+                  </View>
+                )}
+              </View>
+
               {/* Search Food Field */}
               <View style={styles.fieldContainer}>
                 <Text style={styles.fieldLabel}>
@@ -1363,7 +1012,7 @@ export default function DetailsDay () {
                           onPress={() => {
                             setSelectedFoodItem(food);
                             const calories = food.calories_kcal || food.calories || 0;
-                            setCalorieInput(String(Math.round(calories * parseFloat(mealQuantity || '1'))));
+                            setCalorieInput(String(Math.round(calories * mealQuantityValue)));
                             setFoodSearch('');
                             setShowFoodSearch(false);
                           }}
@@ -1586,7 +1235,7 @@ export default function DetailsDay () {
                         style={styles.drinkResultCard}
                         onPress={() => {
                           setSelectedDrink(drink);
-                          const hydrationValue = ((drink.hydration_percent || 100) / 100) * 0.25; // Convert to liters
+                          const hydrationValue = getDrinkHydrationLiters(drink, 1);
                           setWaterInput(hydrationValue.toFixed(2));
                           setDrinkSearch('');
                           setShowDrinkSearch(false);
@@ -1643,20 +1292,20 @@ export default function DetailsDay () {
                     </View>
                     <View style={styles.drinkNutritionItem}>
                       <Ionicons name="flame" size={16} color="#F97316" />
-                      <Text style={styles.drinkNutritionValue}>{Math.round(selectedDrink.calories_kcal * parseFloat(drinkQuantity || '1'))}</Text>
+                      <Text style={styles.drinkNutritionValue}>{Math.round(selectedDrink.calories_kcal * drinkQuantityValue)}</Text>
                       <Text style={styles.drinkNutritionLabel}>cal</Text>
                     </View>
                     {selectedDrink.protein_g > 0 && (
                       <View style={styles.drinkNutritionItem}>
                         <Ionicons name="fitness" size={16} color="#2E86AB" />
-                        <Text style={styles.drinkNutritionValue}>{Math.round(selectedDrink.protein_g * parseFloat(drinkQuantity || '1'))}</Text>
+                        <Text style={styles.drinkNutritionValue}>{Math.round(selectedDrink.protein_g * drinkQuantityValue)}</Text>
                         <Text style={styles.drinkNutritionLabel}>protein</Text>
                       </View>
                     )}
                     {selectedDrink.carbs_g > 0 && (
                       <View style={styles.drinkNutritionItem}>
                         <Ionicons name="leaf" size={16} color="#FFA500" />
-                        <Text style={styles.drinkNutritionValue}>{Math.round(selectedDrink.carbs_g * parseFloat(drinkQuantity || '1'))}</Text>
+                        <Text style={styles.drinkNutritionValue}>{Math.round(selectedDrink.carbs_g * drinkQuantityValue)}</Text>
                         <Text style={styles.drinkNutritionLabel}>carbs</Text>
                       </View>
                     )}
@@ -1669,9 +1318,9 @@ export default function DetailsDay () {
                       <TouchableOpacity 
                         style={styles.quantityControlBtn}
                         onPress={() => {
-                          const q = Math.max(0.5, parseFloat(drinkQuantity || '1') - 0.5);
+                          const q = Math.max(0.5, drinkQuantityValue - 0.5);
                           setDrinkQuantity(String(q));
-                          const hydrationValue = ((selectedDrink.hydration_percent || 100) / 100) * 0.25 * q;
+                          const hydrationValue = getDrinkHydrationLiters(selectedDrink, q);
                           setWaterInput(hydrationValue.toFixed(2));
                         }}
                       >
@@ -1684,7 +1333,7 @@ export default function DetailsDay () {
                           onChangeText={(text) => {
                             setDrinkQuantity(text);
                             if (text && !isNaN(parseFloat(text))) {
-                              const hydrationValue = ((selectedDrink.hydration_percent || 100) / 100) * 0.25 * parseFloat(text);
+                              const hydrationValue = getDrinkHydrationLiters(selectedDrink, parseFloat(text));
                               setWaterInput(hydrationValue.toFixed(2));
                             }
                           }}
@@ -1695,9 +1344,9 @@ export default function DetailsDay () {
                       <TouchableOpacity 
                         style={styles.quantityControlBtn}
                         onPress={() => {
-                          const q = parseFloat(drinkQuantity || '1') + 0.5;
+                          const q = drinkQuantityValue + 0.5;
                           setDrinkQuantity(String(q));
-                          const hydrationValue = ((selectedDrink.hydration_percent || 100) / 100) * 0.25 * q;
+                          const hydrationValue = getDrinkHydrationLiters(selectedDrink, q);
                           setWaterInput(hydrationValue.toFixed(2));
                         }}
                       >
@@ -1721,6 +1370,7 @@ export default function DetailsDay () {
                       onPress={() => {
                         setWaterInput(option.amount.toString());
                         setSelectedDrink(null);
+                        setDrinkQuantity('1');
                       }}
                       activeOpacity={0.7}
                     >
@@ -1761,7 +1411,7 @@ export default function DetailsDay () {
                     />
                     <Text style={styles.waterUnit}>Liters</Text>
                     <Text style={styles.waterGlasses}>
-                      ≈ {Math.round((parseFloat(waterInput || '0') / 0.25) * 10) / 10} glasses
+                      ≈ {Math.round((waterInputValue / 0.25) * 10) / 10} glasses
                     </Text>
                   </View>
                   
@@ -1782,7 +1432,7 @@ export default function DetailsDay () {
                 <View style={styles.hydProgressHeader}>
                   <Text style={styles.progressTitle}>Today's Progress</Text>
                   <Text style={styles.progressPercent}>
-                    {calculatePercentage(dayData.achieviedHydration + parseFloat(waterInput || '0'), dayData.targetHydration)}%
+                    {calculatePercentage(projectedHydration, targetHydrationValue)}%
                   </Text>
                 </View>
                 <View style={styles.progressBarBg}>
@@ -1790,7 +1440,7 @@ export default function DetailsDay () {
                     style={[
                       styles.progressBarFg,
                       {
-                        width: `${Math.min(((dayData.achieviedHydration + parseFloat(waterInput || '0')) / dayData.targetHydration) * 100, 100)}%`,
+                        width: `${targetHydrationValue > 0 ? Math.min((projectedHydration / targetHydrationValue) * 100, 100) : 0}%`,
                         backgroundColor: '#2E86AB'
                       }
                     ]}
@@ -1798,7 +1448,7 @@ export default function DetailsDay () {
                 </View>
                 <View style={styles.progressStats}>
                   <Text style={styles.progressCurrent}>
-                    {(dayData.achieviedHydration + parseFloat(waterInput || '0')).toFixed(2)}L of {dayData.targetHydration}L
+                    {projectedHydration.toFixed(2)}L of {dayData.targetHydration}L
                   </Text>
                 </View>
               </View>
@@ -1818,7 +1468,7 @@ export default function DetailsDay () {
                     {selectedFoodItem.serving_size || '100g'}
                   </Text>
                   <Text style={styles.selectedFoodCalories}>
-                    {Math.round((selectedFoodItem.calories_kcal || selectedFoodItem.calories || 0) * parseFloat(mealQuantity || '1'))} calories
+                    {Math.round((selectedFoodItem.calories_kcal || selectedFoodItem.calories || 0) * mealQuantityValue)} calories
                   </Text>
                 </View>
                 <TouchableOpacity onPress={() => setSelectedFoodItem(null)}>
@@ -1832,19 +1482,19 @@ export default function DetailsDay () {
                   {selectedFoodItem.protein_g && (
                     <View style={styles.nutritionItem}>
                       <Text style={styles.nutritionLabel}>Protein</Text>
-                      <Text style={styles.nutritionValue}>{Math.round((selectedFoodItem.protein_g || 0) * parseFloat(mealQuantity || '1'))}g</Text>
+                      <Text style={styles.nutritionValue}>{Math.round((selectedFoodItem.protein_g || 0) * mealQuantityValue)}g</Text>
                     </View>
                   )}
                   {(selectedFoodItem.carbs_g || selectedFoodItem.carbohydrates_g) && (
                     <View style={styles.nutritionItem}>
                       <Text style={styles.nutritionLabel}>Carbs</Text>
-                      <Text style={styles.nutritionValue}>{Math.round((selectedFoodItem.carbs_g || selectedFoodItem.carbohydrates_g || 0) * parseFloat(mealQuantity || '1'))}g</Text>
+                      <Text style={styles.nutritionValue}>{Math.round((selectedFoodItem.carbs_g || selectedFoodItem.carbohydrates_g || 0) * mealQuantityValue)}g</Text>
                     </View>
                   )}
                   {selectedFoodItem.fat_g && (
                     <View style={styles.nutritionItem}>
                       <Text style={styles.nutritionLabel}>Fat</Text>
-                      <Text style={styles.nutritionValue}>{Math.round((selectedFoodItem.fat_g || 0) * parseFloat(mealQuantity || '1'))}g</Text>
+                      <Text style={styles.nutritionValue}>{Math.round((selectedFoodItem.fat_g || 0) * mealQuantityValue)}g</Text>
                     </View>
                   )}
                 </View>
@@ -1857,7 +1507,7 @@ export default function DetailsDay () {
                   <TouchableOpacity 
                     style={styles.quantityBtn}
                     onPress={() => {
-                      const q = Math.max(0.5, parseFloat(mealQuantity || '1') - 0.5);
+                      const q = Math.max(0.5, mealQuantityValue - 0.5);
                       setMealQuantity(String(q));
                       const calories = selectedFoodItem.calories_kcal || selectedFoodItem.calories || 0;
                       setCalorieInput(String(Math.round(calories * q)));
@@ -1880,7 +1530,7 @@ export default function DetailsDay () {
                   <TouchableOpacity 
                     style={styles.quantityBtn}
                     onPress={() => {
-                      const q = parseFloat(mealQuantity || '1') + 0.5;
+                      const q = mealQuantityValue + 0.5;
                       setMealQuantity(String(q));
                       const calories = selectedFoodItem.calories_kcal || selectedFoodItem.calories || 0;
                       setCalorieInput(String(Math.round(calories * q)));
@@ -1911,15 +1561,15 @@ export default function DetailsDay () {
               {calorieInput && (
                 <View style={styles.calorieInfo}>
                   <Text style={styles.calorieInfoText}>
-                    Remaining: {dayData.targetCalories - parseInt(calorieInput)} / {dayData.targetCalories} cals
+                    Remaining: {targetCaloriesValue - calorieInputValue} / {dayData.targetCalories} cals
                   </Text>
                   <View style={styles.calorieBar}>
                     <View 
                       style={[
                         styles.calorieBarFill,
                         {
-                          width: `${Math.min((parseInt(calorieInput) / dayData.targetCalories) * 100, 100)}%`,
-                          backgroundColor: parseInt(calorieInput) > dayData.targetCalories ? '#F97316' : '#2E86AB'
+                          width: `${targetCaloriesValue > 0 ? Math.min((calorieInputValue / targetCaloriesValue) * 100, 100) : 0}%`,
+                          backgroundColor: calorieInputValue > targetCaloriesValue ? '#F97316' : '#2E86AB'
                         }
                       ]}
                     />
@@ -1948,20 +1598,6 @@ export default function DetailsDay () {
             />
           </View>
 
-          {inputMethod === 'audio' && (
-            <View style={styles.audioSection}>
-              <Ionicons name="lock-closed" size={Math.min(hp(5), wp(12))} color="#CCCCCC" />
-              <Text style={styles.audioInstructions}>Voice input coming soon</Text>
-              <Text style={styles.comingSoonMessage}>We're working on voice recognition for meal logging</Text>
-            </View>
-          )}
-          {inputMethod === 'photo' && (
-            <View style={styles.audioSection}>
-              <Ionicons name="lock-closed" size={Math.min(hp(5), wp(12))} color="#CCCCCC" />
-              <Text style={styles.audioInstructions}>Photo input coming soon</Text>
-              <Text style={styles.comingSoonMessage}>We're working on AI food recognition</Text>
-            </View>
-          )}
         </View>
 
         <View style={styles.menuButtons}>
@@ -1969,185 +1605,17 @@ export default function DetailsDay () {
             <Text style={styles.backMenuText}>Back</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.submitMenuButton, (((!calorieInput.trim() && parseFloat(waterInput || '0') <= 0)) || isLoading) && {opacity: 0.5}]}
-            disabled={(((!calorieInput.trim() && parseFloat(waterInput || '0') <= 0)) || isLoading)}
-            onPress={async () => {
-              setIsLoading(true);
-              try {
-                const dayLogId = (dayData as any)._id || (props as any)._id;
-
-                console.log('🔍 [DetailsDay] Saving meal - dayLogId:', dayLogId);
-                console.log('🔍 [DetailsDay] dayData._id:', (dayData as any)._id);
-                console.log('🔍 [DetailsDay] props._id:', (props as any)._id);
-                console.log('🔍 [DetailsDay] Full props:', JSON.stringify(props, null, 2));
-
-                if (!dayLogId) {
-                  Alert.alert('Error', 'Unable to find day log. Please refresh and try again.');
-                  console.error('❌ [DetailsDay] No dayLogId found!');
-                  return;
-                }
-
-                let hasMeal = false;
-                let hasWater = false;
-                let successMessages = [];
-                let updatedDayData: any = { ...dayData };
-                let loggedCalories = 0;
-                let loggedWaterLiters = 0;
-
-                // Log meal if calories are entered
-                if (calorieInput.trim()) {
-                  const calories = parseInt(calorieInput);
-                  const foodName = selectedFoodItem?.food_name || selectedFoodItem?.name || 'Custom Meal';
-                  const servingSize = selectedFoodItem?.serving_size || 'portion';
-                  const quantity = parseFloat(mealQuantity || '1');
-                  
-                  // Calculate nutrition values multiplied by quantity
-                  const baseProtein = selectedFoodItem?.protein_g || 0;
-                  const baseCarbs = selectedFoodItem?.carbs_g || selectedFoodItem?.carbohydrates_g || 0;
-                  const baseFats = selectedFoodItem?.fat_g || 0;
-                  
-                  const protein = Math.round(baseProtein * quantity);
-                  const carbs = Math.round(baseCarbs * quantity);
-                  const fats = Math.round(baseFats * quantity);
-
-                  const mealResponse = await dailyLogsApi.addMeal(
-                    dayLogId,
-                    foodName,
-                    quantity,
-                    servingSize,
-                    calories,
-                    protein,
-                    carbs,
-                    fats,
-                    descriptionInput
-                  );
-
-                  if (mealResponse) {
-                    hasMeal = true;
-                    loggedCalories = calories;
-                    successMessages.push(`${calories} calories logged`);
-                    
-                    updatedDayData = {
-                      ...updatedDayData,
-                      achievedCalories: (updatedDayData.achievedCalories || 0) + calories,
-                      meals: updatedDayData.meals ? [...updatedDayData.meals, mealResponse] : [mealResponse],
-                    };
-                  }
-                }
-
-                // Log water if amount is entered
-                const waterAmount = parseFloat(waterInput || '0');
-                if (waterAmount > 0) {
-                  const waterResponse = await dailyLogsApi.addWater(dayLogId, waterAmount);
-
-                  if (waterResponse) {
-                    hasWater = true;
-                    loggedWaterLiters = waterAmount;
-                    successMessages.push(`${waterAmount}L of water logged`);
-                    
-                    // Update with full response data to ensure accuracy
-                    updatedDayData = {
-                      ...updatedDayData,
-                      achieviedHydration: waterResponse.achieviedHydration || (updatedDayData.achieviedHydration || 0) + waterAmount,
-                      waterIntake: waterResponse.waterIntake || updatedDayData.waterIntake,
-                    };
-                  }
-                }
-
-                // Show combined success message
-                if (hasMeal || hasWater) {
-                  // Update local cache so charts/dashboard use the latest adaptive targets.
-                  updatedDayData = await syncUpdatedDayToLocalCache(updatedDayData);
-                  setDayData(updatedDayData);
-                  await recordEarlyLogLocally({
-                    dayLogId,
-                    type: hasMeal && hasWater ? 'mixed' : hasMeal ? 'meal' : 'hydration',
-                  });
-                  
-                  // Reset forms immediately
-                  setFoodSearch('');
-                  setSelectedFoodItem(null);
-                  setCalorieInput('');
-                  setMealQuantity('1');
-                  setDescriptionInput('');
-                  setWaterInput('0');
-
-                  try {
-                    await recordNutritionProfileEntry({
-                      dayLogId,
-                      dayNo: updatedDayData.dayNo,
-                      dayDate: updatedDayData.date,
-                      timestamp: new Date().toISOString(),
-                      calories: loggedCalories,
-                      waterLiters: loggedWaterLiters,
-                      targetCalories: updatedDayData.targetCalories,
-                      achievedCaloriesAfter: updatedDayData.achievedCalories,
-                      targetHydration: updatedDayData.targetHydration,
-                      achievedHydrationAfter: updatedDayData.achieviedHydration,
-                    });
-
-                    await scheduleAdaptiveNutritionNotifications({
-                      summary: {
-                        dayLogId,
-                        dayNo: updatedDayData.dayNo,
-                        date: updatedDayData.date,
-                        achievedCalories: updatedDayData.achievedCalories,
-                        targetCalories: updatedDayData.targetCalories,
-                        achievedHydration: updatedDayData.achieviedHydration,
-                        targetHydration: updatedDayData.targetHydration,
-                      },
-                      schedule: scheduleFitFaatNotification,
-                      cancel: cancelScheduledNotification,
-                    });
-                  } catch (profileError) {
-                    console.error('Error updating adaptive nutrition notifications:', profileError);
-                  }
-
-                  await sendFitFaatNotification(
-                    hasMeal ? 'meal' : 'health',
-                    hasMeal && hasWater ? 'Food and Water Saved' : hasMeal ? 'Food Saved' : 'Water Saved',
-                    successMessages.join('\n')
-                  );
-                  
-                  // Use setTimeout to ensure state updates are processed
-                  setTimeout(() => {
-                    closeMenu();
-                    
-                    Alert.alert(
-                      'Success! ✅',
-                      successMessages.join('\n')
-                    );
-                  }, 100);
-                } else {
-                  Alert.alert('Error', 'Please enter at least meal calories or water amount');
-                }
-              } catch (error: any) {
-                console.error('Error logging:', error);
-                
-                // Handle expired cycle error
-                if (error.message?.includes('old/completed cycle') || error.message?.includes('CYCLE_EXPIRED')) {
-                  Alert.alert(
-                    'Cycle Expired',
-                    'Your data is outdated. A new weekly cycle has been created. Please go back to refresh.',
-                    [
-                      {
-                        text: 'Go Back',
-                        onPress: () => {
-                          // Clear local storage to force refresh
-                          AsyncStorage.removeItem('JsonResponse').then(() => {
-                            router.back();
-                          });
-                        }
-                      }
-                    ]
-                  );
-                } else {
-                  Alert.alert('Error', 'Failed to log entry. Please check your connection.');
-                }
-              } finally {
-                setIsLoading(false);
-              }
-            }}
+            style={[styles.submitMenuButton, ((!canSubmitNutritionEntry) || isLoading) && {opacity: 0.5}]}
+            disabled={((!canSubmitNutritionEntry) || isLoading)}
+            onPress={() => handleSubmitNutritionEntry({
+              calorieInput,
+              waterInput,
+              selectedFoodItem,
+              selectedDrink,
+              drinkQuantity,
+              mealQuantity,
+              descriptionInput,
+            })}
           >
             <Text style={styles.submitMenuText}>Save Entry</Text>
             <Ionicons name="checkmark" size={Math.min(hp(2.2), wp(5))} color="white" />
@@ -2300,11 +1768,10 @@ export default function DetailsDay () {
           <View style={{ width: 24 }} />
         </View>
 
-        <KeyboardAwareScrollView
+        <KeyboardAwareModalContent
           style={styles.customRecipeModalContent}
           contentContainerStyle={styles.customRecipeModalScrollContent}
           showsVerticalScrollIndicator={false}
-          enableOnAndroid={true}
           extraScrollHeight={Math.max(insets.bottom, hp(3))}
         >
           {/* Recipe Name */}
@@ -2633,6 +2100,10 @@ export default function DetailsDay () {
                   }
 
                   const calories = parseFloat(customRecipeCalories);
+                  if (!Number.isFinite(calories) || calories <= 0) {
+                    Alert.alert('Error', 'Please enter a valid calorie amount');
+                    return;
+                  }
 
                   // Save recipe to backend
                   const savedRecipe = await customRecipesApi.createRecipe({
@@ -2689,7 +2160,7 @@ export default function DetailsDay () {
               <Text style={styles.customRecipeAddButtonText}>Use This Recipe</Text>
             </TouchableOpacity>
           </View>
-        </KeyboardAwareScrollView>
+        </KeyboardAwareModalContent>
       </View>
     </Modal>
   </View>
@@ -2864,6 +2335,11 @@ const getStyles = (colors: any, bottomInset = 0) => StyleSheet.create({
         alignItems: 'center',
         flex: 1,
     },
+    goalRangeValue: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: Math.min(hp(5.1), wp(11.5)),
+    },
     goalDivider: {
         width: 1.5,
         height: hp(4),
@@ -2878,6 +2354,11 @@ const getStyles = (colors: any, bottomInset = 0) => StyleSheet.create({
         marginBottom: hp(0.2),
         textTransform: 'uppercase',
         letterSpacing: 0.4,
+    },
+    statLabelRange: {
+        flexShrink: 1,
+        lineHeight: Math.min(hp(1.45), wp(3.25)),
+        textAlign: 'left',
     },
     statValue: {
         fontSize: Math.min(hp(2.4), wp(5.5)),
@@ -4560,64 +4041,86 @@ const getStyles = (colors: any, bottomInset = 0) => StyleSheet.create({
     // Tracking Mode Selector Styles
     trackingModeSection: {
         backgroundColor: colors.cardBg,
-        borderRadius: 16,
-        padding: wp(5),
+        borderRadius: 22,
+        padding: wp(4),
         marginBottom: hp(2.5),
-        shadowColor: colors.primary,
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.15,
-        shadowRadius: 10,
-        elevation: 4,
-        borderWidth: 2,
-        borderColor: '#000000',
+        borderWidth: 0,
+    },
+    trackingModeHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(2.4),
+        marginBottom: hp(1.4),
+    },
+    trackingModeIconBadge: {
+        width: Math.min(hp(3.8), wp(8.6)),
+        height: Math.min(hp(3.8), wp(8.6)),
+        borderRadius: Math.min(hp(1.9), wp(4.3)),
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.primary + '12',
+        borderWidth: 1,
+        borderColor: colors.primary + '18',
     },
     trackingModeTitle: {
-        fontSize: Math.min(hp(1.5), wp(3.5)),
-        fontWeight: '600',
+        flex: 1,
+        fontSize: Math.min(hp(1.65), wp(3.9)),
+        fontWeight: '700',
         color: colors.textPrimary,
-        marginBottom: hp(1.5),
-        letterSpacing: 0.3,
+        letterSpacing: 0,
     },
     modeToggleContainer: {
         flexDirection: 'row',
-        backgroundColor: colors.gray + '05',
-        borderRadius: 10,
-        padding: wp(2),
-        gap: wp(1),
+        backgroundColor: colors.primary + '08',
+        borderRadius: 18,
+        padding: wp(1.2),
+        gap: wp(1.4),
         alignItems: 'center',
+        borderWidth: 1,
+        borderColor: colors.primary + '12',
     },
     modeButton: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: hp(1.2),
-        paddingHorizontal: wp(3),
-        borderRadius: 8,
+        minHeight: hp(6.2),
+        paddingVertical: hp(1),
+        paddingHorizontal: wp(2),
+        borderRadius: 15,
         backgroundColor: 'transparent',
-        gap: wp(1.5),
+        gap: wp(2),
     },
     modeButtonActive: {
         backgroundColor: colors.primary,
         shadowColor: colors.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 5,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.22,
+        shadowRadius: 10,
+        elevation: 4,
+    },
+    modeIconBadge: {
+        width: Math.min(hp(3.6), wp(8.2)),
+        height: Math.min(hp(3.6), wp(8.2)),
+        borderRadius: Math.min(hp(1.8), wp(4.1)),
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.cardBg,
+        borderWidth: 1,
+        borderColor: colors.gray + '22',
+    },
+    modeIconBadgeActive: {
+        backgroundColor: '#FFFFFF',
+        borderColor: '#FFFFFF',
     },
     modeButtonText: {
-        fontSize: Math.min(hp(1.4), wp(3.2)),
-        fontWeight: '600',
+        fontSize: Math.min(hp(1.55), wp(3.6)),
+        fontWeight: '700',
         color: colors.textSecondary,
     },
     modeButtonTextActive: {
         color: '#FFFFFF',
         fontWeight: '700',
-    },
-    modeButtonDivider: {
-        width: 1,
-        height: hp(2),
-        backgroundColor: colors.gray + '30',
     },
     // Calorie Progress Styles
     calProgressSection: {
@@ -4985,6 +4488,162 @@ const getStyles = (colors: any, bottomInset = 0) => StyleSheet.create({
     calProgressTarget: {
         fontSize: Math.min(hp(1), wp(2.5)),
         color: colors.textSecondary,
+    },
+    mealTemplateSection: {
+        backgroundColor: colors.cardBackground,
+        borderRadius: wp(4),
+        padding: wp(4),
+        marginBottom: hp(2),
+        borderWidth: 1,
+        borderColor: colors.cardBorder || colors.gray + '20',
+    },
+    templateSubtitle: {
+        marginTop: hp(0.2),
+        color: colors.textSecondary,
+        fontSize: Math.min(hp(1.18), wp(2.8)),
+        fontWeight: '700',
+    },
+    saveTemplateButton: {
+        minHeight: hp(3.8),
+        borderRadius: hp(1.9),
+        paddingHorizontal: wp(3),
+        backgroundColor: colors.primary,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: wp(1),
+    },
+    saveTemplateButtonDisabled: {
+        backgroundColor: colors.gray + '70',
+    },
+    saveTemplateText: {
+        color: '#FFFFFF',
+        fontSize: Math.min(hp(1.22), wp(2.9)),
+        fontWeight: '900',
+    },
+    repeatYesterdayButton: {
+        minHeight: hp(7),
+        borderRadius: hp(1.6),
+        borderWidth: 1,
+        borderColor: colors.primary + '25',
+        backgroundColor: colors.primary + '10',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(2.5),
+        paddingHorizontal: wp(3),
+        paddingVertical: hp(1),
+        marginTop: hp(1.3),
+    },
+    repeatYesterdayIcon: {
+        width: Math.min(hp(4.8), wp(10.5)),
+        height: Math.min(hp(4.8), wp(10.5)),
+        borderRadius: Math.min(hp(2.4), wp(5.25)),
+        backgroundColor: colors.cardBackground,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    repeatYesterdayCopy: {
+        flex: 1,
+        minWidth: 0,
+    },
+    repeatYesterdayTitle: {
+        color: colors.textPrimary,
+        fontSize: Math.min(hp(1.55), wp(3.6)),
+        fontWeight: '900',
+    },
+    repeatYesterdaySubtitle: {
+        marginTop: hp(0.25),
+        color: colors.textSecondary,
+        fontSize: Math.min(hp(1.12), wp(2.65)),
+        fontWeight: '700',
+    },
+    mealTemplateList: {
+        paddingTop: hp(1.4),
+        gap: wp(2.5),
+        paddingRight: wp(2),
+    },
+    mealTemplateCard: {
+        width: wp(34),
+        minHeight: hp(15),
+        borderRadius: hp(1.6),
+        borderWidth: 1,
+        borderColor: colors.cardBorder || colors.gray + '20',
+        backgroundColor: colors.surface || colors.screenColor,
+        padding: wp(2.4),
+        position: 'relative',
+    },
+    templateRemoveButton: {
+        position: 'absolute',
+        top: hp(0.7),
+        right: wp(1.7),
+        zIndex: 2,
+        width: hp(2.5),
+        height: hp(2.5),
+        borderRadius: hp(1.25),
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.cardBackground,
+        borderWidth: 1,
+        borderColor: colors.cardBorder || colors.gray + '20',
+    },
+    mealTemplateBody: {
+        flex: 1,
+        paddingTop: hp(0.4),
+    },
+    mealTemplateIcon: {
+        width: Math.min(hp(4), wp(8.8)),
+        height: Math.min(hp(4), wp(8.8)),
+        borderRadius: Math.min(hp(2), wp(4.4)),
+        backgroundColor: colors.primary + '16',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: hp(0.8),
+    },
+    mealTemplateName: {
+        color: colors.textPrimary,
+        fontSize: Math.min(hp(1.35), wp(3.2)),
+        fontWeight: '900',
+        lineHeight: hp(1.85),
+        paddingRight: wp(3),
+    },
+    mealTemplateMeta: {
+        marginTop: hp(0.35),
+        color: colors.textSecondary,
+        fontSize: Math.min(hp(1.08), wp(2.55)),
+        fontWeight: '800',
+    },
+    templateAddButton: {
+        minHeight: hp(3.4),
+        borderRadius: hp(1.7),
+        backgroundColor: colors.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: hp(1),
+    },
+    templateAddText: {
+        color: '#FFFFFF',
+        fontSize: Math.min(hp(1.18), wp(2.8)),
+        fontWeight: '900',
+    },
+    emptyTemplateCard: {
+        minHeight: hp(7),
+        borderRadius: hp(1.4),
+        borderWidth: 1,
+        borderStyle: 'dashed',
+        borderColor: colors.cardBorder || colors.gray + '30',
+        backgroundColor: colors.surface || colors.screenColor,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(2),
+        paddingHorizontal: wp(3),
+        marginTop: hp(1.3),
+    },
+    emptyTemplateText: {
+        flex: 1,
+        color: colors.textSecondary,
+        fontSize: Math.min(hp(1.2), wp(2.85)),
+        fontWeight: '700',
+        lineHeight: hp(1.8),
     },
     
     // Beautiful Completion Modal Styles

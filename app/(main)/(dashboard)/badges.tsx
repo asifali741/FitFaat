@@ -6,8 +6,8 @@ import {
 } from '@/constants/achievementBadges';
 import { useTheme } from '@/contexts/ThemeContext';
 import { loadAchievementLocalStats } from '@/utils/achievementStorage';
+import { getStoredDashboardCache } from '@/utils/dashboardStorage';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -32,9 +32,8 @@ export default function BadgesScreen() {
     let mounted = true;
 
     const loadBadges = async () => {
-      const localJson = await AsyncStorage.getItem('JsonResponse');
-      const parsed = localJson ? JSON.parse(localJson) : null;
-      const progressData = (parsed?.data || null) as Record<string, AchievementDay> | null;
+      const cachedDashboard = await getStoredDashboardCache<Record<string, AchievementDay>>();
+      const progressData = cachedDashboard?.data || null;
       const localStats = await loadAchievementLocalStats();
       const calculatedBadges = calculateAchievementBadges(progressData, localStats);
 

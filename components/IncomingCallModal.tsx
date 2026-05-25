@@ -49,7 +49,7 @@ export default function IncomingCallModal({
         ])
       ).start();
     }
-  }, [visible]);
+  }, [pulseAnim, visible]);
 
   return (
     <Modal

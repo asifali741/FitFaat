@@ -1,5 +1,11 @@
 // Utility to call the Gemini model hosted on openrouter.ai
 import * as SecureStore from 'expo-secure-store';
+import {
+  ApiRequestError,
+  cachedRequestJson,
+  fetchWithTimeout,
+  requestJson,
+} from './apiHelper';
 import { getConfigValue, getBackendUrl } from './config';
 
 // Get config values via centralized helper (works in Expo Go AND standalone APKs)
@@ -13,9 +19,85 @@ const getBackendApiUrl = (): string => {
   return getBackendUrl();
 };
 
-const buildDirectChatbotResponse = async (message: string) => {
+export type ChatbotCoachContext = {
+  goalLabel?: string;
+  plan?: "free" | "premium";
+  score?: number;
+  scoreLabel?: string;
+  scoreConfidence?: string;
+  streakCount?: number;
+  recentLogs?: string[];
+  calories?: {
+    achieved: number;
+    target: number;
+    progress: number;
+  };
+  hydration?: {
+    achieved: number;
+    target: number;
+    progress: number;
+  };
+  steps?: {
+    achieved: number;
+    target: number;
+    progress: number;
+    source: "pedometer" | "local history" | "manual log";
+  };
+  nextBestAction?: string;
+};
+
+const buildCoachContextPrompt = (context?: ChatbotCoachContext) => {
+  if (!context) {
+    return [
+      "HeaLora response rules:",
+      "Use concise, practical coaching.",
+      "Give today's next best action when the user asks for guidance.",
+      "Avoid generic health advice and avoid long lists.",
+      "Use a gentle medical disclaimer only for symptoms, medications, diagnoses, injuries, or urgent concerns.",
+    ].join("\n");
+  }
+
+  const contextLines = [
+    `Goal: ${context.goalLabel || "unknown"}`,
+    `Plan: ${context.plan || "free"}`,
+    `Score: ${context.score ?? "unknown"} (${context.scoreLabel || "health score"}, ${context.scoreConfidence || "signal unknown"})`,
+    `Streak: ${context.streakCount ?? 0} day(s)`,
+    context.calories
+      ? `Calories: ${context.calories.achieved}/${context.calories.target} (${context.calories.progress}%) from manual logs`
+      : "Calories: not logged",
+    context.hydration
+      ? `Hydration: ${context.hydration.achieved}/${context.hydration.target}L (${context.hydration.progress}%) from manual logs`
+      : "Hydration: not logged",
+    context.steps
+      ? `Steps: ${context.steps.achieved}/${context.steps.target} (${context.steps.progress}%) from ${context.steps.source}`
+      : "Steps: not available",
+    context.nextBestAction ? `Today's next best action: ${context.nextBestAction}` : null,
+    context.recentLogs?.length ? `Recent logs: ${context.recentLogs.join("; ")}` : null,
+  ].filter(Boolean);
+
+  return [
+    "HeaLora response rules:",
+    "Use the FitFaat context below when it helps.",
+    "Keep replies short: 2 to 4 sentences or 3 bullets maximum.",
+    "Make suggestions specific, immediate, and doable today.",
+    "Avoid generic health advice. Do not invent data that is not in context.",
+    "Give today's next best action when relevant.",
+    "Use a gentle medical disclaimer only for symptoms, medications, diagnoses, injuries, or urgent concerns.",
+    "",
+    "FitFaat context:",
+    ...contextLines,
+  ].join("\n");
+};
+
+const buildDirectChatbotResponse = async (
+  message: string,
+  coachContext?: ChatbotCoachContext
+) => {
   const userTimestamp = new Date().toISOString();
-  const content = await callGemini(message);
+  const content = await callGemini(message, {
+    contextPrompt: buildCoachContextPrompt(coachContext),
+    temperature: 0.45,
+  });
 
   return {
     userMessage: {
@@ -139,12 +221,13 @@ async function makeAPICall(
   url: string,
   options: RequestInit,
   retries = 5,
-  baseDelay = 1000
+  baseDelay = 1000,
+  timeoutMs = 18000
 ): Promise<Response> {
   let lastError: unknown = null;
   for (let i = 0; i < retries; i++) {
     try {
-      const response = await fetch(url, options);
+      const response = await fetchWithTimeout(url, options, timeoutMs);
       if (response.status === 429) {
         // Prefer server-supplied Retry-After header
         const ra = response.headers.get('Retry-After') || response.headers.get('retry-after');
@@ -185,7 +268,17 @@ async function makeAPICall(
 
 export async function callGemini(
   prompt: string,
-  options?: { apiKey?: string; model?: string; temperature?: number; baseUrl?: string; retries?: number; baseDelay?: number }
+  options?: {
+    apiKey?: string;
+    model?: string;
+    temperature?: number;
+    baseUrl?: string;
+    retries?: number;
+    baseDelay?: number;
+    timeoutMs?: number;
+    contextPrompt?: string;
+    systemPrompt?: string;
+  }
 ): Promise<string> {
   if (isGreetingQuery(prompt)) {
     // For greetings, let the AI generate a dynamic, friendly response
@@ -201,8 +294,9 @@ export async function callGemini(
     const messages = [
       {
         role: 'system',
-        content: "You are HeaLora, an AI-powered health companion. Respond to greetings, thanks, and help requests in a warm, friendly, and helpful way. Keep your answers concise and on-brand."
+        content: options?.systemPrompt || "You are HeaLora, an AI-powered health companion. Respond warmly, keep answers concise, and use FitFaat context when available."
       },
+      ...(options?.contextPrompt ? [{ role: 'system', content: options.contextPrompt }] : []),
       { role: 'user', content: prompt }
     ];
     const body = {
@@ -219,7 +313,7 @@ export async function callGemini(
         'X-Title': 'Bot App',
       },
       body: JSON.stringify(body),
-    }, options?.retries ?? 5, options?.baseDelay ?? 1000);
+    }, options?.retries ?? 5, options?.baseDelay ?? 1000, options?.timeoutMs ?? 18000);
     if (!res.ok) {
       // Try to parse JSON error to detect common OpenRouter 404 policy issue
       const text = await res.text();
@@ -261,8 +355,9 @@ export async function callGemini(
   const messages = [
     {
       role: 'system',
-      content: 'You are HeaLora, an AI health assistant. Provide accurate, helpful information about health, wellness, and medical topics. Always include a disclaimer that users should consult healthcare professionals for medical advice. Keep responses focused on general health information and wellness guidance.'
+      content: options?.systemPrompt || 'You are HeaLora, a FitFaat health coach. Use the user context when available, keep suggestions short and actionable, avoid generic wellness advice, and give today\'s next best action. Add a gentle consult-a-professional disclaimer only for symptoms, medication, diagnosis, injury, or urgent medical concerns.'
     },
+    ...(options?.contextPrompt ? [{ role: 'system', content: options.contextPrompt }] : []),
     { role: 'user', content: prompt }
   ];
   const body = {
@@ -279,7 +374,7 @@ export async function callGemini(
       'X-Title': 'Bot App',
     },
     body: JSON.stringify(body),
-  }, options?.retries ?? 5, options?.baseDelay ?? 1000);
+  }, options?.retries ?? 5, options?.baseDelay ?? 1000, options?.timeoutMs ?? 18000);
   const response = res; // alias for clearer error handling
   if (!response.ok) {
     const text = await response.text();
@@ -312,7 +407,8 @@ export async function callGemini(
  */
 export async function sendChatbotMessage(
   message: string,
-  sessionId?: string
+  sessionId?: string,
+  coachContext?: ChatbotCoachContext
 ): Promise<{
   userMessage: {
     role: 'user';
@@ -332,48 +428,36 @@ export async function sendChatbotMessage(
     const token = await SecureStore.getItemAsync('fitfaat_auth_token');
     if (!token) {
       console.log('No backend auth token found; using direct AI chatbot fallback.');
-      return buildDirectChatbotResponse(message.trim());
+      return buildDirectChatbotResponse(message.trim(), coachContext);
     }
 
     const apiUrl = getBackendApiUrl();
     const endpoint = `${apiUrl}/chatbot/message`;
 
-    console.log('🤖 Sending message to chatbot:', { message, sessionId, endpoint });
+    console.log('Sending message to chatbot:', { message, sessionId, endpoint });
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
+    const data = await requestJson<any>(
+      endpoint,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          message: message.trim(),
+          ...(sessionId && { sessionId }),
+          ...(coachContext && {
+            context: coachContext,
+            coachContext,
+            promptHints: buildCoachContextPrompt(coachContext),
+          }),
+        }),
       },
-      body: JSON.stringify({
-        message: message.trim(),
-        ...(sessionId && { sessionId }),
-      }),
-    });
+      { timeoutMs: 15000, retries: 0 }
+    );
 
-    const responseText = await response.text();
-    console.log('📥 Backend response status:', response.status);
-
-    if (!response.ok) {
-      let errorMessage = 'Failed to get chatbot response';
-      
-      try {
-        const errorData = JSON.parse(responseText);
-        errorMessage = errorData.message || errorMessage;
-      } catch (e) {
-        errorMessage = responseText || errorMessage;
-      }
-
-      if (response.status === 401) {
-        throw new Error('Session expired. Please log in again.');
-      }
-      
-      throw new Error(errorMessage);
-    }
-
-    const data = JSON.parse(responseText);
-    console.log('✅ Chatbot response received:', {
+    console.log('Chatbot response received:', {
       success: data.success,
       hasData: !!data.data,
       source: data.data?.aiResponse?.source,
@@ -384,6 +468,10 @@ export async function sendChatbotMessage(
     return data.data;
   } catch (error) {
     console.warn('Chatbot API error:', error);
+
+    if (error instanceof ApiRequestError && error.status === 401) {
+      throw new Error('Session expired. Please log in again.');
+    }
     
     if (error instanceof Error) {
       throw error;
@@ -419,18 +507,26 @@ export async function getChatHistory(
     
     const endpoint = `${apiUrl}/chatbot/history?${params}`;
 
-    const response = await fetch(endpoint, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
+    const data = await cachedRequestJson<any>(
+      `chat-history:${sessionId || 'default'}:${limit}`,
+      endpoint,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
       },
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch chat history');
-    }
-
-    const data = await response.json();
+      {
+        timeoutMs: 7000,
+        retries: 1,
+        retryDelayMs: 500,
+        cacheTtlMs: 2 * 60 * 1000,
+        maxStaleMs: 24 * 60 * 60 * 1000,
+        allowStaleOnError: true,
+        maxWaitForFreshMs: 2500,
+        refreshCacheInBackground: true,
+      }
+    );
     return data.messages || [];
   } catch (error) {
     console.warn('Failed to fetch chat history:', error);

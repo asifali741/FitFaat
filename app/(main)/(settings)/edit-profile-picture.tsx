@@ -10,6 +10,7 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  type AlertButton,
   Image,
   Platform,
   ScrollView,
@@ -21,6 +22,14 @@ import {
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getBackendBaseUrl } from '@/utils/config';
+import {
+  getGmailProfileImageUrl,
+  getProfileImageUserKey,
+  readCachedProfileImage,
+  resolveBackendImageUrl,
+  withProfileImageVersion,
+  writeCachedProfileImage,
+} from '@/utils/profileImage';
 import { profileImageEvents } from '@/utils/profileImageEvents';
 
 const ENV = Constants.expoConfig?.extra;
@@ -37,11 +46,12 @@ const API_URL = getAPIURL();
 
 export default function EditProfilePicture() {
   const { colors } = useTheme();
+  const [currentImage, setCurrentImage] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [userName, setUserName] = useState<string>("");
-  const [userEmail, setUserEmail] = useState<string>("");
+  const [hasPendingChange, setHasPendingChange] = useState(false);
+  const [isPendingRemoval, setIsPendingRemoval] = useState(false);
 
   useEffect(() => {
     loadUserData();
@@ -60,11 +70,16 @@ export default function EditProfilePicture() {
 
       const token = await SecureStore.getItemAsync('fitfaat_auth_token');
       const userDataStr = await SecureStore.getItemAsync('fitfaat_user');
+      let userData: any = null;
       
       if (userDataStr) {
-        const userData = JSON.parse(userDataStr);
-        setUserName(userData.userInfo?.name || userData.name || userData.username || "User");
-        setUserEmail(userData.email || "");
+        userData = JSON.parse(userDataStr);
+
+        const cachedProfileImage = await readCachedProfileImage(userData);
+        if (cachedProfileImage?.backendImageUrl) {
+          setCurrentImage(cachedProfileImage.backendImageUrl);
+          setSelectedImage(cachedProfileImage.backendImageUrl);
+        }
       }
 
       if (token) {
@@ -79,33 +94,49 @@ export default function EditProfilePicture() {
 
           const data = await response.json();
           if (data.success && data.data.imageUrl) {
-            const imageUrl = `${API_URL}${data.data.imageUrl}`;
+            const imageUrl = resolveBackendImageUrl(API_URL, data.data.imageUrl);
+            setCurrentImage(imageUrl);
             setSelectedImage(imageUrl);
+            await writeCachedProfileImage(userData, {
+              backendImageUrl: imageUrl,
+              gmailImageUrl: getGmailProfileImageUrl(userData),
+            });
           }
-        } catch (error) {
+        } catch {
           console.log('No profile picture found, using default');
         }
       }
     } catch (error) {
       console.error('Error loading user data:', error);
     } finally {
+      setHasPendingChange(false);
+      setIsPendingRemoval(false);
       setIsLoading(false);
     }
   };
 
-  const requestPermissions = async () => {
+  const requestCameraPermission = async () => {
     const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
-    const mediaLibraryStatus = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
-    if (cameraStatus.status !== 'granted' || mediaLibraryStatus.status !== 'granted') {
-      Alert.alert('Permission Required', 'Please grant camera and gallery permissions to continue');
+    if (cameraStatus.status !== 'granted') {
+      Alert.alert('Permission Required', 'Please grant camera permission to continue');
       return false;
     }
+
+    return true;
+  };
+
+  const requestMediaLibraryPermission = async () => {
+    const mediaLibraryStatus = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (mediaLibraryStatus.status !== 'granted') {
+      Alert.alert('Permission Required', 'Please grant gallery permission to continue');
+      return false;
+    }
+
     return true;
   };
 
   const pickImageFromGallery = async () => {
-    const hasPermission = await requestPermissions();
+    const hasPermission = await requestMediaLibraryPermission();
     if (!hasPermission) return;
 
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -117,11 +148,13 @@ export default function EditProfilePicture() {
 
     if (!result.canceled) {
       setSelectedImage(result.assets[0].uri);
+      setHasPendingChange(true);
+      setIsPendingRemoval(false);
     }
   };
 
   const takePhotoWithCamera = async () => {
-    const hasPermission = await requestPermissions();
+    const hasPermission = await requestCameraPermission();
     if (!hasPermission) return;
 
     const result = await ImagePicker.launchCameraAsync({
@@ -132,59 +165,109 @@ export default function EditProfilePicture() {
 
     if (!result.canceled) {
       setSelectedImage(result.assets[0].uri);
+      setHasPendingChange(true);
+      setIsPendingRemoval(false);
     }
+  };
+
+  const markPhotoForRemoval = () => {
+    setSelectedImage(null);
+    setHasPendingChange(true);
+    setIsPendingRemoval(true);
+  };
+
+  const openPhotoOptions = () => {
+    const options: AlertButton[] = [
+      { text: "Take Photo", onPress: takePhotoWithCamera },
+      { text: "Choose From Gallery", onPress: pickImageFromGallery },
+    ];
+
+    if (currentImage || selectedImage) {
+      options.push({ text: "Remove Photo", onPress: removePhoto });
+    }
+
+    Alert.alert("Change Photo", "Choose how you want to update your profile picture.", [
+      ...options,
+      { text: "Cancel", style: "cancel" },
+    ]);
   };
 
   const removePhoto = () => {
     Alert.alert(
       "Remove Photo",
-      "Are you sure you want to remove your profile picture?",
+      "This will remove your profile picture after you tap Save Profile Picture.",
       [
         { text: "Cancel", style: "cancel" },
         { 
           text: "Remove", 
           style: "destructive",
-          onPress: async () => {
-            try {
-              setSelectedImage(null);
-
-              const token = await SecureStore.getItemAsync('fitfaat_auth_token');
-              
-              if (token) {
-                const response = await fetch(`${API_URL}/api/user/delete-profile-picture`, {
-                  method: 'DELETE',
-                  headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                  },
-                });
-
-                const data = await response.json();
-                if (!data.success) {
-                  console.error('Failed to delete from server:', data.message);
-                }
-              }
-              
-              profileImageEvents.emit();
-              Alert.alert("Success", "Profile picture removed");
-            } catch (error) {
-              console.error('Error removing profile picture:', error);
-              Alert.alert("Error", "Failed to remove profile picture");
-            }
-          }
+          onPress: markPhotoForRemoval,
         }
       ]
     );
   };
 
+  const deleteProfilePicture = async () => {
+    const token = await SecureStore.getItemAsync('fitfaat_auth_token');
+    
+    if (token) {
+      const response = await fetch(`${API_URL}/api/user/delete-profile-picture`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to remove profile picture');
+      }
+    }
+
+    const userDataStr = await SecureStore.getItemAsync('fitfaat_user');
+    const userData = userDataStr ? JSON.parse(userDataStr) : null;
+    const updatedAt = new Date().toISOString();
+    const gmailImageUrl = getGmailProfileImageUrl(userData);
+    await writeCachedProfileImage(userData, {
+      backendImageUrl: null,
+      gmailImageUrl,
+    }, updatedAt);
+    
+    profileImageEvents.emit({
+      backendImageUrl: null,
+      displayImageUrl: gmailImageUrl,
+      gmailImageUrl,
+      removed: true,
+      updatedAt,
+      userKey: getProfileImageUserKey(userData),
+    });
+
+    setCurrentImage(null);
+    setSelectedImage(null);
+    setHasPendingChange(false);
+    setIsPendingRemoval(false);
+  };
+
   const uploadImage = async () => {
-    if (!selectedImage) {
-      Alert.alert("No Image", "Please select an image first");
+    if (!hasPendingChange) {
+      Alert.alert("No Changes", "Choose or remove a photo before saving.");
       return;
     }
 
     setIsUploading(true);
     try {
+      if (isPendingRemoval) {
+        await deleteProfilePicture();
+        Alert.alert("Success", "Profile picture removed");
+        return;
+      }
+
+      if (!selectedImage) {
+        Alert.alert("No Image", "Please select an image first");
+        return;
+      }
+
       const token = await SecureStore.getItemAsync('fitfaat_auth_token');
 
       if (!token) {
@@ -194,7 +277,8 @@ export default function EditProfilePicture() {
 
       const formData = new FormData();
       const uriParts = selectedImage.split('.');
-      const fileType = uriParts[uriParts.length - 1];
+      const rawFileType = uriParts[uriParts.length - 1]?.split(/[?#]/)[0];
+      const fileType = rawFileType && rawFileType.length <= 5 ? rawFileType : 'jpg';
 
       formData.append('profileImage', {
         uri: selectedImage,
@@ -213,14 +297,43 @@ export default function EditProfilePicture() {
       const data = await response.json();
 
       if (data.success) {
-        profileImageEvents.emit();
+        const userDataStr = await SecureStore.getItemAsync('fitfaat_user');
+        const userData = userDataStr ? JSON.parse(userDataStr) : null;
+        const updatedAt = new Date().toISOString();
+        const uploadedImageUrl = resolveBackendImageUrl(
+          API_URL,
+          data?.data?.imageUrl || data?.imageUrl || data?.profileImageUrl || data?.profileImage
+        );
+        const displayImageUrl = withProfileImageVersion(uploadedImageUrl || selectedImage, updatedAt);
+        const immediateDisplayImageUrl = /^(file|content|ph):/i.test(selectedImage)
+          ? selectedImage
+          : displayImageUrl;
+        const gmailImageUrl = getGmailProfileImageUrl(userData);
+
+        if (uploadedImageUrl) {
+          await writeCachedProfileImage(userData, {
+            backendImageUrl: displayImageUrl || uploadedImageUrl,
+            gmailImageUrl,
+          }, updatedAt);
+        }
+
+        if (displayImageUrl) {
+          setCurrentImage(displayImageUrl);
+          setSelectedImage(displayImageUrl);
+        }
+        setHasPendingChange(false);
+        setIsPendingRemoval(false);
+
+        profileImageEvents.emit({
+          backendImageUrl: displayImageUrl || uploadedImageUrl,
+          displayImageUrl: immediateDisplayImageUrl || displayImageUrl || uploadedImageUrl || selectedImage,
+          gmailImageUrl,
+          updatedAt,
+          userKey: getProfileImageUserKey(userData),
+        });
         Alert.alert(
           "Success", 
-          "Profile picture uploaded successfully!",
-          [{
-            text: "OK",
-            onPress: () => loadUserData()
-          }]
+          "Profile picture uploaded successfully!"
         );
       } else {
         Alert.alert("Error", data.message || "Failed to upload profile picture");
@@ -234,6 +347,14 @@ export default function EditProfilePicture() {
   };
 
   const styles = getStyles(colors);
+  const previewStatusText = isPendingRemoval
+    ? "Photo will be removed"
+    : hasPendingChange
+      ? "New photo selected"
+      : selectedImage
+        ? "Current photo"
+        : "No profile photo";
+  const canSaveProfilePicture = hasPendingChange && !isUploading;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -252,122 +373,77 @@ export default function EditProfilePicture() {
             <Text style={styles.loadingText}>Loading...</Text>
           </View>
         ) : (
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {/* Authentication Badge */}
-            <View style={styles.authBadgeContainer}>
-              <View style={[styles.authBadge, { backgroundColor: colors.secondary }]}>
-                <Ionicons 
-                  name="mail"
-                  size={16} 
-                  color="white" 
-                />
-                <Text style={styles.authBadgeText}>
-                  Email User
-                </Text>
-              </View>
-            </View>
-
-            {/* Current Profile Picture */}
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+          >
             <View style={styles.imageSection}>
               <View style={styles.imageContainer}>
                 {selectedImage ? (
-                  <Image source={{ uri: selectedImage }} style={[styles.profileImage, { borderColor: colors.primary }]} />
+                  <Image
+                    source={{ uri: selectedImage }}
+                    style={[styles.profileImage, { borderColor: colors.primary }]}
+                  />
                 ) : (
                   <View style={[styles.placeholderImage, { backgroundColor: colors.primary + '20', borderColor: colors.primary + '40' }]}>
                     <Ionicons name="person" size={80} color={colors.textSecondary} />
                   </View>
                 )}
-                
-                {/* Edit Overlay */}
-                <TouchableOpacity style={[styles.editOverlay, { backgroundColor: colors.primary }]} onPress={pickImageFromGallery}>
-                  <Ionicons name="camera" size={24} color="white" />
-                </TouchableOpacity>
               </View>
-              
-              <Text style={[styles.userName, { color: colors.textPrimary }]}>{userName || "User"}</Text>
-              <Text style={[styles.userEmail, { color: colors.textSecondary }]}>{userEmail}</Text>
+
+              <Text style={[styles.previewStatus, { color: colors.textSecondary }]}>
+                {previewStatusText}
+              </Text>
             </View>
 
-          {/* Action Buttons */}
-          <View style={styles.actionsSection}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Choose Photo</Text>
-            
-            <TouchableOpacity style={styles.actionButton} onPress={takePhotoWithCamera}>
-              <View style={[styles.actionIcon, { backgroundColor: colors.primary + '20' }]}>
-                <Ionicons name="camera-outline" size={24} color={colors.primary} />
-              </View>
-              <View style={styles.actionText}>
-                <Text style={[styles.actionTitle, { color: colors.textPrimary }]}>Take Photo</Text>
-                <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>Use your camera to take a new photo</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.actionButton} onPress={pickImageFromGallery}>
-              <View style={[styles.actionIcon, { backgroundColor: colors.primary + '20' }]}>
-                <Ionicons name="images-outline" size={24} color={colors.primary} />
-              </View>
-              <View style={styles.actionText}>
-                <Text style={[styles.actionTitle, { color: colors.textPrimary }]}>Choose from Gallery</Text>
-                <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>Select a photo from your device</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
-
-            {selectedImage && (
-              <TouchableOpacity style={styles.actionButton} onPress={removePhoto}>
-                <View style={[styles.actionIcon, { backgroundColor: colors.error + '20' }]}>
-                  <Ionicons name="trash-outline" size={24} color={colors.error} />
-                </View>
-                <View style={styles.actionText}>
-                  <Text style={[styles.actionTitle, { color: colors.error }]}>Remove Photo</Text>
-                  <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>Delete your current profile picture</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Upload Button */}
-          {selectedImage && (
-            <TouchableOpacity 
-              style={[styles.uploadButton, { backgroundColor: colors.primary }, isUploading && styles.uploadButtonDisabled]}
-              onPress={uploadImage}
+            <TouchableOpacity
+              style={[styles.changePhotoButton, { borderColor: colors.primary, backgroundColor: colors.cardBackground }]}
+              onPress={openPhotoOptions}
               disabled={isUploading}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="camera-outline" size={22} color={colors.primary} />
+              <Text style={[styles.changePhotoText, { color: colors.primary }]}>Change Photo</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[
+                styles.uploadButton,
+                { backgroundColor: colors.primary },
+                !canSaveProfilePicture && styles.uploadButtonDisabled,
+              ]}
+              onPress={uploadImage}
+              disabled={!canSaveProfilePicture}
+              activeOpacity={0.85}
             >
               {isUploading ? (
-                <Text style={styles.uploadButtonText}>Uploading...</Text>
+                <>
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <Text style={styles.uploadButtonText}>Saving...</Text>
+                </>
               ) : (
                 <>
-                  <Ionicons name="cloud-upload-outline" size={24} color="white" />
+                  <Ionicons name="checkmark-circle-outline" size={24} color="white" />
                   <Text style={styles.uploadButtonText}>Save Profile Picture</Text>
                 </>
               )}
             </TouchableOpacity>
-          )}
 
-          {/* Guidelines */}
-          <View style={styles.guidelinesSection}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Photo Guidelines</Text>
-            <View style={styles.guidelineItem}>
-              <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-              <Text style={[styles.guidelineText, { color: colors.textSecondary }]}>Use a clear, well-lit photo</Text>
+            <View style={[styles.tipsSection, { backgroundColor: colors.cardBackground }]}>
+              <Text style={[styles.tipsTitle, { color: colors.textPrimary }]}>Photo Tips</Text>
+              <View style={styles.tipRow}>
+                <Ionicons name="checkmark-circle-outline" size={19} color={colors.success} />
+                <Text style={[styles.tipText, { color: colors.textSecondary }]}>Use a clear face photo.</Text>
+              </View>
+              <View style={styles.tipRow}>
+                <Ionicons name="checkmark-circle-outline" size={19} color={colors.success} />
+                <Text style={[styles.tipText, { color: colors.textSecondary }]}>Avoid blurry or dark images.</Text>
+              </View>
+              <View style={styles.tipRow}>
+                <Ionicons name="checkmark-circle-outline" size={19} color={colors.success} />
+                <Text style={[styles.tipText, { color: colors.textSecondary }]}>Square photos work best.</Text>
+              </View>
             </View>
-            <View style={styles.guidelineItem}>
-              <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-              <Text style={[styles.guidelineText, { color: colors.textSecondary }]}>Face should be clearly visible</Text>
-            </View>
-            <View style={styles.guidelineItem}>
-              <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-              <Text style={[styles.guidelineText, { color: colors.textSecondary }]}>Avoid group photos</Text>
-            </View>
-            <View style={styles.guidelineItem}>
-              <Ionicons name="close-circle" size={20} color={colors.error} />
-              <Text style={[styles.guidelineText, { color: colors.textSecondary }]}>No offensive or inappropriate content</Text>
-            </View>
-          </View>
-
-          <View style={{ height: hp(4) }} />
         </ScrollView>
         )}
       </View>
@@ -383,6 +459,11 @@ const getStyles = (colors: any) => StyleSheet.create({
   content: {
     flex: 1,
     backgroundColor: colors.screenColor,
+  },
+  scrollContent: {
+    paddingHorizontal: wp(5),
+    paddingTop: hp(3),
+    paddingBottom: hp(5),
   },
   loadingContainer: {
     flex: 1,
@@ -422,7 +503,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   imageSection: {
     alignItems: 'center',
-    paddingVertical: hp(3),
+    paddingVertical: hp(2),
   },
   imageContainer: {
     position: 'relative',
@@ -446,6 +527,26 @@ const getStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 4,
+  },
+  previewStatus: {
+    fontSize: hp(1.55),
+    fontWeight: '700',
+    marginTop: hp(0.4),
+  },
+  changePhotoButton: {
+    minHeight: hp(5.8),
+    borderRadius: hp(1.4),
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: wp(2),
+    marginTop: hp(1.4),
+    marginBottom: hp(1.5),
+  },
+  changePhotoText: {
+    fontSize: hp(1.75),
+    fontWeight: '800',
   },
   editOverlay: {
     position: 'absolute',
@@ -532,6 +633,33 @@ const getStyles = (colors: any) => StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 4,
     elevation: 2,
+  },
+  tipsSection: {
+    padding: wp(4),
+    borderRadius: hp(1.4),
+    marginTop: hp(1.5),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  tipsTitle: {
+    fontSize: hp(1.8),
+    fontWeight: '800',
+    marginBottom: hp(1.2),
+  },
+  tipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: hp(0.8),
+  },
+  tipText: {
+    flex: 1,
+    fontSize: hp(1.5),
+    lineHeight: hp(2.1),
+    marginLeft: wp(2.3),
+    fontWeight: '600',
   },
   guidelineItem: {
     flexDirection: 'row',

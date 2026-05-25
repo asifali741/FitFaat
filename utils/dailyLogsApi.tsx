@@ -1,40 +1,77 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { tokenStorage } from '@/utils/auth/tokenStorage';
 import { saveAdaptiveGoalCarryForwardFromStorage } from '@/utils/adaptiveGoals';
+import {
+  removeStoredDashboardCache,
+  setStoredWeeklyTrackingId,
+} from '@/utils/dashboardStorage';
+import {
+  cachedRequestJson,
+  clearRequestJsonCachesWithPrefix,
+  isRequestAbortError,
+  requestJson,
+} from './apiHelper';
 import { getBackendUrl } from './config';
 
 const API_BASE_URL = getBackendUrl();
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
+
+const READ_REQUEST_CONFIG = {
+  timeoutMs: 9000,
+  retries: 1,
+  retryDelayMs: 600,
+  cacheTtlMs: 2 * 60 * 1000,
+  maxStaleMs: 24 * 60 * 60 * 1000,
+  allowStaleOnError: true,
+  maxWaitForFreshMs: 3200,
+  refreshCacheInBackground: true,
+};
+
+const WRITE_REQUEST_CONFIG = {
+  timeoutMs: 12000,
+  retries: 0,
+};
+
+const dailyLogsCachePrefix = 'daily-logs:';
+const weeklyProgressCacheKey = (weeklyTrackingId: string) => `${dailyLogsCachePrefix}weekly:${weeklyTrackingId}`;
+const dailyLogCacheKey = (dayId: string) => `${dailyLogsCachePrefix}day:${dayId}`;
+
+const clearDailyLogRequestCache = async () => {
+  await clearRequestJsonCachesWithPrefix(dailyLogsCachePrefix);
+};
 
 export const dailyLogsApi = {
   // Check and create new cycle if needed (handles expired/completed cycles)
-  checkAndCreateCycle: async (userId: string, weeklyTrackingId?: string | null, baseTargetCalories?: number, baseTargetHydration?: number) => {
+  checkAndCreateCycle: async (
+    userId: string,
+    weeklyTrackingId?: string | null,
+    baseTargetCalories?: number,
+    baseTargetHydration?: number
+  ) => {
     try {
       console.log('[checkAndCreateCycle] Checking cycle for user:', userId);
-      const response = await fetch(`${API_BASE_URL}/daily-logs/check-cycle`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const data = await requestJson<any>(
+        `${API_BASE_URL}/daily-logs/check-cycle`,
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({
+            userId,
+            weeklyTrackingId,
+            baseTargetCalories,
+            baseTargetHydration,
+          }),
         },
-        body: JSON.stringify({
-          userId,
-          weeklyTrackingId,
-          baseTargetCalories,
-          baseTargetHydration,
-        }),
-      });
+        WRITE_REQUEST_CONFIG
+      );
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to check/create cycle');
-      }
-      
       // If a new cycle was created, update AsyncStorage and tokenStorage
       if (data.newCycleCreated && data.newWeeklyTrackingId) {
         await saveAdaptiveGoalCarryForwardFromStorage({ userId, weeklyTrackingId });
-        await AsyncStorage.setItem('weeklyTrackingId', data.newWeeklyTrackingId);
+        await setStoredWeeklyTrackingId(data.newWeeklyTrackingId);
         // Clear old cached data
-        await AsyncStorage.removeItem('JsonResponse');
-        
+        await removeStoredDashboardCache(undefined, weeklyTrackingId);
+        await clearDailyLogRequestCache();
+
         // Also update user's weeklyTrackingId in tokenStorage
         const user = await tokenStorage.getUser();
         if (user) {
@@ -42,18 +79,20 @@ export const dailyLogsApi = {
           await tokenStorage.saveUser(user);
           console.log('[checkAndCreateCycle] Updated user weeklyTrackingId in tokenStorage');
         }
-        
+
         console.log('[checkAndCreateCycle] New cycle created! Updated weeklyTrackingId:', data.newWeeklyTrackingId);
       }
-      
+
       return {
         data: data.data,
         newCycleCreated: data.newCycleCreated,
         newWeeklyTrackingId: data.newWeeklyTrackingId,
-        message: data.message
+        message: data.message,
       };
     } catch (error: any) {
-      console.error('Error checking/creating cycle:', error);
+      if (!isRequestAbortError(error)) {
+        console.error('Error checking/creating cycle:', error);
+      }
       throw error;
     }
   },
@@ -61,23 +100,22 @@ export const dailyLogsApi = {
   // Create a new weekly plan
   createWeeklyPlan: async (userId: string, baseTargetCalories: number, baseTargetHydration: number) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/daily-logs/weekly-plan`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const data = await requestJson<any>(
+        `${API_BASE_URL}/daily-logs/weekly-plan`,
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({
+            userId,
+            baseTargetCalories,
+            baseTargetHydration,
+            startDate: new Date().toISOString(),
+          }),
         },
-        body: JSON.stringify({
-          userId,
-          baseTargetCalories,
-          baseTargetHydration,
-          startDate: new Date().toISOString(),
-        }),
-      });
+        WRITE_REQUEST_CONFIG
+      );
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to create weekly plan');
-      }
+      await clearDailyLogRequestCache();
       return data.data;
     } catch (error: any) {
       console.error('Error creating weekly plan:', error);
@@ -88,20 +126,16 @@ export const dailyLogsApi = {
   // Get weekly progress with all 7 days
   getWeeklyProgress: async (weeklyTrackingId: string) => {
     try {
-      const response = await fetch(
+      const data = await cachedRequestJson<any>(
+        weeklyProgressCacheKey(weeklyTrackingId),
         `${API_BASE_URL}/daily-logs/progress/${weeklyTrackingId}`,
         {
           method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
+          headers: JSON_HEADERS,
+        },
+        READ_REQUEST_CONFIG
       );
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to fetch weekly progress');
-      }
       return data.data;
     } catch (error) {
       console.error('Error fetching weekly progress:', error);
@@ -112,17 +146,16 @@ export const dailyLogsApi = {
   // Get single day log
   getDailyLog: async (dayId: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/daily-logs/${dayId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
+      const data = await cachedRequestJson<any>(
+        dailyLogCacheKey(dayId),
+        `${API_BASE_URL}/daily-logs/${dayId}`,
+        {
+          method: 'GET',
+          headers: JSON_HEADERS,
         },
-      });
+        READ_REQUEST_CONFIG
+      );
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to fetch daily log');
-      }
       return data.data;
     } catch (error) {
       console.error('Error fetching daily log:', error);
@@ -143,36 +176,32 @@ export const dailyLogsApi = {
     notes?: string
   ) => {
     try {
-      console.log('🍽️ [addMeal] Adding meal to dayId:', dayId);
-      console.log('🍽️ [addMeal] API URL:', `${API_BASE_URL}/daily-logs/${dayId}/meal`);
-      
-      const response = await fetch(`${API_BASE_URL}/daily-logs/${dayId}/meal`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          foodName,
-          quantity,
-          unit,
-          calories,
-          protein,
-          carbs,
-          fats,
-          notes,
-        }),
-      });
+      console.log('[addMeal] Adding meal to dayId:', dayId);
+      console.log('[addMeal] API URL:', `${API_BASE_URL}/daily-logs/${dayId}/meal`);
 
-      console.log('🍽️ [addMeal] Response status:', response.status);
-      const data = await response.json();
-      console.log('🍽️ [addMeal] Response data:', JSON.stringify(data));
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to add meal');
-      }
+      const data = await requestJson<any>(
+        `${API_BASE_URL}/daily-logs/${dayId}/meal`,
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({
+            foodName,
+            quantity,
+            unit,
+            calories,
+            protein,
+            carbs,
+            fats,
+            notes,
+          }),
+        },
+        WRITE_REQUEST_CONFIG
+      );
+
+      await clearDailyLogRequestCache();
       return data.data;
     } catch (error) {
-      console.error('❌ [addMeal] Error adding meal:', error);
+      console.error('[addMeal] Error adding meal:', error);
       throw error;
     }
   },
@@ -180,20 +209,16 @@ export const dailyLogsApi = {
   // Remove meal from a day
   removeMeal: async (dayId: string, mealId: string) => {
     try {
-      const response = await fetch(
+      const data = await requestJson<any>(
         `${API_BASE_URL}/daily-logs/${dayId}/meal/${mealId}`,
         {
           method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
+          headers: JSON_HEADERS,
+        },
+        WRITE_REQUEST_CONFIG
       );
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to remove meal');
-      }
+      await clearDailyLogRequestCache();
       return data.data;
     } catch (error) {
       console.error('Error removing meal:', error);
@@ -204,21 +229,17 @@ export const dailyLogsApi = {
   // Update calorie level for a day
   updateCalorieLevel: async (dayId: string, calorieLevel: number) => {
     try {
-      const response = await fetch(
+      const data = await requestJson<any>(
         `${API_BASE_URL}/daily-logs/${dayId}/calorie-level`,
         {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: JSON_HEADERS,
           body: JSON.stringify({ calorieLevel }),
-        }
+        },
+        WRITE_REQUEST_CONFIG
       );
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to update calorie level');
-      }
+      await clearDailyLogRequestCache();
       return data.data;
     } catch (error) {
       console.error('Error updating calorie level:', error);
@@ -229,21 +250,17 @@ export const dailyLogsApi = {
   // Update hydration for a day
   updateHydration: async (dayId: string, hydrationAmount: number) => {
     try {
-      const response = await fetch(
+      const data = await requestJson<any>(
         `${API_BASE_URL}/daily-logs/${dayId}/hydration`,
         {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: JSON_HEADERS,
           body: JSON.stringify({ hydrationAmount }),
-        }
+        },
+        WRITE_REQUEST_CONFIG
       );
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to update hydration');
-      }
+      await clearDailyLogRequestCache();
       return data.data;
     } catch (error) {
       console.error('Error updating hydration:', error);
@@ -254,60 +271,56 @@ export const dailyLogsApi = {
   // Complete a day and unlock the next
   completeDay: async (weeklyTrackingId: string, dayNumber: number) => {
     try {
-      console.log('🔧 API Request Details:');
+      console.log('API Request Details:');
       console.log('- URL:', `${API_BASE_URL}/daily-logs/complete-day`);
       console.log('- weeklyTrackingId:', weeklyTrackingId);
       console.log('- dayNumber:', dayNumber);
-      
-      const response = await fetch(`${API_BASE_URL}/daily-logs/complete-day`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          weeklyTrackingId,
-          dayNumber,
-        }),
-      });
 
-      console.log('📡 Response Status:', response.status, response.statusText);
-      
-      const data = await response.json();
-      console.log('📦 Response Data:', JSON.stringify(data, null, 2));
-      
-      if (!response.ok) {
-        console.error('❌ API Error:', data);
-        throw new Error(data.message || `HTTP ${response.status}: Failed to complete day`);
-      }
-      
+      const data = await requestJson<any>(
+        `${API_BASE_URL}/daily-logs/complete-day`,
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({
+            weeklyTrackingId,
+            dayNumber,
+          }),
+        },
+        WRITE_REQUEST_CONFIG
+      );
+
+      await clearDailyLogRequestCache();
+
       // Check if a new weekly cycle was created (Day 7 completion)
       if (data.data && data.data.weekCompleted && data.data.newWeeklyTrackingId) {
         // Update AsyncStorage with new weekly tracking ID
         try {
-          await saveAdaptiveGoalCarryForwardFromStorage({ weeklyTrackingId });
-          await AsyncStorage.setItem('weeklyTrackingId', data.data.newWeeklyTrackingId);
-          console.log('🔄 New weekly cycle started! Updated weeklyTrackingId:', data.data.newWeeklyTrackingId);
-          
+          const user = await tokenStorage.getUser();
+          await saveAdaptiveGoalCarryForwardFromStorage({ userId: user?.id, weeklyTrackingId });
+          await setStoredWeeklyTrackingId(data.data.newWeeklyTrackingId, user);
+          console.log('New weekly cycle started! Updated weeklyTrackingId:', data.data.newWeeklyTrackingId);
+
           // Clear old cached data to force fresh data fetch
-          await AsyncStorage.removeItem('JsonResponse');
-          
+          await removeStoredDashboardCache(user, weeklyTrackingId);
+          await clearDailyLogRequestCache();
+
           return {
             ...data.data,
             cycleRestarted: true,
-            newWeeklyTrackingId: data.data.newWeeklyTrackingId
+            newWeeklyTrackingId: data.data.newWeeklyTrackingId,
           };
         } catch (storageError) {
           console.error('Error updating weekly tracking ID:', storageError);
         }
       }
-      
+
       return data.data;
     } catch (error: any) {
-      console.error('💥 Complete Day Error:', error);
+      console.error('Complete Day Error:', error);
       console.error('Error details:', {
         name: error.name,
         message: error.message,
-        stack: error.stack
+        stack: error.stack,
       });
       throw error;
     }
@@ -316,21 +329,17 @@ export const dailyLogsApi = {
   // Complete and save week to user profile
   completeWeek: async (weeklyTrackingId: string, userId: string) => {
     try {
-      const response = await fetch(
+      const data = await requestJson<any>(
         `${API_BASE_URL}/daily-logs/complete-week/${weeklyTrackingId}`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: JSON_HEADERS,
           body: JSON.stringify({ userId }),
-        }
+        },
+        WRITE_REQUEST_CONFIG
       );
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to complete week');
-      }
+      await clearDailyLogRequestCache();
       return data.data;
     } catch (error) {
       console.error('Error completing week:', error);
@@ -341,18 +350,17 @@ export const dailyLogsApi = {
   // Add water intake to a day
   addWater: async (dayId: string, amount: number) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/daily-logs/${dayId}/water`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const data = await requestJson<any>(
+        `${API_BASE_URL}/daily-logs/${dayId}/water`,
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ amount }),
         },
-        body: JSON.stringify({ amount }),
-      });
+        WRITE_REQUEST_CONFIG
+      );
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to add water intake');
-      }
+      await clearDailyLogRequestCache();
       return data.data;
     } catch (error) {
       console.error('Error adding water:', error);

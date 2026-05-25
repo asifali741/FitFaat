@@ -35,6 +35,7 @@ export default {
         "android.permission.ACCESS_NETWORK_STATE",
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.POST_NOTIFICATIONS",
+        "android.permission.ACTIVITY_RECOGNITION",
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.VIBRATE",
       ],
@@ -48,6 +49,13 @@ export default {
 
     plugins: [
       "expo-router",
+      [
+        "expo-sensors",
+        {
+          motionPermission:
+            "Allow FitFaat to access your motion activity for premium step tracking.",
+        },
+      ],
       [
         "expo-notifications",
         {
@@ -110,6 +118,7 @@ export default {
       Email: process.env.Email,
       EmailPassword: process.env.EmailPassword,
       OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
+      GROQ_API_KEY: process.env.GROQ_API_KEY,
       ZEGO_APP_ID: process.env.ZEGO_APP_ID,
       ZEGO_APP_SIGN: process.env.ZEGO_APP_SIGN,
     },
