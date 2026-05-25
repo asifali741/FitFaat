@@ -2,11 +2,13 @@ import AppHeader from "@/components/AppHeader";
 import { legalDocuments } from "@/constants/legalContent";
 import { useTheme } from "@/contexts/ThemeContext";
 import { authApi } from "@/utils/auth/authApi";
+import { tokenStorage } from "@/utils/auth/tokenStorage";
 import {
   loadGoalDisplayMode,
   saveGoalDisplayMode,
   type GoalDisplayMode,
 } from "@/utils/goalTargetDisplay";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -30,6 +32,7 @@ export default function Settings() {
   const router = useRouter();
   const { isDarkMode, toggleDarkMode, colors } = useTheme();
   const [goalDisplayMode, setGoalDisplayMode] = useState<GoalDisplayMode>("simple");
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const legalSettingMap = {
     "Terms of Service": legalDocuments.terms,
     "Privacy Policy": legalDocuments.privacy,
@@ -160,6 +163,55 @@ export default function Settings() {
             } catch {
               Alert.alert("Error", "Failed to sign out. Please try again.");
             }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleDeleteAccount = () => {
+    if (isDeletingAccount) return;
+
+    Alert.alert(
+      "Delete Account",
+      "This action cannot be undone. All your data will be permanently deleted. Are you sure?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Delete Account", 
+          style: "destructive",
+          onPress: () => {
+            Alert.alert(
+              "Final Confirmation",
+              "This will permanently delete your account and all associated data.",
+              [
+                { text: "Cancel", style: "cancel" },
+                { 
+                  text: "Delete Forever", 
+                  style: "destructive",
+                  onPress: async () => {
+                    try {
+                      setIsDeletingAccount(true);
+                      await authApi.deleteAccount();
+                      await tokenStorage.clearAll();
+                      await AsyncStorage.removeItem('weeklyTrackingId');
+                      Alert.alert(
+                        "Account Deleted",
+                        "Your account has been permanently deleted.",
+                        [{ text: "OK", onPress: () => router.replace('/(auth)/email-login') }]
+                      );
+                    } catch (error: any) {
+                      Alert.alert(
+                        "Error",
+                        error?.message || error?.response?.data?.message || "Failed to delete account. Please try again."
+                      );
+                    } finally {
+                      setIsDeletingAccount(false);
+                    }
+                  }
+                }
+              ]
+            );
           }
         }
       ]
@@ -408,6 +460,16 @@ export default function Settings() {
             </TouchableOpacity>
           </View>
 
+          {/* Delete Account Section */}
+          <View style={styles.section}>
+            <TouchableOpacity style={[styles.deleteAccountButton, { backgroundColor: colors.cardBackground, borderColor: colors.error + '40' }]} onPress={handleDeleteAccount}>
+              <Ionicons name="trash-outline" size={24} color={colors.error} />
+              <Text style={[styles.deleteAccountText, { color: colors.error }]}>
+                {isDeletingAccount ? "Deleting Account..." : "Delete Account"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           <View style={{ height: hp(12) }} />
           </ScrollView>
         </View>
@@ -497,6 +559,26 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   logoutText: {
+    fontSize: hp(1.8),
+    fontWeight: '600',
+    marginLeft: wp(2),
+  },
+  deleteAccountButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: hp(2),
+    paddingHorizontal: wp(4),
+    marginBottom: hp(0.5),
+    borderRadius: hp(1.5),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+    borderWidth: 1,
+  },
+  deleteAccountText: {
     fontSize: hp(1.8),
     fontWeight: '600',
     marginLeft: wp(2),

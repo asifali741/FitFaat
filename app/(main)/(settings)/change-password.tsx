@@ -1,7 +1,8 @@
 import AppHeader from "@/components/AppHeader";
 import { useTheme } from "@/contexts/ThemeContext";
-import { authApi } from "@/utils/auth/authApi";
+import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from "expo-constants";
 import { useRouter } from "expo-router";
 import * as NavigationBar from 'expo-navigation-bar';
@@ -141,7 +142,8 @@ export default function ChangePassword() {
           [{
             text: "OK",
             onPress: async () => {
-              await authApi.logout();
+              await tokenStorage.clearAll();
+              await AsyncStorage.removeItem('weeklyTrackingId');
               setFormData({
                 currentPassword: "",
                 newPassword: "",
@@ -159,6 +161,24 @@ export default function ChangePassword() {
     } finally {
       setIsChanging(false);
     }
+  };
+
+  const handleForgotCurrentPassword = () => {
+    Alert.alert(
+      "Reset Password",
+      "You will be signed out so you can reset your password using your email.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Continue",
+          onPress: async () => {
+            await tokenStorage.clearAll();
+            await AsyncStorage.removeItem('weeklyTrackingId');
+            router.replace('/forgot-password');
+          }
+        }
+      ]
+    );
   };
 
   const getPasswordStrengthColor = () => {
@@ -402,7 +422,7 @@ export default function ChangePassword() {
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.forgotButton}>
+            <TouchableOpacity style={styles.forgotButton} onPress={handleForgotCurrentPassword}>
               <Text style={styles.forgotButtonText}>Forgot your current password?</Text>
             </TouchableOpacity>
 

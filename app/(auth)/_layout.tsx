@@ -29,6 +29,15 @@ export default function AuthLayout() {
           headerShown: false,
         }}
       />
+      <Stack.Screen
+        name="forgot-password"
+        options={{
+          headerShown: true,
+          title: 'Forgot Password',
+          headerTintColor: '#007AFF',
+          headerBackTitle: 'Back',
+        }}
+      />
     </Stack>
   );
 }

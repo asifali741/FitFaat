@@ -1,5 +1,6 @@
 import AppHeader from "@/components/AppHeader";
 import { useTheme } from "@/contexts/ThemeContext";
+import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import * as ImagePicker from 'expo-image-picker';
@@ -315,6 +316,15 @@ export default function EditProfilePicture() {
             backendImageUrl: displayImageUrl || uploadedImageUrl,
             gmailImageUrl,
           }, updatedAt);
+        }
+
+        const storedUser = await tokenStorage.getUser();
+        if (storedUser) {
+          await tokenStorage.saveUser({
+            ...storedUser,
+            profileImage: data.data?.profileImage || storedUser.profileImage || null,
+            profileImageUrl: data.data?.imageUrl || uploadedImageUrl || storedUser.profileImageUrl || null,
+          });
         }
 
         if (displayImageUrl) {
