@@ -1,7 +1,10 @@
 import * as SecureStore from 'expo-secure-store';
+import { clearAccountScopedStorage } from './accountScopedStorage';
 
 const TOKEN_KEY = 'fitfaat_auth_token';
+const LEGACY_TOKEN_KEY = 'authToken';
 const USER_KEY = 'fitfaat_user';
+const LEGACY_USER_KEY = 'fitfaat_user_data';
 
 export const tokenStorage = {
   // Save auth token securely
@@ -16,7 +19,16 @@ export const tokenStorage = {
   // Get auth token
   getToken: async () => {
     try {
-      return await SecureStore.getItemAsync(TOKEN_KEY);
+      const token = await SecureStore.getItemAsync(TOKEN_KEY);
+      if (token) return token;
+
+      const legacyToken = await SecureStore.getItemAsync(LEGACY_TOKEN_KEY);
+      if (legacyToken) {
+        await SecureStore.setItemAsync(TOKEN_KEY, legacyToken);
+        await SecureStore.deleteItemAsync(LEGACY_TOKEN_KEY);
+      }
+
+      return legacyToken;
     } catch (error) {
       console.error('Error getting token:', error);
       return null;
@@ -26,7 +38,10 @@ export const tokenStorage = {
   // Remove auth token
   removeToken: async () => {
     try {
-      await SecureStore.deleteItemAsync(TOKEN_KEY);
+      await Promise.all([
+        SecureStore.deleteItemAsync(TOKEN_KEY),
+        SecureStore.deleteItemAsync(LEGACY_TOKEN_KEY),
+      ]);
     } catch (error) {
       console.error('Error removing token:', error);
     }
@@ -55,7 +70,10 @@ export const tokenStorage = {
   // Remove user data
   removeUser: async () => {
     try {
-      await SecureStore.deleteItemAsync(USER_KEY);
+      await Promise.all([
+        SecureStore.deleteItemAsync(USER_KEY),
+        SecureStore.deleteItemAsync(LEGACY_USER_KEY),
+      ]);
     } catch (error) {
       console.error('Error removing user:', error);
     }
@@ -64,9 +82,12 @@ export const tokenStorage = {
   // Clear all auth data
   clearAll: async () => {
     try {
+      await clearAccountScopedStorage();
       await Promise.all([
         SecureStore.deleteItemAsync(TOKEN_KEY),
+        SecureStore.deleteItemAsync(LEGACY_TOKEN_KEY),
         SecureStore.deleteItemAsync(USER_KEY),
+        SecureStore.deleteItemAsync(LEGACY_USER_KEY),
       ]);
     } catch (error) {
       console.error('Error clearing auth data:', error);

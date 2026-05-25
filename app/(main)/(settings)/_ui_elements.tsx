@@ -1,7 +1,11 @@
-import { Dimensions } from "react-native";
-const { width } =  Dimensions.get('window');
+import {
+  heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
+} from "react-native-responsive-screen";
+
 const BASE_WIDTH = 375; //iphone 12
-const S = width / BASE_WIDTH; // scale factor
+const BASE_HEIGHT = 812;
+const S = Math.min(wp(100) / BASE_WIDTH, hp(100) / BASE_HEIGHT); // scale factor
 export const rf = (n: number, min = 10, max = 48) => Math.round(Math.min(Math.max(n * S, min), max));
 export const rs = (n: number) => Math.round(n * S); // responsive size (pixels)
 export const colorsSheet = {

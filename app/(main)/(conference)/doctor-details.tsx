@@ -1,5 +1,6 @@
 import BackButton from '@/components/BackButton';
 import { theme } from "@/constants/theme";
+import { useTheme } from '@/contexts/ThemeContext';
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React from "react";
@@ -9,6 +10,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { getDoctorById } from "./_doctorsData";
 
 export default function DoctorDetailsScreen() {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const router = useRouter();
   const { doctorId, date } = useLocalSearchParams<{ doctorId: string; date: string }>();
   const doctor = getDoctorById(doctorId);
@@ -40,7 +43,7 @@ export default function DoctorDetailsScreen() {
         {/* Doctor Profile Card */}
         <View style={styles.profileCard}>
           <View style={styles.avatarLarge}>
-            <Ionicons name="person" size={80} color={theme.colors.primary} />
+            <Ionicons name="person" size={80} color={colors.primary} />
           </View>
           <Text style={styles.doctorName}>{doctor.name}</Text>
           <View style={styles.specialtyContainer}>
@@ -68,7 +71,7 @@ export default function DoctorDetailsScreen() {
           
           <View style={styles.detailRow}>
             <View style={styles.detailIconContainer}>
-              <Ionicons name="briefcase" size={22} color={theme.colors.primary} />
+              <Ionicons name="briefcase" size={22} color={colors.primary} />
             </View>
             <View style={styles.detailTextContainer}>
               <Text style={styles.detailLabel}>Experience</Text>
@@ -78,7 +81,7 @@ export default function DoctorDetailsScreen() {
 
           <View style={styles.detailRow}>
             <View style={styles.detailIconContainer}>
-              <Ionicons name="star" size={22} color={theme.colors.warning} />
+              <Ionicons name="star" size={22} color={colors.warning} />
             </View>
             <View style={styles.detailTextContainer}>
               <Text style={styles.detailLabel}>Rating</Text>
@@ -88,7 +91,7 @@ export default function DoctorDetailsScreen() {
 
           <View style={styles.detailRow}>
             <View style={styles.detailIconContainer}>
-              <Ionicons name="cash" size={22} color={theme.colors.success} />
+              <Ionicons name="cash" size={22} color={colors.success} />
             </View>
             <View style={styles.detailTextContainer}>
               <Text style={styles.detailLabel}>Consultation Fee</Text>
@@ -98,7 +101,7 @@ export default function DoctorDetailsScreen() {
 
           <View style={styles.detailRow}>
             <View style={styles.detailIconContainer}>
-              <Ionicons name="mail" size={22} color={theme.colors.info} />
+              <Ionicons name="mail" size={22} color={colors.info} />
             </View>
             <View style={styles.detailTextContainer}>
               <Text style={styles.detailLabel}>Email</Text>
@@ -113,17 +116,17 @@ export default function DoctorDetailsScreen() {
           onPress={handleBookAppointment}
         >
           <Text style={styles.bookButtonText}>Continue to Book Appointment</Text>
-          <Ionicons name="arrow-forward" size={20} color={theme.colors.white} />
+          <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
   },
   header: {
     flexDirection: "row",
@@ -138,7 +141,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: hp(2.2),
     fontWeight: "bold",
-    color: theme.colors.textOnPrimary,
+    color: colors.textOnPrimary,
     flex: 1,
     textAlign: "center",
   },
@@ -147,7 +150,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: theme.colors.screenColor,
+    backgroundColor: colors.screenColor,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     paddingTop: hp(3),
@@ -155,11 +158,11 @@ const styles = StyleSheet.create({
   },
   profileCard: {
     alignItems: "center",
-    backgroundColor: theme.colors.white,
+    backgroundColor: colors.white,
     borderRadius: 20,
     padding: wp(6),
     marginBottom: hp(2),
-    shadowColor: theme.colors.primary,
+    shadowColor: colors.primary,
     shadowOffset: {
       width: 0,
       height: 3,
@@ -172,17 +175,17 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: hp(2),
     borderWidth: 3,
-    borderColor: theme.colors.primary,
+    borderColor: colors.primary,
   },
   doctorName: {
     fontSize: hp(2.5),
     fontWeight: "bold",
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: hp(1),
   },
   specialtyContainer: {
@@ -191,13 +194,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   specialtyBadge: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     paddingHorizontal: wp(4),
     paddingVertical: hp(0.8),
     borderRadius: 20,
   },
   specialtyText: {
-    color: theme.colors.white,
+    color: colors.white,
     fontSize: hp(1.6),
     fontWeight: "600",
   },
@@ -207,7 +210,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: hp(2),
     fontWeight: "600",
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: hp(1.5),
   },
   tagsContainer: {
@@ -216,24 +219,24 @@ const styles = StyleSheet.create({
     gap: wp(2),
   },
   tag: {
-    backgroundColor: theme.colors.success,
+    backgroundColor: colors.success,
     paddingHorizontal: wp(3),
     paddingVertical: hp(1),
     borderRadius: 15,
   },
   tagText: {
-    color: theme.colors.white,
+    color: colors.white,
     fontSize: hp(1.5),
     fontWeight: "500",
   },
   detailRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: theme.colors.white,
+    backgroundColor: colors.white,
     borderRadius: 12,
     padding: wp(4),
     marginBottom: hp(1),
-    shadowColor: theme.colors.primary,
+    shadowColor: colors.primary,
     shadowOffset: {
       width: 0,
       height: 1,
@@ -246,7 +249,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: theme.colors.primarySoft,
+    backgroundColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center",
     marginRight: wp(3),
@@ -256,24 +259,24 @@ const styles = StyleSheet.create({
   },
   detailLabel: {
     fontSize: hp(1.5),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: hp(0.3),
   },
   detailValue: {
     fontSize: hp(1.8),
     fontWeight: "600",
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
   },
   bookButton: {
     flexDirection: "row",
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     paddingVertical: hp(2),
     paddingHorizontal: wp(6),
     borderRadius: 25,
     alignItems: "center",
     justifyContent: "center",
     marginVertical: hp(3),
-    shadowColor: theme.colors.primary,
+    shadowColor: colors.primary,
     shadowOffset: {
       width: 0,
       height: 3,
@@ -283,7 +286,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   bookButtonText: {
-    color: theme.colors.white,
+    color: colors.white,
     fontSize: hp(2),
     fontWeight: "600",
     marginRight: wp(2),

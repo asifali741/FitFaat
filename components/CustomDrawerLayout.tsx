@@ -1,43 +1,154 @@
 import { useTheme } from "@/contexts/ThemeContext";
-import { useAuth, useUser } from "@clerk/clerk-expo";
+import { cachedRequestJson, isRequestAbortError } from "@/utils/apiHelper";
+import { authApi } from "@/utils/auth/authApi";
+import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
 import {
     DrawerContentComponentProps,
     DrawerItem
 } from "@react-navigation/drawer";
-import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
+import { usePathname, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Image, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Animated, {
     useAnimatedStyle,
     useSharedValue,
     withSpring,
 } from "react-native-reanimated";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { DrawerFonts } from "../app/(main)/(settings)/_ui_elements";
-type DrawerSceneWrapperProps = DrawerContentComponentProps;
+import {
+  heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
+} from "react-native-responsive-screen";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { getBackendBaseUrl } from '@/utils/config';
+import {
+  clearCachedProfileImage,
+  buildStableBackendProfileImageUrl,
+  getBackendProfileImageUrl,
+  getGmailProfileImageUrl,
+  getProfileImageUserKey,
+  readCachedProfileImage,
+  writeCachedProfileImage,
+} from "@/utils/profileImage";
+import { profileImageEvents, type ProfileImageUpdateEvent } from '@/utils/profileImageEvents';
+type DrawerSceneWrapperProps = DrawerContentComponentProps & {
+  onDrawerStatusChange?: (isOpen: boolean) => void;
+};
 
-// Helper function to get API URL
+const DRAWER_READ_CONFIG = {
+  timeoutMs: 7000,
+  retries: 1,
+  retryDelayMs: 500,
+  cacheTtlMs: 5 * 60 * 1000,
+  maxStaleMs: 24 * 60 * 60 * 1000,
+  allowStaleOnError: true,
+  maxWaitForFreshMs: 2200,
+  refreshCacheInBackground: true,
+};
+
 const getAPIURL = () => {
-  const ENV = Constants.expoConfig?.extra;
-  const apiUrl = ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001');
-  return apiUrl.replace(/\/api\/?$/, '');
+  return getBackendBaseUrl();
+};
+
+const AnimatedLogoutLetter = ({
+  letter,
+  isActive,
+  textStyle,
+}: {
+  letter: string;
+  isActive: boolean;
+  textStyle: any;
+}) => {
+  const scale = useSharedValue(1);
+
+  useEffect(() => {
+    scale.value = withSpring(isActive ? 1.5 : 1, {
+      damping: 6,
+      stiffness: 200,
+    });
+  }, [isActive, scale]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <Animated.Text style={[textStyle, animatedStyle]}>{letter}</Animated.Text>
+  );
 };
 
 export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
   const { colors } = useTheme();
-  const { user } = useUser(); // Get Clerk user
+  const { navigation, onDrawerStatusChange, state } = props;
+  const insets = useSafeAreaInsets();
+  const pathname = usePathname();
   const [userName, setUserName] = useState('User');
   const [userEmail, setUserEmail] = useState('user@example.com');
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const [gmailImageUrl, setGmailImageUrl] = useState<string | null>(null);
   const [isDoctor, setIsDoctor] = useState(false);
-  const [doctorName, setDoctorName] = useState('');
+  const lastProfileImageEventAt = useRef(0);
+  const profileImageUserKeyRef = useRef<string | null>(null);
+  const displayImageUrl = profileImageUrl || gmailImageUrl;
   
   useEffect(() => {
     fetchUserData();
     checkDoctorStatus();
-  }, [user]);
+  }, []);
+
+  useEffect(() => {
+    const drawerNavigation = navigation as any;
+    const unsubscribeOpen = drawerNavigation.addListener?.('drawerOpen', () => {
+      onDrawerStatusChange?.(true);
+    });
+    const unsubscribeClose = drawerNavigation.addListener?.('drawerClose', () => {
+      onDrawerStatusChange?.(false);
+    });
+
+    return () => {
+      unsubscribeOpen?.();
+      unsubscribeClose?.();
+    };
+  }, [navigation, onDrawerStatusChange]);
+
+  // Re-fetch user data (including profile image) when it changes
+  useEffect(() => {
+    const handleProfileImageUpdate = (event?: ProfileImageUpdateEvent) => {
+      if (!event) {
+        fetchUserData();
+        return;
+      }
+
+      lastProfileImageEventAt.current = Date.now();
+      if (
+        event.userKey &&
+        profileImageUserKeyRef.current &&
+        event.userKey !== profileImageUserKeyRef.current
+      ) {
+        return;
+      }
+
+      if (event.removed) {
+        setProfileImageUrl(null);
+        setGmailImageUrl(event.gmailImageUrl || null);
+        return;
+      }
+
+      setProfileImageUrl(event.displayImageUrl || event.backendImageUrl || null);
+      setGmailImageUrl(event.gmailImageUrl || null);
+    };
+
+    const unsubscribe = profileImageEvents.subscribe(handleProfileImageUpdate);
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = (navigation as any).addListener?.('drawerOpen', () => {
+      fetchUserData();
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   const checkDoctorStatus = async () => {
     try {
@@ -45,24 +156,27 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
       if (!token) return;
 
       const API_URL = getAPIURL();
-      const baseURL = Platform.OS === 'android' ? API_URL.replace('localhost', '10.0.2.2') : API_URL;
+      const baseURL = API_URL;
 
-      const response = await fetch(`${baseURL}/api/doctors/status`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
+      const storedUser = await tokenStorage.getUser();
+      const cacheUserKey = storedUser?._id || storedUser?.id || storedUser?.userId || 'current';
+      const result = await cachedRequestJson<any>(
+        `drawer:doctor-status:${cacheUserKey}`,
+        `${baseURL}/api/doctors/status`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
         },
-      });
+        DRAWER_READ_CONFIG
+      );
 
-      if (response.ok) {
-        const result = await response.json();
-        console.log('Drawer - Doctor Status:', result);
-        if (result.success && result.doctor) {
-          setIsDoctor(true);
-          setDoctorName(result.doctor.name || 'Doctor');
-          console.log('Drawer - User is doctor:', result.doctor.name);
-        }
+      console.log('Drawer - Doctor Status:', result);
+      if (result.success && result.doctor) {
+        setIsDoctor(true);
+        console.log('Drawer - User is doctor:', result.doctor.name);
       }
     } catch (error) {
       console.log('Drawer - Not a doctor or error:', error);
@@ -71,113 +185,166 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
 
   const fetchUserData = async () => {
     try {
-      console.log('=== Drawer: Fetching user data ===');
-      console.log('Clerk user object:', JSON.stringify(user, null, 2));
-      console.log('Clerk user exists:', !!user);
-      
-      // Check if user is logged in with Clerk
-      if (user) {
-        console.log('Using Clerk user data');
-        console.log('Clerk firstName:', user.firstName);
-        console.log('Clerk username:', user.username);
-        console.log('Clerk email:', user.primaryEmailAddress?.emailAddress);
-        console.log('Clerk imageUrl:', user.imageUrl);
-        
-        const name = user.firstName || user.username || 'User';
-        const email = user.primaryEmailAddress?.emailAddress || 'user@example.com';
-        const imageUrl = user.imageUrl || null;
-        
-        console.log('Setting Clerk data - Name:', name, 'Email:', email);
-        setUserName(name);
-        setUserEmail(email);
-        setProfileImageUrl(imageUrl);
-        return;
+      const fetchStartedAt = Date.now();
+      const storedUser = await tokenStorage.getUser();
+      let cachedProfileImage = null as Awaited<ReturnType<typeof readCachedProfileImage>>;
+      if (storedUser) {
+        profileImageUserKeyRef.current = getProfileImageUserKey(storedUser);
+        setUserName(storedUser.userInfo?.name || storedUser.name || storedUser.username || 'User');
+        setUserEmail(storedUser.email || 'user@example.com');
+        cachedProfileImage = await readCachedProfileImage(storedUser);
+        setProfileImageUrl(
+          cachedProfileImage
+            ? cachedProfileImage.backendImageUrl
+            : getBackendProfileImageUrl(getAPIURL(), storedUser)
+        );
+        setGmailImageUrl(cachedProfileImage?.gmailImageUrl || getGmailProfileImageUrl(storedUser));
       }
 
-      console.log('No Clerk user, checking backend token');
-      // Otherwise, fetch from backend for email/password users
       const token = await SecureStore.getItemAsync('fitfaat_auth_token');
-      console.log('Backend token:', token ? `Found (${token.substring(0, 20)}...)` : 'Not found');
       
       if (!token) {
-        console.log('No token found, using defaults');
         return;
       }
 
       const API_URL = getAPIURL();
-      console.log('API_URL from config:', API_URL);
-      const baseURL = Platform.OS === 'android' ? API_URL.replace('localhost', '10.0.2.2') : API_URL;
-      console.log('Base URL:', baseURL);
-      console.log('Fetching from:', `${baseURL}/api/user/profile`);
+      const baseURL = API_URL;
 
-      // Fetch user profile data
-      const response = await fetch(`${baseURL}/api/user/profile`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
+      const cacheUserKey = storedUser?._id || storedUser?.id || storedUser?.userId || 'current';
+      const result = await cachedRequestJson<any>(
+        `drawer:user-profile:${cacheUserKey}`,
+        `${baseURL}/api/user/profile`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
         },
-      });
+        DRAWER_READ_CONFIG
+      );
 
-      console.log('Backend response status:', response.status);
-      const responseText = await response.text();
-      console.log('Backend response text:', responseText);
-
-      if (response.ok) {
-        const result = JSON.parse(responseText);
-        console.log('Backend user result:', JSON.stringify(result, null, 2));
-        
-        // Handle the response structure with success flag
-        if (result.success && result.data && result.data.user) {
-          const data = result.data.user;
-          console.log('Setting user data from backend:', data.username, data.email);
-          setUserName(data.username || 'User');
-          setUserEmail(data.email || 'user@example.com');
-          
-          // Fetch profile image if available
-          if (data.profileImage) {
-            const imageUrl = `${baseURL}/uploads/profiles/${data.profileImage}`;
-            console.log('Setting profile image URL:', imageUrl);
-            setProfileImageUrl(imageUrl);
-          }
-        } else {
-          console.log('Response does not have success=true or no data.user');
+      // Handle the response structure with success flag
+      if (result.success && result.data && result.data.user) {
+        const data = result.data.user;
+        setUserName(data.userInfo?.name || data.name || data.username || 'User');
+        setUserEmail(data.email || 'user@example.com');
+        if (fetchStartedAt < lastProfileImageEventAt.current) {
+          return;
         }
-      } else {
-        console.log('Response not OK, status:', response.status);
+
+        const backendImageUrl = getBackendProfileImageUrl(baseURL, data);
+        const gmailImageUrl = getGmailProfileImageUrl(data) || getGmailProfileImageUrl(storedUser);
+        const latestCachedProfileImage = await readCachedProfileImage(data || storedUser);
+        const hasProfileImageDecision = !!latestCachedProfileImage;
+
+        setGmailImageUrl(latestCachedProfileImage?.gmailImageUrl || gmailImageUrl);
+
+        // Fetch profile image if available
+        if (hasProfileImageDecision) {
+          setProfileImageUrl(latestCachedProfileImage.backendImageUrl);
+          return;
+        }
+
+        if (backendImageUrl) {
+          const versionSeed =
+            data.profileImageUpdatedAt ||
+            data.profilePictureUpdatedAt ||
+            data.updatedAt ||
+            data.updated_at ||
+            result?.data?.updatedAt ||
+            result?.data?.updated_at ||
+            null;
+          const imageUrl = buildStableBackendProfileImageUrl(
+            baseURL,
+            backendImageUrl,
+            latestCachedProfileImage,
+            versionSeed
+          );
+          setProfileImageUrl(imageUrl);
+          await writeCachedProfileImage(data || storedUser, {
+            backendImageUrl: imageUrl,
+            gmailImageUrl,
+          }, String(versionSeed || new Date().toISOString()));
+        } else {
+          setProfileImageUrl(null);
+          if (gmailImageUrl) {
+            await writeCachedProfileImage(data || storedUser, {
+              backendImageUrl: null,
+              gmailImageUrl,
+            });
+          } else {
+            await clearCachedProfileImage(data || storedUser);
+          }
+        }
       }
     } catch (error) {
-      console.error('Error fetching user data:', error);
-      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
+      if (!isRequestAbortError(error)) {
+        console.log('[Drawer] Using saved profile data:', error);
+      }
     }
   };
   
   const handleProfilePress = () => {
-    props.navigation.navigate('profile');
+    navigation.navigate('profile');
+  };
+
+  const handleProfileImageError = () => {
+    if (displayImageUrl === gmailImageUrl) {
+      setGmailImageUrl(null);
+    } else {
+      setProfileImageUrl(null);
+    }
   };
 
   // Helper function to check if route is active
   const isRouteActive = (routeName: string) => {
-    const currentRoute = props.state.routeNames[props.state.index];
+    const currentRoute = state.routeNames[state.index];
     return currentRoute === routeName;
   };
 
   // Helper function to check if we're in exercises section
   const isExercisesActive = () => {
-    const currentRoute = props.state.routeNames[props.state.index];
+    const currentRoute = state.routeNames[state.index];
     return currentRoute === '(exercises)/workout' || currentRoute.startsWith('(exercises)');
   };
 
-  const styles = getStyles(colors);
+  const isChartsActive = () => pathname.includes('/charts');
+
+  const styles = getStyles(colors, insets.bottom);
+  const drawerLabelStyle = {
+    marginLeft: wp(1.8),
+    fontSize: Math.min(hp(1.95), wp(4.35)),
+    fontFamily: "PoppinsMedium500",
+    color: colors.textOnPrimary,
+    lineHeight: Math.min(hp(2.55), wp(5.7)),
+  };
+  const drawerItemStyle = (isActive: boolean) => ({
+    marginHorizontal: wp(3),
+    marginVertical: hp(0.12),
+    borderRadius: Math.min(wp(6), hp(3)),
+    paddingHorizontal: wp(4.2),
+    paddingVertical: hp(0.28),
+    minHeight: Math.min(hp(5.2), wp(12)),
+    backgroundColor: isActive ? colors.drawerActiveTabColor : 'transparent',
+    justifyContent: 'center' as const,
+  });
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.drawerBackground }}>
       {/* Top Part */}
       <TouchableOpacity style={styles.userContainer} onPress={handleProfilePress}>
-        <Image 
-          source={profileImageUrl ? { uri: profileImageUrl } : require("../assets/images/Default_Profile.png")} 
-          style={styles.userImage} 
-        />
+        {displayImageUrl ? (
+          <Image
+            source={{ uri: displayImageUrl }}
+            style={styles.userImage}
+            onError={handleProfileImageError}
+          />
+        ) : (
+          <View style={[styles.userImage, styles.userImagePlaceholder]}>
+            <Ionicons name="person" size={Math.min(wp(7.5), hp(3.8))} color={colors.textSecondary} />
+          </View>
+        )}
         <View style={styles.userInfo}>
           <Text
             style={styles.userName}
@@ -197,122 +364,38 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
       </TouchableOpacity>
 
       {/* Drawer Items */}
-      <View style={{ flex: 1, paddingVertical: 10 }}>
+      <View style={styles.drawerItems}>
         <DrawerItem
           label="Dashboard"
-          onPress={() => props.navigation.navigate('(dashboard)')}
-          labelStyle={{
-            marginLeft: 8,
-            fontSize: 18,
-            fontFamily: "PoppinsMedium500",
-            color: colors.textOnPrimary,
-          }}
-          style={{
-            marginHorizontal: 12,
-            marginVertical: 1,
-            borderRadius: 25,
-            paddingHorizontal: 20,
-            paddingVertical: 8,
-            minHeight: 45,
-            backgroundColor: isRouteActive('(dashboard)') ? colors.drawerActiveTabColor : 'transparent',
-          }}
+          onPress={() => navigation.navigate('(dashboard)')}
+          labelStyle={drawerLabelStyle}
+          style={drawerItemStyle(isRouteActive('(dashboard)') && !isChartsActive())}
         />
         <DrawerItem
-          label="Chatbot"
-          onPress={() => props.navigation.navigate('(chatbot)')}
-          labelStyle={{
-            marginLeft: 8,
-            fontSize: 18,
-            fontFamily: "PoppinsMedium500",
-            color: colors.textOnPrimary,
-          }}
-          style={{
-            marginHorizontal: 12,
-            marginVertical: 1,
-            borderRadius: 25,
-            paddingHorizontal: 20,
-            paddingVertical: 8,
-            minHeight: 45,
-            backgroundColor: isRouteActive('(chatbot)') ? colors.drawerActiveTabColor : 'transparent',
-          }}
+          label="HeaLora"
+          onPress={() => navigation.navigate('(chatbot)')}
+          labelStyle={drawerLabelStyle}
+          style={drawerItemStyle(isRouteActive('(chatbot)'))}
         />
         {!isDoctor && (
           <DrawerItem
-            label="Conference"
-            onPress={() => props.navigation.navigate('(conference)')}
-            labelStyle={{
-              marginLeft: 8,
-              fontSize: 18,
-              fontFamily: "PoppinsMedium500",
-              color: colors.textOnPrimary,
-            }}
-            style={{
-              marginHorizontal: 12,
-              marginVertical: 1,
-              borderRadius: 25,
-              paddingHorizontal: 20,
-              paddingVertical: 8,
-              minHeight: 45,
-              backgroundColor: isRouteActive('(conference)') ? colors.drawerActiveTabColor : 'transparent',
-            }}
+            label="Doctors"
+            onPress={() => navigation.navigate('(conference)')}
+            labelStyle={drawerLabelStyle}
+            style={drawerItemStyle(isRouteActive('(conference)'))}
           />
         )}
         <DrawerItem
           label="Workouts 👑"
-          onPress={() => props.navigation.navigate('(exercises)/workout')}
-          labelStyle={{
-            marginLeft: 8,
-            fontSize: 18,
-            fontFamily: "PoppinsMedium500",
-            color: colors.textOnPrimary,
-          }}
-          style={{
-            marginHorizontal: 12,
-            marginVertical: 1,
-            borderRadius: 25,
-            paddingHorizontal: 20,
-            paddingVertical: 8,
-            minHeight: 45,
-            backgroundColor: isExercisesActive() ? colors.drawerActiveTabColor : 'transparent',
-          }}
-        />
-        <DrawerItem
-          label={isDoctor && doctorName ? `Dr. ${doctorName} 👨‍⚕️` : "Join as Doctor 👨‍⚕️"}
-          onPress={() => props.navigation.navigate('(doctor-portal)')}
-          labelStyle={{
-            marginLeft: 8,
-            fontSize: 18,
-            fontFamily: "PoppinsMedium500",
-            color: colors.textOnPrimary,
-          }}
-          style={{
-            marginHorizontal: 12,
-            marginVertical: 1,
-            borderRadius: 25,
-            paddingHorizontal: 20,
-            paddingVertical: 8,
-            minHeight: 45,
-            backgroundColor: isRouteActive('(doctor-portal)') ? colors.drawerActiveTabColor : 'transparent',
-          }}
+          onPress={() => navigation.navigate('(exercises)/workout')}
+          labelStyle={drawerLabelStyle}
+          style={drawerItemStyle(isExercisesActive())}
         />
         <DrawerItem
           label="Settings"
-          onPress={() => props.navigation.navigate('(settings)')}
-          labelStyle={{
-            marginLeft: 8,
-            fontSize: 18,
-            fontFamily: "PoppinsMedium500",
-            color: colors.textOnPrimary,
-          }}
-          style={{
-            marginHorizontal: 12,
-            marginVertical: 1,
-            borderRadius: 25,
-            paddingHorizontal: 20,
-            paddingVertical: 8,
-            minHeight: 45,
-            backgroundColor: isRouteActive('(settings)') ? colors.drawerActiveTabColor : 'transparent',
-          }}
+          onPress={() => navigation.navigate('(settings)')}
+          labelStyle={drawerLabelStyle}
+          style={drawerItemStyle(isRouteActive('(settings)'))}
         />
       </View>
 
@@ -325,27 +408,17 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
 
 const Logout_Button = () => {
   const { colors } = useTheme();
-  const { signOut } = useAuth();
-  const { user } = useUser();
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
   const baseText = "Logout".split(""); // Array of letters
   const [activeIndex, setActiveIndex] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Shared values for each letter
-  const scales = baseText.map(() => useSharedValue(1));
-
-  const animateLetter = (index: number) => {
-    scales.forEach((s, i) => {
-      s.value = withSpring(i === index ? 1.5 : 1, { damping: 6, stiffness: 200 });
-    });
-  };
 
   const handleLongPress = () => {
     if (intervalRef.current) return;
     intervalRef.current = setInterval(() => {
       setActiveIndex((prev) => {
         const next = (prev + 1) % baseText.length;
-        animateLetter(next);
         return next;
       });
     }, 200);
@@ -357,31 +430,17 @@ const Logout_Button = () => {
       intervalRef.current = null;
     }
     setActiveIndex(0);
-    animateLetter(0);
 
     try {
-      // Check if user is logged in with Clerk
-      if (user) {
-        console.log("Logging out Clerk user");
-        await signOut();
-        console.log("Clerk user signed out successfully");
-      } else {
-        // Backend email/password user - clear token and navigate to auth
-        console.log("Logging out backend user");
-        await SecureStore.deleteItemAsync('fitfaat_auth_token');
-        await SecureStore.deleteItemAsync('fitfaat_user_data');
-        console.log("Backend user signed out successfully");
-        
-        // Navigate to auth screen (you'll need to import router)
-        const { router } = require('expo-router');
-        router.replace('/(auth)');
-      }
+      console.log("Logging out user");
+      await authApi.logout();
+      router.replace('/(auth)');
     } catch (err) {
       console.error("Error signing out:", err);
     }
   };
 
-  const styles = getStyles(colors);
+  const styles = getStyles(colors, insets.bottom);
 
   return (
     <Pressable
@@ -389,78 +448,97 @@ const Logout_Button = () => {
       onLongPress={handleLongPress}
       onPressOut={handlePressOut}
     >
-      <Ionicons name="log-out" size={24} color={colors.textOnPrimary} />
-      <View style={{ flexDirection: "row", marginLeft: 5 }}>
-        {baseText.map((letter, i) => {
-          const animatedStyle = useAnimatedStyle(() => ({
-            transform: [{ scale: scales[i].value }],
-          }));
-
-          return (
-            <Animated.Text key={i} style={[styles.logoutText, animatedStyle]}>
-              {letter}
-            </Animated.Text>
-          );
-        })}
+      <Ionicons name="log-out" size={Math.min(hp(3), wp(6.4))} color={colors.textOnPrimary} />
+      <View style={styles.logoutTextRow}>
+        {baseText.map((letter, i) => (
+          <AnimatedLogoutLetter
+            key={`${letter}-${i}`}
+            letter={letter}
+            isActive={activeIndex === i}
+            textStyle={styles.logoutText}
+          />
+        ))}
       </View>
     </Pressable>
   );
 };
 
 
-const getStyles = (colors: any) => StyleSheet.create({
+const getStyles = (colors: any, bottomInset = 0) => StyleSheet.create({
   userContainer: {
   flexDirection: "row",
   alignItems: "center",
-  padding: 16,
-  marginHorizontal: 12,
+  paddingVertical: hp(1.25),
+  paddingHorizontal: wp(3.4),
+  marginHorizontal: wp(3),
+  marginTop: hp(0.35),
   backgroundColor: colors.cardBackground,
   borderBottomWidth: 1,
   borderBottomColor: colors.cardBorder,
-  borderRadius: 25,
-  marginBottom: 20,
+  borderRadius: Math.min(wp(6), hp(3)),
+  marginBottom: Math.min(hp(2.4), wp(5.4)),
+  minHeight: Math.min(hp(10.8), wp(23)),
 },
 
 userInfo: {
-  flex: 1,              // take up remaining space
-  minWidth: 0,          // 🔑 allows text to shrink
+  flex: 1,
+  minWidth: 0,
 },
 
 userName: {
-  fontSize: DrawerFonts.body,
+  fontSize: Math.min(hp(1.95), wp(4.25)),
+  lineHeight: Math.min(hp(2.55), wp(5.5)),
   fontWeight: "600",
   color: colors.textPrimary,
 },
 
 userEmail: {
-  fontSize: DrawerFonts.drawerEmail,
+  fontSize: Math.min(hp(1.55), wp(3.5)),
+  lineHeight: Math.min(hp(2.1), wp(4.6)),
   color: colors.textSecondary,
-  marginTop: 2,
+  marginTop: hp(0.15),
 },
 
   userImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginRight: 12,
+    width: Math.min(wp(13.5), hp(6.8)),
+    height: Math.min(wp(13.5), hp(6.8)),
+    borderRadius: Math.min(wp(6.75), hp(3.4)),
+    marginRight: wp(2.8),
     borderWidth: 2,
     borderColor: colors.cardBorder,
+  },
+  userImagePlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primarySoft,
+  },
+  drawerItems: {
+    flex: 1,
+    paddingTop: hp(0.35),
+    paddingBottom: hp(0.4),
   },
   logoutButton: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
-    marginHorizontal: 12,
-    marginVertical: 20,
+    minHeight: Math.min(hp(5.5), wp(12.5)),
+    paddingVertical: hp(0.9),
+    paddingHorizontal: wp(3.6),
+    marginHorizontal: wp(3),
+    marginTop: hp(0.45),
+    marginBottom: bottomInset + hp(1.6),
     backgroundColor: colors.error,
-    borderRadius: 25,
+    borderRadius: Math.min(wp(6), hp(3)),
     justifyContent: "center",
     alignSelf: 'stretch',
   },
+  logoutTextRow: {
+    flexDirection: "row",
+    marginLeft: wp(1.5),
+  },
   logoutText: {
     color: colors.white,
-    fontSize: 16,
+    fontSize: Math.min(hp(2), wp(4.3)),
     fontWeight: "600",
-    marginLeft: 8,
+    marginLeft: wp(0.4),
   },
 });

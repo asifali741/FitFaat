@@ -1,19 +1,24 @@
-import Constants from 'expo-constants';
-import { Platform } from 'react-native';
+import {
+  cachedRequestJson,
+  clearRequestJsonCachesWithPrefix,
+  requestJson,
+} from './apiHelper';
+import { getBackendUrl } from './config';
 
-const ENV = Constants.expoConfig?.extra;
+const API_BASE_URL = getBackendUrl() + '/exercise';
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
+const EXERCISE_CACHE_PREFIX = 'exercise:';
 
-// Get base URL from environment variables - same pattern as other APIs
-const getBaseURL = () => {
-  const envUrl = ENV?.EXPO_PUBLIC_BACKEND_API_URL;
-  if (envUrl) {
-    return envUrl;
-  }
-  const defaultHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
-  return `http://${defaultHost}:5001/api`;
+const READ_REQUEST_CONFIG = {
+  timeoutMs: 9000,
+  retries: 1,
+  retryDelayMs: 600,
+  cacheTtlMs: 2 * 60 * 1000,
+  maxStaleMs: 24 * 60 * 60 * 1000,
+  allowStaleOnError: true,
+  maxWaitForFreshMs: 2800,
+  refreshCacheInBackground: true,
 };
-
-const API_BASE_URL = getBaseURL() + '/exercise';
 
 export const exerciseApi = {
   /**
@@ -26,56 +31,45 @@ export const exerciseApi = {
   async finishExercise(userId: string, exerciseName: string, durationSeconds: number) {
     const url = `${API_BASE_URL}/finish`;
     const body = { userId, exerciseName, durationSeconds };
-    
-    console.log('\n🏃 [finishExercise]');
+
+    console.log('\n[finishExercise]');
     console.log('   URL:', url);
     console.log('   Exercise:', exerciseName);
     console.log('   Duration:', durationSeconds, 'seconds');
-    
+
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      const data = await requestJson<any | undefined>(
+        url,
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(body),
+        },
+        { timeoutMs: 30000, retries: 0 }
+      );
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: controller.signal
-      });
+      await clearRequestJsonCachesWithPrefix(EXERCISE_CACHE_PREFIX);
 
-      clearTimeout(timeoutId);
-      console.log('   Status:', response.status);
-
-      const responseText = await response.text();
-      if (!responseText) {
-        if (response.ok) {
-          return {
-            success: true,
-            message: 'Exercise saved successfully',
-            data: { exerciseName, duration: durationSeconds }
-          };
-        } else {
-          throw new Error(`Server returned ${response.status}`);
-        }
+      if (!data) {
+        return {
+          success: true,
+          message: 'Exercise saved successfully',
+          data: { exerciseName, duration: durationSeconds },
+        };
       }
 
-      const data = JSON.parse(responseText);
-      if (!response.ok) {
-        throw new Error(data.message || `Status ${response.status}`);
-      }
-      
       // Log calories data if available
       if (data.data?.calorieData) {
-        console.log('   📊 Calories Burned:', data.data.calorieData.calories, 'kcal');
-        console.log('   🔥 Fat Burn:', data.data.calorieData.fatBurnGrams, 'grams');
-        console.log('   💪 Intensity:', data.data.calorieData.intensity);
+        console.log('   Calories Burned:', data.data.calorieData.calories, 'kcal');
+        console.log('   Fat Burn:', data.data.calorieData.fatBurnGrams, 'grams');
+        console.log('   Intensity:', data.data.calorieData.intensity);
         console.log('   Message:', data.data.motivationalMessage);
       }
-      
+
       return data;
     } catch (error: any) {
-      console.error('\n❌ [finishExercise] Error:', error.message);
-      
+      console.error('\n[finishExercise] Error:', error.message);
+
       if (error.name === 'AbortError') {
         throw new Error('Request timeout - Backend not responding');
       }
@@ -97,21 +91,16 @@ export const exerciseApi = {
       if (options.limit) queryParams.append('limit', options.limit.toString());
       if (options.date) queryParams.append('date', options.date);
 
-      const response = await fetch(
-        `${API_BASE_URL}/history/${userId}?${queryParams}`,
+      const endpoint = `${API_BASE_URL}/history/${userId}?${queryParams}`;
+      return await cachedRequestJson<any>(
+        `${EXERCISE_CACHE_PREFIX}history:${userId}:${queryParams.toString()}`,
+        endpoint,
         {
           method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        }
+          headers: JSON_HEADERS,
+        },
+        READ_REQUEST_CONFIG
       );
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to fetch exercise history');
-      }
-      return data;
     } catch (error) {
       console.error('Error fetching exercise history:', error);
       throw error;
@@ -125,21 +114,18 @@ export const exerciseApi = {
    */
   async getExerciseStats(userId: string) {
     try {
-      const response = await fetch(`${API_BASE_URL}/stats/${userId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to fetch exercise statistics');
-      }
-      return data;
+      return await cachedRequestJson<any>(
+        `${EXERCISE_CACHE_PREFIX}stats:${userId}`,
+        `${API_BASE_URL}/stats/${userId}`,
+        {
+          method: 'GET',
+          headers: JSON_HEADERS,
+        },
+        READ_REQUEST_CONFIG
+      );
     } catch (error) {
       console.error('Error fetching exercise stats:', error);
       throw error;
     }
-  }
+  },
 };

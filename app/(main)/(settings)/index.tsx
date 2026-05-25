@@ -1,41 +1,66 @@
 import AppHeader from "@/components/AppHeader";
+import { legalDocuments } from "@/constants/legalContent";
 import { useTheme } from "@/contexts/ThemeContext";
+import { authApi } from "@/utils/auth/authApi";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
+import {
+  loadGoalDisplayMode,
+  saveGoalDisplayMode,
+  type GoalDisplayMode,
+} from "@/utils/goalTargetDisplay";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DrawerActions, useNavigation } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { Alert, Linking, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import {
+  Alert,
+  Linking,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+const SUPPORT_EMAIL = "asif1465majid@gmail.com";
+
 export default function Settings() {
-  const navigation = useNavigation();
   const router = useRouter();
   const { isDarkMode, toggleDarkMode, colors } = useTheme();
-  const [notifications, setNotifications] = useState(true);
-  const [locationServices, setLocationServices] = useState(true);
-  const [dataSync, setDataSync] = useState(true);
-  const [user, setUser] = useState<any>(null);
+  const [goalDisplayMode, setGoalDisplayMode] = useState<GoalDisplayMode>("simple");
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const legalSettingMap = {
+    "Terms of Service": legalDocuments.terms,
+    "Privacy Policy": legalDocuments.privacy,
+    "Licenses": legalDocuments.licenses,
+  } as const;
 
   useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const userData = await tokenStorage.getUser();
-        setUser(userData);
-      } catch (error) {
-        console.error('Error loading user:', error);
-      }
-    };
-    loadUser();
+    loadGoalDisplayMode().then(setGoalDisplayMode).catch(() => setGoalDisplayMode("simple"));
   }, []);
 
-  const openDrawer = () => {
-    navigation.dispatch(DrawerActions.openDrawer());
+  const handleGoalDisplayToggle = async (showAdvanced: boolean) => {
+    const nextMode: GoalDisplayMode = showAdvanced ? "advanced" : "simple";
+    setGoalDisplayMode(nextMode);
+    try {
+      await saveGoalDisplayMode(nextMode);
+    } catch {
+      setGoalDisplayMode(showAdvanced ? "simple" : "advanced");
+      Alert.alert("Error", "Could not save target display preference. Please try again.");
+    }
   };
 
   const handleSettingPress = (setting: string) => {
+    const legalDocument = legalSettingMap[setting as keyof typeof legalSettingMap];
+    if (legalDocument) {
+      Alert.alert(legalDocument.title, legalDocument.body, [{ text: "OK" }]);
+      return;
+    }
+
     switch (setting) {
       case "Profile Information":
         router.push("/profile-information");
@@ -60,46 +85,17 @@ export default function Settings() {
       case "Workout Preferences":
         router.push("/(exercises)/workout");
         break;
-      
-      case "Diet Preferences":
-        Alert.alert(
-          "Diet Preferences",
-          "Set your dietary requirements, allergies, and food preferences for personalized meal plans.",
-          [{ text: "OK" }]
-        );
+
+      case "Step Counter":
+        router.push("/(main)/(steps)" as any);
         break;
-      
-      case "Health Goals":
-        Alert.alert(
-          "Health Goals",
-          "Set and track your health objectives like weight loss, muscle gain, or general fitness.",
-          [{ text: "OK" }]
-        );
+
+      case "Mindfulness":
+        router.push("/(main)/(mindfulness)" as any);
         break;
-      
-      case "Language":
-        Alert.alert(
-          "Language",
-          "Select your preferred language for the app interface.",
-          [
-            { text: "English", onPress: () => console.log("Set language to English") },
-            { text: "Spanish", onPress: () => console.log("Set language to Spanish") },
-            { text: "French", onPress: () => console.log("Set language to French") },
-            { text: "Cancel", style: "cancel" }
-          ]
-        );
-        break;
-      
-      case "Time Zone":
-        Alert.alert(
-          "Time Zone",
-          "Set your time zone for accurate scheduling and notifications.",
-          [{ text: "OK" }]
-        );
-        break;
-      
+
       case "Help Center":
-        Linking.openURL('https://help.fitfaat.com');
+        Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=FitFaat%20Help%20Center`);
         break;
       
       case "Contact Support":
@@ -107,20 +103,8 @@ export default function Settings() {
           "Contact Support",
           "Get help from our support team.",
           [
-            { text: "Email Support", onPress: () => Linking.openURL('mailto:support@fitfaat.com') },
-            { text: "Live Chat", onPress: () => console.log("Open live chat") },
+            { text: "Email Support", onPress: () => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=FitFaat%20Support`) },
             { text: "Cancel", style: "cancel" }
-          ]
-        );
-        break;
-      
-      case "Rate App":
-        Alert.alert(
-          "Rate App",
-          "We'd love to hear your feedback! Please rate our app.",
-          [
-            { text: "Rate Now", onPress: () => console.log("Open app store rating") },
-            { text: "Maybe Later", style: "cancel" }
           ]
         );
         break;
@@ -136,7 +120,7 @@ export default function Settings() {
       case "Terms of Service":
         Alert.alert(
           "Terms of Service",
-          "FITFAAT TERMS OF SERVICE\n\nLast Updated: January 2024\n\n1. ACCEPTANCE OF TERMS\nBy using FitFaat, you agree to be bound by these Terms of Service.\n\n2. DESCRIPTION OF SERVICE\nFitFaat provides AI-powered health and fitness guidance, personalized meal plans, workout routines, and telemedicine consultations.\n\n3. USER ACCOUNTS\nYou must provide accurate information and maintain account security.\n\n4. HEALTH DISCLAIMER\nFitFaat provides general health information only. Always consult healthcare professionals for medical advice.\n\n5. PRIVACY\nYour privacy is important to us. See our Privacy Policy for details.\n\n6. PROHIBITED USES\nYou may not use FitFaat for illegal activities or to harm others.\n\n7. INTELLECTUAL PROPERTY\nAll content is owned by FitFaat or licensed to us.\n\n8. LIMITATION OF LIABILITY\nFitFaat is not liable for any health outcomes or damages.\n\n9. TERMINATION\nWe may terminate accounts that violate these terms.\n\n10. CHANGES TO TERMS\nWe may update these terms with notice to users.\n\nFor full terms, visit: https://fitfaat.com/terms",
+          legalDocuments.terms.body,
           [{ text: "OK" }]
         );
         break;
@@ -152,73 +136,13 @@ export default function Settings() {
       case "Licenses":
         Alert.alert(
           "Open Source Licenses",
-          "FITFAAT OPEN SOURCE LICENSES\n\nThis app uses the following open source libraries:\n\n• React Native (MIT License)\n• Expo (MIT License)\n• Clerk Authentication (MIT License)\n• React Navigation (MIT License)\n• AsyncStorage (MIT License)\n• React Native Vector Icons (MIT License)\n• React Native Responsive Screen (MIT License)\n• React Native Reanimated (MIT License)\n• React Native Gesture Handler (MIT License)\n• React Native Safe Area Context (MIT License)\n• React Native Keyboard Aware Scroll View (MIT License)\n• React Native Progress (MIT License)\n• React Native Marquee (MIT License)\n• React Native Heroicons (MIT License)\n• Axios (MIT License)\n• Day.js (MIT License)\n• NativeWind (MIT License)\n• Tailwind CSS (MIT License)\n• Prettier (MIT License)\n• ESLint (MIT License)\n\nAll libraries are used in compliance with their respective licenses. Source code for these libraries is available on GitHub.\n\nFor detailed license information, visit: https://fitfaat.com/licenses",
+          "FITFAAT OPEN SOURCE LICENSES\n\nThis app uses the following open source libraries:\n\n• React Native (MIT License)\n• Expo (MIT License)\n• React Navigation (MIT License)\n• AsyncStorage (MIT License)\n• React Native Vector Icons (MIT License)\n• React Native Responsive Screen (MIT License)\n• React Native Reanimated (MIT License)\n• React Native Gesture Handler (MIT License)\n• React Native Safe Area Context (MIT License)\n• React Native Keyboard Aware Scroll View (MIT License)\n• React Native Progress (MIT License)\n• React Native Marquee (MIT License)\n• React Native Heroicons (MIT License)\n• Axios (MIT License)\n• Day.js (MIT License)\n• NativeWind (MIT License)\n• Tailwind CSS (MIT License)\n• Prettier (MIT License)\n• ESLint (MIT License)\n\nAll libraries are used in compliance with their respective licenses. Source code for these libraries is available on GitHub.\n\nFor detailed license information, visit: https://fitfaat.com/licenses",
           [{ text: "OK" }]
         );
         break;
       
       default:
         Alert.alert(setting, `This will open ${setting} settings`, [{ text: "OK" }]);
-    }
-  };
-
-  const handleClearCache = async () => {
-    try {
-      // Clear various cached data
-      await AsyncStorage.multiRemove([
-        'cached_exercises',
-        'cached_workouts',
-        'temp_data',
-        'image_cache'
-      ]);
-      
-      Alert.alert(
-        "Cache Cleared",
-        "Successfully cleared cached data and freed up storage space.",
-        [{ text: "OK" }]
-      );
-    } catch (error) {
-      Alert.alert(
-        "Error",
-        "Failed to clear cache. Please try again.",
-        [{ text: "OK" }]
-      );
-    }
-  };
-
-  const handleDownloadData = async () => {
-    try {
-      // Get current user data
-      const userData = {
-        profile: {
-          name: user?.username || "User",
-          email: user?.email || "user@example.com",
-          createdAt: user?.createdAt
-        },
-        workouts: await AsyncStorage.getItem('workout_history') || [],
-        favorites: await AsyncStorage.getItem('favoriteExercises') || [],
-        appointments: await AsyncStorage.getItem('appointments') || [],
-        settings: {
-          notifications,
-          darkMode: isDarkMode,
-          locationServices,
-          dataSync
-        }
-      };
-      
-      Alert.alert(
-        "Data Export",
-        "Your data has been prepared for download. You will receive an email with the download link shortly.",
-        [{ text: "OK" }]
-      );
-      
-      console.log("User data prepared for export:", userData);
-    } catch (error) {
-      Alert.alert(
-        "Error",
-        "Failed to prepare data export. Please try again.",
-        [{ text: "OK" }]
-      );
     }
   };
 
@@ -233,13 +157,10 @@ export default function Settings() {
           style: "destructive",
           onPress: async () => {
             try {
-              // Clear all auth data
-              await tokenStorage.removeToken();
-              await tokenStorage.removeUser();
-              await AsyncStorage.removeItem('weeklyTrackingId');
+              await authApi.logout();
               // Navigate to login
               router.replace('/(auth)/email-login');
-            } catch (error) {
+            } catch {
               Alert.alert("Error", "Failed to sign out. Please try again.");
             }
           }
@@ -249,6 +170,8 @@ export default function Settings() {
   };
 
   const handleDeleteAccount = () => {
+    if (isDeletingAccount) return;
+
     Alert.alert(
       "Delete Account",
       "This action cannot be undone. All your data will be permanently deleted. Are you sure?",
@@ -260,19 +183,31 @@ export default function Settings() {
           onPress: () => {
             Alert.alert(
               "Final Confirmation",
-              "This will permanently delete your account and all associated data. Type 'DELETE' to confirm.",
+              "This will permanently delete your account and all associated data.",
               [
                 { text: "Cancel", style: "cancel" },
                 { 
                   text: "Delete Forever", 
                   style: "destructive",
-                  onPress: () => {
-                    // In a real app, this would call an API to delete the account
-                    Alert.alert(
-                      "Account Deletion",
-                      "Account deletion request submitted. You will receive a confirmation email.",
-                      [{ text: "OK" }]
-                    );
+                  onPress: async () => {
+                    try {
+                      setIsDeletingAccount(true);
+                      await authApi.deleteAccount();
+                      await tokenStorage.clearAll();
+                      await AsyncStorage.removeItem('weeklyTrackingId');
+                      Alert.alert(
+                        "Account Deleted",
+                        "Your account has been permanently deleted.",
+                        [{ text: "OK", onPress: () => router.replace('/(auth)/email-login') }]
+                      );
+                    } catch (error: any) {
+                      Alert.alert(
+                        "Error",
+                        error?.message || error?.response?.data?.message || "Failed to delete account. Please try again."
+                      );
+                    } finally {
+                      setIsDeletingAccount(false);
+                    }
                   }
                 }
               ]
@@ -310,23 +245,31 @@ export default function Settings() {
       </View>
       <View style={styles.settingRight}>
         {rightComponent || (showArrow && (
-          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+          <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
         ))}
       </View>
     </TouchableOpacity>
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.primary }]}>
-      <AppHeader 
-        title="Settings"
-        showStepIndicator={false}
-        showMenuButton={true}
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.screenColor }]} edges={['top']}>
+      <StatusBar
+        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+        backgroundColor={colors.screenColor}
       />
+      <View style={[styles.container, { backgroundColor: colors.primary }]}>
+        <AppHeader 
+          title="Settings"
+          showStepIndicator={false}
+          showMenuButton={true}
+        />
 
-      {/* Main Content */}
-      <View style={[styles.content, { backgroundColor: colors.screenColor }]}>
-        <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Main Content */}
+        <View style={[styles.content, { backgroundColor: colors.screenColor }]}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+          >
           {/* Account Section */}
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Account</Text>
@@ -362,6 +305,17 @@ export default function Settings() {
             />
           </View>
 
+          {/* Professional Access Section */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Professional Access</Text>
+            <SettingItem
+              icon="medkit-outline"
+              title="Join as Doctor"
+              subtitle="Register or manage your doctor profile"
+              onPress={() => router.push("/(main)/(doctor-portal)")}
+            />
+          </View>
+
           {/* Preferences Section */}
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Preferences</Text>
@@ -386,16 +340,39 @@ export default function Settings() {
               showArrow={false}
             />
             <SettingItem
-              icon="language-outline"
-              title="Language"
-              subtitle="English (US)"
-              onPress={() => handleSettingPress("Language")}
+              icon="options-outline"
+              title="Advanced Target Ranges"
+              subtitle={
+                goalDisplayMode === "advanced"
+                  ? "Show calories and hydration as estimated ranges"
+                  : "Show calories and hydration as one simple number"
+              }
+              rightComponent={
+                <Switch
+                  value={goalDisplayMode === "advanced"}
+                  onValueChange={handleGoalDisplayToggle}
+                  trackColor={{ false: colors.textSecondary + '40', true: colors.primary + '40' }}
+                  thumbColor={goalDisplayMode === "advanced" ? colors.primary : colors.textSecondary}
+                />
+              }
+              showArrow={false}
+            />
+          </View>
+
+          {/* Local Sync Section */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Local Sync</Text>
+            <SettingItem
+              icon="archive-outline"
+              title="Backup Center"
+              subtitle="Export, preview, test, and restore local FitFaat backups"
+              onPress={() => router.push("/(main)/(settings)/backup-center" as any)}
             />
             <SettingItem
-              icon="time-outline"
-              title="Time Zone"
-              subtitle="Auto (GMT+5:30)"
-              onPress={() => handleSettingPress("Time Zone")}
+              icon="help-circle-outline"
+              title="How To Backup"
+              subtitle="Export, test, move, preview, and restore backup files"
+              onPress={() => router.push("/(main)/(settings)/local-sync-guide" as any)}
             />
           </View>
 
@@ -409,50 +386,23 @@ export default function Settings() {
               onPress={() => handleSettingPress("Workout Preferences")}
             />
             <SettingItem
-              icon="restaurant-outline"
-              title="Diet Preferences"
-              subtitle="Set your dietary requirements"
-              onPress={() => handleSettingPress("Diet Preferences")}
+              icon="basket-outline"
+              title="Meal Planner"
+              subtitle="Premium meal planning and grocery lists"
+              onPress={() => router.push("/(main)/(meal-planner)" as any)}
             />
             <SettingItem
-              icon="medical-outline"
-              title="Health Goals"
-              subtitle="Track your health objectives"
-              onPress={() => handleSettingPress("Health Goals")}
+              icon="footsteps-outline"
+              title="Step Counter"
+              subtitle="Basic daily steps; Premium unlocks advanced step insights"
+              onPress={() => handleSettingPress("Step Counter")}
             />
-            <SettingItem
-              icon="sync-outline"
-              title="Data Sync"
-              subtitle="Sync your health data across devices"
-              rightComponent={
-                <Switch
-                  value={dataSync}
-                  onValueChange={setDataSync}
-                  trackColor={{ false: colors.textSecondary + '40', true: colors.primary + '40' }}
-                  thumbColor={dataSync ? colors.primary : colors.textSecondary}
-                />
-              }
-              showArrow={false}
-            />
-          </View>
-
-          {/* App Settings Section */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>App Settings</Text>
-            <SettingItem
-              icon="location-outline"
-              title="Location Services"
-              subtitle="Allow location access for better recommendations"
-              rightComponent={
-                <Switch
-                  value={locationServices}
-                  onValueChange={setLocationServices}
-                  trackColor={{ false: colors.textSecondary + '40', true: colors.primary + '40' }}
-                  thumbColor={locationServices ? colors.primary : colors.textSecondary}
-                />
-              }
-              showArrow={false}
-            />
+              <SettingItem
+                icon="leaf-outline"
+                title="Mindfulness"
+                subtitle="Basic breathing is free; Premium unlocks the full library"
+                onPress={() => handleSettingPress("Mindfulness")}
+              />
           </View>
 
           {/* Support Section */}
@@ -461,20 +411,14 @@ export default function Settings() {
             <SettingItem
               icon="help-circle-outline"
               title="Help Center"
-              subtitle="Get help and support"
+              subtitle={SUPPORT_EMAIL}
               onPress={() => handleSettingPress("Help Center")}
             />
             <SettingItem
-              icon="chatbubble-outline"
+              icon="mail-outline"
               title="Contact Support"
-              subtitle="Reach out to our support team"
+              subtitle={SUPPORT_EMAIL}
               onPress={() => handleSettingPress("Contact Support")}
-            />
-            <SettingItem
-              icon="star-outline"
-              title="Rate App"
-              subtitle="Share your feedback"
-              onPress={() => handleSettingPress("Rate App")}
             />
             <SettingItem
               icon="information-circle-outline"
@@ -520,25 +464,32 @@ export default function Settings() {
           <View style={styles.section}>
             <TouchableOpacity style={[styles.deleteAccountButton, { backgroundColor: colors.cardBackground, borderColor: colors.error + '40' }]} onPress={handleDeleteAccount}>
               <Ionicons name="trash-outline" size={24} color={colors.error} />
-              <Text style={[styles.deleteAccountText, { color: colors.error }]}>Delete Account</Text>
+              <Text style={[styles.deleteAccountText, { color: colors.error }]}>
+                {isDeletingAccount ? "Deleting Account..." : "Delete Account"}
+              </Text>
             </TouchableOpacity>
-        </View>
+          </View>
 
-          <View style={{ height: hp(4) }} />
-        </ScrollView>
+          <View style={{ height: hp(12) }} />
+          </ScrollView>
+        </View>
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+  },
   container: {
     flex: 1,
   },
   content: {
     flex: 1,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
+  },
+  scrollContent: {
+    paddingBottom: hp(4),
   },
   section: {
     marginTop: hp(2),

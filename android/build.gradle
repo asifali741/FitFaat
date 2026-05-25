@@ -1,0 +1,52 @@
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+
+buildscript {
+  repositories {
+    google()
+    mavenCentral()
+  }
+  dependencies {
+    classpath('com.android.tools.build:gradle')
+    classpath('com.facebook.react:react-native-gradle-plugin')
+    classpath('org.jetbrains.kotlin:kotlin-gradle-plugin')
+  }
+}
+
+allprojects {
+  repositories {
+    maven { url 'https://maven.zego.im' }
+    google()
+    mavenCentral()
+    maven { url 'https://www.jitpack.io' }
+  }
+}
+
+def reactNativeNewArchCodegenProjects = [
+  'react-native-webview',
+]
+
+subprojects { subproject ->
+  if (reactNativeNewArchCodegenProjects.contains(subproject.name)) {
+    subproject.pluginManager.withPlugin('com.android.library') {
+      subproject.pluginManager.apply('com.facebook.react')
+    }
+  }
+}
+
+gradle.projectsEvaluated {
+  def codegenTasks = reactNativeNewArchCodegenProjects.collect { projectName ->
+    findProject(":${projectName}")?.tasks?.findByName('generateCodegenArtifactsFromSchema')
+  }.findAll { it != null }
+
+  if (!codegenTasks.isEmpty()) {
+    project(':app').tasks.matching { task ->
+      task.name.startsWith('configureCMake') ||
+        (task.name.startsWith('externalNativeBuild') && !task.name.startsWith('externalNativeBuildClean'))
+    }.configureEach {
+      dependsOn(codegenTasks)
+    }
+  }
+}
+
+apply plugin: "expo-root-project"
+apply plugin: "com.facebook.react.rootproject"

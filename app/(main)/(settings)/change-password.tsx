@@ -1,9 +1,13 @@
 import AppHeader from "@/components/AppHeader";
 import { useTheme } from "@/contexts/ThemeContext";
-import { useUser } from "@clerk/clerk-expo";
+import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from "expo-constants";
+import { useRouter } from "expo-router";
+import * as NavigationBar from 'expo-navigation-bar';
 import * as SecureStore from 'expo-secure-store';
+import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -18,6 +22,7 @@ import {
 } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { getBackendBaseUrl } from '@/utils/config';
 
 const ENV = Constants.expoConfig?.extra;
 
@@ -26,16 +31,14 @@ const getAPIURL = () => {
   if (envUrl) {
     return envUrl.replace(/\/api\/?$/, '');
   }
-  const defaultHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
-  return `http://${defaultHost}:5001`;
+  return getBackendBaseUrl();
 };
 
 const API_URL = getAPIURL();
 
 export default function ChangePassword() {
+  const router = useRouter();
   const { colors } = useTheme();
-  const { user, isLoaded } = useUser();
-  const [isClerkUser, setIsClerkUser] = useState(false);
   
   const [formData, setFormData] = useState({
     currentPassword: "",
@@ -59,12 +62,13 @@ export default function ChangePassword() {
   const [passwordStrength, setPasswordStrength] = useState(0);
 
   useEffect(() => {
-    if (user && isLoaded) {
-      setIsClerkUser(true);
-    } else {
-      setIsClerkUser(false);
+    // Set Android navigation bar to white
+    if (Platform.OS === 'android') {
+      NavigationBar.setBackgroundColorAsync('#FFFFFF').catch(() => {});
+      NavigationBar.setButtonStyleAsync('dark').catch(() => {});
+      NavigationBar.setStyle('light');
     }
-  }, [user, isLoaded]);
+  }, []);
 
   const checkPasswordStrength = (password: string) => {
     let strength = 0;
@@ -107,77 +111,74 @@ export default function ChangePassword() {
 
   const handleChangePassword = async () => {
     if (!validateForm()) return;
-    
+
     setIsChanging(true);
     try {
-      if (isClerkUser) {
-        // Clerk user - use Clerk's API
-        await user?.updatePassword({
+      const token = await SecureStore.getItemAsync('fitfaat_auth_token');
+
+      if (!token) {
+        Alert.alert("Error", "Authentication required. Please log in again.");
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/api/user/change-password`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           currentPassword: formData.currentPassword,
           newPassword: formData.newPassword,
-        });
-        
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
         Alert.alert(
-          "Success", 
-          "Your password has been changed successfully.",
-          [{ text: "OK", onPress: () => {
-            setFormData({
-              currentPassword: "",
-              newPassword: "",
-              confirmPassword: "",
-            });
-          }}]
+          "Success",
+          "Your password has been changed successfully. Please log in with your new password.",
+          [{
+            text: "OK",
+            onPress: async () => {
+              await tokenStorage.clearAll();
+              await AsyncStorage.removeItem('weeklyTrackingId');
+              setFormData({
+                currentPassword: "",
+                newPassword: "",
+                confirmPassword: "",
+              });
+              router.replace('/(auth)/email-login');
+            }
+          }]
         );
       } else {
-        // Backend email user - use backend API
-        const token = await SecureStore.getItemAsync('fitfaat_auth_token');
-        
-        if (!token) {
-          Alert.alert("Error", "Authentication required. Please log in again.");
-          return;
-        }
-
-        const response = await fetch(`${API_URL}/api/user/change-password`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            currentPassword: formData.currentPassword,
-            newPassword: formData.newPassword,
-          }),
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-          Alert.alert(
-            "Success", 
-            "Your password has been changed successfully. Please log in with your new password.",
-            [{ 
-              text: "OK", 
-              onPress: async () => {
-                // Clear stored credentials and redirect to login
-                await SecureStore.deleteItemAsync('fitfaat_auth_token');
-                await SecureStore.deleteItemAsync('fitfaat_user');
-                setFormData({
-                  currentPassword: "",
-                  newPassword: "",
-                  confirmPassword: "",
-                });
-              }
-            }]
-          );
-        } else {
-          Alert.alert("Error", data.message || "Failed to change password");
-        }
+        Alert.alert("Error", data.message || "Failed to change password");
       }
     } catch (error: any) {
       Alert.alert("Error", error.message || "Failed to change password");
     } finally {
       setIsChanging(false);
     }
+  };
+
+  const handleForgotCurrentPassword = () => {
+    Alert.alert(
+      "Reset Password",
+      "You will be signed out so you can reset your password using your email.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Continue",
+          onPress: async () => {
+            await tokenStorage.clearAll();
+            await AsyncStorage.removeItem('weeklyTrackingId');
+            router.replace('/forgot-password');
+          }
+        }
+      ]
+    );
   };
 
   const getPasswordStrengthColor = () => {
@@ -197,6 +198,7 @@ export default function ChangePassword() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
       <AppHeader 
         title="Change Password"
         showStepIndicator={false}
@@ -212,14 +214,14 @@ export default function ChangePassword() {
           <ScrollView showsVerticalScrollIndicator={false}>
             {/* Authentication Method Badge */}
             <View style={styles.authBadgeContainer}>
-              <View style={[styles.authBadge, { backgroundColor: isClerkUser ? colors.primary : colors.secondary }]}>
+              <View style={[styles.authBadge, { backgroundColor: colors.secondary }]}>
                 <Ionicons 
-                  name={isClerkUser ? "logo-google" : "mail"} 
+                  name="mail"
                   size={16} 
                   color="white" 
                 />
                 <Text style={styles.authBadgeText}>
-                  {isClerkUser ? "Clerk Authentication" : "Email Authentication"}
+                  Email Authentication
                 </Text>
               </View>
             </View>
@@ -228,9 +230,7 @@ export default function ChangePassword() {
             <View style={styles.securityNotice}>
               <Ionicons name="shield-checkmark" size={26} color={colors.primary} />
               <Text style={styles.securityText}>
-                {isClerkUser 
-                  ? "For your security, you'll need to sign in again after changing your password"
-                  : "After changing your password, you will be logged out. Please log in with your new password."}
+                After changing your password, you will be logged out. Please log in with your new password.
               </Text>
             </View>
 
@@ -422,7 +422,7 @@ export default function ChangePassword() {
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.forgotButton}>
+            <TouchableOpacity style={styles.forgotButton} onPress={handleForgotCurrentPassword}>
               <Text style={styles.forgotButtonText}>Forgot your current password?</Text>
             </TouchableOpacity>
 
@@ -437,13 +437,11 @@ export default function ChangePassword() {
 const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.screenColor || '#FFFFFF',
   },
   content: {
     flex: 1,
     backgroundColor: colors.screenColor,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
   },
   authBadgeContainer: {
     alignItems: 'center',

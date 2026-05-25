@@ -3,6 +3,20 @@
  * Healthcare-focused color palette and design tokens
  */
 
+import {
+  heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
+} from 'react-native-responsive-screen';
+
+const BASE_WIDTH = 375;
+const BASE_HEIGHT = 812;
+
+const rw = (value: number) => wp((value / BASE_WIDTH) * 100);
+const rh = (value: number) => hp((value / BASE_HEIGHT) * 100);
+const rs = (value: number) => Math.round(Math.min(rw(value), rh(value)));
+const rf = (value: number, min = 10, max = 34) =>
+  Math.round(Math.min(Math.max(rs(value), min), max));
+
 export const theme = {
   colors: {
     // Primary Colors - Professional Health App Palette
@@ -11,6 +25,8 @@ export const theme = {
     accent: '#06B6D4',         // Energetic Cyan (CTAs, Highlights)
     
     // Backgrounds
+    white: '#FFFFFF',
+    black: '#000000',
     background: '#F8FAFC',     // Soft Off-White
     surface: '#FFFFFF',        // Card backgrounds
     screenColor: '#FFFFFF',    // Screen background (Clean White)
@@ -73,13 +89,13 @@ export const theme = {
     
     // Font Sizes
     fontSize: {
-      xs: 12,
-      sm: 14,
-      base: 16,
-      lg: 18,
-      xl: 20,
-      xxl: 24,
-      xxxl: 32,
+      xs: rf(12, 10, 13),
+      sm: rf(14, 11, 15),
+      base: rf(16, 12, 17),
+      lg: rf(18, 14, 20),
+      xl: rf(20, 16, 22),
+      xxl: rf(24, 18, 26),
+      xxxl: rf(32, 24, 34),
     },
     
     // Font Weights
@@ -99,43 +115,43 @@ export const theme = {
   },
   
   spacing: {
-    xs: 4,
-    sm: 8,
-    md: 12,
-    lg: 16,
-    xl: 24,
-    xxl: 32,
-    xxxl: 48,
+    xs: rs(4),
+    sm: rs(8),
+    md: rs(12),
+    lg: rs(16),
+    xl: rs(24),
+    xxl: rs(32),
+    xxxl: rs(48),
   },
   
   borderRadius: {
-    small: 8,
-    medium: 12,
-    large: 16,
-    xl: 20,
+    small: rs(8),
+    medium: rs(12),
+    large: rs(16),
+    xl: rs(20),
     full: 9999,
   },
   
   shadows: {
     small: {
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
+      shadowOffset: { width: 0, height: rs(1) },
       shadowOpacity: 0.1,
-      shadowRadius: 2,
+      shadowRadius: rs(2),
       elevation: 2,
     },
     medium: {
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
+      shadowOffset: { width: 0, height: rs(2) },
       shadowOpacity: 0.15,
-      shadowRadius: 4,
+      shadowRadius: rs(4),
       elevation: 4,
     },
     large: {
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
+      shadowOffset: { width: 0, height: rs(4) },
       shadowOpacity: 0.2,
-      shadowRadius: 8,
+      shadowRadius: rs(8),
       elevation: 8,
     },
   },
@@ -144,24 +160,24 @@ export const theme = {
   components: {
     button: {
       height: {
-        small: 36,
-        medium: 44,
-        large: 52,
+        small: rh(36),
+        medium: rh(44),
+        large: rh(52),
       },
       paddingHorizontal: {
-        small: 12,
-        medium: 16,
-        large: 24,
+        small: rw(12),
+        medium: rw(16),
+        large: rw(24),
       },
     },
     input: {
-      height: 48,
+      height: rh(48),
       borderWidth: 1,
-      paddingHorizontal: 16,
+      paddingHorizontal: rw(16),
     },
     card: {
-      padding: 16,
-      borderRadius: 12,
+      padding: rs(16),
+      borderRadius: rs(12),
     },
   },
 };

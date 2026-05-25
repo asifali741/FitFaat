@@ -1,10 +1,11 @@
 import IncomingCallModal from '@/components/IncomingCallModal';
+import { tokenStorage } from '@/utils/auth/tokenStorage';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import { io, Socket } from 'socket.io-client';
+import { getBackendBaseUrl, isRealtimeSocketEnabled } from '@/utils/config';
 
 interface IncomingCall {
   callerId: string;
@@ -31,7 +32,7 @@ export const useGlobalCall = () => {
 };
 
 const ENV = Constants.expoConfig?.extra;
-const API_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')).replace(/\/api\/?$/, '');
+const API_URL = getBackendBaseUrl();
 
 export const GlobalCallProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const router = useRouter();
@@ -41,7 +42,9 @@ export const GlobalCallProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   useEffect(() => {
     const initSocket = async () => {
       try {
-        const token = await SecureStore.getItemAsync('authToken');
+        if (!isRealtimeSocketEnabled()) return;
+
+        const token = await tokenStorage.getToken();
         if (!token) return;
 
         console.log('🌐 [GLOBAL CALL] Initializing global socket connection');

@@ -1,10 +1,9 @@
-import { HEADER_PADDING_HORIZONTAL, HEADER_PADDING_VERTICAL } from '@/constants/ui';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleProp, StyleSheet, Text, TextStyle, TouchableOpacity, View } from 'react-native';
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
 
 interface AppHeaderProps {
@@ -18,10 +17,13 @@ interface AppHeaderProps {
   showNotificationBell?: boolean;
   notificationCount?: number;
   onNotificationPress?: () => void;
+  titleStyle?: StyleProp<TextStyle>;
+  titleMinimumFontScale?: number;
+  compactTitleSpacing?: boolean;
 }
 export default function AppHeader({
   title,
-  showBackButton = true,
+  showBackButton = false,
   showStepIndicator = false,
   currentStep = 1,
   totalSteps = 6,
@@ -30,15 +32,29 @@ export default function AppHeader({
   showNotificationBell = false,
   notificationCount = 0,
   onNotificationPress,
+  titleStyle,
+  titleMinimumFontScale = 0.82,
+  compactTitleSpacing = false,
 }: AppHeaderProps) {
   const navigation = useNavigation();
   const router = useRouter();
   const { colors } = useTheme();
 
-
-
   const openDrawer = () => {
     navigation.dispatch(DrawerActions.openDrawer());
+  };
+
+  const handleNotificationPress = () => {
+    if (onNotificationPress) {
+      onNotificationPress();
+      return;
+    }
+
+    try {
+      router.push('/(main)/(news)');
+    } catch (e) {
+      // No-op fallback keeps the header harmless if the news route is unavailable.
+    }
   };
 
   const handleBackPress = () => {
@@ -73,28 +89,49 @@ export default function AppHeader({
 
   return (
     <View style={[styles.container, { backgroundColor: colors.primary }]}>
-      {/* Top Bar */}
-      <View style={[styles.topBar, { backgroundColor: colors.primary }]}>
-        {showMenuButton ? (
-          <TouchableOpacity 
-            style={styles.menuButton}
-            onPress={openDrawer}
-          >
-            <Ionicons name="menu" size={24} color={colors.textOnPrimary} />
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.spacer} />
-        )}
+      <View style={[styles.topBar, compactTitleSpacing && styles.topBarCompact, { backgroundColor: colors.primary }]}>
+        <View style={[styles.sideSlot, compactTitleSpacing && styles.sideSlotCompact]}>
+          {showBackButton ? (
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={handleBackPress}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+            >
+              <Ionicons name="arrow-back" size={Math.min(hp(3.3), wp(7))} color="#FFFFFF" />
+            </TouchableOpacity>
+          ) : showMenuButton ? (
+            <TouchableOpacity 
+              style={styles.iconButton}
+              onPress={openDrawer}
+              accessibilityRole="button"
+              accessibilityLabel="Open menu"
+            >
+              <Ionicons name="menu" size={Math.min(hp(3.8), wp(8))} color={colors.textOnPrimary} />
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.spacer} />
+          )}
+        </View>
         
-        <Text style={[styles.title, { color: colors.textOnPrimary }]}>{title}</Text>
+        <Text
+          style={[styles.title, { color: colors.textOnPrimary }, titleStyle]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={titleMinimumFontScale}
+        >
+          {title}
+        </Text>
         
-        <View style={styles.rightIconContainer}>
+        <View style={[styles.sideSlot, compactTitleSpacing && styles.sideSlotCompact, styles.rightSlot]}>
           {showNotificationBell && (
             <TouchableOpacity 
-              style={styles.notificationButton}
-              onPress={onNotificationPress}
+              style={styles.iconButton}
+              onPress={handleNotificationPress}
+              accessibilityRole="button"
+              accessibilityLabel="Open notifications"
             >
-              <Ionicons name="notifications" size={24} color={colors.textOnPrimary} />
+              <Ionicons name="notifications" size={Math.min(hp(3.7), wp(7.8))} color={colors.textOnPrimary} />
               {notificationCount > 0 && (
                 <View style={[styles.badge, { backgroundColor: '#FF6B6B' }]}>
                   <Text style={styles.badgeText}>
@@ -104,23 +141,13 @@ export default function AppHeader({
               )}
             </TouchableOpacity>
           )}
-          
-          {showBackButton && !showNotificationBell && (
-            <TouchableOpacity 
-              style={styles.backButton}
-              onPress={handleBackPress}
-            >
-              <Ionicons name="arrow-back" size={24} color={colors.textOnPrimary} />
-            </TouchableOpacity>
-          )}
-          
-          {!showNotificationBell && !showBackButton && (
+
+          {!showNotificationBell && (
             <View style={styles.spacer} />
           )}
         </View>
       </View>
 
-      {/* Step Indicator */}
       {showStepIndicator && (
         <View style={styles.stepIndicatorContainer}>
           <View style={styles.stepDots}>
@@ -143,57 +170,70 @@ export default function AppHeader({
 }
 
 const styles = StyleSheet.create({
-  container: {},
+  container: {
+    width: '100%',
+  },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: HEADER_PADDING_HORIZONTAL,
-    paddingVertical: HEADER_PADDING_VERTICAL,
+    justifyContent: 'space-around',
+    minHeight: hp(7.6),
+    paddingHorizontal: wp(5),
   },
-  menuButton: {
-    padding: 8,
+  topBarCompact: {
+    paddingHorizontal: wp(3.5),
   },
   title: {
-    fontSize: hp(2.5),
-    fontWeight: 'bold',
+    fontSize: Math.min(hp(3.1), wp(7.2)),
+    fontWeight: '800',
     flex: 1,
     textAlign: 'center',
+    includeFontPadding: false,
   },
-  backButton: {
-    padding: 8,
+  sideSlot: {
+    width: wp(13),
+    minWidth: Math.min(hp(5.4), wp(11.8)),
+    alignItems: 'flex-start',
+    justifyContent: 'center',
   },
-  notificationButton: {
-    padding: 8,
-    position: 'relative',
+  sideSlotCompact: {
+    width: wp(11.8),
   },
-  rightIconContainer: {
-    flexDirection: 'row',
+  rightSlot: {
+    alignItems: 'flex-end',
+  },
+  iconButton: {
+    width: Math.min(hp(5.4), wp(11.8)),
+    height: Math.min(hp(5.4), wp(11.8)),
+    borderRadius: Math.min(hp(2.7), wp(5.9)),
+    justifyContent: 'center',
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    minWidth: wp(12),
+    position: 'relative',
   },
   badge: {
     position: 'absolute',
-    top: 0,
-    right: 0,
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
+    top: hp(0.2),
+    right: wp(0.3),
+    minWidth: Math.min(hp(2.2), wp(4.8)),
+    height: Math.min(hp(2.2), wp(4.8)),
+    borderRadius: Math.min(hp(1.1), wp(2.4)),
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: wp(0.8),
   },
   badgeText: {
     color: 'white',
-    fontSize: 10,
+    fontSize: Math.min(hp(1.2), wp(2.7)),
     fontWeight: 'bold',
+    includeFontPadding: false,
   },
   spacer: {
-    width: wp(12),
+    width: Math.min(hp(5.4), wp(11.8)),
+    height: Math.min(hp(5.4), wp(11.8)),
   },
   stepIndicatorContainer: {
     alignItems: 'center',
-    paddingBottom: hp(2),
+    paddingBottom: hp(1.4),
   },
   stepDots: {
     flexDirection: 'row',

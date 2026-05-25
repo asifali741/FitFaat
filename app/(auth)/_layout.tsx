@@ -1,12 +1,6 @@
-console.log("TOP OF FILE")
 import { Stack } from "expo-router";
-import { useEffect } from "react";
 
 export default function AuthLayout() {
-  useEffect(() => {
-    console.log('Auth layout mounted');
-  }, []);
-
   return (
     <Stack
       screenOptions={{
@@ -26,25 +20,22 @@ export default function AuthLayout() {
       <Stack.Screen 
         name="email-login" 
         options={{
-          headerShown: true,
-          title: 'Login',
-          headerTintColor: '#007AFF',
-          headerBackTitle: 'Back',
-        }}
-        listeners={{
-          focus: () => console.log('Login screen focused'),
+          headerShown: false,
         }}
       />
       <Stack.Screen 
         name="email-signup"
         options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="forgot-password"
+        options={{
           headerShown: true,
-          title: 'Sign Up',
+          title: 'Forgot Password',
           headerTintColor: '#007AFF',
           headerBackTitle: 'Back',
-        }}
-        listeners={{
-          focus: () => console.log('Signup screen focused'),
         }}
       />
     </Stack>

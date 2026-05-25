@@ -5,14 +5,21 @@
 
 import { KeyboardAwareContainer, ThemedButton, ThemedInput } from '@/components/themed';
 import { theme } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
+} from 'react-native-responsive-screen';
 import { authApi } from '../../utils/auth/authApi';
 
 export default function SignupThemed() {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -124,14 +131,23 @@ export default function SignupThemed() {
   };
 
   return (
-    <KeyboardAwareContainer>
+    <KeyboardAwareContainer
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
+      contentContainerStyle={styles.keyboardContent}
+    >
       {/* Professional Header with Gradient */}
       <LinearGradient
-        colors={[theme.colors.secondary, theme.colors.primary]}
+        colors={[colors.secondary, colors.primary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.headerGradient}
       >
+        <Image
+          source={require('../../assets/images/sal2.jpg')}
+          style={styles.headerImage}
+          resizeMode="cover"
+        />
+        <View style={styles.headerImageOverlay} />
         <View style={styles.decorativeHeader}>
           <View style={[styles.circle, styles.circle1]} />
           <View style={[styles.circle, styles.circle2]} />
@@ -143,7 +159,7 @@ export default function SignupThemed() {
         <View style={styles.header}>
           <View style={styles.logoContainer}>
             <View style={styles.logoBg}>
-              <Ionicons name="heart" size={36} color={theme.colors.surface} />
+              <Ionicons name="heart" size={Math.min(hp(4.4), wp(9.6))} color={colors.textOnPrimary} />
             </View>
           </View>
           <Text style={styles.title}>Create Account</Text>
@@ -237,24 +253,24 @@ export default function SignupThemed() {
           <View style={styles.requirement}>
             <Ionicons 
               name={password.length >= 8 ? "checkmark-circle" : "ellipse-outline"} 
-              size={16} 
-              color={password.length >= 8 ? theme.colors.success : theme.colors.textTertiary} 
+              size={Math.min(hp(2), wp(4.3))} 
+              color={password.length >= 8 ? colors.success : colors.textTertiary} 
             />
             <Text style={styles.requirementText}>At least 8 characters</Text>
           </View>
           <View style={styles.requirement}>
             <Ionicons 
               name={/[A-Za-z]/.test(password) ? "checkmark-circle" : "ellipse-outline"} 
-              size={16} 
-              color={/[A-Za-z]/.test(password) ? theme.colors.success : theme.colors.textTertiary} 
+              size={Math.min(hp(2), wp(4.3))} 
+              color={/[A-Za-z]/.test(password) ? colors.success : colors.textTertiary} 
             />
             <Text style={styles.requirementText}>At least one letter</Text>
           </View>
           <View style={styles.requirement}>
             <Ionicons 
               name={/\d/.test(password) ? "checkmark-circle" : "ellipse-outline"} 
-              size={16} 
-              color={/\d/.test(password) ? theme.colors.success : theme.colors.textTertiary} 
+              size={Math.min(hp(2), wp(4.3))} 
+              color={/\d/.test(password) ? colors.success : colors.textTertiary} 
             />
             <Text style={styles.requirementText}>At least one number</Text>
           </View>
@@ -288,11 +304,25 @@ export default function SignupThemed() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
+  keyboardContent: {
+    flexGrow: 1,
+    paddingBottom: hp(5),
+  },
   headerGradient: {
-    height: 220,
+    height: hp(27),
     position: 'relative',
     overflow: 'hidden',
+  },
+  headerImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+  },
+  headerImageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.secondary,
+    opacity: 0.18,
   },
   decorativeHeader: {
     position: 'absolute',
@@ -308,58 +338,58 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   circle1: {
-    width: 250,
-    height: 250,
-    top: -100,
-    right: -80,
+    width: wp(66.7),
+    height: wp(66.7),
+    top: -hp(12.3),
+    right: -wp(21.3),
   },
   circle2: {
-    width: 180,
-    height: 180,
-    top: 80,
-    left: -50,
+    width: wp(48),
+    height: wp(48),
+    top: hp(9.8),
+    left: -wp(13.3),
   },
   formContainer: {
-    flex: 1,
     paddingHorizontal: theme.spacing.xl,
     paddingTop: theme.spacing.xxl,
-    backgroundColor: theme.colors.screenColor,
-    marginTop: -40,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
+    paddingBottom: hp(5),
+    backgroundColor: colors.screenColor,
+    marginTop: -hp(4.9),
+    borderTopLeftRadius: wp(8.5),
+    borderTopRightRadius: wp(8.5),
     ...theme.shadows.large,
   },
   header: {
     alignItems: 'center',
     marginBottom: theme.spacing.xl,
-    marginTop: -60,
+    marginTop: -hp(7.4),
   },
   logoContainer: {
     marginBottom: theme.spacing.lg,
   },
   logoBg: {
-    width: 80,
-    height: 80,
+    width: Math.min(hp(9.8), wp(21.3)),
+    height: Math.min(hp(9.8), wp(21.3)),
     borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.secondary,
+    backgroundColor: colors.secondary,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 4,
-    borderColor: theme.colors.surface,
+    borderWidth: wp(1),
+    borderColor: colors.textOnPrimary,
     ...theme.shadows.large,
   },
   title: {
-    fontSize: theme.typography.fontSize.xxxl + 4,
+    fontSize: Math.min(hp(4.4), wp(9.6)),
     fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: theme.spacing.xs,
-    letterSpacing: -0.5,
+    letterSpacing: 0,
   },
   subtitle: {
     fontSize: theme.typography.fontSize.base,
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: hp(2.7),
   },
   progressContainer: {
     flexDirection: 'row',
@@ -368,37 +398,37 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.xl,
   },
   progressStep: {
-    width: 44,
-    height: 44,
+    width: Math.min(hp(5.4), wp(11.7)),
+    height: Math.min(hp(5.4), wp(11.7)),
     borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 2.5,
-    borderColor: theme.colors.border,
+    backgroundColor: colors.surface,
+    borderWidth: wp(0.65),
+    borderColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
     ...theme.shadows.small,
   },
   progressStepActive: {
-    backgroundColor: theme.colors.secondary,
-    borderColor: theme.colors.secondary,
+    backgroundColor: colors.secondary,
+    borderColor: colors.secondary,
     ...theme.shadows.medium,
   },
   progressText: {
     fontSize: theme.typography.fontSize.base,
     fontWeight: theme.typography.fontWeight.semiBold,
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
   },
   progressTextActive: {
-    color: theme.colors.surface,
+    color: colors.textOnPrimary,
   },
   progressLine: {
-    width: 40,
-    height: 2,
-    backgroundColor: theme.colors.border,
+    width: wp(10.7),
+    height: hp(0.25),
+    backgroundColor: colors.border,
     marginHorizontal: theme.spacing.xs,
   },
   requirementsContainer: {
-    backgroundColor: theme.colors.backgroundHighlight,
+    backgroundColor: colors.backgroundHighlight,
     padding: theme.spacing.md,
     borderRadius: theme.borderRadius.medium,
     marginBottom: theme.spacing.lg,
@@ -406,7 +436,7 @@ const styles = StyleSheet.create({
   requirementsTitle: {
     fontSize: theme.typography.fontSize.sm,
     fontWeight: theme.typography.fontWeight.medium,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: theme.spacing.sm,
   },
   requirement: {
@@ -417,7 +447,7 @@ const styles = StyleSheet.create({
   },
   requirementText: {
     fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
   },
   dividerContainer: {
     flexDirection: 'row',
@@ -427,12 +457,12 @@ const styles = StyleSheet.create({
   divider: {
     flex: 1,
     height: 1,
-    backgroundColor: theme.colors.border,
+    backgroundColor: colors.border,
   },
   dividerText: {
     marginHorizontal: theme.spacing.md,
     fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
   },
   footer: {
     alignItems: 'center',
@@ -441,7 +471,8 @@ const styles = StyleSheet.create({
   },
   linkText: {
     fontSize: theme.typography.fontSize.base,
-    color: theme.colors.secondary,
+    color: colors.secondary,
     fontWeight: theme.typography.fontWeight.semiBold,
   },
 });
+

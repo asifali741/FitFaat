@@ -1,4 +1,5 @@
 import { theme } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
@@ -30,6 +31,8 @@ export const ThemedInput: React.FC<ThemedInputProps> = ({
   secureTextEntry,
   ...props
 }) => {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const [isFocused, setIsFocused] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 
@@ -55,14 +58,14 @@ export const ThemedInput: React.FC<ThemedInputProps> = ({
           <Ionicons
             name={leftIcon}
             size={20}
-            color={error ? theme.colors.error : theme.colors.textSecondary}
+            color={error ? colors.error : colors.textSecondary}
             style={styles.leftIcon}
           />
         )}
         
         <TextInput
           style={[styles.input, style]}
-          placeholderTextColor={theme.colors.textTertiary}
+          placeholderTextColor={colors.textTertiary}
           secureTextEntry={showPassword}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
@@ -73,7 +76,7 @@ export const ThemedInput: React.FC<ThemedInputProps> = ({
           <Ionicons
             name={isPasswordVisible ? 'eye-off-outline' : 'eye-outline'}
             size={20}
-            color={theme.colors.textSecondary}
+            color={colors.textSecondary}
             style={styles.rightIcon}
             onPress={() => setIsPasswordVisible(!isPasswordVisible)}
           />
@@ -83,7 +86,7 @@ export const ThemedInput: React.FC<ThemedInputProps> = ({
           <Ionicons
             name={rightIcon}
             size={20}
-            color={theme.colors.textSecondary}
+            color={colors.textSecondary}
             style={styles.rightIcon}
           />
         )}
@@ -94,40 +97,40 @@ export const ThemedInput: React.FC<ThemedInputProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     marginBottom: theme.spacing.md,
   },
   label: {
     fontSize: theme.typography.fontSize.sm,
     fontWeight: theme.typography.fontWeight.medium,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: theme.spacing.xs,
   },
   required: {
-    color: theme.colors.error,
+    color: colors.error,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     height: theme.components.input.height,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: theme.components.input.borderWidth,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     borderRadius: theme.borderRadius.medium,
     paddingHorizontal: theme.components.input.paddingHorizontal,
   },
   inputContainerFocused: {
-    borderColor: theme.colors.primary,
+    borderColor: colors.primary,
     borderWidth: 2,
   },
   inputContainerError: {
-    borderColor: theme.colors.error,
+    borderColor: colors.error,
   },
   input: {
     flex: 1,
     fontSize: theme.typography.fontSize.base,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     paddingVertical: 0,
   },
   leftIcon: {
@@ -138,7 +141,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: theme.typography.fontSize.xs,
-    color: theme.colors.error,
+    color: colors.error,
     marginTop: theme.spacing.xs,
   },
 });

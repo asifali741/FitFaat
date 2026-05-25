@@ -1,15 +1,15 @@
-import { theme } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 import React from 'react';
 import {
     Keyboard,
     KeyboardAvoidingView,
     Platform,
-    ScrollView,
     StyleSheet,
     TouchableWithoutFeedback,
     View,
     ViewStyle,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface KeyboardAwareContainerProps {
@@ -18,6 +18,8 @@ interface KeyboardAwareContainerProps {
   style?: ViewStyle;
   contentContainerStyle?: ViewStyle;
   keyboardVerticalOffset?: number;
+  extraScrollHeight?: number;
+  extraHeight?: number;
 }
 
 /**
@@ -30,22 +32,34 @@ export const KeyboardAwareContainer: React.FC<KeyboardAwareContainerProps> = ({
   style,
   contentContainerStyle,
   keyboardVerticalOffset = 0,
+  extraScrollHeight,
+  extraHeight,
 }) => {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
+  const keyboardExtraScrollHeight = extraScrollHeight ?? Math.max(160, keyboardVerticalOffset + 140);
+  const keyboardExtraHeight = extraHeight ?? keyboardExtraScrollHeight;
+
   const dismissKeyboard = () => {
     Keyboard.dismiss();
   };
 
   const content = scrollable ? (
-    <ScrollView
+    <KeyboardAwareScrollView
       style={[styles.scrollView, style]}
       contentContainerStyle={[styles.contentContainer, contentContainerStyle]}
       keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="interactive"
       showsVerticalScrollIndicator={false}
+      enableOnAndroid
+      enableAutomaticScroll
+      extraScrollHeight={keyboardExtraScrollHeight}
+      extraHeight={keyboardExtraHeight}
     >
       <TouchableWithoutFeedback onPress={dismissKeyboard}>
         <View style={styles.inner}>{children}</View>
       </TouchableWithoutFeedback>
-    </ScrollView>
+    </KeyboardAwareScrollView>
   ) : (
     <TouchableWithoutFeedback onPress={dismissKeyboard}>
       <View style={[styles.container, style]}>{children}</View>
@@ -54,21 +68,25 @@ export const KeyboardAwareContainer: React.FC<KeyboardAwareContainerProps> = ({
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
-        keyboardVerticalOffset={keyboardVerticalOffset}
-      >
-        {content}
-      </KeyboardAvoidingView>
+      {scrollable ? (
+        content
+      ) : (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardView}
+          keyboardVerticalOffset={keyboardVerticalOffset}
+        >
+          {content}
+        </KeyboardAvoidingView>
+      )}
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: colors.screenColor,
   },
   keyboardView: {
     flex: 1,

@@ -1,19 +1,24 @@
-import Constants from 'expo-constants';
-import { Platform } from 'react-native';
+import {
+  cachedRequestJson,
+  clearRequestJsonCachesWithPrefix,
+  requestJson,
+} from './apiHelper';
+import { getBackendUrl } from './config';
 
-const ENV = Constants.expoConfig?.extra;
+const API_BASE_URL = getBackendUrl();
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
+const STREAK_CACHE_PREFIX = 'streak:';
 
-// Get base URL from environment variables
-const getBaseURL = () => {
-  const envUrl = ENV?.EXPO_PUBLIC_BACKEND_API_URL;
-  if (envUrl) {
-    return envUrl;
-  }
-  const defaultHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
-  return `http://${defaultHost}:5001/api`;
+const READ_REQUEST_CONFIG = {
+  timeoutMs: 8000,
+  retries: 1,
+  retryDelayMs: 600,
+  cacheTtlMs: 2 * 60 * 1000,
+  maxStaleMs: 24 * 60 * 60 * 1000,
+  allowStaleOnError: true,
+  maxWaitForFreshMs: 2500,
+  refreshCacheInBackground: true,
 };
-
-const API_BASE_URL = getBaseURL();
 
 export const streakApi = {
   /**
@@ -22,17 +27,15 @@ export const streakApi = {
    */
   getUserStreak: async (userId: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/streak/${userId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
+      const data = await cachedRequestJson<any>(
+        `${STREAK_CACHE_PREFIX}current:${userId}`,
+        `${API_BASE_URL}/streak/${userId}`,
+        {
+          method: 'GET',
+          headers: JSON_HEADERS,
         },
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to fetch streak');
-      }
+        READ_REQUEST_CONFIG
+      );
 
       return data.data;
     } catch (error) {
@@ -47,17 +50,15 @@ export const streakApi = {
    */
   getStreakHistory: async (userId: string, days: number = 30) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/streak/${userId}/history?days=${days}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
+      const data = await cachedRequestJson<any>(
+        `${STREAK_CACHE_PREFIX}history:${userId}:${days}`,
+        `${API_BASE_URL}/streak/${userId}/history?days=${days}`,
+        {
+          method: 'GET',
+          headers: JSON_HEADERS,
         },
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to fetch streak history');
-      }
+        READ_REQUEST_CONFIG
+      );
 
       return data.data;
     } catch (error) {
@@ -72,18 +73,16 @@ export const streakApi = {
    */
   resetReminderStatus: async (userId: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/streak/${userId}/reset-reminder`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const data = await requestJson<any>(
+        `${API_BASE_URL}/streak/${userId}/reset-reminder`,
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
         },
-      });
+        { timeoutMs: 12000, retries: 0 }
+      );
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to reset reminder');
-      }
-
+      await clearRequestJsonCachesWithPrefix(STREAK_CACHE_PREFIX);
       return data.data;
     } catch (error) {
       console.error('[streakApi] Error resetting reminder:', error);
@@ -97,18 +96,16 @@ export const streakApi = {
    */
   sendStreakReminder: async (userId: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/streak/${userId}/send-reminder`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const data = await requestJson<any>(
+        `${API_BASE_URL}/streak/${userId}/send-reminder`,
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
         },
-      });
+        { timeoutMs: 12000, retries: 0 }
+      );
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to send reminder');
-      }
-
+      await clearRequestJsonCachesWithPrefix(STREAK_CACHE_PREFIX);
       return data.data;
     } catch (error) {
       console.error('[streakApi] Error sending streak reminder:', error);

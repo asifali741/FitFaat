@@ -1,6 +1,11 @@
 import dayjs from "dayjs";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { useTheme } from "@/contexts/ThemeContext";
+import {
+  heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
+} from "react-native-responsive-screen";
 
 type TimingProps = {
   timestamp?: Date;
@@ -8,6 +13,8 @@ type TimingProps = {
 };
 
 export default function Timing({ timestamp, align = "right" }: TimingProps) {
+  const { colors } = useTheme();
+
   if (!timestamp) return null;
   return (
     <View
@@ -16,7 +23,7 @@ export default function Timing({ timestamp, align = "right" }: TimingProps) {
         { alignItems: align === "right" ? "flex-end" : "flex-start" },
       ]}
     >
-      <Text style={styles.text}>
+      <Text style={[styles.text, { color: colors.textSecondary }]}>
         {dayjs(timestamp).format("ddd, MMM D • h:mm A")}
       </Text>
     </View>
@@ -25,10 +32,9 @@ export default function Timing({ timestamp, align = "right" }: TimingProps) {
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 4,
+    marginTop: hp(0.5),
   },
   text: {
-    fontSize: 12,
-    color: "#666",
+    fontSize: Math.min(hp(1.5), wp(3.2)),
   },
 });

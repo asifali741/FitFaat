@@ -1,0 +1,40 @@
+# EAS Build ignore file
+# This overrides .gitignore for EAS Build uploads
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+
+# Native
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# typescript
+*.tsbuildinfo
+
+# Android local files
+android/.gradle/
+android/build/
+
+# NOTE: .env is NOT listed here so it WILL be uploaded to EAS Build
+# This ensures dotenv/config in app.config.js can read environment variables

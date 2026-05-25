@@ -1,11 +1,9 @@
 import { tokenStorage } from '@/utils/auth/tokenStorage';
-import Constants from 'expo-constants';
+import { requestJson } from '@/utils/apiHelper';
+import { getBackendBaseUrl } from '@/utils/config';
 import { useEffect, useState } from 'react';
-import { Platform } from 'react-native';
 
-// Remove /api from BACKEND_URL since routes already include it
-const ENV = Constants.expoConfig?.extra;
-const BACKEND_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')).replace(/\/api\/?$/, '');
+const BACKEND_URL = getBackendBaseUrl();
 
 /**
  * Hook to check if chat is available for an appointment
@@ -35,17 +33,18 @@ export const useChatAccess = (appointmentId: string) => {
         return;
       }
 
-      const response = await fetch(
+      const data = await requestJson<any>(
         `${BACKEND_URL}/api/chat/appointment/${appointmentId}/access`,
         {
+          method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           }
-        }
+        },
+        { timeoutMs: 7000, retries: 1, retryDelayMs: 500 }
       );
 
-      const data = await response.json();
       console.log('Chat access check response:', data);
 
       if (data.success && data.allowed) {

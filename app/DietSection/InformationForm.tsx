@@ -1,4 +1,5 @@
-import { dataScreenStyles } from "@/components/dataScreenStyles";
+import { createDataScreenStyles } from "@/components/dataScreenStyles";
+import { useTheme } from "@/contexts/ThemeContext";
 import { useCustomOnboarding } from "@/hooks/useCustomOnboarding";
 import { Ionicons } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
@@ -36,6 +37,8 @@ const data = [
 
 export default function Index() {
   const { completeOnboarding, isLoading } = useCustomOnboarding();
+  const { colors } = useTheme();
+  const screenStyles = createDataScreenStyles(colors);
   
   // Form state
   const [name, setName] = useState("");
@@ -216,46 +219,47 @@ export default function Index() {
   }
   
   return (
-    <SafeAreaView style={dataScreenStyles.container}>
+    <SafeAreaView style={screenStyles.container}>
       <ScrollView 
         contentContainerStyle={{ paddingBottom: hp(3) }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
         {/* Header */}
-        <View style={dataScreenStyles.headingandlogo}>
-          <Text style={dataScreenStyles.mainHeading}>FitFaat</Text>
+        <View style={screenStyles.headingandlogo}>
+          <Text style={screenStyles.mainHeading}>FitFaat</Text>
           <Image
             source={require("../../assets/images/logo.png")}
-            style={dataScreenStyles.logoImage}
+            style={screenStyles.logoImage}
           />
         </View>
 
         {/* Main Form Container */}
-        <View style={dataScreenStyles.mainBox}>
-          <Text style={dataScreenStyles.personalizedText}>
+        <View style={screenStyles.mainBox}>
+          <Text style={screenStyles.personalizedText}>
             🎯 Create Your Personalized Meal Plan
           </Text>
 
           {/* Name Field */}
           <View>
-            <Text style={dataScreenStyles.subHeading}>Full Name *</Text>
+            <Text style={screenStyles.subHeading}>Full Name *</Text>
             <TextInput
-              placeholderTextColor={"#A0AEC0"}
+              placeholderTextColor={colors.textTertiary}
               placeholder="Enter your full name"
-              style={dataScreenStyles.mainTextInput}
+              style={screenStyles.mainTextInput}
               value={name}
               onChangeText={setName}
             />
           </View>
 
           {/* Height & Weight Row */}
-          <View style={dataScreenStyles.subContainer}>
+          <View style={screenStyles.subContainer}>
             <View style={{ flex: 1 }}>
-              <Text style={dataScreenStyles.subsubHeading}>Height (ft) *</Text>
+              <Text style={screenStyles.subsubHeading}>Height (ft) *</Text>
               <TextInput
-                style={dataScreenStyles.miniTextInput}
+                style={screenStyles.miniTextInput}
                 placeholder="5.66"
+                placeholderTextColor={colors.textTertiary}
                 keyboardType="numeric"
                 maxLength={4}
                 value={height}
@@ -263,10 +267,11 @@ export default function Index() {
               />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={dataScreenStyles.subsubHeading}>Weight (kg) *</Text>
+              <Text style={screenStyles.subsubHeading}>Weight (kg) *</Text>
               <TextInput
-                style={dataScreenStyles.miniTextInput}
+                style={screenStyles.miniTextInput}
                 placeholder="77.4"
+                placeholderTextColor={colors.textTertiary}
                 keyboardType="numeric"
                 maxLength={5}
                 value={weight}
@@ -277,14 +282,14 @@ export default function Index() {
 
           {/* Gender Selection */}
           <View>
-            <Text style={dataScreenStyles.genderHeading}>Gender *</Text>
-            <View style={dataScreenStyles.subContainer}>
+            <Text style={screenStyles.genderHeading}>Gender *</Text>
+            <View style={screenStyles.subContainer}>
               <TouchableOpacity 
                 style={[
-                  dataScreenStyles.genderSelection,
+                  screenStyles.genderSelection,
                   selectedGender === 'male' && { 
-                    backgroundColor: '#E3F2FD', 
-                    borderColor: '#2563EB', 
+                    backgroundColor: colors.primarySoft, 
+                    borderColor: colors.info, 
                     borderWidth: 2 
                   }
                 ]}
@@ -292,16 +297,26 @@ export default function Index() {
               >
                 <Ionicons 
                   name="male-outline" 
-                  size={hp(3.5)} 
-                  color={selectedGender === 'male' ? '#2563EB' : '#A0AEC0'} 
+                  size={hp(3.2)} 
+                  color={selectedGender === 'male' ? colors.info : colors.textTertiary} 
                 />
+                <Text
+                  style={[
+                    screenStyles.genderLabel,
+                    { color: selectedGender === 'male' ? colors.info : colors.textTertiary }
+                  ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                >
+                  Male
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[
-                  dataScreenStyles.genderSelection,
+                  screenStyles.genderSelection,
                   selectedGender === 'female' && { 
-                    backgroundColor: '#FCE4EC', 
-                    borderColor: '#DB2777', 
+                    backgroundColor: colors.primarySoft, 
+                    borderColor: colors.error, 
                     borderWidth: 2 
                   }
                 ]}
@@ -309,16 +324,26 @@ export default function Index() {
               >
                 <Ionicons 
                   name="female-outline" 
-                  size={hp(3.5)} 
-                  color={selectedGender === 'female' ? '#DB2777' : '#A0AEC0'} 
+                  size={hp(3.2)} 
+                  color={selectedGender === 'female' ? colors.error : colors.textTertiary} 
                 />
+                <Text
+                  style={[
+                    screenStyles.genderLabel,
+                    { color: selectedGender === 'female' ? colors.error : colors.textTertiary }
+                  ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                >
+                  Female
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[
-                  dataScreenStyles.genderSelection,
+                  screenStyles.genderSelection,
                   selectedGender === 'other' && { 
-                    backgroundColor: '#F3E5F5', 
-                    borderColor: '#9C27B0', 
+                    backgroundColor: colors.primarySoft, 
+                    borderColor: colors.primary, 
                     borderWidth: 2 
                   }
                 ]}
@@ -326,20 +351,31 @@ export default function Index() {
               >
                 <Ionicons 
                   name="male-female-outline" 
-                  size={hp(3.5)} 
-                  color={selectedGender === 'other' ? '#9C27B0' : '#A0AEC0'} 
+                  size={hp(3.2)} 
+                  color={selectedGender === 'other' ? colors.primary : colors.textTertiary} 
                 />
+                <Text
+                  style={[
+                    screenStyles.genderLabel,
+                    { color: selectedGender === 'other' ? colors.primary : colors.textTertiary }
+                  ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                >
+                  Mix
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
 
           {/* Date of Birth */}
           <View>
-            <Text style={dataScreenStyles.subHeading}>Date of Birth *</Text>
-            <View style={dataScreenStyles.dob}>
+            <Text style={screenStyles.subHeading}>Date of Birth *</Text>
+            <View style={screenStyles.dob}>
               <TextInput
-                style={dataScreenStyles.dobInput}
+                style={screenStyles.dobInput}
                 placeholder="DD"
+                placeholderTextColor={colors.textTertiary}
                 keyboardType="numeric"
                 maxLength={2}
                 value={birthDate.day}
@@ -353,10 +389,11 @@ export default function Index() {
                   setBirthDate(prev => ({ ...prev, day: val ? String(val) : '' }));
                 }}
               />
-              <Text style={dataScreenStyles.dobText}>/</Text>
+              <Text style={screenStyles.dobText}>/</Text>
               <TextInput
-                style={dataScreenStyles.dobInput}
+                style={screenStyles.dobInput}
                 placeholder="MM"
+                placeholderTextColor={colors.textTertiary}
                 keyboardType="numeric"
                 maxLength={2}
                 value={birthDate.month}
@@ -367,10 +404,11 @@ export default function Index() {
                   setBirthDate(prev => ({ ...prev, month: val ? String(val) : '' }));
                 }}
               />
-              <Text style={dataScreenStyles.dobText}>/</Text>
+              <Text style={screenStyles.dobText}>/</Text>
               <TextInput
-                style={dataScreenStyles.dobInput}
+                style={screenStyles.dobInput}
                 placeholder="YYYY"
+                placeholderTextColor={colors.textTertiary}
                 keyboardType="numeric"
                 maxLength={4}
                 value={birthDate.year}
@@ -384,32 +422,33 @@ export default function Index() {
 
           {/* Age */}
           <View>
-            <Text style={dataScreenStyles.subHeading}>Age (Auto-calculated) *</Text>
+            <Text style={screenStyles.subHeading}>Age (Auto-calculated) *</Text>
             <TextInput
-              style={[dataScreenStyles.mainTextInput, { backgroundColor: '#F3F4F6', color: '#6B7280' }]}
+              style={[screenStyles.mainTextInput, { backgroundColor: colors.backgroundHeader, color: colors.textSecondary }]}
               placeholder="Age will be calculated from DOB"
+              placeholderTextColor={colors.textTertiary}
               keyboardType="numeric"
               maxLength={3}
               value={age}
               editable={false}
             />
             {age && (
-              <Text style={{ fontSize: hp(1.5), color: '#10B981', marginTop: hp(0.5), marginLeft: wp(1) }}>
+              <Text style={{ fontSize: hp(1.5), color: colors.success, marginTop: hp(0.5), marginLeft: wp(1) }}>
                 ✓ Age calculated: {age} years old
               </Text>
             )}
           </View>
 
           {/* Fitness Goal Selection */}
-          <Text style={dataScreenStyles.subHeading}>What's Your Goal? *</Text>
-          <View style={dataScreenStyles.mappingCol}>
+          <Text style={screenStyles.subHeading}>What's Your Goal? *</Text>
+          <View style={screenStyles.mappingCol}>
             {data.map((item) => (
               <TouchableOpacity 
                 key={item.id} 
                 style={[
-                  dataScreenStyles.mapping,
+                  screenStyles.mapping,
                   selectedGoal === item.id && { 
-                    backgroundColor: '#F0F8FF', 
+                    backgroundColor: colors.primarySoft, 
                     borderColor: item.color, 
                     borderWidth: 2 
                   }
@@ -425,12 +464,12 @@ export default function Index() {
                 />
                 <View style={{ flex: 1 }}>
                   <Text style={[
-                    dataScreenStyles.mappingHeading,
+                    screenStyles.mappingHeading,
                     { color: item.color }
                   ]}>
                     {item.name}
                   </Text>
-                  <Text style={dataScreenStyles.mappingHeadingName}>
+                  <Text style={screenStyles.mappingHeadingName}>
                     {item.description}
                   </Text>
                 </View>
@@ -441,7 +480,7 @@ export default function Index() {
           {/* Submit Button */}
           <TouchableOpacity
             style={[
-              dataScreenStyles.generateButton,
+              screenStyles.generateButton,
               isLoading && { opacity: 0.7 }
             ]}
             onPress={handleFormSubmit}
@@ -450,17 +489,17 @@ export default function Index() {
           >
             {isLoading ? (
               <>
-                <ActivityIndicator color="white" size="small" />
-                <Text style={{ color: "white", fontSize: hp(1.8), marginLeft: wp(2), fontWeight: "600" }}>
+                <ActivityIndicator color={colors.textOnPrimary} size="small" />
+                <Text style={{ color: colors.textOnPrimary, fontSize: hp(1.8), marginLeft: wp(2), fontWeight: "600" }}>
                   Creating Your Plan...
                 </Text>
               </>
             ) : (
               <>
-                <Text style={{ color: "white", fontSize: hp(1.8), fontWeight: "700" }}>
+                <Text style={{ color: colors.textOnPrimary, fontSize: hp(1.8), fontWeight: "700" }}>
                   Complete Setup
                 </Text>
-                <Ionicons name="arrow-forward" size={hp(2.2)} color="white" />
+                <Ionicons name="arrow-forward" size={hp(2.2)} color="#FFFFFF" />
               </>
             )}
           </TouchableOpacity>

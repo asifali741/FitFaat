@@ -4,7 +4,6 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
     ActivityIndicator,
-    Dimensions,
     FlatList,
     Image,
     Modal,
@@ -15,6 +14,10 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import {
+  heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
+} from 'react-native-responsive-screen';
 
 interface NewsItem {
   _id: string;
@@ -27,9 +30,6 @@ interface NewsItem {
   views?: number;
   createdAt?: string;
 }
-
-const { width } = Dimensions.get('window');
-const CARD_WIDTH = width - 24;
 
 const getCategoryColor = (category: string) => {
   const colors: Record<string, string> = {
@@ -91,7 +91,7 @@ export default function NewsScreen() {
         <View style={styles.categoryBadge}>
           <Ionicons
             name={getCategoryIcon(item.category) as any}
-            size={14}
+            size={Math.min(hp(1.7), wp(3.7))}
             color="white"
           />
           <Text
@@ -132,7 +132,7 @@ export default function NewsScreen() {
               </Text>
             )}
           </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+          <Ionicons name="chevron-forward" size={Math.min(hp(2.5), wp(5.4))} color="#FFFFFF" />
         </View>
       </View>
     </TouchableOpacity>
@@ -142,7 +142,7 @@ export default function NewsScreen() {
     <View style={styles.emptyContainer}>
       <Ionicons
         name="newspaper-outline"
-        size={64}
+        size={Math.min(hp(7.8), wp(17))}
         color={colors.textSecondary}
       />
       <Text style={[styles.emptyTitle, { color: colors.text }]}>
@@ -185,7 +185,7 @@ export default function NewsScreen() {
             <View style={styles.header}>
               <Ionicons
                 name="newspaper"
-                size={32}
+                size={Math.min(hp(3.9), wp(8.5))}
                 color="#4CAF50"
               />
               <View>
@@ -199,7 +199,7 @@ export default function NewsScreen() {
             </View>
             {error && (
               <View style={[styles.errorBanner, { borderColor: colors.border }]}>
-                <Ionicons name="alert-circle" size={20} color="#FF5722" />
+                <Ionicons name="alert-circle" size={Math.min(hp(2.5), wp(5.4))} color="#FF5722" />
                 <Text style={[styles.errorText]}>
                   Error: {error}
                 </Text>
@@ -224,12 +224,12 @@ export default function NewsScreen() {
             style={[styles.modalHeader, { backgroundColor: colors.card, borderColor: colors.border }]}
           >
             <TouchableOpacity onPress={() => setSelectedNews(null)}>
-              <Ionicons name="close" size={24} color={colors.text} />
+              <Ionicons name="close" size={Math.min(hp(3), wp(6.4))} color={colors.text} />
             </TouchableOpacity>
             <Text style={[styles.modalTitle, { color: colors.text }]}>
               News Details
             </Text>
-            <View style={{ width: 24 }} />
+            <View style={{ width: wp(6.4) }} />
           </View>
 
           {/* Modal Content */}
@@ -248,7 +248,7 @@ export default function NewsScreen() {
               <View style={styles.categoryBadge}>
                 <Ionicons
                   name={getCategoryIcon(selectedNews?.category || 'general') as any}
-                  size={16}
+                  size={Math.min(hp(2), wp(4.3))}
                   color="white"
                 />
                 <Text
@@ -296,7 +296,7 @@ export default function NewsScreen() {
 
               {selectedNews?.views !== undefined && (
                 <View style={styles.viewsSection}>
-                  <Ionicons name="eye" size={18} color={colors.textSecondary} />
+                  <Ionicons name="eye" size={Math.min(hp(2.2), wp(4.8))} color={colors.textSecondary} />
                   <Text style={[styles.viewsText, { color: colors.textSecondary }]}>
                     {selectedNews.views} people viewed this
                   </Text>
@@ -315,58 +315,58 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   listContent: {
-    paddingBottom: 20,
+    paddingBottom: hp(2.5),
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 16,
-    gap: 12,
+    paddingHorizontal: wp(3.2),
+    paddingVertical: hp(2),
+    gap: wp(3.2),
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: Math.min(hp(3.4), wp(7.5)),
     fontWeight: '700',
   },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 12,
-    marginBottom: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
+    marginHorizontal: wp(3.2),
+    marginBottom: hp(1.5),
+    paddingHorizontal: wp(3.2),
+    paddingVertical: hp(1.2),
+    borderRadius: wp(2.1),
     borderWidth: 1,
     borderColor: '#FF5722',
     backgroundColor: 'rgba(255, 87, 34, 0.1)',
-    gap: 8,
+    gap: wp(2.1),
   },
   errorText: {
     flex: 1,
-    fontSize: 14,
+    fontSize: Math.min(hp(1.8), wp(3.8)),
     color: '#FF5722',
     fontWeight: '500',
   },
   newsCard: {
-    marginHorizontal: 12,
-    marginVertical: 8,
-    borderRadius: 12,
+    marginHorizontal: wp(3.2),
+    marginVertical: hp(1),
+    borderRadius: wp(3.2),
     overflow: 'hidden',
     borderWidth: 1,
     elevation: 3,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: hp(0.25) },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: wp(1.1),
   },
   newsImage: {
     width: '100%',
-    height: 180,
+    height: hp(22),
     backgroundColor: '#f0f0f0',
   },
   newsContent: {
-    padding: 12,
-    gap: 8,
+    padding: wp(3.2),
+    gap: hp(1),
   },
   categoryBadge: {
     flexDirection: 'row',
@@ -374,55 +374,55 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   categoryText: {
-    fontSize: 12,
+    fontSize: Math.min(hp(1.5), wp(3.2)),
     fontWeight: '600',
     color: 'white',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: wp(2.1),
+    paddingVertical: hp(0.5),
+    borderRadius: wp(3.2),
     overflow: 'hidden',
   },
   newsTitle: {
-    fontSize: 16,
+    fontSize: Math.min(hp(2), wp(4.3)),
     fontWeight: '700',
   },
   newsDescription: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: Math.min(hp(1.6), wp(3.5)),
+    lineHeight: hp(2.2),
   },
   newsFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: hp(1),
   },
   footerLeft: {
     flexDirection: 'column',
-    gap: 4,
+    gap: hp(0.5),
   },
   adminName: {
-    fontSize: 12,
+    fontSize: Math.min(hp(1.5), wp(3.2)),
     fontWeight: '500',
   },
   views: {
-    fontSize: 12,
+    fontSize: Math.min(hp(1.5), wp(3.2)),
     fontWeight: '500',
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 60,
+    paddingHorizontal: wp(5.4),
+    paddingVertical: hp(7.4),
   },
   emptyTitle: {
-    fontSize: 20,
+    fontSize: Math.min(hp(2.5), wp(5.4)),
     fontWeight: '700',
-    marginTop: 16,
+    marginTop: hp(2),
   },
   emptySubtitle: {
-    fontSize: 14,
-    marginTop: 8,
+    fontSize: Math.min(hp(1.8), wp(3.8)),
+    marginTop: hp(1),
     textAlign: 'center',
   },
   // Modal Styles
@@ -433,12 +433,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: wp(4.3),
+    paddingVertical: hp(1.5),
     borderBottomWidth: 1,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: Math.min(hp(2.2), wp(4.8)),
     fontWeight: '600',
   },
   modalContent: {
@@ -446,48 +446,48 @@ const styles = StyleSheet.create({
   },
   modalImage: {
     width: '100%',
-    height: 300,
+    height: hp(37),
     backgroundColor: '#f0f0f0',
   },
   modalBody: {
-    padding: 16,
-    gap: 12,
+    padding: wp(4.3),
+    gap: hp(1.5),
   },
   detailTitle: {
-    fontSize: 22,
+    fontSize: Math.min(hp(2.7), wp(5.9)),
     fontWeight: '700',
-    marginTop: 8,
-    lineHeight: 28,
+    marginTop: hp(1),
+    lineHeight: hp(3.4),
   },
   byLine: {
-    fontSize: 14,
+    fontSize: Math.min(hp(1.8), wp(3.8)),
     fontWeight: '500',
     fontStyle: 'italic',
   },
   dateText: {
-    fontSize: 12,
+    fontSize: Math.min(hp(1.5), wp(3.2)),
   },
   detailDescription: {
-    fontSize: 15,
-    lineHeight: 22,
-    marginTop: 8,
+    fontSize: Math.min(hp(1.9), wp(4)),
+    lineHeight: hp(2.7),
+    marginTop: hp(1),
   },
   viewsSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 16,
-    paddingTop: 16,
+    marginTop: hp(2),
+    paddingTop: hp(2),
     borderTopWidth: 1,
     borderTopColor: 'rgba(0, 0, 0, 0.1)',
-    gap: 8,
+    gap: wp(2.1),
   },
   viewsText: {
-    fontSize: 13,
+    fontSize: Math.min(hp(1.6), wp(3.5)),
     fontWeight: '500',
   },
   debugText: {
-    fontSize: 11,
+    fontSize: Math.min(hp(1.35), wp(3)),
     fontWeight: '400',
-    marginTop: 4,
+    marginTop: hp(0.5),
   },
 });

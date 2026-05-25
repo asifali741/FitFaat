@@ -1,8 +1,7 @@
-import Constants from 'expo-constants';
-import * as SecureStore from 'expo-secure-store';
+import { tokenStorage } from '@/utils/auth/tokenStorage';
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { Platform } from 'react-native';
 import { io, Socket } from 'socket.io-client';
+import { getBackendBaseUrl, isRealtimeSocketEnabled } from '@/utils/config';
 
 interface SocketContextType {
   socket: Socket | null;
@@ -19,9 +18,6 @@ export const useSocket = () => {
   return context;
 };
 
-const ENV = Constants.expoConfig?.extra;
-const API_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')).replace(/\/api\/?$/, '');
-
 export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -29,14 +25,19 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     const initSocket = async () => {
       try {
-        const token = await SecureStore.getItemAsync('authToken');
+        if (!isRealtimeSocketEnabled()) {
+          setIsConnected(false);
+          return;
+        }
+
+        const token = await tokenStorage.getToken();
         if (!token) {
           console.log('⚠️ [SOCKET PROVIDER] No auth token, skipping socket init');
           return;
         }
 
         console.log('🌐 [SOCKET PROVIDER] Initializing shared socket connection');
-        const socket = io(API_URL, {
+        const socket = io(getBackendBaseUrl(), {
           auth: { token },
           transports: ['websocket'],
           reconnection: true,

@@ -1,4 +1,3 @@
-import { useTheme } from '@/contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
@@ -16,7 +15,6 @@ type BackButtonProps = {
 export default function BackButton({ style, size = 24, color, onPress, testID }: BackButtonProps) {
   const navigation = useNavigation();
   const router = useRouter();
-  const { colors } = useTheme();
 
   const handlePress = () => {
     if (onPress) return onPress();
@@ -46,7 +44,7 @@ export default function BackButton({ style, size = 24, color, onPress, testID }:
 
   return (
     <TouchableOpacity onPress={handlePress} style={style} testID={testID}>
-      <Ionicons name="arrow-back" size={size} color={color || colors.textPrimary} />
+      <Ionicons name="arrow-back" size={size} color={color || "#FFFFFF"} />
     </TouchableOpacity>
   );
 }

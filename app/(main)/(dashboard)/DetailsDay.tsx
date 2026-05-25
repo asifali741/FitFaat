@@ -1,25 +1,42 @@
-import { pakistaniDishes } from '@/app/Dataset/dataSet';
 import { drinksDataSet } from '@/app/Dataset/waterDataSet';
 import BackButton from '@/components/BackButton';
 import PatientDietPlanViewer from '@/components/PatientDietPlanViewer';
-import { goalBasedSuggestions, waterIntakeDatabase } from '@/constants/foodDatabase';
+import { KeyboardAwareModalContent } from '@/components/themed';
+import {
+    getDietPreferenceLabel,
+    getDietTypeForFood,
+    waterIntakeDatabase,
+} from '@/constants/foodDatabase';
 import { HEADER_PADDING_HORIZONTAL } from '@/constants/ui';
+import { useNotifications } from '@/contexts/NotificationContext';
 import { useTheme } from "@/contexts/ThemeContext";
-import { dailyLogsApi } from '@/utils/dailyLogsApi';
-import { customRecipesApi, CustomRecipeData } from '@/utils/customRecipesApi';
+import {
+    buildMealDraftFromTemplate,
+    getDrinkHydrationLiters,
+    toMealNumber,
+    type MealTemplate,
+} from '@/hooks/detailsDay/detailsDayNutritionUtils';
+import { calculatePercentage, useDetailsDayData } from '@/hooks/detailsDay/useDetailsDayData';
+import { useFoodDetection } from '@/hooks/detailsDay/useFoodDetection';
+import { useMealTemplates } from '@/hooks/detailsDay/useMealTemplates';
+import { useNutritionLogger } from '@/hooks/detailsDay/useNutritionLogger';
+import { customRecipesApi } from '@/utils/customRecipesApi';
+import { getExerciseCaloriesBurned } from '@/utils/localExerciseProgress';
+import { getDashboardCalorieSummary } from '@/utils/dashboardProgress';
+import {
+    formatCalorieTarget,
+    formatHydrationTarget,
+} from '@/utils/goalTargetDisplay';
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
-import { Audio } from 'expo-av';
-import Constants from 'expo-constants';
-import * as ImagePicker from 'expo-image-picker';
+import * as NavigationBar from 'expo-navigation-bar';
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Modal } from "react-native";
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import Animated, { Easing, runOnJS, useAnimatedProps, useSharedValue, withTiming } from "react-native-reanimated";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Day as typeDay } from "./types";
 interface ProgressCircleProps {
   achievedCalories: number;
@@ -28,22 +45,27 @@ interface ProgressCircleProps {
   targetHydration: number;
 };
 
-const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 export default function DetailsDay () {
     const { colors } = useTheme();
-    const { selectedDay  } = useLocalSearchParams<{ selectedDay : string }>();
+    const { sendFitFaatNotification, scheduleFitFaatNotification, cancelScheduledNotification } = useNotifications();
+    const { selectedDay, quickMode  } = useLocalSearchParams<{ selectedDay : string; quickMode?: string }>();
     const router = useRouter();
-    const props: typeDay = JSON.parse(selectedDay )
-    
-    // State for fetched day data from backend
-    const [dayData, setDayData] = useState<any>(props);
-    const [isLoading, setIsLoading] = useState(false);
-    const [isCompletingDay, setIsCompletingDay] = useState(false);
-    
-    // Completion popup states
-    const [showCompletionModal, setShowCompletionModal] = useState(false);
-    const [completionModalType, setCompletionModalType] = useState<'confirm' | 'success' | 'weekComplete' | 'error'>('confirm');
-    const [completionModalData, setCompletionModalData] = useState<any>({});
+    const props: typeDay = useMemo(() => JSON.parse(selectedDay), [selectedDay]);
+    const initialTrackingMode: 'meal' | 'hydration' = quickMode === 'hydration' ? 'hydration' : 'meal';
+    const {
+      dayData,
+      setDayData,
+      isLoading,
+      setIsLoading,
+      isCompletingDay,
+      isPremium,
+      goalDisplayMode,
+      showCompletionModal,
+      setShowCompletionModal,
+      completionModalType,
+      completionModalData,
+      syncUpdatedDayToLocalCache,
+    } = useDetailsDayData({ initialDayData: props, router });
     
     // Calculate time remaining in the day (from current time to 11:59:59 PM)
     function getRemainingTime(){
@@ -62,48 +84,6 @@ export default function DetailsDay () {
         return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     }
     
-    // Fetch complete day data from backend
-    useEffect(() => {
-      const fetchDayData = async () => {
-        try {
-          setIsLoading(false);
-          console.log('Day data loaded from props:', props.dayNo);
-          
-          // Use the props data directly since it comes from the weekly API
-          // which already has all the updated calorie and hydration values
-          setDayData({
-            ...props,
-            achievedCalories: props.achievedCalories || 0,
-            achieviedHydration: props.achieviedHydration || 0,
-            targetCalories: props.targetCalories,
-            targetHydration: props.targetHydration,
-            meals: (props as any).meals || [],
-            remarks: props.remarks,
-            status: props.status,
-            isCompleted: (props as any).isCompleted || false,
-            completionPercentage: (props as any).completionPercentage || 0,
-          });
-        } catch (error) {
-          console.error('Error loading day data:', error);
-          setDayData(props);
-        } finally {
-          setIsLoading(false);
-        }
-      };
-      
-      fetchDayData();
-    }, [props.dayNo]);
-    
-    // Helper function to safely calculate percentage
-    const calculatePercentage = (achieved: number, target: number): number => {
-      if (!target || target === 0) return 0;
-      if (!achieved || achieved < 0) return 0;
-      const percent = (achieved / target) * 100;
-      return Math.min(Math.round(percent * 10) / 10, 100); // Round to 1 decimal place, cap at 100
-    };
-
-    //states to track changes
-    const [updateInput, setUpdateInput] = useState<string>('');
     const [timer, setTimer] = useState<string>(getRemainingTime())
     
     // Update timer every second
@@ -115,87 +95,14 @@ export default function DetailsDay () {
       return () => clearInterval(timerInterval);
     }, []);
 
-    // Complete Day functionality
-    const handleCompleteDay = async () => {
-      setCompletionModalType('confirm');
-      setCompletionModalData({
-        dayNumber: dayData.dayNo,
-        onConfirm: async () => {
-          setShowCompletionModal(false);
-          
-          try {
-            setIsCompletingDay(true);
-            
-            // Get weekly tracking ID from storage
-            const weeklyTrackingId = await AsyncStorage.getItem('weeklyTrackingId');
-            if (!weeklyTrackingId) {
-              setCompletionModalType('error');
-              setCompletionModalData({ message: 'Weekly tracking ID not found. Please restart the app.' });
-              setShowCompletionModal(true);
-              return;
-            }
-
-            console.log(`🚀 Completing Day ${dayData.dayNo}...`);
-            const result = await dailyLogsApi.completeDay(weeklyTrackingId, dayData.dayNo);
-            
-            if (result.cycleRestarted) {
-              setCompletionModalType('weekComplete');
-              setCompletionModalData({
-                dayNumber: dayData.dayNo,
-                onContinue: () => {
-                  setShowCompletionModal(false);
-                  router.back();
-                }
-              });
-            } else {
-              setCompletionModalType('success');
-              setCompletionModalData({
-                dayNumber: dayData.dayNo,
-                onContinue: () => {
-                  setShowCompletionModal(false);
-                  router.back();
-                }
-              });
-            }
-            setShowCompletionModal(true);
-            
-          } catch (error) {
-            console.error('Error completing day:', error);
-            setCompletionModalType('error');
-            setCompletionModalData({ 
-              message: error instanceof Error ? error.message : 'Failed to complete day. Please try again.' 
-            });
-            setShowCompletionModal(true);
-          } finally {
-            setIsCompletingDay(false);
-          }
-        },
-        onCancel: () => setShowCompletionModal(false)
-      });
-      setShowCompletionModal(true);
-    };
-    
-    const [showMenu, setShowMenu] = useState<Boolean>(false)
-    const [timeInput, setTimeInput] = useState<string>('');
-    const [selectedTime, setSelectedTime] = useState<Date>(new Date());
-    const [showTimePicker, setShowTimePicker] = useState<boolean>(false);
-    const [foodNameInput, setFoodNameInput] = useState<string>('');
+    const [showMenu, setShowMenu] = useState<boolean>(false)
     const [descriptionInput, setDescriptionInput] = useState<string>('');
-    const [selectedImage, setSelectedImage] = useState<string | null>(null);
-    const [recording, setRecording] = useState<Audio.Recording | undefined>();
-    const [audioUri, setAudioUri] = useState<string | null>(null);
-    const [isRecording, setIsRecording] = useState(false);
-    const [inputMethod, setInputMethod] = useState<'text' | 'audio' | 'photo'>('text');
     const [calorieInput, setCalorieInput] = useState<string>('');
     const [selectedFoodItem, setSelectedFoodItem] = useState<any>(null);
     const [foodSearch, setFoodSearch] = useState<string>('');
-    const [filteredFoods, setFilteredFoods] = useState<any[]>([]);
-    const [showFoodSearch, setShowFoodSearch] = useState(false);
-    const [suggestedFoods, setSuggestedFoods] = useState<any[]>([]);
     const [mealQuantity, setMealQuantity] = useState<string>('1');
     const [waterInput, setWaterInput] = useState<string>('0'); // Default to 0
-    const [showWaterTab, setShowWaterTab] = useState(false);
-    const [trackingMode, setTrackingMode] = useState<'meal' | 'hydration'>('meal');
+    const [trackingMode, setTrackingMode] = useState<'meal' | 'hydration'>(initialTrackingMode);
     
     // Drink search states
     const [drinkSearch, setDrinkSearch] = useState<string>('');
@@ -203,26 +110,19 @@ export default function DetailsDay () {
     const [showDrinkSearch, setShowDrinkSearch] = useState(false);
     const [selectedDrink, setSelectedDrink] = useState<any>(null);
     const [drinkQuantity, setDrinkQuantity] = useState<string>('1');
-    
-    // Image detection states
-    const [isDetectingDish, setIsDetectingDish] = useState(false);
-    const [detectedDishName, setDetectedDishName] = useState<string>('');
-    
+
     // Diet plan viewer state
     const [showDietPlanViewer, setShowDietPlanViewer] = useState(false);
-    
-    // Custom recipes list
-    const [userCustomRecipes, setUserCustomRecipes] = useState<CustomRecipeData[]>([]);
     
     // Custom recipe states
     const [showCustomRecipeModal, setShowCustomRecipeModal] = useState(false);
     const [customRecipeName, setCustomRecipeName] = useState<string>('');
-    const [customRecipeIngredients, setCustomRecipeIngredients] = useState<Array<{
+    const [customRecipeIngredients, setCustomRecipeIngredients] = useState<{
       name: string;
       protein_g: number;
       carbs_g: number;
       fat_g: number;
-    }>>([]);
+    }[]>([]);
     const [customRecipeServingSize, setCustomRecipeServingSize] = useState<string>('1 serving');
     const [customRecipeCalories, setCustomRecipeCalories] = useState<string>('');
     const [customRecipeProtein, setCustomRecipeProtein] = useState<string>('');
@@ -235,88 +135,6 @@ export default function DetailsDay () {
       carbs_g: '',
       fat_g: ''
     });
-    
-    // Fetch user's custom recipes on mount
-    useEffect(() => {
-      const fetchCustomRecipes = async () => {
-        try {
-          const recipes = await customRecipesApi.getUserRecipes();
-          setUserCustomRecipes(recipes);
-          console.log('✅ Custom recipes loaded:', recipes.length);
-        } catch (error) {
-          console.error('Error loading custom recipes:', error);
-        }
-      };
-      fetchCustomRecipes();
-    }, []);
-    
-    // Extract userGoal to avoid infinite loop with props dependency
-    const userGoal = (props as any).userGoal || 3;
-    
-    // Memoize suggested foods to prevent infinite re-renders
-    const combinedSuggestedFoods = useMemo(() => {
-      const suggestions = goalBasedSuggestions[userGoal as keyof typeof goalBasedSuggestions];
-      
-      // Convert custom recipes to food format
-      const customRecipesAsFoods = userCustomRecipes.map(recipe => ({
-        food_name: recipe.recipeName,
-        serving_size: recipe.servingSize,
-        calories_kcal: recipe.calories_kcal,
-        calories: recipe.calories_kcal,
-        protein_g: recipe.protein_g,
-        carbs_g: recipe.carbs_g,
-        fat_g: recipe.fat_g,
-        category: 'Custom Recipe',
-        isCustomRecipe: true,
-        _id: recipe._id
-      }));
-      
-      // Custom recipes first, then goal-based suggestions
-      return [...customRecipesAsFoods, ...(suggestions?.foods || [])];
-    }, [userGoal, userCustomRecipes]);
-    
-    // Update suggested foods when combined suggestions change
-    useEffect(() => {
-      setSuggestedFoods(combinedSuggestedFoods);
-    }, [combinedSuggestedFoods]);
-    
-    // Handle food search with custom recipes and Pakistani dishes dataset
-    useEffect(() => {
-      if (foodSearch.trim().length > 1) {
-        const query = foodSearch.toLowerCase();
-        
-        // Search custom recipes first
-        const customRecipeMatches = userCustomRecipes
-          .filter(recipe => recipe.recipeName.toLowerCase().includes(query))
-          .map(recipe => ({
-            food_name: recipe.recipeName,
-            serving_size: recipe.servingSize,
-            calories_kcal: recipe.calories_kcal,
-            calories: recipe.calories_kcal,
-            protein_g: recipe.protein_g,
-            carbs_g: recipe.carbs_g,
-            fat_g: recipe.fat_g,
-            category: '⭐ My Recipe',
-            isCustomRecipe: true,
-            _id: recipe._id
-          }));
-        
-        // Search Pakistani dishes
-        const dishMatches = pakistaniDishes.filter((dish: any) => {
-          const name = dish.food_name || dish.name || '';
-          const category = dish.category || '';
-          return name.toLowerCase().includes(query) || category.toLowerCase().includes(query);
-        }).slice(0, 10);
-        
-        // Combine: custom recipes first, then database dishes
-        const results = [...customRecipeMatches, ...dishMatches].slice(0, 15);
-        setFilteredFoods(results);
-        setShowFoodSearch(true);
-      } else {
-        setShowFoodSearch(false);
-        setFilteredFoods([]);
-      }
-    }, [foodSearch, userCustomRecipes]);
 
     // Handle drink search with drinks dataset
     useEffect(() => {
@@ -334,229 +152,170 @@ export default function DetailsDay () {
       }
     }, [drinkSearch]);
 
-    // Detect dish from image using Google Vision API
-    const detectDishFromImage = async () => {
-      try {
-        // Request permission
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permission Required', 'Please allow access to your photos to use this feature.');
-          return;
-        }
-
-        // Pick image
-        const result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: true,
-          aspect: [4, 3],
-          quality: 0.8,
-        });
-
-        if (result.canceled || !result.assets || result.assets.length === 0) {
-          return;
-        }
-
-        setIsDetectingDish(true);
-        const imageUri = result.assets[0].uri;
-
-        // Prepare FormData
-        const formData = new FormData();
-        const filename = imageUri.split('/').pop() || 'image.jpg';
-        const match = /\.(\w+)$/.exec(filename);
-        const type = match ? `image/${match[1]}` : 'image/jpeg';
-
-        formData.append('image', {
-          uri: imageUri,
-          name: filename,
-          type: type,
-        } as any);
-
-        // Get backend URL
-        const ENV = Constants.expoConfig?.extra;
-        const baseUrl = ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001');
-        const apiUrl = baseUrl.replace(/\/api\/?$/, '') + '/api/food-detect/upload';
-
-        // Upload to backend (Clarifai food detection)
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          body: formData,
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
-
-        const data = await response.json();
-
-        if (data.success && data.foodName) {
-          const dishName = data.foodName;
-          setDetectedDishName(dishName);
-          
-          // Auto-search in the food database
-          setFoodSearch(dishName);
-          
-          // Try to find exact or partial match
-          const query = dishName.toLowerCase();
-          const matches = pakistaniDishes.filter((dish: any) => {
-            const name = (dish.food_name || dish.name || '').toLowerCase();
-            return name.includes(query) || query.includes(name);
-          });
-
-          if (matches.length > 0) {
-            // Auto-select the best match
-            const bestMatch = matches[0];
-            setSelectedFoodItem(bestMatch);
-            const calories = bestMatch.calories_kcal || 0;
-            setCalorieInput(String(Math.round(calories * parseFloat(mealQuantity || '1'))));
-            setShowFoodSearch(false);
-            
-            Alert.alert(
-              'Food Detected! 🎯',
-              `Found: ${bestMatch.food_name || bestMatch.name}\nCalories: ${calories} kcal\nConfidence: ${Math.round(data.confidence * 100)}%\n\nYou can adjust the quantity and add the meal.`,
-              [{ text: 'OK' }]
-            );
-          } else {
-            // Show search results if no exact match
-            setShowFoodSearch(true);
-            Alert.alert(
-              'Food Detected',
-              `Detected: ${dishName}\nConfidence: ${Math.round(data.confidence * 100)}%\n\nPlease select from the search results or enter details manually.`,
-              [{ text: 'OK' }]
-            );
-          }
-        } else {
-          Alert.alert('Detection Failed', data.message || 'Could not detect a dish in the image. Please try another image or enter manually.');
-        }
-      } catch (error) {
-        console.error('Image detection error:', error);
-        Alert.alert('Error', 'Failed to process the image. Please try again.');
-      } finally {
-        setIsDetectingDish(false);
-      }
-    };
-
-    // Ensure UI updates when dayData changes
-    useEffect(() => {
-      // This empty effect serves to notify React that dayData has changed
-      // triggering a full component re-render
-    }, [dayData.achieviedHydration, dayData.achievedCalories]);
-
     const fade = useSharedValue(1);
     const insets = useSafeAreaInsets();
-    // trigger fade-out + menu
-    const openMenu = () => {
-    fade.value = withTiming(
-      0,
-      { duration: 800, easing: Easing.inOut(Easing.ease) },
-      (isFinished) => {
-        if (isFinished) {
-          // call setShowMenu(true) on JS thread
-          runOnJS(setShowMenu)(true);
-        }
+
+    useEffect(() => {
+      if (quickMode !== 'meal' && quickMode !== 'hydration') return;
+
+      setTrackingMode(quickMode);
+      fade.value = 0;
+      setShowMenu(true);
+    }, [fade, quickMode]);
+
+    useEffect(() => {
+      if (Platform.OS !== 'android') return;
+
+      if (showCustomRecipeModal) {
+        NavigationBar.setBackgroundColorAsync('#FFFFFF').catch(() => {});
+        NavigationBar.setButtonStyleAsync('dark').catch(() => {});
+        NavigationBar.setStyle('light');
+      } else {
+        NavigationBar.setBackgroundColorAsync(colors.screenColor || '#FFFFFF').catch(() => {});
+        NavigationBar.setButtonStyleAsync('dark').catch(() => {});
       }
-    );
-  };
+    }, [colors.screenColor, showCustomRecipeModal]);
 
-  // closeMenu: set showMenu false first (so menu overlay disappears),
-  // then fade main content back in
-  const closeMenu = () => {
-    // set state on JS thread immediately
-    setShowMenu(false);
-    // animate fade in
-    fade.value = withTiming(1, { duration: 500, easing: Easing.inOut(Easing.ease) });
-  };
+    const openMenu = useCallback(() => {
+      fade.value = withTiming(
+        0,
+        { duration: 800, easing: Easing.inOut(Easing.ease) },
+        (isFinished) => {
+          if (isFinished) {
+            runOnJS(setShowMenu)(true);
+          }
+        }
+      );
+    }, [fade]);
 
+    const closeMenu = useCallback(() => {
+      setShowMenu(false);
+      fade.value = withTiming(1, { duration: 500, easing: Easing.inOut(Easing.ease) });
+    }, [fade]);
+
+    const resetMealForm = useCallback(() => {
+      setFoodSearch('');
+      setSelectedFoodItem(null);
+      setCalorieInput('');
+      setMealQuantity('1');
+      setDescriptionInput('');
+    }, []);
+
+    const resetNutritionForm = useCallback(() => {
+      resetMealForm();
+      setWaterInput('0');
+      setSelectedDrink(null);
+      setDrinkSearch('');
+      setShowDrinkSearch(false);
+      setDrinkQuantity('1');
+    }, [resetMealForm]);
+
+    const { logMealDrafts, handleSubmitNutritionEntry } = useNutritionLogger({
+      dayData,
+      initialDayData: props,
+      router,
+      setDayData,
+      setIsLoading,
+      syncUpdatedDayToLocalCache,
+      closeMenu,
+      resetMealForm,
+      resetNutritionForm,
+      sendFitFaatNotification,
+      scheduleFitFaatNotification,
+      cancelScheduledNotification,
+    });
+
+    const {
+      dietPreference,
+      dietPreferenceOptions,
+      mealTemplates,
+      filteredFoods,
+      showFoodSearch,
+      setShowFoodSearch,
+      isRepeatingYesterday,
+      quickPickFoods,
+      applyTemplateToForm,
+      saveCurrentMealAsTemplate,
+      removeMealTemplate,
+      handleDietPreferenceChange,
+      handleRepeatYesterday,
+      setUserCustomRecipes,
+    } = useMealTemplates({
+      calorieInput,
+      mealQuantity,
+      selectedFoodItem,
+      detectedDishName: '',
+      foodSearch,
+      descriptionInput,
+      dayData,
+      setTrackingMode,
+      setSelectedFoodItem,
+      setMealQuantity,
+      setCalorieInput,
+      setFoodSearch,
+      logMealDrafts,
+    });
+
+    const { isDetectingDish, detectDishFromImage } = useFoodDetection({
+      dietPreference,
+      mealQuantity,
+      setFoodSearch,
+      setSelectedFoodItem,
+      setCalorieInput,
+      setShowFoodSearch,
+    });
+
+    const handleTemplateOneTap = useCallback(async (template: MealTemplate) => {
+      await logMealDrafts([buildMealDraftFromTemplate(template)], {
+        title: 'Template Added',
+      });
+    }, [logMealDrafts]);
 
     //functions
     const handleUpdate = () => {
         //Main api calling
     }
 
-    // Image picker functions
-    const pickImage = async () => {
-        const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            aspect: [4, 3],
-            quality: 0.8,
-        });
+    const styles = useMemo(() => getStyles(colors, insets.bottom), [colors, insets.bottom]);
+    const workoutAccessUnlocked = isPremium;
+    const calorieSummary = getDashboardCalorieSummary(dayData, isPremium);
+    const exerciseCaloriesBurned = workoutAccessUnlocked ? getExerciseCaloriesBurned(dayData) : 0;
+    const walkingCaloriesBurned = isPremium ? calorieSummary.walkingCalories : 0;
+    const walkingCaloriesTarget = isPremium ? calorieSummary.walkingTarget : 0;
+    const netCalories = workoutAccessUnlocked
+      ? calorieSummary.netCalories
+      : Number(dayData.achievedCalories || 0);
+    const goalPlan = isPremium ? "premium" : "free";
+    const showEstimatedRanges = goalDisplayMode === "advanced";
+    const goalCardLabel = showEstimatedRanges ? "Estimated Ranges" : "Goal";
+    const calorieTargetLabel = formatCalorieTarget(dayData, goalDisplayMode, goalPlan);
+    const hydrationTargetLabel = formatHydrationTarget(dayData, goalDisplayMode, goalPlan);
+    const renderGoalTargetValue = (label: string) => {
+      const shouldStackRange = showEstimatedRanges && label.length > 8 && label.includes('-');
+      if (!shouldStackRange) {
+        return <Text style={styles.statValue} numberOfLines={1}>{label}</Text>;
+      }
 
-        if (!result.canceled) {
-            setSelectedImage(result.assets[0].uri);
-        }
+      const [minLabel, maxLabel] = label.split('-');
+      return (
+        <View style={styles.goalRangeValue}>
+          <Text style={styles.statValue} numberOfLines={1}>{minLabel}-</Text>
+          <Text style={styles.statValue} numberOfLines={1}>{maxLabel}</Text>
+        </View>
+      );
     };
-
-    const takePhoto = async () => {
-        const result = await ImagePicker.launchCameraAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            aspect: [4, 3],
-            quality: 0.8,
-        });
-
-        if (!result.canceled) {
-            setSelectedImage(result.assets[0].uri);
-        }
-    };
-
-    // Audio recording functions
-    const startRecording = async () => {
-        try {
-            // Request permissions properly
-            const { status } = await Audio.requestPermissionsAsync();
-            if (status !== 'granted') {
-                Alert.alert('Permission Denied', 'Audio recording permission is required');
-                return;
-            }
-            
-            await Audio.setAudioModeAsync({
-                allowsRecordingIOS: true,
-                playsInSilentModeIOS: true,
-                staysActiveInBackground: true,
-                shouldDuckAndroid: true,
-                playThroughEarpieceAndroid: false
-            });
-
-            const { recording } = await Audio.Recording.createAsync(
-                Audio.RecordingOptionsPresets.HIGH_QUALITY
-            );
-            setRecording(recording);
-            setIsRecording(true);
-        } catch (err: any) {
-            console.error('Failed to start recording', err);
-            Alert.alert('Failed to start recording', err?.message || 'Unknown error occurred');
-        }
-    };
-
-    const stopRecording = async () => {
-        if (!recording) return;
-        
-        try {
-            setIsRecording(false);
-            await recording.stopAndUnloadAsync();
-            await Audio.setAudioModeAsync({
-                allowsRecordingIOS: false,
-            });
-            const uri = recording.getURI();
-            setAudioUri(uri);
-            setRecording(undefined);
-        } catch (err: any) {
-            console.error('Failed to stop recording', err);
-            Alert.alert('Failed to stop recording', err?.message || 'Unknown error occurred');
-        }
-    };
-
-    const handleMediaAction = () => {
-        Alert.alert(
-            "Add Media",
-            "Choose how you want to add media",
-            [
-                { text: "Take Photo", onPress: takePhoto },
-                { text: "Choose from Gallery", onPress: pickImage },
-                { text: "Cancel", style: "cancel" }
-            ]
-        );
-    };
-    const styles = useMemo(() => getStyles(colors), [colors]);
+    const mealQuantityValue = Math.max(0.5, toMealNumber(mealQuantity, 1));
+    const drinkQuantityValue = Math.max(0.5, toMealNumber(drinkQuantity, 1));
+    const waterInputValue = Math.max(0, toMealNumber(waterInput, 0));
+    const achievedHydrationValue = Math.max(
+      0,
+      toMealNumber(dayData.achieviedHydration ?? dayData.achievedHydration, 0)
+    );
+    const targetHydrationValue = Math.max(0, toMealNumber(dayData.targetHydration, 0));
+    const projectedHydration = achievedHydrationValue + waterInputValue;
+    const calorieInputValue = Math.max(0, Math.round(toMealNumber(calorieInput, 0)));
+    const targetCaloriesValue = Math.max(0, toMealNumber(dayData.targetCalories, 0));
+    const canSubmitNutritionEntry = calorieInput.trim().length > 0 || waterInputValue > 0;
     //output
     return (
   <View style={{ flex: 1, paddingTop: insets.top, backgroundColor: colors.screenColor }}>
@@ -566,7 +325,7 @@ export default function DetailsDay () {
       >
         <View style={styles.heading}>
           <View style={styles.headerContent}>
-            <BackButton style={styles.backButton} testID="detailsday-back" />
+            <BackButton style={styles.backButton} testID="detailsday-back" color="#000000" />
             <View style={styles.dayDateWrapper}>
               <View style={styles.dayBadge}>
                 <Text style={styles.dayNumber}>0{props.dayNo}</Text>
@@ -616,16 +375,21 @@ export default function DetailsDay () {
                   <View style={styles.statCard}>
                     <View style={styles.statCardHeader}>
                       <Ionicons name="flag" size={Math.min(hp(2.2), wp(5.5))} color={colors.primary} />
-                      <Text style={styles.statLabel}>Goal</Text>
+                      <Text
+                        style={[styles.statLabel, showEstimatedRanges && styles.statLabelRange]}
+                        numberOfLines={showEstimatedRanges ? 2 : 1}
+                      >
+                        {goalCardLabel}
+                      </Text>
                     </View>
                     <View style={styles.goalRowContainer}>
                       <View style={styles.goalItem}>
-                        <Text style={styles.statValue}>{dayData.targetCalories}</Text>
+                        {renderGoalTargetValue(calorieTargetLabel)}
                         <Text style={styles.statUnit}>cals</Text>
                       </View>
                       <View style={styles.goalDivider} />
                       <View style={styles.goalItem}>
-                        <Text style={styles.statValue}>{dayData.targetHydration}</Text>
+                        {renderGoalTargetValue(hydrationTargetLabel)}
                         <Text style={styles.statUnit}>liters</Text>
                       </View>
                     </View>
@@ -636,18 +400,51 @@ export default function DetailsDay () {
                       <Ionicons name="flame" size={Math.min(hp(2.2), wp(5.5))} color="#F97316" />
                       <Text style={styles.statLabel}>Calories</Text>
                     </View>
-                    <Text style={styles.statValue}>{dayData.achievedCalories}</Text>
+                    <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{dayData.achievedCalories}</Text>
                     <Text style={styles.statUnit}>cals</Text>
                   </View>
+
+                  {workoutAccessUnlocked && (
+                    <View style={styles.statCard}>
+                      <View style={styles.statCardContent}>
+                        <Ionicons name="fitness" size={Math.min(hp(2.2), wp(5.5))} color="#10B981" />
+                        <Text style={styles.statLabel}>Burned</Text>
+                      </View>
+                      <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{exerciseCaloriesBurned}</Text>
+                      <Text style={styles.statUnit}>cals</Text>
+                    </View>
+                  )}
+
+                  {isPremium && (
+                    <View style={styles.statCard}>
+                      <View style={styles.statCardContent}>
+                        <Ionicons name="footsteps" size={Math.min(hp(2.2), wp(5.5))} color="#22C55E" />
+                        <Text style={styles.statLabel}>Walking</Text>
+                      </View>
+                      <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{walkingCaloriesBurned}</Text>
+                      <Text style={styles.statUnit}>cals</Text>
+                    </View>
+                  )}
 
                   <View style={styles.statCard}>
                     <View style={styles.statCardContent}>
                       <Ionicons name="water" size={Math.min(hp(2.2), wp(5.5))} color="#2E86AB" />
                       <Text style={styles.statLabel}>Hydration</Text>
                     </View>
-                    <Text style={styles.statValue}>{dayData.achieviedHydration}</Text>
+                    <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{dayData.achieviedHydration}</Text>
                     <Text style={styles.statUnit}>liters</Text>
                   </View>
+
+                  {workoutAccessUnlocked && (
+                    <View style={styles.statCard}>
+                      <View style={styles.statCardContent}>
+                        <Ionicons name="analytics" size={Math.min(hp(2.2), wp(5.5))} color="#14B8A6" />
+                        <Text style={styles.statLabel}>Net</Text>
+                      </View>
+                      <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{netCalories}</Text>
+                      <Text style={styles.statUnit}>cals</Text>
+                    </View>
+                  )}
 
                   <View style={styles.statCard}>
                     <View style={styles.statCardContent}>
@@ -681,7 +478,55 @@ export default function DetailsDay () {
                       {calculatePercentage(dayData.achievedCalories, dayData.targetCalories)}%
                     </Text>
                   </View>
-                  
+
+                  {workoutAccessUnlocked && (
+                    <View style={styles.progressItem}>
+                      <View style={styles.progressHeader}>
+                        <Ionicons name="analytics-outline" size={16} color="#14B8A6" />
+                        <Text style={styles.progressLabel}>Net Calories</Text>
+                      </View>
+                      <View style={styles.progressBarContainer}>
+                        <View
+                          key={`net-active-${netCalories}`}
+                          style={[
+                            styles.progressBar,
+                            {
+                              width: `${calculatePercentage(netCalories, dayData.targetCalories)}%`,
+                              backgroundColor: '#14B8A6'
+                            }
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.progressPercentage}>
+                        {calculatePercentage(netCalories, dayData.targetCalories)}%
+                      </Text>
+                    </View>
+                  )}
+
+                  {isPremium && (
+                    <View style={styles.progressItem}>
+                      <View style={styles.progressHeader}>
+                        <Ionicons name="footsteps-outline" size={16} color="#22C55E" />
+                        <Text style={styles.progressLabel}>Walking Calories</Text>
+                      </View>
+                      <View style={styles.progressBarContainer}>
+                        <View
+                          key={`walking-active-${walkingCaloriesBurned}`}
+                          style={[
+                            styles.progressBar,
+                            {
+                              width: `${calculatePercentage(walkingCaloriesBurned, walkingCaloriesTarget)}%`,
+                              backgroundColor: '#22C55E'
+                            }
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.progressPercentage}>
+                        {calculatePercentage(walkingCaloriesBurned, walkingCaloriesTarget)}%
+                      </Text>
+                    </View>
+                  )}
+                   
                   <View style={styles.progressItem}>
                     <View style={styles.progressHeader}>
                       <Ionicons name="water-outline" size={16} color="#2E86AB" />
@@ -740,16 +585,21 @@ export default function DetailsDay () {
                   <View style={styles.statCard}>
                     <View style={styles.statCardHeader}>
                       <Ionicons name="flag" size={Math.min(hp(2.2), wp(5.5))} color={colors.primary} />
-                      <Text style={styles.statLabel}>Goal</Text>
+                      <Text
+                        style={[styles.statLabel, showEstimatedRanges && styles.statLabelRange]}
+                        numberOfLines={showEstimatedRanges ? 2 : 1}
+                      >
+                        {goalCardLabel}
+                      </Text>
                     </View>
                     <View style={styles.goalRowContainer}>
                       <View style={styles.goalItem}>
-                        <Text style={styles.statValue}>{dayData.targetCalories}</Text>
+                        {renderGoalTargetValue(calorieTargetLabel)}
                         <Text style={styles.statUnit}>cals</Text>
                       </View>
                       <View style={styles.goalDivider} />
                       <View style={styles.goalItem}>
-                        <Text style={styles.statValue}>{dayData.targetHydration}</Text>
+                        {renderGoalTargetValue(hydrationTargetLabel)}
                         <Text style={styles.statUnit}>liters</Text>
                       </View>
                     </View>
@@ -760,18 +610,51 @@ export default function DetailsDay () {
                       <Ionicons name="flame" size={Math.min(hp(2.2), wp(5.5))} color="#F97316" />
                       <Text style={styles.statLabel}>Calories</Text>
                     </View>
-                    <Text style={styles.statValue}>{dayData.achievedCalories}</Text>
+                    <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{dayData.achievedCalories}</Text>
                     <Text style={styles.statUnit}>cals</Text>
                   </View>
+
+                  {workoutAccessUnlocked && (
+                    <View style={styles.statCard}>
+                      <View style={styles.statCardContent}>
+                        <Ionicons name="fitness" size={Math.min(hp(2.2), wp(5.5))} color="#10B981" />
+                        <Text style={styles.statLabel}>Burned</Text>
+                      </View>
+                      <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{exerciseCaloriesBurned}</Text>
+                      <Text style={styles.statUnit}>cals</Text>
+                    </View>
+                  )}
+
+                  {isPremium && (
+                    <View style={styles.statCard}>
+                      <View style={styles.statCardContent}>
+                        <Ionicons name="footsteps" size={Math.min(hp(2.2), wp(5.5))} color="#22C55E" />
+                        <Text style={styles.statLabel}>Walking</Text>
+                      </View>
+                      <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{walkingCaloriesBurned}</Text>
+                      <Text style={styles.statUnit}>cals</Text>
+                    </View>
+                  )}
 
                   <View style={styles.statCard}>
                     <View style={styles.statCardContent}>
                       <Ionicons name="water" size={Math.min(hp(2.2), wp(5.5))} color="#2E86AB" />
                       <Text style={styles.statLabel}>Hydration</Text>
                     </View>
-                    <Text style={styles.statValue}>{dayData.achieviedHydration}</Text>
+                    <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{dayData.achieviedHydration}</Text>
                     <Text style={styles.statUnit}>liters</Text>
                   </View>
+
+                  {workoutAccessUnlocked && (
+                    <View style={styles.statCard}>
+                      <View style={styles.statCardContent}>
+                        <Ionicons name="analytics" size={Math.min(hp(2.2), wp(5.5))} color="#14B8A6" />
+                        <Text style={styles.statLabel}>Net</Text>
+                      </View>
+                      <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{netCalories}</Text>
+                      <Text style={styles.statUnit}>cals</Text>
+                    </View>
+                  )}
 
                   <View style={styles.statCard}>
                     <View style={styles.statCardContent}>
@@ -805,7 +688,55 @@ export default function DetailsDay () {
                       {calculatePercentage(dayData.achievedCalories, dayData.targetCalories)}%
                     </Text>
                   </View>
-                  
+
+                  {workoutAccessUnlocked && (
+                    <View style={styles.progressItem}>
+                      <View style={styles.progressHeader}>
+                        <Ionicons name="analytics-outline" size={16} color="#14B8A6" />
+                        <Text style={styles.progressLabel}>Net Calories</Text>
+                      </View>
+                      <View style={styles.progressBarContainer}>
+                        <View
+                          key={`net-inactive-${netCalories}`}
+                          style={[
+                            styles.progressBar,
+                            {
+                              width: `${calculatePercentage(netCalories, dayData.targetCalories)}%`,
+                              backgroundColor: '#14B8A6'
+                            }
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.progressPercentage}>
+                        {calculatePercentage(netCalories, dayData.targetCalories)}%
+                      </Text>
+                    </View>
+                  )}
+
+                  {isPremium && (
+                    <View style={styles.progressItem}>
+                      <View style={styles.progressHeader}>
+                        <Ionicons name="footsteps-outline" size={16} color="#22C55E" />
+                        <Text style={styles.progressLabel}>Walking Calories</Text>
+                      </View>
+                      <View style={styles.progressBarContainer}>
+                        <View
+                          key={`walking-inactive-${walkingCaloriesBurned}`}
+                          style={[
+                            styles.progressBar,
+                            {
+                              width: `${calculatePercentage(walkingCaloriesBurned, walkingCaloriesTarget)}%`,
+                              backgroundColor: '#22C55E'
+                            }
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.progressPercentage}>
+                        {calculatePercentage(walkingCaloriesBurned, walkingCaloriesTarget)}%
+                      </Text>
+                    </View>
+                  )}
+                   
                   <View style={styles.progressItem}>
                     <View style={styles.progressHeader}>
                       <Ionicons name="water-outline" size={16} color="#2E86AB" />
@@ -865,23 +796,37 @@ export default function DetailsDay () {
           </Text>
         </View>
 
-        {/* Tracking Mode Selector - Professional Toggle */}
+        {/* Tracking Mode Selector */}
         <View style={styles.trackingModeSection}>
-          <Text style={styles.trackingModeTitle}>What would you like to track today?</Text>
+          <View style={styles.trackingModeHeaderRow}>
+            <View style={styles.trackingModeIconBadge}>
+              <Ionicons
+                name={trackingMode === 'meal' ? 'restaurant-outline' : 'water-outline'}
+                size={Math.min(hp(2), wp(4.5))}
+                color={colors.primary}
+              />
+            </View>
+            <Text style={styles.trackingModeTitle}>What would you like to track today?</Text>
+          </View>
           <View style={styles.modeToggleContainer}>
             <TouchableOpacity 
               style={[styles.modeButton, trackingMode === 'meal' && styles.modeButtonActive]}
               onPress={() => setTrackingMode('meal')}
+              activeOpacity={0.85}
             >
-              <Ionicons name="fast-food-outline" size={22} color={trackingMode === 'meal' ? '#FFFFFF' : colors.textSecondary} />
+              <View style={[styles.modeIconBadge, trackingMode === 'meal' && styles.modeIconBadgeActive]}>
+                <Ionicons name="fast-food-outline" size={Math.min(hp(2.2), wp(5))} color={trackingMode === 'meal' ? colors.primary : colors.textSecondary} />
+              </View>
               <Text style={[styles.modeButtonText, trackingMode === 'meal' && styles.modeButtonTextActive]}>Meal</Text>
             </TouchableOpacity>
-            <View style={styles.modeButtonDivider} />
             <TouchableOpacity 
               style={[styles.modeButton, trackingMode === 'hydration' && styles.modeButtonActive]}
               onPress={() => setTrackingMode('hydration')}
+              activeOpacity={0.85}
             >
-              <Ionicons name="water-outline" size={22} color={trackingMode === 'hydration' ? '#FFFFFF' : colors.textSecondary} />
+              <View style={[styles.modeIconBadge, trackingMode === 'hydration' && styles.modeIconBadgeActive]}>
+                <Ionicons name="water-outline" size={Math.min(hp(2.2), wp(5))} color={trackingMode === 'hydration' ? colors.primary : colors.textSecondary} />
+              </View>
               <Text style={[styles.modeButtonText, trackingMode === 'hydration' && styles.modeButtonTextActive]}>Hydration</Text>
             </TouchableOpacity>
           </View>
@@ -891,33 +836,299 @@ export default function DetailsDay () {
           {/* MEAL TRACKING MODE */}
           {trackingMode === 'meal' && (
             <>
+              {/* Food Preference Filter */}
+              <View style={styles.sectionContainer}>
+                <Text style={styles.sectionLabel}>Food Preference</Text>
+                <View style={styles.dietFilterContainer}>
+                  {dietPreferenceOptions.map((option) => {
+                    const isActive = dietPreference === option.value;
+
+                    return (
+                      <TouchableOpacity
+                        key={option.value}
+                        style={[
+                          styles.dietFilterButton,
+                          isActive && {
+                            backgroundColor: colors.primary,
+                            borderColor: colors.primary,
+                          },
+                        ]}
+                        onPress={() => handleDietPreferenceChange(option.value)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons
+                          name={option.icon}
+                          size={Math.min(hp(2), wp(4.5))}
+                          color={isActive ? '#FFFFFF' : colors.textSecondary}
+                        />
+                        <Text
+                          style={[
+                            styles.dietFilterText,
+                            { color: isActive ? '#FFFFFF' : colors.textSecondary },
+                          ]}
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                        >
+                          {option.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <View style={styles.mealTemplateSection}>
+                <View style={styles.sectionHeaderRow}>
+                  <View>
+                    <Text style={styles.sectionLabel}>Meal Templates</Text>
+                    <Text style={styles.templateSubtitle}>Save common meals and log them fast.</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[
+                      styles.saveTemplateButton,
+                      !calorieInput.trim() && styles.saveTemplateButtonDisabled,
+                    ]}
+                    onPress={saveCurrentMealAsTemplate}
+                    disabled={!calorieInput.trim()}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="bookmark-outline" size={Math.min(hp(1.8), wp(4))} color="#FFFFFF" />
+                    <Text style={styles.saveTemplateText}>Save</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.repeatYesterdayButton,
+                    (isRepeatingYesterday || isLoading) && { opacity: 0.65 },
+                  ]}
+                  onPress={handleRepeatYesterday}
+                  disabled={isRepeatingYesterday || isLoading}
+                  activeOpacity={0.82}
+                >
+                  <View style={styles.repeatYesterdayIcon}>
+                    <Ionicons name="refresh" size={Math.min(hp(2.4), wp(5.4))} color={colors.primary} />
+                  </View>
+                  <View style={styles.repeatYesterdayCopy}>
+                    <Text style={styles.repeatYesterdayTitle}>
+                      {isRepeatingYesterday ? 'Repeating meals...' : 'Repeat Yesterday'}
+                    </Text>
+                    <Text style={styles.repeatYesterdaySubtitle}>Add yesterday's saved meals to today</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={Math.min(hp(2.1), wp(4.8))} color={colors.textSecondary} />
+                </TouchableOpacity>
+
+                {mealTemplates.length > 0 ? (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.mealTemplateList}
+                  >
+                    {mealTemplates.map((template) => {
+                      const totalCalories = Math.round(
+                        template.caloriesPerServing * (template.quantity || 1)
+                      );
+
+                      return (
+                        <View key={template.id} style={styles.mealTemplateCard}>
+                          <TouchableOpacity
+                            style={styles.templateRemoveButton}
+                            onPress={() => removeMealTemplate(template.id)}
+                            hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                          >
+                            <Ionicons name="close" size={Math.min(hp(1.7), wp(3.8))} color={colors.textSecondary} />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.mealTemplateBody}
+                            onPress={() => applyTemplateToForm(template)}
+                            activeOpacity={0.78}
+                          >
+                            <View style={styles.mealTemplateIcon}>
+                              <Ionicons name="restaurant-outline" size={Math.min(hp(2.4), wp(5.3))} color={colors.primary} />
+                            </View>
+                            <Text style={styles.mealTemplateName} numberOfLines={2}>{template.name}</Text>
+                            <Text style={styles.mealTemplateMeta} numberOfLines={1}>
+                              {template.quantity}x | {totalCalories} cal
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.templateAddButton}
+                            onPress={() => handleTemplateOneTap(template)}
+                            disabled={isLoading}
+                            activeOpacity={0.82}
+                          >
+                            <Text style={styles.templateAddText}>Add</Text>
+                          </TouchableOpacity>
+                        </View>
+                      );
+                    })}
+                  </ScrollView>
+                ) : (
+                  <View style={styles.emptyTemplateCard}>
+                    <Ionicons name="bookmark-outline" size={Math.min(hp(2.5), wp(5.6))} color={colors.textSecondary} />
+                    <Text style={styles.emptyTemplateText}>
+                      Select any meal, then tap Save to create your first template.
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Search Food Field */}
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>
+                  <Ionicons name="search" size={16} color={colors.primary} /> Search Food
+                </Text>
+                <View style={styles.searchInputContainer}>
+                  <Ionicons name="search-outline" size={20} color={colors.textSecondary} style={styles.searchIconLeft} />
+                  <TextInput
+                    style={styles.searchInputField}
+                    placeholder={`Search ${getDietPreferenceLabel(dietPreference).toLowerCase()} foods...`}
+                    placeholderTextColor={colors.textSecondary}
+                    value={foodSearch}
+                    onChangeText={setFoodSearch}
+                  />
+                  {foodSearch.length > 0 && (
+                    <TouchableOpacity onPress={() => { setFoodSearch(''); setShowFoodSearch(false); }} style={styles.searchClearButton}>
+                      <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
+              {/* Search Results with Better Spacing */}
+              {showFoodSearch && filteredFoods.length > 0 && (
+                <View style={styles.searchResultsContainer}>
+                  <Text style={styles.searchResultsHeader}>
+                    Found {filteredFoods.length} {getDietPreferenceLabel(dietPreference).toLowerCase()} items - Select one
+                  </Text>
+                  <ScrollView style={styles.searchResultsScroll} nestedScrollEnabled showsVerticalScrollIndicator={true}>
+                    {filteredFoods.slice(0, 10).map((food, index) => {
+                      const foodDietType = getDietTypeForFood(food);
+
+                      return (
+                        <TouchableOpacity
+                          key={index}
+                          style={styles.searchResultCard}
+                          onPress={() => {
+                            setSelectedFoodItem(food);
+                            const calories = food.calories_kcal || food.calories || 0;
+                            setCalorieInput(String(Math.round(calories * mealQuantityValue)));
+                            setFoodSearch('');
+                            setShowFoodSearch(false);
+                          }}
+                          activeOpacity={0.6}
+                        >
+                          <View style={styles.searchResultLeft}>
+                            <View style={styles.searchResultIconBg}>
+                              <Ionicons name="fast-food" size={18} color={colors.primary} />
+                            </View>
+                            <View style={styles.searchResultInfo}>
+                              <Text style={styles.searchResultTitle}>{food.food_name || food.name}</Text>
+                              <Text style={styles.searchResultMeta}>
+                                {food.serving_size || food.category || '100g'}
+                              </Text>
+                              <View
+                                style={[
+                                  styles.searchDietBadge,
+                                  {
+                                    backgroundColor:
+                                      foodDietType === 'vegetarian' ? colors.success + '18' : colors.warning + '18',
+                                  },
+                                ]}
+                              >
+                                <Ionicons
+                                  name={foodDietType === 'vegetarian' ? 'leaf-outline' : 'flame-outline'}
+                                  size={Math.min(hp(1.2), wp(2.7))}
+                                  color={foodDietType === 'vegetarian' ? colors.success : colors.warning}
+                                />
+                                <Text
+                                  style={[
+                                    styles.searchDietBadgeText,
+                                    { color: foodDietType === 'vegetarian' ? colors.success : colors.warning },
+                                  ]}
+                                >
+                                  {foodDietType === 'vegetarian' ? 'Veg' : 'Non-Veg'}
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+                          <View style={styles.searchResultRight}>
+                            <Text style={styles.searchResultCalValue}>{food.calories_kcal || food.calories}</Text>
+                            <Text style={styles.searchResultCalLabel}>cal</Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              )}
+
               {/* Quick Pick Suggestions */}
               <View style={styles.sectionContainer}>
-                <Text style={styles.sectionLabel}>Quick Pick Favorites</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickPickScroll}>
-                  {suggestedFoods.slice(0, 6).map((food, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={styles.quickPickItem}
-                      onPress={() => {
-                        setSelectedFoodItem(food);
-                        setCalorieInput(String(food.calories_kcal || food.calories));
-                        setFoodSearch('');
-                        setShowFoodSearch(false);
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.quickPickIcon}>
-                        <Ionicons name="restaurant" size={20} color={colors.primary} />
-                      </View>
-                      <Text style={styles.quickPickName} numberOfLines={2}>{food.food_name || food.name}</Text>
-                      <View style={styles.quickPickCalories}>
-                        <Ionicons name="flame" size={12} color="#F97316" />
-                        <Text style={styles.quickPickCalText}>{food.calories_kcal || food.calories}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={styles.sectionLabel}>Quick Pick Favorites</Text>
+                  <Text style={styles.dietFilterSummary}>{getDietPreferenceLabel(dietPreference)}</Text>
+                </View>
+                {quickPickFoods.length > 0 ? (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickPickScroll}>
+                    {quickPickFoods.map((food, index) => {
+                      const foodDietType = getDietTypeForFood(food);
+
+                      return (
+                        <TouchableOpacity
+                          key={index}
+                          style={styles.quickPickItem}
+                          onPress={() => {
+                            setSelectedFoodItem(food);
+                            setCalorieInput(String(food.calories_kcal || food.calories));
+                            setFoodSearch('');
+                            setShowFoodSearch(false);
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <View style={styles.quickPickIcon}>
+                            <Ionicons name="restaurant" size={20} color={colors.primary} />
+                          </View>
+                          <Text style={styles.quickPickName} numberOfLines={2}>{food.food_name || food.name}</Text>
+                          <View style={styles.quickPickCalories}>
+                            <Ionicons name="flame" size={12} color="#F97316" />
+                            <Text style={styles.quickPickCalText}>{food.calories_kcal || food.calories}</Text>
+                          </View>
+                          <View
+                            style={[
+                              styles.foodTypeBadge,
+                              {
+                                backgroundColor:
+                                  foodDietType === 'vegetarian' ? colors.success + '18' : colors.warning + '18',
+                              },
+                            ]}
+                          >
+                            <Ionicons
+                              name={foodDietType === 'vegetarian' ? 'leaf-outline' : 'flame-outline'}
+                              size={Math.min(hp(1.25), wp(2.9))}
+                              color={foodDietType === 'vegetarian' ? colors.success : colors.warning}
+                            />
+                            <Text
+                              style={[
+                                styles.foodTypeBadgeText,
+                                { color: foodDietType === 'vegetarian' ? colors.success : colors.warning },
+                              ]}
+                            >
+                              {foodDietType === 'vegetarian' ? 'Veg' : 'Non-Veg'}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                ) : (
+                  <View style={styles.emptyDietFilterCard}>
+                    <Ionicons name="search-outline" size={Math.min(hp(2.2), wp(4.8))} color={colors.textSecondary} />
+                    <Text style={styles.emptyDietFilterText}>
+                      No {getDietPreferenceLabel(dietPreference).toLowerCase()} quick picks found.
+                    </Text>
+                  </View>
+                )}
               </View>
 
               {/* View Diet Plan Button */}
@@ -983,68 +1194,6 @@ export default function DetailsDay () {
                 </TouchableOpacity>
               </View>
 
-              {/* Search Food Field */}
-              <View style={styles.fieldContainer}>
-                <Text style={styles.fieldLabel}>
-                  <Ionicons name="search" size={16} color={colors.primary} /> Search Food
-                </Text>
-                <View style={styles.searchInputContainer}>
-                  <Ionicons name="search-outline" size={20} color={colors.textSecondary} style={styles.searchIconLeft} />
-                  <TextInput 
-                    style={styles.searchInputField}
-                    placeholder="Search Pakistani dishes, rice, chicken..."
-                    placeholderTextColor={colors.textSecondary}
-                    value={foodSearch}
-                    onChangeText={setFoodSearch}
-                  />
-                  {foodSearch.length > 0 && (
-                    <TouchableOpacity onPress={() => { setFoodSearch(''); setShowFoodSearch(false); }} style={styles.searchClearButton}>
-                      <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-
-              {/* Search Results with Better Spacing */}
-              {showFoodSearch && filteredFoods.length > 0 && (
-                <View style={styles.searchResultsContainer}>
-                  <Text style={styles.searchResultsHeader}>
-                    Found {filteredFoods.length} items - Select one
-                  </Text>
-                  <ScrollView style={styles.searchResultsScroll} nestedScrollEnabled showsVerticalScrollIndicator={true}>
-                    {filteredFoods.slice(0, 10).map((food, index) => (
-                      <TouchableOpacity
-                        key={index}
-                        style={styles.searchResultCard}
-                        onPress={() => {
-                          setSelectedFoodItem(food);
-                          const calories = food.calories_kcal || food.calories || 0;
-                          setCalorieInput(String(Math.round(calories * parseFloat(mealQuantity || '1'))));
-                          setFoodSearch('');
-                          setShowFoodSearch(false);
-                        }}
-                        activeOpacity={0.6}
-                      >
-                        <View style={styles.searchResultLeft}>
-                          <View style={styles.searchResultIconBg}>
-                            <Ionicons name="fast-food" size={18} color={colors.primary} />
-                          </View>
-                          <View style={styles.searchResultInfo}>
-                            <Text style={styles.searchResultTitle}>{food.food_name || food.name}</Text>
-                            <Text style={styles.searchResultMeta}>
-                              {food.serving_size || food.category || '100g'}
-                            </Text>
-                          </View>
-                        </View>
-                        <View style={styles.searchResultRight}>
-                          <Text style={styles.searchResultCalValue}>{food.calories_kcal || food.calories}</Text>
-                          <Text style={styles.searchResultCalLabel}>cal</Text>
-                        </View>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
             </>
           )}
 
@@ -1086,7 +1235,7 @@ export default function DetailsDay () {
                         style={styles.drinkResultCard}
                         onPress={() => {
                           setSelectedDrink(drink);
-                          const hydrationValue = ((drink.hydration_percent || 100) / 100) * 0.25; // Convert to liters
+                          const hydrationValue = getDrinkHydrationLiters(drink, 1);
                           setWaterInput(hydrationValue.toFixed(2));
                           setDrinkSearch('');
                           setShowDrinkSearch(false);
@@ -1143,20 +1292,20 @@ export default function DetailsDay () {
                     </View>
                     <View style={styles.drinkNutritionItem}>
                       <Ionicons name="flame" size={16} color="#F97316" />
-                      <Text style={styles.drinkNutritionValue}>{Math.round(selectedDrink.calories_kcal * parseFloat(drinkQuantity || '1'))}</Text>
+                      <Text style={styles.drinkNutritionValue}>{Math.round(selectedDrink.calories_kcal * drinkQuantityValue)}</Text>
                       <Text style={styles.drinkNutritionLabel}>cal</Text>
                     </View>
                     {selectedDrink.protein_g > 0 && (
                       <View style={styles.drinkNutritionItem}>
                         <Ionicons name="fitness" size={16} color="#2E86AB" />
-                        <Text style={styles.drinkNutritionValue}>{Math.round(selectedDrink.protein_g * parseFloat(drinkQuantity || '1'))}</Text>
+                        <Text style={styles.drinkNutritionValue}>{Math.round(selectedDrink.protein_g * drinkQuantityValue)}</Text>
                         <Text style={styles.drinkNutritionLabel}>protein</Text>
                       </View>
                     )}
                     {selectedDrink.carbs_g > 0 && (
                       <View style={styles.drinkNutritionItem}>
                         <Ionicons name="leaf" size={16} color="#FFA500" />
-                        <Text style={styles.drinkNutritionValue}>{Math.round(selectedDrink.carbs_g * parseFloat(drinkQuantity || '1'))}</Text>
+                        <Text style={styles.drinkNutritionValue}>{Math.round(selectedDrink.carbs_g * drinkQuantityValue)}</Text>
                         <Text style={styles.drinkNutritionLabel}>carbs</Text>
                       </View>
                     )}
@@ -1169,9 +1318,9 @@ export default function DetailsDay () {
                       <TouchableOpacity 
                         style={styles.quantityControlBtn}
                         onPress={() => {
-                          const q = Math.max(0.5, parseFloat(drinkQuantity || '1') - 0.5);
+                          const q = Math.max(0.5, drinkQuantityValue - 0.5);
                           setDrinkQuantity(String(q));
-                          const hydrationValue = ((selectedDrink.hydration_percent || 100) / 100) * 0.25 * q;
+                          const hydrationValue = getDrinkHydrationLiters(selectedDrink, q);
                           setWaterInput(hydrationValue.toFixed(2));
                         }}
                       >
@@ -1184,7 +1333,7 @@ export default function DetailsDay () {
                           onChangeText={(text) => {
                             setDrinkQuantity(text);
                             if (text && !isNaN(parseFloat(text))) {
-                              const hydrationValue = ((selectedDrink.hydration_percent || 100) / 100) * 0.25 * parseFloat(text);
+                              const hydrationValue = getDrinkHydrationLiters(selectedDrink, parseFloat(text));
                               setWaterInput(hydrationValue.toFixed(2));
                             }
                           }}
@@ -1195,9 +1344,9 @@ export default function DetailsDay () {
                       <TouchableOpacity 
                         style={styles.quantityControlBtn}
                         onPress={() => {
-                          const q = parseFloat(drinkQuantity || '1') + 0.5;
+                          const q = drinkQuantityValue + 0.5;
                           setDrinkQuantity(String(q));
-                          const hydrationValue = ((selectedDrink.hydration_percent || 100) / 100) * 0.25 * q;
+                          const hydrationValue = getDrinkHydrationLiters(selectedDrink, q);
                           setWaterInput(hydrationValue.toFixed(2));
                         }}
                       >
@@ -1221,6 +1370,7 @@ export default function DetailsDay () {
                       onPress={() => {
                         setWaterInput(option.amount.toString());
                         setSelectedDrink(null);
+                        setDrinkQuantity('1');
                       }}
                       activeOpacity={0.7}
                     >
@@ -1261,7 +1411,7 @@ export default function DetailsDay () {
                     />
                     <Text style={styles.waterUnit}>Liters</Text>
                     <Text style={styles.waterGlasses}>
-                      ≈ {Math.round((parseFloat(waterInput || '0') / 0.25) * 10) / 10} glasses
+                      ≈ {Math.round((waterInputValue / 0.25) * 10) / 10} glasses
                     </Text>
                   </View>
                   
@@ -1282,7 +1432,7 @@ export default function DetailsDay () {
                 <View style={styles.hydProgressHeader}>
                   <Text style={styles.progressTitle}>Today's Progress</Text>
                   <Text style={styles.progressPercent}>
-                    {calculatePercentage(dayData.achieviedHydration + parseFloat(waterInput || '0'), dayData.targetHydration)}%
+                    {calculatePercentage(projectedHydration, targetHydrationValue)}%
                   </Text>
                 </View>
                 <View style={styles.progressBarBg}>
@@ -1290,7 +1440,7 @@ export default function DetailsDay () {
                     style={[
                       styles.progressBarFg,
                       {
-                        width: `${Math.min(((dayData.achieviedHydration + parseFloat(waterInput || '0')) / dayData.targetHydration) * 100, 100)}%`,
+                        width: `${targetHydrationValue > 0 ? Math.min((projectedHydration / targetHydrationValue) * 100, 100) : 0}%`,
                         backgroundColor: '#2E86AB'
                       }
                     ]}
@@ -1298,7 +1448,7 @@ export default function DetailsDay () {
                 </View>
                 <View style={styles.progressStats}>
                   <Text style={styles.progressCurrent}>
-                    {(dayData.achieviedHydration + parseFloat(waterInput || '0')).toFixed(2)}L of {dayData.targetHydration}L
+                    {projectedHydration.toFixed(2)}L of {dayData.targetHydration}L
                   </Text>
                 </View>
               </View>
@@ -1318,7 +1468,7 @@ export default function DetailsDay () {
                     {selectedFoodItem.serving_size || '100g'}
                   </Text>
                   <Text style={styles.selectedFoodCalories}>
-                    {Math.round((selectedFoodItem.calories_kcal || selectedFoodItem.calories || 0) * parseFloat(mealQuantity || '1'))} calories
+                    {Math.round((selectedFoodItem.calories_kcal || selectedFoodItem.calories || 0) * mealQuantityValue)} calories
                   </Text>
                 </View>
                 <TouchableOpacity onPress={() => setSelectedFoodItem(null)}>
@@ -1332,19 +1482,19 @@ export default function DetailsDay () {
                   {selectedFoodItem.protein_g && (
                     <View style={styles.nutritionItem}>
                       <Text style={styles.nutritionLabel}>Protein</Text>
-                      <Text style={styles.nutritionValue}>{Math.round((selectedFoodItem.protein_g || 0) * parseFloat(mealQuantity || '1'))}g</Text>
+                      <Text style={styles.nutritionValue}>{Math.round((selectedFoodItem.protein_g || 0) * mealQuantityValue)}g</Text>
                     </View>
                   )}
                   {(selectedFoodItem.carbs_g || selectedFoodItem.carbohydrates_g) && (
                     <View style={styles.nutritionItem}>
                       <Text style={styles.nutritionLabel}>Carbs</Text>
-                      <Text style={styles.nutritionValue}>{Math.round((selectedFoodItem.carbs_g || selectedFoodItem.carbohydrates_g || 0) * parseFloat(mealQuantity || '1'))}g</Text>
+                      <Text style={styles.nutritionValue}>{Math.round((selectedFoodItem.carbs_g || selectedFoodItem.carbohydrates_g || 0) * mealQuantityValue)}g</Text>
                     </View>
                   )}
                   {selectedFoodItem.fat_g && (
                     <View style={styles.nutritionItem}>
                       <Text style={styles.nutritionLabel}>Fat</Text>
-                      <Text style={styles.nutritionValue}>{Math.round((selectedFoodItem.fat_g || 0) * parseFloat(mealQuantity || '1'))}g</Text>
+                      <Text style={styles.nutritionValue}>{Math.round((selectedFoodItem.fat_g || 0) * mealQuantityValue)}g</Text>
                     </View>
                   )}
                 </View>
@@ -1357,7 +1507,7 @@ export default function DetailsDay () {
                   <TouchableOpacity 
                     style={styles.quantityBtn}
                     onPress={() => {
-                      const q = Math.max(0.5, parseFloat(mealQuantity || '1') - 0.5);
+                      const q = Math.max(0.5, mealQuantityValue - 0.5);
                       setMealQuantity(String(q));
                       const calories = selectedFoodItem.calories_kcal || selectedFoodItem.calories || 0;
                       setCalorieInput(String(Math.round(calories * q)));
@@ -1380,7 +1530,7 @@ export default function DetailsDay () {
                   <TouchableOpacity 
                     style={styles.quantityBtn}
                     onPress={() => {
-                      const q = parseFloat(mealQuantity || '1') + 0.5;
+                      const q = mealQuantityValue + 0.5;
                       setMealQuantity(String(q));
                       const calories = selectedFoodItem.calories_kcal || selectedFoodItem.calories || 0;
                       setCalorieInput(String(Math.round(calories * q)));
@@ -1411,15 +1561,15 @@ export default function DetailsDay () {
               {calorieInput && (
                 <View style={styles.calorieInfo}>
                   <Text style={styles.calorieInfoText}>
-                    Remaining: {dayData.targetCalories - parseInt(calorieInput)} / {dayData.targetCalories} cals
+                    Remaining: {targetCaloriesValue - calorieInputValue} / {dayData.targetCalories} cals
                   </Text>
                   <View style={styles.calorieBar}>
                     <View 
                       style={[
                         styles.calorieBarFill,
                         {
-                          width: `${Math.min((parseInt(calorieInput) / dayData.targetCalories) * 100, 100)}%`,
-                          backgroundColor: parseInt(calorieInput) > dayData.targetCalories ? '#F97316' : '#2E86AB'
+                          width: `${targetCaloriesValue > 0 ? Math.min((calorieInputValue / targetCaloriesValue) * 100, 100) : 0}%`,
+                          backgroundColor: calorieInputValue > targetCaloriesValue ? '#F97316' : '#2E86AB'
                         }
                       ]}
                     />
@@ -1448,161 +1598,24 @@ export default function DetailsDay () {
             />
           </View>
 
-          {inputMethod === 'audio' && (
-            <View style={styles.audioSection}>
-              <Ionicons name="lock-closed" size={Math.min(hp(5), wp(12))} color="#CCCCCC" />
-              <Text style={styles.audioInstructions}>Voice input coming soon</Text>
-              <Text style={styles.comingSoonMessage}>We're working on voice recognition for meal logging</Text>
-            </View>
-          )}
-          {inputMethod === 'photo' && (
-            <View style={styles.audioSection}>
-              <Ionicons name="lock-closed" size={Math.min(hp(5), wp(12))} color="#CCCCCC" />
-              <Text style={styles.audioInstructions}>Photo input coming soon</Text>
-              <Text style={styles.comingSoonMessage}>We're working on AI food recognition</Text>
-            </View>
-          )}
         </View>
 
         <View style={styles.menuButtons}>
           <TouchableOpacity style={styles.backMenuButton} onPress={closeMenu}>
-            <Ionicons name="arrow-back" size={Math.min(hp(2.2), wp(5))} color={colors.primary} />
             <Text style={styles.backMenuText}>Back</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.submitMenuButton, (((!calorieInput.trim() && parseFloat(waterInput || '0') <= 0)) || isLoading) && {opacity: 0.5}]}
-            disabled={(((!calorieInput.trim() && parseFloat(waterInput || '0') <= 0)) || isLoading)}
-            onPress={async () => {
-              setIsLoading(true);
-              try {
-                const dayLogId = (dayData as any)._id || (props as any)._id;
-
-                console.log('🔍 [DetailsDay] Saving meal - dayLogId:', dayLogId);
-                console.log('🔍 [DetailsDay] dayData._id:', (dayData as any)._id);
-                console.log('🔍 [DetailsDay] props._id:', (props as any)._id);
-                console.log('🔍 [DetailsDay] Full props:', JSON.stringify(props, null, 2));
-
-                if (!dayLogId) {
-                  Alert.alert('Error', 'Unable to find day log. Please refresh and try again.');
-                  console.error('❌ [DetailsDay] No dayLogId found!');
-                  return;
-                }
-
-                let hasMeal = false;
-                let hasWater = false;
-                let successMessages = [];
-                let updatedDayData: any = { ...dayData };
-
-                // Log meal if calories are entered
-                if (calorieInput.trim()) {
-                  const calories = parseInt(calorieInput);
-                  const foodName = selectedFoodItem?.food_name || selectedFoodItem?.name || 'Custom Meal';
-                  const servingSize = selectedFoodItem?.serving_size || 'portion';
-                  const quantity = parseFloat(mealQuantity || '1');
-                  
-                  // Calculate nutrition values multiplied by quantity
-                  const baseProtein = selectedFoodItem?.protein_g || 0;
-                  const baseCarbs = selectedFoodItem?.carbs_g || selectedFoodItem?.carbohydrates_g || 0;
-                  const baseFats = selectedFoodItem?.fat_g || 0;
-                  
-                  const protein = Math.round(baseProtein * quantity);
-                  const carbs = Math.round(baseCarbs * quantity);
-                  const fats = Math.round(baseFats * quantity);
-
-                  const mealResponse = await dailyLogsApi.addMeal(
-                    dayLogId,
-                    foodName,
-                    quantity,
-                    servingSize,
-                    calories,
-                    protein,
-                    carbs,
-                    fats,
-                    descriptionInput
-                  );
-
-                  if (mealResponse) {
-                    hasMeal = true;
-                    successMessages.push(`${calories} calories logged`);
-                    
-                    updatedDayData = {
-                      ...updatedDayData,
-                      achievedCalories: (updatedDayData.achievedCalories || 0) + calories,
-                      meals: updatedDayData.meals ? [...updatedDayData.meals, mealResponse] : [mealResponse],
-                    };
-                  }
-                }
-
-                // Log water if amount is entered
-                const waterAmount = parseFloat(waterInput || '0');
-                if (waterAmount > 0) {
-                  const waterResponse = await dailyLogsApi.addWater(dayLogId, waterAmount);
-
-                  if (waterResponse) {
-                    hasWater = true;
-                    successMessages.push(`${waterAmount}L of water logged`);
-                    
-                    // Update with full response data to ensure accuracy
-                    updatedDayData = {
-                      ...updatedDayData,
-                      achieviedHydration: waterResponse.achieviedHydration || (updatedDayData.achieviedHydration || 0) + waterAmount,
-                      waterIntake: waterResponse.waterIntake || updatedDayData.waterIntake,
-                    };
-                  }
-                }
-
-                // Show combined success message
-                if (hasMeal || hasWater) {
-                  // Update state once with all changes
-                  setDayData(updatedDayData);
-                  
-                  // Reset forms immediately
-                  setFoodSearch('');
-                  setSelectedFoodItem(null);
-                  setCalorieInput('');
-                  setMealQuantity('1');
-                  setDescriptionInput('');
-                  setWaterInput('0');
-                  
-                  // Use setTimeout to ensure state updates are processed
-                  setTimeout(() => {
-                    closeMenu();
-                    
-                    Alert.alert(
-                      'Success! ✅',
-                      successMessages.join('\n')
-                    );
-                  }, 100);
-                } else {
-                  Alert.alert('Error', 'Please enter at least meal calories or water amount');
-                }
-              } catch (error: any) {
-                console.error('Error logging:', error);
-                
-                // Handle expired cycle error
-                if (error.message?.includes('old/completed cycle') || error.message?.includes('CYCLE_EXPIRED')) {
-                  Alert.alert(
-                    'Cycle Expired',
-                    'Your data is outdated. A new weekly cycle has been created. Please go back to refresh.',
-                    [
-                      {
-                        text: 'Go Back',
-                        onPress: () => {
-                          // Clear local storage to force refresh
-                          AsyncStorage.removeItem('JsonResponse').then(() => {
-                            router.back();
-                          });
-                        }
-                      }
-                    ]
-                  );
-                } else {
-                  Alert.alert('Error', 'Failed to log entry. Please check your connection.');
-                }
-              } finally {
-                setIsLoading(false);
-              }
-            }}
+            style={[styles.submitMenuButton, ((!canSubmitNutritionEntry) || isLoading) && {opacity: 0.5}]}
+            disabled={((!canSubmitNutritionEntry) || isLoading)}
+            onPress={() => handleSubmitNutritionEntry({
+              calorieInput,
+              waterInput,
+              selectedFoodItem,
+              selectedDrink,
+              drinkQuantity,
+              mealQuantity,
+              descriptionInput,
+            })}
           >
             <Text style={styles.submitMenuText}>Save Entry</Text>
             <Ionicons name="checkmark" size={Math.min(hp(2.2), wp(5))} color="white" />
@@ -1677,7 +1690,7 @@ export default function DetailsDay () {
                   style={[styles.modalButton, styles.modalSuccessButton, { backgroundColor: colors.success }]}
                   onPress={completionModalData.onContinue}
                 >
-                  <Ionicons name="arrow-forward" size={18} color="white" />
+                  <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
                   <Text style={styles.modalSuccessText}>Continue</Text>
                 </Pressable>
               </View>
@@ -1747,18 +1760,19 @@ export default function DetailsDay () {
       onRequestClose={() => setShowCustomRecipeModal(false)}
     >
       <View style={styles.customRecipeModalContainer}>
-        <View style={styles.customRecipeModalHeader}>
+        <View style={[styles.customRecipeModalHeader, { paddingTop: insets.top + 10 }]}>
           <TouchableOpacity onPress={() => setShowCustomRecipeModal(false)}>
-            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
           </TouchableOpacity>
           <Text style={styles.customRecipeModalTitle}>Create Custom Recipe</Text>
           <View style={{ width: 24 }} />
         </View>
 
-        <KeyboardAwareScrollView
+        <KeyboardAwareModalContent
           style={styles.customRecipeModalContent}
+          contentContainerStyle={styles.customRecipeModalScrollContent}
           showsVerticalScrollIndicator={false}
-          enableOnAndroid={true}
+          extraScrollHeight={Math.max(insets.bottom, hp(3))}
         >
           {/* Recipe Name */}
           <View style={styles.customRecipeSection}>
@@ -2086,6 +2100,10 @@ export default function DetailsDay () {
                   }
 
                   const calories = parseFloat(customRecipeCalories);
+                  if (!Number.isFinite(calories) || calories <= 0) {
+                    Alert.alert('Error', 'Please enter a valid calorie amount');
+                    return;
+                  }
 
                   // Save recipe to backend
                   const savedRecipe = await customRecipesApi.createRecipe({
@@ -2142,14 +2160,14 @@ export default function DetailsDay () {
               <Text style={styles.customRecipeAddButtonText}>Use This Recipe</Text>
             </TouchableOpacity>
           </View>
-        </KeyboardAwareScrollView>
+        </KeyboardAwareModalContent>
       </View>
     </Modal>
   </View>
 );
 
 }
-const getStyles = (colors: any) => StyleSheet.create({
+const getStyles = (colors: any, bottomInset = 0) => StyleSheet.create({
     heading: {
         paddingHorizontal: HEADER_PADDING_HORIZONTAL,
         paddingVertical: hp(1.2),
@@ -2317,6 +2335,11 @@ const getStyles = (colors: any) => StyleSheet.create({
         alignItems: 'center',
         flex: 1,
     },
+    goalRangeValue: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: Math.min(hp(5.1), wp(11.5)),
+    },
     goalDivider: {
         width: 1.5,
         height: hp(4),
@@ -2331,6 +2354,11 @@ const getStyles = (colors: any) => StyleSheet.create({
         marginBottom: hp(0.2),
         textTransform: 'uppercase',
         letterSpacing: 0.4,
+    },
+    statLabelRange: {
+        flexShrink: 1,
+        lineHeight: Math.min(hp(1.45), wp(3.25)),
+        textAlign: 'left',
     },
     statValue: {
         fontSize: Math.min(hp(2.4), wp(5.5)),
@@ -3194,6 +3222,18 @@ const getStyles = (colors: any) => StyleSheet.create({
         marginBottom: hp(1.2),
         letterSpacing: 0.3,
     },
+    sectionHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: wp(2),
+    },
+    dietFilterSummary: {
+        fontSize: Math.min(hp(1.25), wp(3)),
+        fontWeight: '700',
+        color: colors.primary,
+        marginBottom: hp(1.2),
+    },
     fieldContainer: {
         marginBottom: hp(2.5),
     },
@@ -3241,6 +3281,47 @@ const getStyles = (colors: any) => StyleSheet.create({
         fontSize: Math.min(hp(1.3), wp(3)),
         color: 'rgba(255, 255, 255, 0.85)',
     },
+    dietFilterContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(2),
+    },
+    dietFilterButton: {
+        flex: 1,
+        minHeight: hp(4.8),
+        borderRadius: wp(3),
+        borderWidth: 2,
+        borderColor: colors.borderColor || '#E5E7EB',
+        backgroundColor: colors.cardBackground,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        gap: wp(1.2),
+        paddingHorizontal: wp(2),
+        paddingVertical: hp(0.9),
+    },
+    dietFilterText: {
+        fontSize: Math.min(hp(1.45), wp(3.3)),
+        fontWeight: '800',
+    },
+    emptyDietFilterCard: {
+        minHeight: hp(7),
+        borderRadius: wp(3),
+        borderWidth: 1,
+        borderColor: colors.borderColor || '#E5E7EB',
+        backgroundColor: colors.cardBackground,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        gap: wp(2),
+        paddingHorizontal: wp(3),
+    },
+    emptyDietFilterText: {
+        flex: 1,
+        fontSize: Math.min(hp(1.4), wp(3.3)),
+        color: colors.textSecondary,
+        fontWeight: '600',
+    },
     // Quick Pick Styles
     quickPickScroll: {
         marginTop: hp(0.5),
@@ -3286,6 +3367,19 @@ const getStyles = (colors: any) => StyleSheet.create({
         fontSize: Math.min(hp(1.3), wp(3)),
         fontWeight: '700',
         color: '#F97316',
+    },
+    foodTypeBadge: {
+        marginTop: hp(0.7),
+        borderRadius: hp(1.4),
+        paddingHorizontal: wp(1.6),
+        paddingVertical: hp(0.25),
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(0.6),
+    },
+    foodTypeBadgeText: {
+        fontSize: Math.min(hp(1), wp(2.4)),
+        fontWeight: '800',
     },
     // Search Input Styles
     searchInputContainer: {
@@ -3377,6 +3471,20 @@ const getStyles = (colors: any) => StyleSheet.create({
     searchResultMeta: {
         fontSize: Math.min(hp(1.3), wp(3)),
         color: colors.textSecondary,
+    },
+    searchDietBadge: {
+        alignSelf: 'flex-start',
+        marginTop: hp(0.6),
+        borderRadius: hp(1.2),
+        paddingHorizontal: wp(1.5),
+        paddingVertical: hp(0.25),
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(0.5),
+    },
+    searchDietBadgeText: {
+        fontSize: Math.min(hp(1), wp(2.35)),
+        fontWeight: '800',
     },
     searchResultRight: {
         alignItems: 'flex-end',
@@ -3933,64 +4041,86 @@ const getStyles = (colors: any) => StyleSheet.create({
     // Tracking Mode Selector Styles
     trackingModeSection: {
         backgroundColor: colors.cardBg,
-        borderRadius: 16,
-        padding: wp(5),
+        borderRadius: 22,
+        padding: wp(4),
         marginBottom: hp(2.5),
-        shadowColor: colors.primary,
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.15,
-        shadowRadius: 10,
-        elevation: 4,
-        borderWidth: 2,
-        borderColor: '#000000',
+        borderWidth: 0,
+    },
+    trackingModeHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(2.4),
+        marginBottom: hp(1.4),
+    },
+    trackingModeIconBadge: {
+        width: Math.min(hp(3.8), wp(8.6)),
+        height: Math.min(hp(3.8), wp(8.6)),
+        borderRadius: Math.min(hp(1.9), wp(4.3)),
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.primary + '12',
+        borderWidth: 1,
+        borderColor: colors.primary + '18',
     },
     trackingModeTitle: {
-        fontSize: Math.min(hp(1.5), wp(3.5)),
-        fontWeight: '600',
+        flex: 1,
+        fontSize: Math.min(hp(1.65), wp(3.9)),
+        fontWeight: '700',
         color: colors.textPrimary,
-        marginBottom: hp(1.5),
-        letterSpacing: 0.3,
+        letterSpacing: 0,
     },
     modeToggleContainer: {
         flexDirection: 'row',
-        backgroundColor: colors.gray + '05',
-        borderRadius: 10,
-        padding: wp(2),
-        gap: wp(1),
+        backgroundColor: colors.primary + '08',
+        borderRadius: 18,
+        padding: wp(1.2),
+        gap: wp(1.4),
         alignItems: 'center',
+        borderWidth: 1,
+        borderColor: colors.primary + '12',
     },
     modeButton: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: hp(1.2),
-        paddingHorizontal: wp(3),
-        borderRadius: 8,
+        minHeight: hp(6.2),
+        paddingVertical: hp(1),
+        paddingHorizontal: wp(2),
+        borderRadius: 15,
         backgroundColor: 'transparent',
-        gap: wp(1.5),
+        gap: wp(2),
     },
     modeButtonActive: {
         backgroundColor: colors.primary,
         shadowColor: colors.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 5,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.22,
+        shadowRadius: 10,
+        elevation: 4,
+    },
+    modeIconBadge: {
+        width: Math.min(hp(3.6), wp(8.2)),
+        height: Math.min(hp(3.6), wp(8.2)),
+        borderRadius: Math.min(hp(1.8), wp(4.1)),
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.cardBg,
+        borderWidth: 1,
+        borderColor: colors.gray + '22',
+    },
+    modeIconBadgeActive: {
+        backgroundColor: '#FFFFFF',
+        borderColor: '#FFFFFF',
     },
     modeButtonText: {
-        fontSize: Math.min(hp(1.4), wp(3.2)),
-        fontWeight: '600',
+        fontSize: Math.min(hp(1.55), wp(3.6)),
+        fontWeight: '700',
         color: colors.textSecondary,
     },
     modeButtonTextActive: {
         color: '#FFFFFF',
         fontWeight: '700',
-    },
-    modeButtonDivider: {
-        width: 1,
-        height: hp(2),
-        backgroundColor: colors.gray + '30',
     },
     // Calorie Progress Styles
     calProgressSection: {
@@ -4031,8 +4161,8 @@ const getStyles = (colors: any) => StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#8B5CF6', // Purple color for diet plan
-        borderRadius: 12,
-        padding: 16,
+        borderRadius: wp(3),
+        padding: wp(4),
         shadowColor: '#8B5CF6',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
@@ -4040,9 +4170,9 @@ const getStyles = (colors: any) => StyleSheet.create({
         elevation: 5,
     },
     dietPlanIconContainer: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: wp(10),
+        height: wp(10),
+        borderRadius: wp(5),
         backgroundColor: 'rgba(255, 255, 255, 0.2)',
         justifyContent: 'center',
         alignItems: 'center',
@@ -4066,8 +4196,8 @@ const getStyles = (colors: any) => StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#F59E0B', // Amber color for custom recipe
-        borderRadius: 12,
-        padding: 16,
+        borderRadius: wp(3),
+        padding: wp(4),
         shadowColor: '#F59E0B',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
@@ -4075,9 +4205,9 @@ const getStyles = (colors: any) => StyleSheet.create({
         elevation: 5,
     },
     customRecipeIconContainer: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: wp(10),
+        height: wp(10),
+        borderRadius: wp(5),
         backgroundColor: 'rgba(255, 255, 255, 0.2)',
         justifyContent: 'center',
         alignItems: 'center',
@@ -4120,6 +4250,9 @@ const getStyles = (colors: any) => StyleSheet.create({
         flex: 1,
         padding: 20,
     },
+    customRecipeModalScrollContent: {
+        paddingBottom: Math.max(hp(5), bottomInset + hp(4)),
+    },
     customRecipeSection: {
         marginBottom: 24,
     },
@@ -4138,10 +4271,10 @@ const getStyles = (colors: any) => StyleSheet.create({
     customRecipeInput: {
         borderWidth: 1,
         borderColor: colors.gray + '40',
-        borderRadius: 10,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        fontSize: 15,
+        borderRadius: wp(2.5),
+        paddingHorizontal: wp(4),
+        paddingVertical: hp(1.5),
+        fontSize: hp(1.8),
         color: colors.textPrimary,
         backgroundColor: colors.cardBackground,
     },
@@ -4311,7 +4444,7 @@ const getStyles = (colors: any) => StyleSheet.create({
         flexDirection: 'row',
         gap: 12,
         marginTop: 24,
-        marginBottom: 20,
+        marginBottom: Math.max(hp(4), bottomInset + hp(2)),
     },
     customRecipeCancelButton: {
         flex: 1,
@@ -4356,6 +4489,162 @@ const getStyles = (colors: any) => StyleSheet.create({
         fontSize: Math.min(hp(1), wp(2.5)),
         color: colors.textSecondary,
     },
+    mealTemplateSection: {
+        backgroundColor: colors.cardBackground,
+        borderRadius: wp(4),
+        padding: wp(4),
+        marginBottom: hp(2),
+        borderWidth: 1,
+        borderColor: colors.cardBorder || colors.gray + '20',
+    },
+    templateSubtitle: {
+        marginTop: hp(0.2),
+        color: colors.textSecondary,
+        fontSize: Math.min(hp(1.18), wp(2.8)),
+        fontWeight: '700',
+    },
+    saveTemplateButton: {
+        minHeight: hp(3.8),
+        borderRadius: hp(1.9),
+        paddingHorizontal: wp(3),
+        backgroundColor: colors.primary,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: wp(1),
+    },
+    saveTemplateButtonDisabled: {
+        backgroundColor: colors.gray + '70',
+    },
+    saveTemplateText: {
+        color: '#FFFFFF',
+        fontSize: Math.min(hp(1.22), wp(2.9)),
+        fontWeight: '900',
+    },
+    repeatYesterdayButton: {
+        minHeight: hp(7),
+        borderRadius: hp(1.6),
+        borderWidth: 1,
+        borderColor: colors.primary + '25',
+        backgroundColor: colors.primary + '10',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(2.5),
+        paddingHorizontal: wp(3),
+        paddingVertical: hp(1),
+        marginTop: hp(1.3),
+    },
+    repeatYesterdayIcon: {
+        width: Math.min(hp(4.8), wp(10.5)),
+        height: Math.min(hp(4.8), wp(10.5)),
+        borderRadius: Math.min(hp(2.4), wp(5.25)),
+        backgroundColor: colors.cardBackground,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    repeatYesterdayCopy: {
+        flex: 1,
+        minWidth: 0,
+    },
+    repeatYesterdayTitle: {
+        color: colors.textPrimary,
+        fontSize: Math.min(hp(1.55), wp(3.6)),
+        fontWeight: '900',
+    },
+    repeatYesterdaySubtitle: {
+        marginTop: hp(0.25),
+        color: colors.textSecondary,
+        fontSize: Math.min(hp(1.12), wp(2.65)),
+        fontWeight: '700',
+    },
+    mealTemplateList: {
+        paddingTop: hp(1.4),
+        gap: wp(2.5),
+        paddingRight: wp(2),
+    },
+    mealTemplateCard: {
+        width: wp(34),
+        minHeight: hp(15),
+        borderRadius: hp(1.6),
+        borderWidth: 1,
+        borderColor: colors.cardBorder || colors.gray + '20',
+        backgroundColor: colors.surface || colors.screenColor,
+        padding: wp(2.4),
+        position: 'relative',
+    },
+    templateRemoveButton: {
+        position: 'absolute',
+        top: hp(0.7),
+        right: wp(1.7),
+        zIndex: 2,
+        width: hp(2.5),
+        height: hp(2.5),
+        borderRadius: hp(1.25),
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.cardBackground,
+        borderWidth: 1,
+        borderColor: colors.cardBorder || colors.gray + '20',
+    },
+    mealTemplateBody: {
+        flex: 1,
+        paddingTop: hp(0.4),
+    },
+    mealTemplateIcon: {
+        width: Math.min(hp(4), wp(8.8)),
+        height: Math.min(hp(4), wp(8.8)),
+        borderRadius: Math.min(hp(2), wp(4.4)),
+        backgroundColor: colors.primary + '16',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: hp(0.8),
+    },
+    mealTemplateName: {
+        color: colors.textPrimary,
+        fontSize: Math.min(hp(1.35), wp(3.2)),
+        fontWeight: '900',
+        lineHeight: hp(1.85),
+        paddingRight: wp(3),
+    },
+    mealTemplateMeta: {
+        marginTop: hp(0.35),
+        color: colors.textSecondary,
+        fontSize: Math.min(hp(1.08), wp(2.55)),
+        fontWeight: '800',
+    },
+    templateAddButton: {
+        minHeight: hp(3.4),
+        borderRadius: hp(1.7),
+        backgroundColor: colors.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: hp(1),
+    },
+    templateAddText: {
+        color: '#FFFFFF',
+        fontSize: Math.min(hp(1.18), wp(2.8)),
+        fontWeight: '900',
+    },
+    emptyTemplateCard: {
+        minHeight: hp(7),
+        borderRadius: hp(1.4),
+        borderWidth: 1,
+        borderStyle: 'dashed',
+        borderColor: colors.cardBorder || colors.gray + '30',
+        backgroundColor: colors.surface || colors.screenColor,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(2),
+        paddingHorizontal: wp(3),
+        marginTop: hp(1.3),
+    },
+    emptyTemplateText: {
+        flex: 1,
+        color: colors.textSecondary,
+        fontSize: Math.min(hp(1.2), wp(2.85)),
+        fontWeight: '700',
+        lineHeight: hp(1.8),
+    },
     
     // Beautiful Completion Modal Styles
     modalOverlay: {
@@ -4367,7 +4656,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     },
     modalContainer: {
         backgroundColor: colors.screenColor || '#FFFFFF',
-        borderRadius: 24,
+        borderRadius: wp(6),
         width: '100%',
         maxWidth: wp(85),
         shadowColor: '#000',
@@ -4487,6 +4776,11 @@ const getStyles = (colors: any) => StyleSheet.create({
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 
+const getClampedCircleProgress = (achieved: number, target: number) => {
+    if (!target || target <= 0) return 0;
+    return Math.min(1, Math.max(0, achieved / target));
+};
+
 const ProgressCircle = (CircleProps: ProgressCircleProps) =>{
     const { colors } = useTheme();
     const outerRadius = 55;
@@ -4499,30 +4793,32 @@ const ProgressCircle = (CircleProps: ProgressCircleProps) =>{
     /**ANIMATED PROPS */
     //Animated props for Calories circle
     const animatedCalProps = useAnimatedProps(()=>{
+        const progress = Math.min(1, Math.max(0, calProgress.value));
         return {
-            strokeDashoffset: outerCircumference * (1 - calProgress.value),
+            strokeDashoffset: progress >= 0.999 ? 0 : outerCircumference * (1 - progress),
         }
-    },[CircleProps.achievedCalories])
+    },[CircleProps.achievedCalories, CircleProps.targetCalories])
     //Animated props for Hydration circle
     const animatedHydrationProps = useAnimatedProps(()=>{
+        const progress = Math.min(1, Math.max(0, hydProgress.value));
         return {
-            strokeDashoffset: innerCircumference * (1 - hydProgress.value),
+            strokeDashoffset: progress >= 0.999 ? 0 : innerCircumference * (1 - progress),
         }
-    },[CircleProps.achievedCalories])
+    },[CircleProps.achieviedHydration, CircleProps.targetHydration])
     /**USE EFFECTS */
     // calories updater
     useEffect(()=>{
         //const target = props.achievedCalories/props.targetCalories
-        calProgress.value = withTiming((CircleProps.achievedCalories/CircleProps.targetCalories),{  
+        calProgress.value = withTiming(getClampedCircleProgress(CircleProps.achievedCalories, CircleProps.targetCalories),{  
                                         duration:1000,
                                         easing: Easing.inOut(Easing.ease)})
-    },[CircleProps.achievedCalories])
+    },[CircleProps.achievedCalories, CircleProps.targetCalories, calProgress])
     //hydration updater
     useEffect(()=>{
-        hydProgress.value = withTiming((CircleProps.achieviedHydration/CircleProps.targetHydration),{  
+        hydProgress.value = withTiming(getClampedCircleProgress(CircleProps.achieviedHydration, CircleProps.targetHydration),{  
                                         duration:1000,
                                         easing: Easing.inOut(Easing.ease)})
-    },[CircleProps.achieviedHydration])
+    },[CircleProps.achieviedHydration, CircleProps.targetHydration, hydProgress])
     /**---------------------------------------------------------------------------------------- */
     
     return(
@@ -4534,16 +4830,21 @@ const ProgressCircle = (CircleProps: ProgressCircleProps) =>{
         {/* Calories progress */}
         <AnimatedCircle  cx="60" cy="60" r={outerRadius}
             stroke={colors.primary}  strokeWidth="10"  fill="transparent"
-            strokeDasharray={outerCircumference} //total
+            strokeDasharray={`${outerCircumference} ${outerCircumference}`} //total
             animatedProps={animatedCalProps}
-            strokeLinecap="round"transform= "rotate(-90 60 60)" />
+            strokeLinecap="round" transform="rotate(-90 60 60)" />
+        <Circle cx="60" cy="60" r={innerRadius}
+            stroke="#E5E7EB" strokeWidth="10" fill="transparent"/>
         {/* Hydration Circcle */}
         <AnimatedCircle cx="60" cy="60" r={innerRadius}
             stroke="#3B82F6"  strokeWidth="10" fill="transparent"
-            strokeDasharray={innerCircumference} 
+            strokeDasharray={`${innerCircumference} ${innerCircumference}`} 
             animatedProps={animatedHydrationProps}
             strokeLinecap="round" transform="rotate(-90 60 60)"/> 
         </Svg>
             //</View>
     )
 }
+
+
+

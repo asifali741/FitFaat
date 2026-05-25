@@ -1,6 +1,7 @@
 import BackButton from '@/components/BackButton';
 import CountdownTimer from "@/components/CountdownTimer";
 import { theme } from "@/constants/theme";
+import { useTheme } from '@/contexts/ThemeContext';
 import { Appointment, useAppointments } from "@/contexts/AppointmentContext";
 import { Ionicons } from "@expo/vector-icons";
 import { DrawerActions, useNavigation } from "@react-navigation/native";
@@ -11,6 +12,8 @@ import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-nat
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function AppointmentDetailsScreen() {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const router = useRouter();
   const navigation = useNavigation();
   const { appointments, updateAppointmentStatus } = useAppointments();
@@ -37,11 +40,14 @@ export default function AppointmentDetailsScreen() {
   };
 
   const handleStartCall = () => {
-    Alert.alert(
-      "Start Call",
-      "This would initiate a video call with the doctor. (Video call functionality not implemented)",
-      [{ text: "OK" }]
-    );
+    router.push({
+      pathname: '/(main)/(conference)/video-call' as any,
+      params: {
+        callId: appointmentId as string,
+        appointmentId: appointmentId as string,
+        userName: appointment?.doctorName || 'Doctor',
+      }
+    });
   };
 
   const handleCancelAppointment = () => {
@@ -72,7 +78,7 @@ export default function AppointmentDetailsScreen() {
             style={styles.menuButton}
             onPress={openDrawer}
           >
-            <Ionicons name="menu" size={24} color={theme.colors.surface} />
+            <Ionicons name="menu" size={24} color={colors.surface} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Appointment Details</Text>
           <BackButton style={styles.backButton} testID="appointment-details-back" />
@@ -92,7 +98,7 @@ export default function AppointmentDetailsScreen() {
           style={styles.menuButton}
           onPress={openDrawer}
         >
-          <Ionicons name="menu" size={24} color={theme.colors.surface} />
+          <Ionicons name="menu" size={24} color={colors.surface} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Appointment Details</Text>
         <BackButton style={styles.backButton} testID="appointment-details-back" />
@@ -106,7 +112,7 @@ export default function AppointmentDetailsScreen() {
             <Ionicons 
               name={appointment.status === 'active' ? "videocam" : "calendar"} 
               size={32} 
-              color={appointment.status === 'active' ? theme.colors.success : theme.colors.primary} 
+              color={appointment.status === 'active' ? colors.success : colors.primary} 
             />
             <Text style={styles.statusTitle}>
               {appointment.status === 'active' ? 'Session Active' : 'Appointment Scheduled'}
@@ -129,7 +135,7 @@ export default function AppointmentDetailsScreen() {
           <Text style={styles.sectionTitle}>Doctor Information</Text>
           <View style={styles.doctorInfo}>
             <View style={styles.doctorAvatar}>
-              <Ionicons name="person" size={24} color={theme.colors.primary} />
+              <Ionicons name="person" size={24} color={colors.primary} />
             </View>
             <View style={styles.doctorDetails}>
               <Text style={styles.doctorName}>{appointment.doctorName}</Text>
@@ -179,7 +185,7 @@ export default function AppointmentDetailsScreen() {
               <Ionicons 
                 name="videocam" 
                 size={20} 
-                color={canStartCall ? theme.colors.surface : theme.colors.textSecondary} 
+                color={canStartCall ? colors.surface : colors.textSecondary} 
               />
               <Text style={[
                 styles.startCallButtonText,
@@ -195,7 +201,7 @@ export default function AppointmentDetailsScreen() {
               style={styles.startCallButton}
               onPress={handleStartCall}
             >
-              <Ionicons name="videocam" size={20} color={theme.colors.surface} />
+              <Ionicons name="videocam" size={20} color={colors.surface} />
               <Text style={styles.startCallButtonText}>Join Call</Text>
             </TouchableOpacity>
           )}
@@ -205,7 +211,7 @@ export default function AppointmentDetailsScreen() {
               style={styles.cancelButton}
               onPress={handleCancelAppointment}
             >
-              <Ionicons name="close-circle" size={20} color={theme.colors.error} />
+              <Ionicons name="close-circle" size={20} color={colors.error} />
               <Text style={styles.cancelButtonText}>Cancel Appointment</Text>
             </TouchableOpacity>
           )}
@@ -215,10 +221,10 @@ export default function AppointmentDetailsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
   },
   header: {
     flexDirection: "row",
@@ -226,7 +232,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: wp(5),
     paddingVertical: hp(2),
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
   },
   menuButton: {
     padding: theme.spacing.sm,
@@ -234,7 +240,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: hp(2.5),
     fontWeight: theme.typography.fontWeight.bold as any,
-    color: theme.colors.surface,
+    color: colors.surface,
     flex: 1,
     textAlign: "center",
   },
@@ -243,19 +249,19 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: colors.background,
     borderTopLeftRadius: theme.borderRadius.xl,
     borderTopRightRadius: theme.borderRadius.xl,
     paddingTop: hp(4),
     paddingHorizontal: wp(6),
   },
   statusCard: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: theme.borderRadius.xl,
     padding: hp(3),
     marginBottom: hp(3),
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     alignItems: "center",
     ...theme.shadows.medium,
   },
@@ -266,34 +272,34 @@ const styles = StyleSheet.create({
   statusTitle: {
     fontSize: Math.min(hp(2.2), wp(5.5)),
     fontWeight: theme.typography.fontWeight.bold as any,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginTop: hp(1),
   },
   countdownContainer: {
     alignItems: "center",
     paddingVertical: hp(2),
-    backgroundColor: theme.colors.primary + '20',
+    backgroundColor: colors.primary + '20',
     borderRadius: theme.borderRadius.medium,
     paddingHorizontal: wp(4),
   },
   countdownLabel: {
     fontSize: Math.min(hp(1.6), wp(4)),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: hp(1),
   },
   sectionCard: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: theme.borderRadius.medium,
     padding: hp(2.5),
     marginBottom: hp(2),
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
     ...theme.shadows.small,
   },
   sectionTitle: {
     fontSize: Math.min(hp(1.8), wp(4.5)),
     fontWeight: theme.typography.fontWeight.bold as any,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: hp(1.5),
   },
   doctorInfo: {
@@ -304,7 +310,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: theme.colors.primary + '20',
+    backgroundColor: colors.primary + '20',
     alignItems: "center",
     justifyContent: "center",
     marginRight: wp(3),
@@ -315,22 +321,22 @@ const styles = StyleSheet.create({
   doctorName: {
     fontSize: Math.min(hp(2), wp(5)),
     fontWeight: theme.typography.fontWeight.bold as any,
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 2,
   },
   doctorSpecialty: {
     fontSize: Math.min(hp(1.6), wp(4)),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: 2,
   },
   doctorExperience: {
     fontSize: Math.min(hp(1.4), wp(3.5)),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: 2,
   },
   doctorFee: {
     fontSize: Math.min(hp(1.4), wp(3.5)),
-    color: theme.colors.primary,
+    color: colors.primary,
     fontWeight: theme.typography.fontWeight.semiBold as any,
   },
   detailsList: {
@@ -342,24 +348,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: hp(1),
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    borderBottomColor: colors.border,
   },
   detailLabel: {
     fontSize: Math.min(hp(1.8), wp(4.5)),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     fontWeight: theme.typography.fontWeight.medium as any,
   },
   detailValue: {
     fontSize: Math.min(hp(1.8), wp(4.5)),
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     fontWeight: theme.typography.fontWeight.semiBold as any,
   },
   statusValue: {
-    color: theme.colors.primary,
+    color: colors.primary,
   },
   problemText: {
     fontSize: Math.min(hp(1.6), wp(4)),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     lineHeight: Math.min(hp(2.2), wp(5.5)),
   },
   actionButtons: {
@@ -370,7 +376,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     borderRadius: theme.borderRadius.xl,
     paddingVertical: hp(2.2),
     paddingHorizontal: wp(6),
@@ -378,10 +384,10 @@ const styles = StyleSheet.create({
     ...theme.shadows.medium,
   },
   startCallButtonActive: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
   },
   startCallButtonDisabled: {
-    backgroundColor: theme.colors.disabled,
+    backgroundColor: colors.disabled,
   },
   startCallButtonText: {
     fontSize: Math.min(hp(2), wp(5)),
@@ -389,31 +395,31 @@ const styles = StyleSheet.create({
     marginLeft: wp(2),
   },
   startCallButtonTextActive: {
-    color: theme.colors.surface,
+    color: colors.surface,
   },
   startCallButtonTextDisabled: {
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
   },
   cancelButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.colors.background,
+    backgroundColor: colors.background,
     borderRadius: theme.borderRadius.xl,
     paddingVertical: hp(2.2),
     paddingHorizontal: wp(6),
     borderWidth: 1,
-    borderColor: theme.colors.error,
+    borderColor: colors.error,
   },
   cancelButtonText: {
     fontSize: Math.min(hp(2), wp(5)),
     fontWeight: theme.typography.fontWeight.semiBold as any,
-    color: theme.colors.error,
+    color: colors.error,
     marginLeft: wp(2),
   },
   errorText: {
     fontSize: Math.min(hp(2), wp(5)),
-    color: theme.colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: "center",
     marginTop: hp(4),
   },

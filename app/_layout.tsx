@@ -1,39 +1,34 @@
 import SafeScreen from "@/components/SafeScreen";
+import { NotificationProvider } from "@/contexts/NotificationContext";
 import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
-import { ClerkProvider, useAuth, useUser } from "@clerk/clerk-expo";
-import { tokenCache } from "@clerk/clerk-expo/token-cache";
+import { authApi } from "@/utils/auth/authApi";
+import { tokenStorage } from "@/utils/auth/tokenStorage";
+import { getStripePublishableKey } from "@/utils/config";
 import { StripeProvider } from "@stripe/stripe-react-native";
-import { Slot, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
-import { ActivityIndicator, StatusBar, View } from "react-native";
+import { Slot, useRouter, useSegments } from "expo-router";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, LogBox, StatusBar, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import Constants from 'expo-constants';
 
-// Safely get keys from Constants
-const publishableKey = Constants.expoConfig?.extra?.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
+// Suppress expo-notifications Expo Go warning (SDK 53 removed push notification support from Expo Go)
+// This only affects development in Expo Go; production builds are unaffected
+LogBox.ignoreLogs([
+  "expo-notifications: Android Push notifications",
+  "expo-notifications` functionality is not fully supported in Expo Go",
+]);
 
 export default function RootLayout() {
-  const stripePublishableKey = Constants.expoConfig?.extra?.EXPO_PUBLIC_STRIPE_PK;
-  
-  // Fail-safe check: If keys are missing, show loader instead of crashing
-  if (!publishableKey || !stripePublishableKey) {
-    console.warn("Keys missing in RootLayout, showing ActivityIndicator");
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: '#000' }}>
-        <ActivityIndicator size="large" color="#fff" />
-      </View>
-    );
-  }
+  const stripePublishableKey = getStripePublishableKey();
   
   return (
     <StripeProvider publishableKey={stripePublishableKey}>
-      <ClerkProvider tokenCache={tokenCache} publishableKey={publishableKey}> 
-        <ThemeProvider>
+      <ThemeProvider>
+        <NotificationProvider>
           <SafeAreaProvider>
             <ThemedApp />
           </SafeAreaProvider>
-        </ThemeProvider>
-      </ClerkProvider>
+        </NotificationProvider>
+      </ThemeProvider>
     </StripeProvider>
   );
 }
@@ -53,41 +48,112 @@ function ThemedApp() {
 
 function AuthGate() {
   const router = useRouter();
-  const { isLoaded, isSignedIn } = useAuth();
-  const { user, isLoaded: userLoaded } = useUser();
-  const [isNavigating, setIsNavigating] = useState(false);
+  const segments = useSegments();
+  const segmentKey = segments.join("/");
+  const rootSegment = segments[0];
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const hasRefreshedSessionRef = useRef(false);
 
   useEffect(() => {
-    if (!isLoaded || !userLoaded || isNavigating) return;
+    let isActive = true;
 
     const handleAuthFlow = async () => {
-      setIsNavigating(true);
-      
       try {
-        if (isSignedIn && user) {
-          const hasCompletedOnboarding = user.unsafeMetadata?.hasCompletedOnboarding;
-          
-          if (hasCompletedOnboarding) {
-            router.replace("/(main)/(dashboard)");
+        const isAuthenticated = await authApi.isAuthenticated();
+        const cachedUser = await tokenStorage.getUser();
+        const isInAuthGroup = rootSegment === "(auth)";
+        const isInMainGroup = rootSegment === "(main)";
+        const isInOnboarding = rootSegment === "DietSection";
+
+        if (!isAuthenticated) {
+          hasRefreshedSessionRef.current = false;
+          if (!isInAuthGroup) {
+            router.replace("/(auth)");
+          }
+          return;
+        }
+
+        let currentUser = cachedUser;
+        let freshOnboardingStatus: any = null;
+
+        if (!hasRefreshedSessionRef.current) {
+          hasRefreshedSessionRef.current = true;
+          if (cachedUser && typeof cachedUser.isOnboardingComplete === "boolean") {
+            authApi.refreshCurrentUserData({ clearBackendCache: true }).catch((error) => {
+              console.log("[AuthGate] Background session refresh unavailable:", error);
+            });
           } else {
-            router.replace("/DietSection");
+            const refreshed = await authApi.refreshCurrentUserData({ clearBackendCache: true });
+            freshOnboardingStatus = refreshed.onboardingStatus;
+            currentUser = refreshed.user || await tokenStorage.getUser() || cachedUser;
           }
         } else {
-          router.replace("/(auth)");
+          currentUser = await tokenStorage.getUser() || cachedUser;
+        }
+
+        const refreshedOnboardingComplete =
+          typeof freshOnboardingStatus?.isOnboardingComplete === "boolean"
+            ? Boolean(freshOnboardingStatus.isOnboardingComplete)
+            : null;
+
+        if (refreshedOnboardingComplete !== null) {
+          if (!refreshedOnboardingComplete && !isInOnboarding) {
+            router.replace("/DietSection");
+          } else if (refreshedOnboardingComplete && !isInMainGroup) {
+            router.replace("/(main)/(dashboard)");
+          }
+
+          return;
+        }
+
+        if (currentUser && typeof currentUser.isOnboardingComplete === "boolean") {
+          if (!currentUser.isOnboardingComplete && !isInOnboarding) {
+            router.replace("/DietSection");
+          } else if (currentUser.isOnboardingComplete && !isInMainGroup) {
+            router.replace("/(main)/(dashboard)");
+          }
+
+          return;
+        }
+
+        try {
+          const onboardingStatus = await authApi.getOnboardingStatus();
+          const isOnboardingComplete = Boolean(onboardingStatus?.isOnboardingComplete);
+
+          if (!isOnboardingComplete && !isInOnboarding) {
+            router.replace("/DietSection");
+            return;
+          }
+
+          if (isOnboardingComplete && !isInMainGroup) {
+            router.replace("/(main)/(dashboard)");
+          }
+        } catch {
+          if (!isInMainGroup) {
+            router.replace("/(main)/(dashboard)");
+          }
         }
       } catch (err) {
         console.error("Navigation error in AuthGate:", err);
+        if (rootSegment !== "(auth)") {
+          router.replace("/(auth)");
+        }
       } finally {
-        setIsNavigating(false);
+        if (isActive) {
+          setIsCheckingAuth(false);
+        }
       }
     };
 
     handleAuthFlow();
-  }, [isLoaded, userLoaded, isSignedIn, user, isNavigating]);
+    return () => {
+      isActive = false;
+    };
+  }, [router, rootSegment, segmentKey]);
 
-  if (!isLoaded || !userLoaded || isNavigating) {
+  if (isCheckingAuth) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: 'white' }}>
         <ActivityIndicator size="large" />
       </View>
     );

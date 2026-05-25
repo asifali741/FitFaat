@@ -1,8 +1,15 @@
 import AppHeader from '@/components/AppHeader';
 import ChatButton from '@/components/ChatButton';
+import SmartEmptyState from '@/components/common/SmartEmptyState';
+import StatusNoticeBanner from '@/components/common/StatusNoticeBanner';
 import { theme } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 import { authApi } from '@/utils/auth/authApi';
+import { tokenStorage } from '@/utils/auth/tokenStorage';
+import { buildChatAccessGrantedNotificationPayload } from '@/utils/chatAccessNotifications';
+import { getBackendBaseUrl, isRealtimeSocketEnabled } from '@/utils/config';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -11,18 +18,77 @@ import {
     Dimensions,
     FlatList,
     Modal,
+    Platform,
     ScrollView,
     StyleSheet,
+    StatusBar,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
+import * as NavigationBar from 'expo-navigation-bar';
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { io } from 'socket.io-client';
 
 const { width } = Dimensions.get('window');
+const DOCTOR_APPOINTMENTS_CACHE_KEY = 'doctorPatientManagementAppointments';
+
+const emitChatAccessGrantedToPatient = async (appointmentId: string) => {
+  if (!isRealtimeSocketEnabled()) return;
+
+  const token = await tokenStorage.getToken();
+  if (!token) return;
+
+  await new Promise<void>((resolve) => {
+    const socket = io(getBackendBaseUrl(), {
+      auth: { token },
+      forceNew: true,
+      timeout: 5000,
+      transports: ['websocket'],
+    });
+    let finished = false;
+    let accessEventSent = false;
+    let closeTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      if (closeTimer) clearTimeout(closeTimer);
+      socket.disconnect();
+      resolve();
+    };
+
+    const sendAccessEvent = () => {
+      if (accessEventSent) return;
+      accessEventSent = true;
+      socket.emit('access-granted', { appointmentId });
+      closeTimer = setTimeout(finish, 350);
+    };
+
+    const fallbackTimer = setTimeout(finish, 5000);
+
+    socket.on('connect', () => {
+      socket.emit('join-appointment', { appointmentId });
+      setTimeout(sendAccessEvent, 500);
+    });
+
+    socket.on('joined', sendAccessEvent);
+    socket.on('connect_error', (error) => {
+      console.warn('Unable to emit chat access notification:', error.message);
+      clearTimeout(fallbackTimer);
+      finish();
+    });
+    socket.on('disconnect', () => {
+      clearTimeout(fallbackTimer);
+    });
+  });
+};
 
 export default function PatientManagementScreen() {
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const styles = getStyles(colors, insets.top, insets.bottom);
   const router = useRouter();
   const [appointments, setAppointments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -33,15 +99,29 @@ export default function PatientManagementScreen() {
   const [doctorId, setDoctorId] = useState<string | null>(null);
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [confirmationType, setConfirmationType] = useState<'approve' | 'reject' | null>(null);
-
-  const styles = useMemo(() => getStyles(), []);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [usingCachedAppointments, setUsingCachedAppointments] = useState(false);
 
   useEffect(() => {
     fetchDoctorAppointments();
   }, []);
 
+  useEffect(() => {
+    StatusBar.setBarStyle('dark-content');
+
+    if (Platform.OS !== 'android') return;
+
+    StatusBar.setBackgroundColor('#FFFFFF');
+    StatusBar.setTranslucent(false);
+    NavigationBar.setBackgroundColorAsync('#FFFFFF').catch(() => {});
+    NavigationBar.setButtonStyleAsync('dark').catch(() => {});
+    NavigationBar.setStyle('light');
+  }, []);
+
   const fetchDoctorAppointments = async () => {
     setIsLoading(true);
+    setLoadError(null);
+    setUsingCachedAppointments(false);
     try {
       // First, get the doctor status to get the doctor ID
       const doctorStatusResponse = await authApi.getDoctorStatus();
@@ -58,13 +138,27 @@ export default function PatientManagementScreen() {
       // Then fetch appointments for this doctor
       const appointmentsResponse = await authApi.getDoctorAppointments(doctorIdValue);
       if (appointmentsResponse.success) {
-        setAppointments(appointmentsResponse.appointments || []);
+        const appointmentList = appointmentsResponse.appointments || [];
+        setAppointments(appointmentList);
+        await AsyncStorage.setItem(DOCTOR_APPOINTMENTS_CACHE_KEY, JSON.stringify(appointmentList));
       } else {
-        Alert.alert('Error', 'Failed to load appointment requests');
+        setLoadError('Failed to load appointment requests');
       }
     } catch (error) {
       console.error('Failed to fetch appointments:', error);
-      Alert.alert('Error', 'Failed to load appointment requests');
+      setLoadError('Failed to load appointment requests. Please check your connection and retry.');
+      try {
+        const cached = await AsyncStorage.getItem(DOCTOR_APPOINTMENTS_CACHE_KEY);
+        const parsed = cached ? JSON.parse(cached) : [];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setAppointments(parsed);
+          setUsingCachedAppointments(true);
+        } else {
+          setAppointments([]);
+        }
+      } catch {
+        setAppointments([]);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -150,10 +244,17 @@ export default function PatientManagementScreen() {
 
   const grantChatAccess = async (appointmentId: string) => {
     try {
-      const response = await authApi.grantChatAccess(appointmentId);
+      const notificationPayload = buildChatAccessGrantedNotificationPayload(
+        appointmentId,
+        selectedAppointment
+      );
+      const response = await authApi.grantChatAccess(appointmentId, notificationPayload);
       
       if (response.success) {
         Alert.alert('Success', 'Chat access granted to user');
+        emitChatAccessGrantedToPatient(appointmentId).catch((error) => {
+          console.warn('Failed to emit chat access socket event:', error);
+        });
         fetchDoctorAppointments();
         if (selectedAppointment && selectedAppointment._id === appointmentId) {
           setSelectedAppointment({
@@ -255,10 +356,10 @@ export default function PatientManagementScreen() {
 
         <View style={styles.cardFooter}>
           <View style={styles.feeContainer}>
-            <Ionicons name="cash" size={16} color={theme.colors.success} />
+            <Ionicons name="cash" size={16} color={colors.success} />
             <Text style={styles.feeText}>Rs {item.price}</Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
+          <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
         </View>
       </TouchableOpacity>
     );
@@ -268,26 +369,50 @@ export default function PatientManagementScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <AppHeader
-          title="Appointment Management"
-          showStepIndicator={false}
-        />
+      <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} />
+        <View style={styles.headerSafeArea}>
+          <AppHeader
+            title="Appointment Management"
+            showStepIndicator={false}
+            titleMinimumFontScale={1}
+            compactTitleSpacing
+          />
+        </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <AppHeader
-        title="Appointment Management"
-        showStepIndicator={false}
-      />
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} />
+      <View style={styles.headerSafeArea}>
+        <AppHeader
+          title="Appointment Management"
+          showStepIndicator={false}
+          titleMinimumFontScale={1}
+          compactTitleSpacing
+        />
+      </View>
 
       <View style={styles.content}>
+        {loadError ? (
+          <StatusNoticeBanner
+            tone={usingCachedAppointments ? 'cached' : 'offline'}
+            title={usingCachedAppointments ? 'Showing Cached Requests' : 'Could Not Refresh Requests'}
+            message={usingCachedAppointments
+              ? 'Latest refresh failed, so these appointments are from saved data.'
+              : loadError}
+            actionLabel="Retry"
+            onAction={fetchDoctorAppointments}
+            colors={colors}
+            style={styles.noticeBanner}
+          />
+        ) : null}
+
         {/* Filter Buttons */}
         <View style={styles.filterContainer}>
           {renderFilterButton('all', 'All Requests')}
@@ -297,21 +422,19 @@ export default function PatientManagementScreen() {
 
         {/* Appointments List */}
         {filteredAppointments.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons
-              name="list-outline"
-              size={64}
-              color={theme.colors.textSecondary}
-            />
-            <Text style={styles.emptyTitle}>No Requests</Text>
-            <Text style={styles.emptySubtitle}>
-              {filterStatus === 'all'
-                ? 'You have no patient requests yet'
-                : filterStatus === 'pending'
-                ? 'No pending requests'
-                : 'No approved appointments'}
-            </Text>
-          </View>
+          <SmartEmptyState
+            icon={filterStatus === 'pending' ? 'hourglass-outline' : 'list-outline'}
+            title="No Requests"
+            message={filterStatus === 'all'
+              ? 'New patient appointment requests will appear here when patients book you.'
+              : filterStatus === 'pending'
+              ? 'No pending requests need your review right now.'
+              : 'Approved appointments will appear here after you accept requests.'}
+            actionLabel="Refresh"
+            onAction={fetchDoctorAppointments}
+            colors={colors}
+            style={styles.smartEmptyState}
+          />
         ) : (
           <FlatList
             data={filteredAppointments}
@@ -337,7 +460,7 @@ export default function PatientManagementScreen() {
               onPress={() => setShowModal(false)}
               style={styles.closeButton}
             >
-              <Ionicons name="close" size={28} color={theme.colors.textPrimary} />
+              <Ionicons name="close" size={28} color={colors.textPrimary} />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>Patient Request</Text>
             <View style={styles.headerSpacer} />
@@ -357,7 +480,7 @@ export default function PatientManagementScreen() {
                       <Ionicons
                         name="person"
                         size={40}
-                        color={theme.colors.primary}
+                        color={colors.primary}
                       />
                     </View>
                     <View style={styles.patientDetails}>
@@ -374,7 +497,7 @@ export default function PatientManagementScreen() {
                   <Text style={styles.sectionTitle}>Appointment Details</Text>
 
                   <View style={styles.detailRow}>
-                    <Ionicons name="calendar" size={20} color={theme.colors.info} />
+                    <Ionicons name="calendar" size={20} color={colors.info} />
                     <View style={styles.detailContent}>
                       <Text style={styles.detailLabel}>Date</Text>
                       <Text style={styles.detailValue}>
@@ -391,7 +514,7 @@ export default function PatientManagementScreen() {
                   </View>
 
                   <View style={styles.detailRow}>
-                    <Ionicons name="time" size={20} color={theme.colors.warning} />
+                    <Ionicons name="time" size={20} color={colors.warning} />
                     <View style={styles.detailContent}>
                       <Text style={styles.detailLabel}>Time</Text>
                       <Text style={styles.detailValue}>
@@ -401,7 +524,7 @@ export default function PatientManagementScreen() {
                   </View>
 
                   <View style={styles.detailRow}>
-                    <Ionicons name="cash" size={20} color={theme.colors.success} />
+                    <Ionicons name="cash" size={20} color={colors.success} />
                     <View style={styles.detailContent}>
                       <Text style={styles.detailLabel}>Consultation Fee</Text>
                       <Text style={styles.detailValue}>
@@ -414,7 +537,7 @@ export default function PatientManagementScreen() {
                     <Ionicons
                       name="document-text"
                       size={20}
-                      color={theme.colors.secondary}
+                      color={colors.secondary}
                     />
                     <View style={styles.detailContent}>
                       <Text style={styles.detailLabel}>Patient Concern</Text>
@@ -521,7 +644,7 @@ export default function PatientManagementScreen() {
                     >
                       {isProcessing ? (
                         <ActivityIndicator
-                          color={theme.colors.surface}
+                          color={colors.surface}
                           size="small"
                         />
                       ) : (
@@ -529,7 +652,7 @@ export default function PatientManagementScreen() {
                           <Ionicons
                             name="checkmark-circle"
                             size={20}
-                            color={theme.colors.surface}
+                            color={colors.surface}
                           />
                           <Text style={styles.actionButtonText}>
                             Approve Request
@@ -552,7 +675,7 @@ export default function PatientManagementScreen() {
                     >
                       {isProcessing ? (
                         <ActivityIndicator
-                          color={theme.colors.surface}
+                          color={colors.surface}
                           size="small"
                         />
                       ) : (
@@ -560,7 +683,7 @@ export default function PatientManagementScreen() {
                           <Ionicons
                             name="close-circle"
                             size={20}
-                            color={theme.colors.surface}
+                            color={colors.surface}
                           />
                           <Text style={styles.actionButtonText}>
                             Reject Request
@@ -573,7 +696,7 @@ export default function PatientManagementScreen() {
 
                 {selectedAppointment.status === 'confirmed' && (
                   <View style={styles.approvedSection}>
-                    <Ionicons name="checkmark-done" size={40} color={theme.colors.success} />
+                    <Ionicons name="checkmark-done" size={40} color={colors.success} />
                     <Text style={styles.approvedTitle}>Request Approved</Text>
                     <Text style={styles.approvedSubtitle}>
                       Patient has been notified about the appointment confirmation
@@ -607,7 +730,7 @@ export default function PatientManagementScreen() {
               <Ionicons
                 name={confirmationType === 'approve' ? 'checkmark-circle' : 'alert-circle'}
                 size={48}
-                color={theme.colors.surface}
+                color={colors.surface}
               />
               <Text style={styles.confirmationTitle}>
                 {confirmationType === 'approve' ? 'Approve Appointment?' : 'Reject Appointment?'}
@@ -618,12 +741,12 @@ export default function PatientManagementScreen() {
             <View style={styles.confirmationContent}>
               <View style={styles.appointmentSummary}>
                 <View style={styles.summaryRow}>
-                  <Ionicons name="person" size={18} color={theme.colors.textSecondary} />
+                  <Ionicons name="person" size={18} color={colors.textSecondary} />
                   <Text style={styles.summaryLabel}>Patient:</Text>
                   <Text style={styles.summaryValue}>{selectedAppointment?.userName || 'Unknown'}</Text>
                 </View>
                 <View style={styles.summaryRow}>
-                  <Ionicons name="calendar" size={18} color={theme.colors.textSecondary} />
+                  <Ionicons name="calendar" size={18} color={colors.textSecondary} />
                   <Text style={styles.summaryLabel}>Date:</Text>
                   <Text style={styles.summaryValue}>
                     {selectedAppointment?.date
@@ -636,7 +759,7 @@ export default function PatientManagementScreen() {
                   </Text>
                 </View>
                 <View style={styles.summaryRow}>
-                  <Ionicons name="time" size={18} color={theme.colors.textSecondary} />
+                  <Ionicons name="time" size={18} color={colors.textSecondary} />
                   <Text style={styles.summaryLabel}>Time:</Text>
                   <Text style={styles.summaryValue}>{selectedAppointment?.time || 'N/A'}</Text>
                 </View>
@@ -670,13 +793,13 @@ export default function PatientManagementScreen() {
                 disabled={isProcessing}
               >
                 {isProcessing ? (
-                  <ActivityIndicator color={theme.colors.surface} size="small" />
+                  <ActivityIndicator color={colors.surface} size="small" />
                 ) : (
                   <>
                     <Ionicons
                       name={confirmationType === 'approve' ? 'checkmark' : 'close'}
                       size={18}
-                      color={theme.colors.surface}
+                      color={colors.surface}
                     />
                     <Text style={styles.confirmationActionText}>
                       {confirmationType === 'approve' ? 'Approve' : 'Reject'}
@@ -692,17 +815,19 @@ export default function PatientManagementScreen() {
   );
 }
 
-const getStyles = () =>
+const getStyles = (colors: any, topInset = 0, bottomInset = 0) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: theme.colors.primary,
+      backgroundColor: colors.screenColor,
+    },
+    headerSafeArea: {
+      paddingTop: topInset,
+      backgroundColor: '#FFFFFF',
     },
     content: {
       flex: 1,
       backgroundColor: '#F8F9FB',
-      borderTopLeftRadius: 30,
-      borderTopRightRadius: 30,
       paddingTop: hp(2),
     },
     filterContainer: {
@@ -716,25 +841,35 @@ const getStyles = () =>
       paddingHorizontal: wp(3.5),
       borderRadius: 12,
       borderWidth: 2,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.surface,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
     },
     filterButtonActive: {
-      backgroundColor: theme.colors.primary,
-      borderColor: theme.colors.primary,
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
     },
     filterButtonText: {
       fontSize: hp(1.4),
       fontWeight: '600',
-      color: theme.colors.textSecondary,
+      color: colors.textSecondary,
     },
     filterButtonTextActive: {
-      color: theme.colors.surface,
+      color: colors.surface,
     },
     loadingContainer: {
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
+    },
+    noticeBanner: {
+      marginHorizontal: wp(4),
+      marginTop: hp(1.2),
+      marginBottom: hp(1),
+    },
+    smartEmptyState: {
+      width: width - wp(8),
+      alignSelf: 'center',
+      marginTop: hp(3),
     },
     emptyContainer: {
       flex: 1,
@@ -745,23 +880,23 @@ const getStyles = () =>
     emptyTitle: {
       fontSize: hp(2.5),
       fontWeight: 'bold',
-      color: theme.colors.textPrimary,
+      color: colors.textPrimary,
       marginTop: hp(2),
       marginBottom: hp(0.5),
     },
     emptySubtitle: {
       fontSize: hp(1.6),
-      color: theme.colors.textSecondary,
+      color: colors.textSecondary,
       textAlign: 'center',
     },
     listContainer: {
       paddingHorizontal: wp(4),
       paddingVertical: hp(1),
-      paddingBottom: hp(3),
+      paddingBottom: Math.max(hp(3), bottomInset + hp(2)),
     },
     // Card Styles
     requestCard: {
-      backgroundColor: theme.colors.surface,
+      backgroundColor: colors.surface,
       borderRadius: 16,
       marginBottom: hp(2),
       shadowColor: '#000',
@@ -789,12 +924,12 @@ const getStyles = () =>
     patientName: {
       fontSize: hp(1.8),
       fontWeight: '700',
-      color: theme.colors.textPrimary,
+      color: colors.textPrimary,
       marginBottom: hp(0.3),
     },
     appointmentDateTime: {
       fontSize: hp(1.4),
-      color: theme.colors.textSecondary,
+      color: colors.textSecondary,
     },
     statusBadge: {
       paddingVertical: hp(0.6),
@@ -826,7 +961,7 @@ const getStyles = () =>
     feeText: {
       fontSize: hp(1.5),
       fontWeight: '600',
-      color: theme.colors.success,
+      color: colors.success,
     },
     requestContent: {
       flexDirection: 'row',
@@ -836,7 +971,7 @@ const getStyles = () =>
       width: wp(12),
       height: wp(12),
       borderRadius: wp(6),
-      backgroundColor: theme.colors.primary + "20",
+      backgroundColor: colors.primary + "20",
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: wp(3),
@@ -847,7 +982,7 @@ const getStyles = () =>
     consultationFee: {
       fontSize: hp(1.4),
       fontWeight: '500',
-      color: theme.colors.success,
+      color: colors.success,
     },
     statusContainer: {
       marginLeft: wp(2),
@@ -863,7 +998,7 @@ const getStyles = () =>
       justifyContent: 'space-between',
       paddingHorizontal: wp(4),
       paddingVertical: hp(2),
-      backgroundColor: theme.colors.surface,
+      backgroundColor: colors.surface,
       borderBottomWidth: 1,
       borderBottomColor: '#EFEFEF',
     },
@@ -873,7 +1008,7 @@ const getStyles = () =>
     modalTitle: {
       fontSize: hp(2.2),
       fontWeight: '700',
-      color: theme.colors.textPrimary,
+      color: colors.textPrimary,
     },
     headerSpacer: {
       width: hp(3),
@@ -889,24 +1024,24 @@ const getStyles = () =>
     sectionTitle: {
       fontSize: hp(2),
       fontWeight: 'bold',
-      color: theme.colors.textPrimary,
+      color: colors.textPrimary,
       marginBottom: hp(1),
     },
     infoCard: {
       flexDirection: 'row',
-      backgroundColor: theme.colors.surface,
+      backgroundColor: colors.surface,
       borderRadius: 16,
       padding: wp(4),
       alignItems: 'center',
       borderLeftWidth: 4,
-      borderLeftColor: theme.colors.primary,
+      borderLeftColor: colors.primary,
       marginBottom: hp(1),
     },
     avatarLarge: {
       width: wp(14),
       height: wp(14),
       borderRadius: wp(7),
-      backgroundColor: theme.colors.primary,
+      backgroundColor: colors.primary,
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: wp(3),
@@ -917,22 +1052,22 @@ const getStyles = () =>
     patientNameLarge: {
       fontSize: hp(1.8),
       fontWeight: '700',
-      color: theme.colors.textPrimary,
+      color: colors.textPrimary,
       marginBottom: hp(0.3),
     },
     patientEmail: {
       fontSize: hp(1.4),
-      color: theme.colors.textSecondary,
+      color: colors.textSecondary,
     },
     detailRow: {
       flexDirection: 'row',
-      backgroundColor: theme.colors.surface,
+      backgroundColor: colors.surface,
       borderRadius: 14,
       padding: wp(4),
       marginBottom: hp(1.2),
       alignItems: 'flex-start',
       borderLeftWidth: 3,
-      borderLeftColor: theme.colors.info,
+      borderLeftColor: colors.info,
     },
     detailContent: {
       flex: 1,
@@ -940,17 +1075,17 @@ const getStyles = () =>
     },
     detailLabel: {
       fontSize: hp(1.2),
-      color: theme.colors.textSecondary,
+      color: colors.textSecondary,
       marginBottom: hp(0.3),
     },
     detailValue: {
       fontSize: hp(1.7),
       fontWeight: '700',
-      color: theme.colors.textPrimary,
+      color: colors.textPrimary,
     },
     statusDisplay: {
       flexDirection: 'row',
-      backgroundColor: theme.colors.surface,
+      backgroundColor: colors.surface,
       borderRadius: 14,
       padding: wp(4),
       borderLeftWidth: 4,
@@ -970,7 +1105,7 @@ const getStyles = () =>
     },
     statusLabel: {
       fontSize: hp(1.3),
-      color: theme.colors.textSecondary,
+      color: colors.textSecondary,
       marginBottom: hp(0.3),
     },
     statusValue: {
@@ -1020,43 +1155,43 @@ const getStyles = () =>
       justifyContent: 'center',
     },
     approveButton: {
-      backgroundColor: theme.colors.success,
+      backgroundColor: colors.success,
     },
     rejectButton: {
-      backgroundColor: theme.colors.error,
+      backgroundColor: colors.error,
     },
     buttonDisabled: {
       opacity: 0.6,
     },
     actionButtonText: {
-      color: theme.colors.surface,
+      color: colors.surface,
       fontSize: hp(1.7),
       fontWeight: '600',
       marginLeft: wp(2),
     },
     approvedSection: {
-      backgroundColor: theme.colors.surface,
+      backgroundColor: colors.surface,
       borderRadius: 15,
       padding: wp(6),
       alignItems: 'center',
       marginBottom: hp(2),
       borderTopWidth: 3,
-      borderTopColor: theme.colors.success,
+      borderTopColor: colors.success,
     },
     approvedTitle: {
       fontSize: hp(2.2),
       fontWeight: 'bold',
-      color: theme.colors.textPrimary,
+      color: colors.textPrimary,
       marginTop: hp(1),
       marginBottom: hp(0.5),
     },
     approvedSubtitle: {
       fontSize: hp(1.5),
-      color: theme.colors.textSecondary,
+      color: colors.textSecondary,
       textAlign: 'center',
     },
     closeModalButton: {
-      backgroundColor: theme.colors.disabled,
+      backgroundColor: colors.disabled,
       paddingVertical: hp(1.8),
       paddingHorizontal: wp(6),
       borderRadius: 15,
@@ -1065,7 +1200,7 @@ const getStyles = () =>
       marginBottom: hp(3),
     },
     closeModalButtonText: {
-      color: theme.colors.textPrimary,
+      color: colors.textPrimary,
       fontSize: hp(1.7),
       fontWeight: '600',
     },
@@ -1077,7 +1212,7 @@ const getStyles = () =>
       alignItems: 'center',
     },
     confirmationContainer: {
-      backgroundColor: theme.colors.surface,
+      backgroundColor: colors.surface,
       borderRadius: 20,
       overflow: 'hidden',
       width: '85%',
@@ -1095,15 +1230,15 @@ const getStyles = () =>
       gap: wp(2),
     },
     confirmApproveHeader: {
-      backgroundColor: theme.colors.success,
+      backgroundColor: colors.success,
     },
     confirmRejectHeader: {
-      backgroundColor: theme.colors.error,
+      backgroundColor: colors.error,
     },
     confirmationTitle: {
       fontSize: hp(2.2),
       fontWeight: '700',
-      color: theme.colors.surface,
+      color: colors.surface,
       textAlign: 'center',
     },
     confirmationContent: {
@@ -1126,19 +1261,19 @@ const getStyles = () =>
     summaryLabel: {
       fontSize: hp(1.4),
       fontWeight: '600',
-      color: theme.colors.textSecondary,
+      color: colors.textSecondary,
       flex: 1,
     },
     summaryValue: {
       fontSize: hp(1.6),
       fontWeight: '700',
-      color: theme.colors.textPrimary,
+      color: colors.textPrimary,
       flex: 1.5,
       textAlign: 'right',
     },
     confirmationMessage: {
       fontSize: hp(1.5),
-      color: theme.colors.textSecondary,
+      color: colors.textSecondary,
       textAlign: 'center',
       marginVertical: hp(1.5),
       lineHeight: hp(2.2),
@@ -1163,7 +1298,7 @@ const getStyles = () =>
     confirmationCancelText: {
       fontSize: hp(1.6),
       fontWeight: '600',
-      color: theme.colors.textPrimary,
+      color: colors.textPrimary,
     },
     confirmationActionButton: {
       flex: 1,
@@ -1175,14 +1310,14 @@ const getStyles = () =>
       gap: wp(1.5),
     },
     confirmationApproveButton: {
-      backgroundColor: theme.colors.success,
+      backgroundColor: colors.success,
     },
     confirmationRejectButton: {
-      backgroundColor: theme.colors.error,
+      backgroundColor: colors.error,
     },
     confirmationActionText: {
       fontSize: hp(1.6),
       fontWeight: '700',
-      color: theme.colors.surface,
+      color: colors.surface,
     },
   });

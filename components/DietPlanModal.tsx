@@ -1,25 +1,37 @@
-import { theme } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
+import { useNotifications } from '@/contexts/NotificationContext';
+import {
+  cachedRequestJson,
+  clearRequestJsonCachesWithPrefix,
+  requestJson,
+} from '@/utils/apiHelper';
 import { tokenStorage } from '@/utils/auth/tokenStorage';
 import { Ionicons } from '@expo/vector-icons';
-import Constants from 'expo-constants';
-import React, { useEffect, useState } from 'react';
+import * as NavigationBar from 'expo-navigation-bar';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Keyboard,
   Modal,
   Platform,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
+import {
+  heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
+} from 'react-native-responsive-screen';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const ENV = Constants.expoConfig?.extra;
-const BACKEND_URL = (ENV?.EXPO_PUBLIC_BACKEND_API_URL || (Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001')).replace(/\/api\/?$/, '');
+import { getBackendBaseUrl } from '@/utils/config';
+
+const BACKEND_URL = getBackendBaseUrl().replace(/\/api\/?$/, '');
 
 interface FoodItem {
   name: string;
@@ -66,6 +78,17 @@ interface DietPlanModalProps {
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snacks'];
+const DIET_PLAN_CACHE_PREFIX = 'diet-plans:';
+const DIET_PLAN_READ_CONFIG = {
+  timeoutMs: 7000,
+  retries: 1,
+  retryDelayMs: 500,
+  cacheTtlMs: 5 * 60 * 1000,
+  maxStaleMs: 24 * 60 * 60 * 1000,
+  allowStaleOnError: true,
+  maxWaitForFreshMs: 1800,
+  refreshCacheInBackground: true,
+};
 
 const DietPlanModal: React.FC<DietPlanModalProps> = ({
   visible,
@@ -76,6 +99,10 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
   loading,
   setLoading
 }) => {
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const { sendDietPlanUpdateNotification } = useNotifications();
+  const styles = getStyles(colors);
   const [selectedDay, setSelectedDay] = useState('monday');
   const [selectedMealType, setSelectedMealType] = useState('breakfast');
   const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
@@ -104,6 +131,21 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
 
   const [showFoodSelector, setShowFoodSelector] = useState(false);
 
+  useEffect(() => {
+    if (!visible) return;
+
+    const systemBarColor = colors.screenColor || '#FFFFFF';
+    StatusBar.setBarStyle('dark-content');
+
+    if (Platform.OS === 'android') {
+      StatusBar.setBackgroundColor(systemBarColor);
+      StatusBar.setTranslucent(false);
+      NavigationBar.setBackgroundColorAsync(systemBarColor).catch(() => {});
+      NavigationBar.setButtonStyleAsync('dark').catch(() => {});
+      NavigationBar.setStyle('light');
+    }
+  }, [colors.screenColor, visible]);
+
   // Debug useEffect to track state changes
   useEffect(() => {
     console.log('=== Diet Plan Modal State Debug ===');
@@ -122,28 +164,23 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
       console.log('- existingPlans:', existingPlans.length, 'plans');
       console.log('- editingPlanId:', editingPlanId);
     }
-  }, [visible]);
+  }, [editingPlanId, existingPlans.length, showExistingPlans, visible]);
 
-  // Fetch food items when modal opens
-  useEffect(() => {
-    if (visible) {
-      console.log('Modal opened, fetching data...');
-      fetchFoodItems();
-      fetchExistingDietPlans();
-    }
-  }, [visible]);
-
-  const fetchFoodItems = async () => {
+  const fetchFoodItems = useCallback(async () => {
     try {
       const token = await tokenStorage.getToken();
-      const response = await fetch(`${BACKEND_URL}/api/diet-plans/foods`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      const data = await response.json();
+      const data = await cachedRequestJson<any>(
+        `${DIET_PLAN_CACHE_PREFIX}foods`,
+        `${BACKEND_URL}/api/diet-plans/foods`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        },
+        DIET_PLAN_READ_CONFIG
+      );
       if (data.success) {
         setFoodItems(data.foods);
       }
@@ -151,19 +188,23 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
       console.error('Error fetching food items:', error);
       Alert.alert('Error', 'Failed to load food items');
     }
-  };
+  }, []);
 
-  const fetchExistingDietPlans = async () => {
+  const fetchExistingDietPlans = useCallback(async () => {
     try {
       const token = await tokenStorage.getToken();
-      const response = await fetch(`${BACKEND_URL}/api/diet-plans/appointment/${appointmentId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      const data = await response.json();
+      const data = await cachedRequestJson<any>(
+        `${DIET_PLAN_CACHE_PREFIX}appointment:${appointmentId}`,
+        `${BACKEND_URL}/api/diet-plans/appointment/${appointmentId}`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        },
+        DIET_PLAN_READ_CONFIG
+      );
       console.log('Existing diet plans:', data);
       if (data.success) {
         console.log('Setting existing plans:', data.dietPlans?.length || 0, 'plans');
@@ -175,7 +216,16 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
     } catch (error) {
       console.error('Error fetching existing diet plans:', error);
     }
-  };
+  }, [appointmentId]);
+
+  // Fetch food items when modal opens
+  useEffect(() => {
+    if (visible) {
+      console.log('Modal opened, fetching data...');
+      fetchFoodItems();
+      fetchExistingDietPlans();
+    }
+  }, [fetchExistingDietPlans, fetchFoodItems, visible]);
 
   const addFoodToMeal = (food: FoodItem) => {
     const foodWithQuantity: MealFood = {
@@ -334,16 +384,16 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
           onPress: async () => {
             try {
               const token = await tokenStorage.getToken();
-              const response = await fetch(`${BACKEND_URL}/api/diet-plans/${planId}`, {
+              const data = await requestJson<any>(`${BACKEND_URL}/api/diet-plans/${planId}`, {
                 method: 'DELETE',
                 headers: {
                   'Authorization': `Bearer ${token}`,
                   'Content-Type': 'application/json'
                 }
-              });
+              }, { timeoutMs: 12000, retries: 0 });
 
-              const data = await response.json();
               if (data.success) {
+                await clearRequestJsonCachesWithPrefix(DIET_PLAN_CACHE_PREFIX);
                 Alert.alert('Success', 'Diet plan deleted successfully!');
                 fetchExistingDietPlans(); // Refresh the list
               } else {
@@ -402,23 +452,24 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
       
       console.log('Making API call to:', apiUrl, 'Method:', method);
       
-      const response = await fetch(apiUrl, {
+      const data = await requestJson<any>(apiUrl, {
         method,
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(requestBody)
-      });
-
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
-      
-      const data = await response.json();
+      }, { timeoutMs: 15000, retries: 0 });
       console.log('Response data:', data);
       
       if (data.success) {
+        await clearRequestJsonCachesWithPrefix(DIET_PLAN_CACHE_PREFIX);
         const message = isEditing ? 'Diet plan updated successfully!' : 'Diet plan created successfully!';
+        await sendDietPlanUpdateNotification(
+          isEditing ? 'Diet Plan Updated' : 'New Diet Plan',
+          `${planTitle || 'Diet plan'} is ready for ${patientName || 'your patient'}.`,
+          data.dietPlan?._id || editingPlanId || undefined
+        );
         Alert.alert('Success', message, [
           { text: 'OK', onPress: () => {
             resetForm();
@@ -476,7 +527,7 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
           </Text>
         </View>
       </View>
-      <Ionicons name="add-circle" size={24} color={theme.colors.primary} />
+      <Ionicons name="add-circle" size={Math.min(hp(3), wp(6.4))} color={colors.primary} />
     </TouchableOpacity>
   );
 
@@ -484,22 +535,27 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
     return (
       <Modal visible={visible} animationType="slide" transparent={false}>
         <View style={styles.container}>
-          <View style={styles.header}>
+          <StatusBar
+            barStyle="dark-content"
+            backgroundColor={colors.screenColor || '#FFFFFF'}
+            translucent={false}
+          />
+          <View style={[styles.header, { paddingTop: insets.top + hp(1.4) }]}>
             <TouchableOpacity onPress={() => setShowFoodSelector(false)}>
-              <Ionicons name="arrow-back" size={24} color={theme.colors.textPrimary} />
+              <Ionicons name="arrow-back" size={Math.min(hp(3), wp(6.4))} color="#FFFFFF" />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Select Food for {selectedMealType}</Text>
-            <View style={{ width: 24 }} />
+            <View style={{ width: wp(6.4) }} />
           </View>
 
           <View style={styles.searchContainer}>
-            <Ionicons name="search" size={20} color={theme.colors.textSecondary} />
+            <Ionicons name="search" size={Math.min(hp(2.5), wp(5.4))} color={colors.textSecondary} />
             <TextInput
               style={styles.searchInput}
               placeholder="Search foods..."
               value={searchTerm}
               onChangeText={setSearchTerm}
-              placeholderTextColor={theme.colors.textTertiary}
+              placeholderTextColor={colors.textTertiary}
             />
           </View>
 
@@ -517,6 +573,11 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
 
   return (
     <Modal visible={visible} animationType="slide" transparent={true}>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={colors.screenColor || '#FFFFFF'}
+        translucent={false}
+      />
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
@@ -524,7 +585,7 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
               {editingPlanId ? 'Edit' : 'Create'} Diet Plan for {patientName}
             </Text>
             <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color={theme.colors.textPrimary} />
+              <Ionicons name="close" size={Math.min(hp(3), wp(6.4))} color={colors.textPrimary} />
             </TouchableOpacity>
           </View>
 
@@ -641,7 +702,7 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
                 placeholder="Diet Plan Title"
                 value={planTitle}
                 onChangeText={setPlanTitle}
-                placeholderTextColor={theme.colors.textTertiary}
+                placeholderTextColor={colors.textTertiary}
               />
               <TextInput
                 style={styles.input}
@@ -649,7 +710,7 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
                 value={customCalories}
                 onChangeText={setCustomCalories}
                 keyboardType="numeric"
-                placeholderTextColor={theme.colors.textTertiary}
+                placeholderTextColor={colors.textTertiary}
               />
               <TextInput
                 style={[styles.input, styles.notesInput]}
@@ -657,7 +718,7 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
                 value={notes}
                 onChangeText={setNotes}
                 multiline
-                placeholderTextColor={theme.colors.textTertiary}
+                placeholderTextColor={colors.textTertiary}
               />
             </View>
 
@@ -721,14 +782,14 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
                   style={styles.addFoodButton}
                   onPress={() => setShowFoodSelector(true)}
                 >
-                  <Ionicons name="add" size={20} color={theme.colors.surface} />
+                  <Ionicons name="add" size={Math.min(hp(2.5), wp(5.4))} color={colors.textOnPrimary} />
                   <Text style={styles.addFoodText}>Add Food</Text>
                 </TouchableOpacity>
               </View>
 
               {weeklyMeals[selectedDay] && weeklyMeals[selectedDay][selectedMealType] && weeklyMeals[selectedDay][selectedMealType].length === 0 ? (
                 <View style={styles.emptyMeal}>
-                  <Ionicons name="restaurant-outline" size={48} color={theme.colors.textTertiary} />
+                  <Ionicons name="restaurant-outline" size={Math.min(hp(5.9), wp(12.8))} color={colors.textTertiary} />
                   <Text style={styles.emptyMealText}>No foods added yet</Text>
                   <TouchableOpacity
                     style={styles.emptyMealButton}
@@ -760,7 +821,7 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
                       <TouchableOpacity
                         onPress={() => removeFoodFromMeal(selectedDay, selectedMealType, index)}
                       >
-                        <Ionicons name="trash" size={20} color={theme.colors.error} />
+                        <Ionicons name="trash" size={Math.min(hp(2.5), wp(5.4))} color={colors.error} />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -768,7 +829,7 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
               )}
             </View>
 
-            <View style={{ height: 100 }} />
+            <View style={{ height: hp(12.3) }} />
           </ScrollView>
           )}
 
@@ -779,10 +840,10 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator size="small" color={theme.colors.surface} />
+                <ActivityIndicator size="small" color={colors.textOnPrimary} />
               ) : (
                 <View style={styles.saveButtonContent}>
-                  <Ionicons name="checkmark" size={20} color={theme.colors.surface} />
+                  <Ionicons name="checkmark" size={Math.min(hp(2.5), wp(5.4))} color={colors.textOnPrimary} />
                   <Text style={styles.saveButtonText}>
                     {editingPlanId ? 'Update' : 'Create'} Diet Plan
                   </Text>
@@ -797,10 +858,16 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
 };
 
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => {
+  const screenSurface = colors.screenColor || colors.surface || '#FFFFFF';
+  const cardSurface = colors.cardBackground || colors.surface || '#FFFFFF';
+  const softSurface = colors.backgroundHeader || colors.offWhite || '#F8FAFC';
+  const inputSurface = colors.inputBackground || softSurface;
+
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: screenSurface,
   },
   modalOverlay: {
     flex: 1,
@@ -808,187 +875,192 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: theme.colors.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: cardSurface,
+    borderTopLeftRadius: wp(6.4),
+    borderTopRightRadius: wp(6.4),
     height: '90%',
-    padding: 20,
+    padding: wp(5.3),
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: hp(2.5),
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: Math.min(hp(2.2), wp(4.8)),
     fontWeight: 'bold',
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     flex: 1,
   },
   modalBody: {
     flex: 1,
+    backgroundColor: cardSurface,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 20,
+    padding: wp(5.3),
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    borderBottomColor: colors.primaryDark,
+    backgroundColor: colors.primary,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: Math.min(hp(2.2), wp(4.8)),
     fontWeight: 'bold',
-    color: theme.colors.textPrimary,
+    color: colors.textOnPrimary,
+    flex: 1,
+    textAlign: 'center',
   },
   section: {
-    marginBottom: 24,
+    marginBottom: hp(3),
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: Math.min(hp(2), wp(4.3)),
     fontWeight: 'bold',
-    color: theme.colors.textPrimary,
-    marginBottom: 12,
+    color: colors.textPrimary,
+    marginBottom: hp(1.5),
   },
   input: {
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    fontSize: 16,
-    color: theme.colors.textPrimary,
+    borderColor: colors.border,
+    borderRadius: wp(3.2),
+    padding: wp(3.2),
+    marginBottom: hp(1.5),
+    fontSize: Math.min(hp(2), wp(4.3)),
+    color: colors.textPrimary,
+    backgroundColor: inputSurface,
   },
   notesInput: {
-    height: 80,
+    height: hp(9.9),
     textAlignVertical: 'top',
   },
   daySelector: {
-    marginBottom: 12,
+    marginBottom: hp(1.5),
   },
   dayButton: {
-    padding: 12,
-    marginRight: 12,
-    borderRadius: 12,
-    backgroundColor: theme.colors.background,
+    padding: wp(3.2),
+    marginRight: wp(3.2),
+    borderRadius: wp(3.2),
+    backgroundColor: softSurface,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    minWidth: 60,
+    borderColor: colors.border,
+    minWidth: wp(16),
     alignItems: 'center',
   },
   dayButtonActive: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   dayButtonText: {
-    fontSize: 14,
+    fontSize: Math.min(hp(1.8), wp(3.8)),
     fontWeight: '500',
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
   },
   dayButtonTextActive: {
-    color: theme.colors.surface,
+    color: colors.textOnPrimary,
   },
   dayCalories: {
-    fontSize: 10,
-    color: theme.colors.textSecondary,
-    marginTop: 2,
+    fontSize: Math.min(hp(1.25), wp(2.7)),
+    color: colors.textSecondary,
+    marginTop: hp(0.25),
   },
   dayCaloriesActive: {
-    color: theme.colors.surface,
+    color: colors.textOnPrimary,
   },
   mealSelector: {
-    marginBottom: 12,
+    marginBottom: hp(1.5),
   },
   mealButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginRight: 12,
-    borderRadius: 20,
-    backgroundColor: theme.colors.background,
+    paddingHorizontal: wp(4.3),
+    paddingVertical: hp(1),
+    marginRight: wp(3.2),
+    borderRadius: wp(5.3),
+    backgroundColor: softSurface,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
   },
   mealButtonActive: {
-    backgroundColor: theme.colors.secondary,
-    borderColor: theme.colors.secondary,
+    backgroundColor: colors.secondary,
+    borderColor: colors.secondary,
   },
   mealButtonText: {
-    fontSize: 14,
-    color: theme.colors.textPrimary,
+    fontSize: Math.min(hp(1.8), wp(3.8)),
+    color: colors.textPrimary,
   },
   mealButtonTextActive: {
-    color: theme.colors.surface,
+    color: colors.textOnPrimary,
   },
   mealHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: hp(2),
   },
   mealTitle: {
-    fontSize: 16,
+    fontSize: Math.min(hp(2), wp(4.3)),
     fontWeight: '600',
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
   },
   addFoodButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    backgroundColor: colors.primary,
+    paddingHorizontal: wp(3.2),
+    paddingVertical: hp(0.7),
+    borderRadius: wp(5.3),
   },
   addFoodText: {
-    color: theme.colors.surface,
-    fontSize: 12,
-    marginLeft: 4,
+    color: colors.textOnPrimary,
+    fontSize: Math.min(hp(1.5), wp(3.2)),
+    marginLeft: wp(1.1),
   },
   emptyMeal: {
     alignItems: 'center',
-    padding: 32,
-    backgroundColor: theme.colors.background,
-    borderRadius: 12,
+    padding: wp(8.5),
+    backgroundColor: softSurface,
+    borderRadius: wp(3.2),
     borderStyle: 'dashed',
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
   },
   emptyMealText: {
-    marginTop: 12,
-    color: theme.colors.textSecondary,
-    fontSize: 14,
+    marginTop: hp(1.5),
+    color: colors.textSecondary,
+    fontSize: Math.min(hp(1.8), wp(3.8)),
   },
   emptyMealButton: {
-    marginTop: 12,
-    backgroundColor: theme.colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    marginTop: hp(1.5),
+    backgroundColor: colors.primary,
+    paddingHorizontal: wp(4.3),
+    paddingVertical: hp(1),
+    borderRadius: wp(5.3),
   },
   emptyMealButtonText: {
-    color: theme.colors.surface,
-    fontSize: 12,
+    color: colors.textOnPrimary,
+    fontSize: Math.min(hp(1.5), wp(3.2)),
   },
   selectedFood: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    backgroundColor: theme.colors.background,
-    borderRadius: 12,
-    marginBottom: 8,
+    padding: wp(3.2),
+    backgroundColor: softSurface,
+    borderRadius: wp(3.2),
+    marginBottom: hp(1),
   },
   selectedFoodInfo: {
     flex: 1,
   },
   selectedFoodName: {
-    fontSize: 14,
+    fontSize: Math.min(hp(1.8), wp(3.8)),
     fontWeight: '500',
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
   },
   selectedFoodNutrition: {
-    fontSize: 12,
-    color: theme.colors.textSecondary,
-    marginTop: 2,
+    fontSize: Math.min(hp(1.5), wp(3.2)),
+    color: colors.textSecondary,
+    marginTop: hp(0.25),
   },
   selectedFoodControls: {
     flexDirection: 'row',
@@ -996,81 +1068,83 @@ const styles = StyleSheet.create({
   },
   quantityInput: {
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: 6,
-    width: 50,
-    height: 32,
+    borderColor: colors.border,
+    borderRadius: wp(1.6),
+    width: wp(13.3),
+    height: hp(3.9),
     textAlign: 'center',
-    fontSize: 12,
-    color: theme.colors.textPrimary,
-    marginRight: 4,
+    fontSize: Math.min(hp(1.5), wp(3.2)),
+    color: colors.textPrimary,
+    marginRight: wp(1.1),
   },
   unitText: {
-    fontSize: 12,
-    color: theme.colors.textSecondary,
-    marginRight: 12,
+    fontSize: Math.min(hp(1.5), wp(3.2)),
+    color: colors.textSecondary,
+    marginRight: wp(3.2),
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.background,
-    margin: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
+    backgroundColor: inputSurface,
+    margin: wp(5.3),
+    paddingHorizontal: wp(4.3),
+    paddingVertical: hp(1.5),
+    borderRadius: wp(3.2),
   },
   searchInput: {
     flex: 1,
-    marginLeft: 12,
-    fontSize: 16,
-    color: theme.colors.textPrimary,
+    marginLeft: wp(3.2),
+    fontSize: Math.min(hp(2), wp(4.3)),
+    color: colors.textPrimary,
   },
   foodList: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: wp(5.3),
+    backgroundColor: screenSurface,
   },
   foodItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: theme.colors.surface,
-    borderRadius: 12,
-    marginBottom: 8,
+    padding: wp(4.3),
+    backgroundColor: cardSurface,
+    borderRadius: wp(3.2),
+    marginBottom: hp(1),
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
   },
   foodItemContent: {
     flex: 1,
   },
   foodName: {
-    fontSize: 14,
+    fontSize: Math.min(hp(1.8), wp(3.8)),
     fontWeight: '500',
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
   },
   foodDetails: {
-    marginTop: 4,
+    marginTop: hp(0.5),
   },
   foodCategory: {
-    fontSize: 12,
-    color: theme.colors.textSecondary,
+    fontSize: Math.min(hp(1.5), wp(3.2)),
+    color: colors.textSecondary,
   },
   foodNutrition: {
-    fontSize: 12,
-    color: theme.colors.textTertiary,
-    marginTop: 2,
+    fontSize: Math.min(hp(1.5), wp(3.2)),
+    color: colors.textTertiary,
+    marginTop: hp(0.25),
   },
   saveButtonContainer: {
-    padding: 20,
+    padding: wp(5.3),
     borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
+    borderTopColor: colors.border,
+    backgroundColor: cardSurface,
   },
   saveButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.colors.primary,
-    paddingVertical: 16,
-    borderRadius: 12,
+    backgroundColor: colors.primary,
+    paddingVertical: hp(2),
+    borderRadius: wp(3.2),
   },
   saveButtonContent: {
     flexDirection: 'row',
@@ -1081,128 +1155,130 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   saveButtonText: {
-    color: theme.colors.surface,
-    fontSize: 16,
+    color: colors.textOnPrimary,
+    fontSize: Math.min(hp(2), wp(4.3)),
     fontWeight: '600',
-    marginLeft: 8,
+    marginLeft: wp(2.1),
   },
   // Existing Plans Styles
   existingPlansContainer: {
-    padding: 20,
-    maxHeight: 600,
+    padding: wp(5.3),
+    maxHeight: hp(74),
   },
   existingPlansList: {
-    maxHeight: 400,
-    marginVertical: 10,
+    maxHeight: hp(49),
+    marginVertical: hp(1.2),
   },
   existingPlanCard: {
-    backgroundColor: theme.colors.background,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
+    backgroundColor: softSurface,
+    padding: wp(4.3),
+    borderRadius: wp(3.2),
+    marginBottom: hp(1.5),
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
   },
   planHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: hp(1),
   },
   planTitle: {
-    fontSize: 16,
+    fontSize: Math.min(hp(2), wp(4.3)),
     fontWeight: '600',
-    color: theme.colors.textPrimary,
+    color: colors.textPrimary,
     flex: 1,
-    marginRight: 10,
+    marginRight: wp(2.7),
   },
   planDate: {
-    fontSize: 12,
-    color: theme.colors.textSecondary,
+    fontSize: Math.min(hp(1.5), wp(3.2)),
+    color: colors.textSecondary,
   },
   planCalories: {
-    fontSize: 14,
-    color: theme.colors.primary,
+    fontSize: Math.min(hp(1.8), wp(3.8)),
+    color: colors.primary,
     fontWeight: '500',
-    marginBottom: 6,
+    marginBottom: hp(0.7),
   },
   planNotes: {
-    fontSize: 13,
-    color: theme.colors.textSecondary,
-    marginBottom: 12,
-    lineHeight: 18,
+    fontSize: Math.min(hp(1.6), wp(3.5)),
+    color: colors.textSecondary,
+    marginBottom: hp(1.5),
+    lineHeight: hp(2.2),
   },
   planActions: {
     flexDirection: 'row',
-    gap: 10,
+    gap: wp(2.7),
   },
   planActionBtn: {
     flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    paddingVertical: hp(1),
+    paddingHorizontal: wp(4.3),
+    borderRadius: wp(2.1),
   },
   editBtn: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
   },
   deleteBtn: {
-    backgroundColor: theme.colors.error,
+    backgroundColor: colors.error,
   },
   planActionText: {
-    color: theme.colors.surface,
-    fontSize: 13,
+    color: colors.textOnPrimary,
+    fontSize: Math.min(hp(1.6), wp(3.5)),
     fontWeight: '500',
     textAlign: 'center',
   },
   newPlanBtn: {
-    backgroundColor: theme.colors.success,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 10,
+    backgroundColor: colors.success,
+    paddingVertical: hp(1.5),
+    paddingHorizontal: wp(5.3),
+    borderRadius: wp(2.7),
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: hp(1.2),
   },
   newPlanBtnText: {
-    color: theme.colors.surface,
-    fontSize: 15,
+    color: colors.textOnPrimary,
+    fontSize: Math.min(hp(1.9), wp(4)),
     fontWeight: '600',
   },
   // Meal preview styles 
   planMealsPreview: {
-    marginBottom: 12,
-    padding: 12,
-    backgroundColor: theme.colors.surface,
-    borderRadius: 8,
+    marginBottom: hp(1.5),
+    padding: wp(3.2),
+    backgroundColor: cardSurface,
+    borderRadius: wp(2.1),
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
   },
   planMealsTitle: {
-    fontSize: 12,
+    fontSize: Math.min(hp(1.5), wp(3.2)),
     fontWeight: '600',
-    color: theme.colors.textPrimary,
-    marginBottom: 6,
+    color: colors.textPrimary,
+    marginBottom: hp(0.7),
   },
   dayPreview: {
-    marginBottom: 4,
+    marginBottom: hp(0.5),
   },
   dayPreviewTitle: {
-    fontSize: 11,
+    fontSize: Math.min(hp(1.35), wp(3)),
     fontWeight: '500',
-    color: theme.colors.primary,
-    marginBottom: 2,
+    color: colors.primary,
+    marginBottom: hp(0.25),
   },
   mealPreview: {
-    fontSize: 10,
-    color: theme.colors.textSecondary,
-    marginLeft: 8,
-    lineHeight: 14,
+    fontSize: Math.min(hp(1.25), wp(2.7)),
+    color: colors.textSecondary,
+    marginLeft: wp(2.1),
+    lineHeight: hp(1.7),
   },
   totalDaysText: {
-    fontSize: 10,
-    color: theme.colors.textTertiary,
-    marginTop: 4,
+    fontSize: Math.min(hp(1.25), wp(2.7)),
+    color: colors.textTertiary,
+    marginTop: hp(0.5),
     fontStyle: 'italic',
   },
 });
+};
 
 export default DietPlanModal;
+

@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 export interface ChatMessage {
   id: string;
@@ -61,19 +61,7 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load sessions from AsyncStorage on mount
-  useEffect(() => {
-    loadSessions();
-  }, []);
-
-  // Save sessions to AsyncStorage whenever sessions change
-  useEffect(() => {
-    if (!isLoading) {
-      saveSessions();
-    }
-  }, [sessions, isLoading]);
-
-  const loadSessions = async () => {
+  const loadSessions = useCallback(async () => {
     try {
       setIsLoading(true);
       const stored = await AsyncStorage.getItem('chatbot_sessions');
@@ -89,8 +77,8 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
         }));
         setSessions(parsedSessions);
         
-        // Set the most recent session as current if no current session
-        if (parsedSessions.length > 0 && !currentSession) {
+        // Set the most recent session as current on initial load.
+        if (parsedSessions.length > 0) {
           const mostRecent = parsedSessions.sort((a: ChatSession, b: ChatSession) => 
             b.lastMessageAt.getTime() - a.lastMessageAt.getTime()
           )[0];
@@ -103,17 +91,29 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const saveSessions = async () => {
+  const saveSessions = useCallback(async () => {
     try {
       await AsyncStorage.setItem('chatbot_sessions', JSON.stringify(sessions));
     } catch (error) {
       console.error('Error saving chat sessions:', error);
     }
-  };
+  }, [sessions]);
 
-  const createNewSession = (): string => {
+  // Load sessions from AsyncStorage on mount
+  useEffect(() => {
+    loadSessions();
+  }, [loadSessions]);
+
+  // Save sessions to AsyncStorage whenever sessions change
+  useEffect(() => {
+    if (!isLoading) {
+      saveSessions();
+    }
+  }, [isLoading, saveSessions]);
+
+  const createNewSession = useCallback((): string => {
     const sessionId = Date.now().toString();
     const newSession: ChatSession = {
       id: sessionId,
@@ -126,31 +126,36 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
     
     setSessions(prev => [newSession, ...prev]);
     setCurrentSession(newSession);
+    setMessages([]);
     return sessionId;
-  };
+  }, []);
 
-  const switchToSession = (sessionId: string) => {
+  const switchToSession = useCallback((sessionId: string) => {
     const session = sessions.find(s => s.id === sessionId);
     if (session) {
       setCurrentSession(session);
+      setMessages(session.messages);
     }
-  };
+  }, [sessions]);
 
-  const deleteSession = (sessionId: string) => {
+  const deleteSession = useCallback((sessionId: string) => {
     setSessions(prev => prev.filter(s => s.id !== sessionId));
     if (currentSession?.id === sessionId) {
       const remainingSessions = sessions.filter(s => s.id !== sessionId);
       if (remainingSessions.length > 0) {
         setCurrentSession(remainingSessions[0]);
+        setMessages(remainingSessions[0].messages);
       } else {
         setCurrentSession(null);
+        setMessages([]);
       }
     }
-  };
+  }, [currentSession?.id, sessions]);
 
-  const addMessage = (text: string, isUser: boolean) => {
+  const addMessage = useCallback((text: string, isUser: boolean) => {
     // If no session exists, we still need to add the message to a new session
     let sessionToUse = currentSession;
+    const newSessionId = Date.now().toString();
     if (!sessionToUse) {
       // We'll handle this by creating message and letting sessions/currentSession updates handle it
     }
@@ -160,13 +165,12 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
       text,
       isUser,
       timestamp: new Date(),
-      sessionId: sessionToUse?.id || Date.now().toString()
+      sessionId: sessionToUse?.id || newSessionId
     };
 
     // Create or update session
     if (!sessionToUse) {
-      const newSessionId = Date.now().toString();
-      sessionToUse = {
+      const newSession: ChatSession = {
         id: newSessionId,
         title: text.length > 30 ? text.substring(0, 30) + '...' : text,
         createdAt: new Date(),
@@ -174,8 +178,9 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
         messageCount: 1,
         messages: [message]
       };
-      setSessions(prev => [sessionToUse, ...prev]);
-      setCurrentSession(sessionToUse);
+      sessionToUse = newSession;
+      setSessions(prev => [newSession, ...prev]);
+      setCurrentSession(newSession);
       setMessages([message]);
       return;
     }
@@ -201,9 +206,9 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
     
     setCurrentSession(updatedSession);
     setMessages(updatedSession.messages);
-  };
+  }, [currentSession]);
 
-  const clearCurrentSession = () => {
+  const clearCurrentSession = useCallback(() => {
     if (currentSession) {
       const clearedSession: ChatSession = {
         ...currentSession,
@@ -216,10 +221,11 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
         prev.map(s => s.id === currentSession.id ? clearedSession : s)
       );
       setCurrentSession(clearedSession);
+      setMessages([]);
     }
-  };
+  }, [currentSession]);
 
-  const clearAllChats = async () => {
+  const clearAllChats = useCallback(async () => {
     try {
       await AsyncStorage.removeItem('chatbot_sessions');
       setSessions([]);
@@ -228,9 +234,9 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
     } catch (error) {
       console.error('Error clearing all chats:', error);
     }
-  };
+  }, []);
 
-  const exportChats = async (): Promise<string> => {
+  const exportChats = useCallback(async (): Promise<string> => {
     try {
       const exportData = {
         sessions: sessions.map(session => ({
@@ -251,21 +257,36 @@ export const ChatbotStorageProvider: React.FC<ChatbotStorageProviderProps> = ({ 
       console.error('Error exporting chats:', error);
       throw error;
     }
-  };
+  }, [sessions]);
 
-  const value: ChatbotStorageContextType = {
-    currentSession,
-    messages,
-    sessions,
-    createNewSession,
-    switchToSession,
-    deleteSession,
-    addMessage,
-    clearCurrentSession,
-    clearAllChats,
-    exportChats,
-    isLoading
-  };
+  const value: ChatbotStorageContextType = useMemo(
+    () => ({
+      currentSession,
+      messages,
+      sessions,
+      createNewSession,
+      switchToSession,
+      deleteSession,
+      addMessage,
+      clearCurrentSession,
+      clearAllChats,
+      exportChats,
+      isLoading,
+    }),
+    [
+      addMessage,
+      clearAllChats,
+      clearCurrentSession,
+      createNewSession,
+      currentSession,
+      deleteSession,
+      exportChats,
+      isLoading,
+      messages,
+      sessions,
+      switchToSession,
+    ]
+  );
 
   return (
     <ChatbotStorageContext.Provider value={value}>

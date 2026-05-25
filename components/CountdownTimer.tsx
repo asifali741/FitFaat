@@ -1,6 +1,10 @@
-import { theme } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import {
+  heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
+} from 'react-native-responsive-screen';
 
 interface CountdownTimerProps {
   targetDate: Date;
@@ -8,6 +12,8 @@ interface CountdownTimerProps {
 }
 
 export default function CountdownTimer({ targetDate, onComplete }: CountdownTimerProps) {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const [timeLeft, setTimeLeft] = useState({
     hours: 0,
     minutes: 0,
@@ -56,14 +62,14 @@ export default function CountdownTimer({ targetDate, onComplete }: CountdownTime
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     alignItems: 'center',
   },
   timerText: {
-    fontSize: 32,
+    fontSize: Math.min(hp(3.9), wp(8.5)),
     fontWeight: 'bold',
-    color: theme.colors.primary,
+    color: colors.primary,
     fontFamily: 'monospace',
   },
 });

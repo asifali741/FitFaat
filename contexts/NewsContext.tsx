@@ -1,8 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
-import Constants from 'expo-constants';
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { Platform } from 'react-native';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState } from 'react-native';
+import { getBackendBaseUrl } from '@/utils/config';
+import { useNotifications } from '@/contexts/NotificationContext';
+import { cachedRequestJson } from '@/utils/apiHelper';
 
 interface NewsItem {
   _id: string;
@@ -32,28 +33,30 @@ interface NewsContextType {
 const NewsContext = createContext<NewsContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'fitfaat_read_news';
+const NEWS_POLL_INTERVAL_MS = 5 * 60 * 1000;
+const NEWS_READ_CONFIG = {
+  timeoutMs: 7000,
+  retries: 1,
+  retryDelayMs: 500,
+  cacheTtlMs: 5 * 60 * 1000,
+  maxStaleMs: 24 * 60 * 60 * 1000,
+  allowStaleOnError: true,
+  maxWaitForFreshMs: 2200,
+  refreshCacheInBackground: true,
+};
 
 export const NewsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { sendFitFaatNotification } = useNotifications();
   const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [readNewsIds, setReadNewsIds] = useState<Set<string>>(new Set());
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const previousIdsRef = useRef<Set<string>>(new Set());
+  const hasLoadedOnceRef = useRef(false);
+  const lastErrorLogRef = useRef('');
 
-  // Get the correct API URL based on platform
-  const getApiUrl = () => {
-    const ENV = Constants.expoConfig?.extra;
-    if (ENV?.EXPO_PUBLIC_BACKEND_API_URL) {
-      return ENV.EXPO_PUBLIC_BACKEND_API_URL.replace(/\/api\/?$/, '');
-    }
-    if (Platform.OS === 'android') {
-      return 'http://10.0.2.2:5001';
-    }
-    return 'http://localhost:5001';
-  };
-
-  const API_BASE_URL = getApiUrl();
+  const API_BASE_URL = getBackendBaseUrl();
 
   // Load read news from storage
   const loadReadNews = async () => {
@@ -79,31 +82,37 @@ export const NewsProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Mark a news item as read
-  const markNewsAsRead = async (newsId: string) => {
+  const markNewsAsRead = useCallback(async (newsId: string) => {
     const newReadIds = new Set(readNewsIds);
     newReadIds.add(newsId);
     setReadNewsIds(newReadIds);
     await saveReadNews(newReadIds);
     console.log('📖 Marked as read:', newsId);
-  };
+  }, [readNewsIds]);
 
-  const fetchPublishedNews = async () => {
+  const fetchPublishedNews = useCallback(async () => {
     try {
-      setLoading(true);
+      if (!hasLoadedOnceRef.current) {
+        setLoading(true);
+      }
       setError(null);
 
       const apiUrl = `${API_BASE_URL}/api/admin/news/published`;
 
-      const response = await axios.get(apiUrl, {
-        timeout: 10000,
-      });
-
-      const newsList = response.data?.data || [];
-
-      // Find newly added items
-      const newlyAdded = newsList.filter(
-        (item: NewsItem) => !previousIdsRef.current.has(item._id || item.id || '')
+      const response = await cachedRequestJson<any>(
+        'news:published',
+        apiUrl,
+        { method: 'GET' },
+        NEWS_READ_CONFIG
       );
+
+      const newsList = response?.data || [];
+
+      const newlyAdded = hasLoadedOnceRef.current
+        ? newsList.filter(
+            (item: NewsItem) => !previousIdsRef.current.has(item._id || item.id || '')
+          )
+        : [];
 
       // Update tracking
       const currentIds: Set<string> = new Set(
@@ -111,18 +120,35 @@ export const NewsProvider: React.FC<{ children: React.ReactNode }> = ({ children
       );
       previousIdsRef.current = currentIds;
       setNews(newsList);
+
+      if (newlyAdded.length > 0) {
+        const latestItem = newlyAdded[0];
+        sendFitFaatNotification(
+          'news',
+          'New Health Update',
+          latestItem.title,
+          { newsId: latestItem._id || latestItem.id }
+        ).catch((notificationError) => {
+          console.error('Error sending news notification:', notificationError);
+        });
+      }
+
+      hasLoadedOnceRef.current = true;
     } catch (err) {
-      const message = axios.isAxiosError(err) ? err.message : 'Failed to fetch';
+      const message = err instanceof Error ? err.message : 'Failed to fetch';
       setError(message);
-      console.error('❌ Error:', message);
+      if (lastErrorLogRef.current !== message) {
+        lastErrorLogRef.current = message;
+        console.warn('[News] Published news unavailable:', message);
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [API_BASE_URL, sendFitFaatNotification]);
 
-  const refreshNews = async () => {
+  const refreshNews = useCallback(async () => {
     await fetchPublishedNews();
-  };
+  }, [fetchPublishedNews]);
 
   useEffect(() => {
     
@@ -130,27 +156,41 @@ export const NewsProvider: React.FC<{ children: React.ReactNode }> = ({ children
     fetchPublishedNews();
 
     pollIntervalRef.current = setInterval(() => {
-      
-      fetchPublishedNews();
-    }, 5000);
+      if (AppState.currentState === 'active') {
+        fetchPublishedNews();
+      }
+    }, NEWS_POLL_INTERVAL_MS);
+
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        fetchPublishedNews();
+      }
+    });
 
     return () => {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      subscription.remove();
     };
-  }, []);
+  }, [fetchPublishedNews]);
 
   // Calculate unread count
-  const unreadCount = news.filter((item) => !readNewsIds.has(item._id || item.id || '')).length;
+  const unreadCount = useMemo(
+    () => news.filter((item) => !readNewsIds.has(item._id || item.id || '')).length,
+    [news, readNewsIds]
+  );
 
-  const value: NewsContextType = {
-    news,
-    loading,
-    error,
-    unreadCount,
-    fetchPublishedNews,
-    refreshNews,
-    markNewsAsRead,
-  };
+  const value: NewsContextType = useMemo(
+    () => ({
+      news,
+      loading,
+      error,
+      unreadCount,
+      fetchPublishedNews,
+      refreshNews,
+      markNewsAsRead,
+    }),
+    [error, fetchPublishedNews, loading, markNewsAsRead, news, refreshNews, unreadCount]
+  );
 
   return <NewsContext.Provider value={value}>{children}</NewsContext.Provider>;
 };

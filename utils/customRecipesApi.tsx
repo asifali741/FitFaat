@@ -1,20 +1,25 @@
-import Constants from 'expo-constants';
-import { Platform } from 'react-native';
 import { tokenStorage } from '@/utils/auth/tokenStorage';
+import {
+  cachedRequestJson,
+  clearRequestJsonCachesWithPrefix,
+  requestJson,
+} from './apiHelper';
+import { getBackendUrl } from './config';
 
-const ENV = Constants.expoConfig?.extra;
+const API_BASE_URL = getBackendUrl();
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
+const CUSTOM_RECIPE_CACHE_PREFIX = 'custom-recipes:';
 
-// Get base URL from environment variables
-const getBaseURL = () => {
-  const envUrl = ENV?.EXPO_PUBLIC_BACKEND_API_URL;
-  if (envUrl) {
-    return envUrl;
-  }
-  const defaultHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
-  return `http://${defaultHost}:5001/api`;
+const READ_REQUEST_CONFIG = {
+  timeoutMs: 8000,
+  retries: 1,
+  retryDelayMs: 600,
+  cacheTtlMs: 2 * 60 * 1000,
+  maxStaleMs: 24 * 60 * 60 * 1000,
+  allowStaleOnError: true,
+  maxWaitForFreshMs: 2500,
+  refreshCacheInBackground: true,
 };
-
-const API_BASE_URL = getBaseURL();
 
 export interface CustomRecipeIngredient {
   name: string;
@@ -39,15 +44,20 @@ export interface CustomRecipeData {
   updatedAt?: string;
 }
 
+const getUserId = async () => {
+  const user = await tokenStorage.getUser();
+  return user?._id || user?.id || user?.userId;
+};
+
+const clearCustomRecipeCache = async () => {
+  await clearRequestJsonCachesWithPrefix(CUSTOM_RECIPE_CACHE_PREFIX);
+};
+
 export const customRecipesApi = {
   // Create a new custom recipe
   createRecipe: async (recipeData: Omit<CustomRecipeData, '_id' | 'createdAt' | 'updatedAt'>): Promise<CustomRecipeData> => {
     try {
-      const user = await tokenStorage.getUser();
-      console.log('[createRecipe] User object:', user);
-      
-      // Try different possible user ID field names
-      const userId = user?._id || user?.id || user?.userId;
+      const userId = await getUserId();
 
       console.log('[createRecipe] Creating recipe:', recipeData.recipeName);
       console.log('[createRecipe] User ID:', userId);
@@ -56,23 +66,20 @@ export const customRecipesApi = {
         throw new Error('User not authenticated. Please log in again.');
       }
 
-      const response = await fetch(`${API_BASE_URL}/custom-recipes`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const data = await requestJson<any>(
+        `${API_BASE_URL}/custom-recipes`,
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({
+            ...recipeData,
+            userId,
+          }),
         },
-        body: JSON.stringify({
-          ...recipeData,
-          userId,
-        }),
-      });
+        { timeoutMs: 12000, retries: 0 }
+      );
 
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to create custom recipe');
-      }
-
+      await clearCustomRecipeCache();
       console.log('[createRecipe] Recipe created successfully:', data.data._id);
       return data.data;
     } catch (error) {
@@ -84,8 +91,7 @@ export const customRecipesApi = {
   // Get all custom recipes for the current user
   getUserRecipes: async (): Promise<CustomRecipeData[]> => {
     try {
-      const user = await tokenStorage.getUser();
-      const userId = user?._id || user?.id || user?.userId;
+      const userId = await getUserId();
 
       if (!userId) {
         console.warn('[getUserRecipes] No user ID found');
@@ -94,18 +100,15 @@ export const customRecipesApi = {
 
       console.log('[getUserRecipes] Fetching recipes for user:', userId);
 
-      const response = await fetch(`${API_BASE_URL}/custom-recipes/user/${userId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
+      const data = await cachedRequestJson<any>(
+        `${CUSTOM_RECIPE_CACHE_PREFIX}user:${userId}`,
+        `${API_BASE_URL}/custom-recipes/user/${userId}`,
+        {
+          method: 'GET',
+          headers: JSON_HEADERS,
         },
-      });
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to fetch custom recipes');
-      }
+        READ_REQUEST_CONFIG
+      );
 
       console.log('[getUserRecipes] Recipes fetched:', data.count);
       return data.data || [];
@@ -118,8 +121,7 @@ export const customRecipesApi = {
   // Search custom recipes
   searchRecipes: async (query: string): Promise<CustomRecipeData[]> => {
     try {
-      const user = await tokenStorage.getUser();
-      const userId = user?._id || user?.id || user?.userId;
+      const userId = await getUserId();
 
       if (!userId) {
         return [];
@@ -127,21 +129,15 @@ export const customRecipesApi = {
 
       console.log('[searchRecipes] Searching recipes:', query);
 
-      const response = await fetch(
+      const data = await cachedRequestJson<any>(
+        `${CUSTOM_RECIPE_CACHE_PREFIX}search:${userId}:${query.trim().toLowerCase()}`,
         `${API_BASE_URL}/custom-recipes/search?userId=${userId}&query=${encodeURIComponent(query)}`,
         {
           method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
+          headers: JSON_HEADERS,
+        },
+        READ_REQUEST_CONFIG
       );
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to search custom recipes');
-      }
 
       return data.data || [];
     } catch (error) {
@@ -153,23 +149,17 @@ export const customRecipesApi = {
   // Get a single recipe by ID
   getRecipeById: async (recipeId: string): Promise<CustomRecipeData | null> => {
     try {
-      const user = await tokenStorage.getUser();
-      const userId = user?._id || user?.id || user?.userId;
-      
       console.log('[getRecipeById] Fetching recipe:', recipeId);
 
-      const response = await fetch(`${API_BASE_URL}/custom-recipes/${recipeId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
+      const data = await cachedRequestJson<any>(
+        `${CUSTOM_RECIPE_CACHE_PREFIX}item:${recipeId}`,
+        `${API_BASE_URL}/custom-recipes/${recipeId}`,
+        {
+          method: 'GET',
+          headers: JSON_HEADERS,
         },
-      });
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to fetch recipe');
-      }
+        READ_REQUEST_CONFIG
+      );
 
       return data.data;
     } catch (error) {
@@ -181,25 +171,19 @@ export const customRecipesApi = {
   // Update a custom recipe
   updateRecipe: async (recipeId: string, updates: Partial<CustomRecipeData>): Promise<CustomRecipeData> => {
     try {
-      const user = await tokenStorage.getUser();
-      const userId = user?._id || user?.id || user?.userId;
-      
       console.log('[updateRecipe] Updating recipe:', recipeId);
 
-      const response = await fetch(`${API_BASE_URL}/custom-recipes/${recipeId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
+      const data = await requestJson<any>(
+        `${API_BASE_URL}/custom-recipes/${recipeId}`,
+        {
+          method: 'PUT',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(updates),
         },
-        body: JSON.stringify(updates),
-      });
+        { timeoutMs: 12000, retries: 0 }
+      );
 
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to update recipe');
-      }
-
+      await clearCustomRecipeCache();
       console.log('[updateRecipe] Recipe updated successfully');
       return data.data;
     } catch (error) {
@@ -211,24 +195,18 @@ export const customRecipesApi = {
   // Delete a custom recipe
   deleteRecipe: async (recipeId: string): Promise<boolean> => {
     try {
-      const user = await tokenStorage.getUser();
-      const userId = user?._id || user?.id || user?.userId;
-      
       console.log('[deleteRecipe] Deleting recipe:', recipeId);
 
-      const response = await fetch(`${API_BASE_URL}/custom-recipes/${recipeId}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
+      await requestJson<any>(
+        `${API_BASE_URL}/custom-recipes/${recipeId}`,
+        {
+          method: 'DELETE',
+          headers: JSON_HEADERS,
         },
-      });
+        { timeoutMs: 12000, retries: 0 }
+      );
 
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to delete recipe');
-      }
-
+      await clearCustomRecipeCache();
       console.log('[deleteRecipe] Recipe deleted successfully');
       return true;
     } catch (error) {
