@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Image,
   Modal,
   Pressable,
   Share,
@@ -18,34 +19,28 @@ import { ProgressRing } from '@/components/common/ProgressRing';
 import {
   getBurnedCaloriesTarget,
   getCalorieScorePercent,
-  DASHBOARD_DATA_SOURCE_LABELS,
-  getDashboardHealthScore,
   getDashboardScoreBreakdown,
-  getFreeStepBurnedCalories,
-  getHealthScoreMetricStatus,
-  getHealthScorePlanExplanation,
-  getHealthScoreReliabilityCopy,
   getHydrationValue,
-  getPremiumScoreChangeExplanation,
   getProgressValue,
   getSingleMetricProgress,
-  getWeeklyHealthScoreTrend,
-  HEALTH_SCORE_DISCLAIMER,
-  HEALTH_SCORE_WEIGHTS,
-  type HealthScoreMetric,
 } from '@/utils/dashboardProgress';
-import { FREE_PLAN_LIMITS } from '@/utils/featureAccess';
 import { getExerciseCaloriesBurned } from '@/utils/localExerciseProgress';
 import {
   DEFAULT_STEP_GOAL,
-  getWalkingCaloriesBurned,
-  getWalkingCaloriesTarget,
 } from '@/utils/localWalkingProgress';
 import {
   formatCalorieTarget,
   formatHydrationTarget,
+  getCalorieTargetProgress,
+  getHydrationTargetProgress,
+  isRangesGoalDisplayMode,
   type GoalDisplayMode,
 } from '@/utils/goalTargetDisplay';
+import {
+  buildGoalSpineSummary,
+  type GoalSpineAction,
+  type GoalSpineKey,
+} from '@/utils/goalSpine';
 import {
   buildWeeklyNutritionReport,
   type WeeklyNutritionReport,
@@ -54,6 +49,12 @@ import type {
   HabitPreferences,
   HabitMission,
 } from '@/utils/habitMissions';
+import {
+  buildNutritionProfile,
+  buildNutritionTimingNudge,
+  type NutritionGoalSummary,
+  type NutritionTimingNudge,
+} from '@/utils/nutritionProfile';
 import { useRouter } from 'expo-router';
 
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -64,15 +65,16 @@ export type QuickAddAction =
   | 'mealPlanner'
   | 'mindfulness'
   | 'steps'
-  | 'weight'
   | 'workout'
   | 'appointment'
   | 'note'
-  | 'chat';
+  | 'chat'
+  | 'settings';
 
 export type DashboardMoodValue = 'strong' | 'good' | 'tired' | 'sore' | 'stressed';
 
 export type DashboardDay = {
+  _id?: string;
   dayNo: number;
   date?: string;
   status?: 'locked' | 'active' | 'finished';
@@ -105,6 +107,13 @@ export type DashboardDay = {
   dailyStepGoal?: number;
   walkingCaloriesBurned?: number;
   targetWalkingCaloriesBurned?: number;
+  calorieGoalDirection?: 'missed' | 'exceeded' | 'onTarget' | 'unknown';
+  nutritionGapSeverity?: 'none' | 'low' | 'medium' | 'high' | 'critical';
+  hydrationRiskScore?: number;
+  recoveryNeedScore?: number;
+  goalRiskScore?: number;
+  nudgePriority?: 'silent' | 'low' | 'medium' | 'high';
+  nudgeReason?: string;
   meals?: any[];
   waterIntake?: any[];
 };
@@ -125,10 +134,17 @@ type DashboardCommandCenterProps = {
   selectedMood: DashboardMoodValue | null;
   onOpenQuickAdd: () => void;
   onQuickAddAction: (action: QuickAddAction) => void;
+  showStepPermissionPrompt?: boolean;
+  stepCounterReady?: boolean;
+  onOpenStepPermissions?: () => void;
   afterCommandCenter?: React.ReactNode;
   showReadiness?: boolean;
   showWeeklyReport?: boolean;
+  showNutritionScore?: boolean;
+  showHabitMission?: boolean;
   goalDisplayMode?: GoalDisplayMode;
+  onGoalDisplayModeChange?: (mode: GoalDisplayMode) => void;
+  fitnessGoal?: GoalSpineKey | unknown;
   nutritionReport?: WeeklyNutritionReport | null;
   habitMission?: HabitMission | null;
   habitStreakCount?: number;
@@ -149,21 +165,11 @@ type QuickAddBottomSheetProps = {
   colors: any;
   selectedMood: DashboardMoodValue | null;
   isPremium?: boolean;
+  actions?: QuickAddAction[];
+  showMoodAction?: boolean;
   onClose: () => void;
   onSelectMood: (mood: DashboardMoodValue) => void;
   onAction: (action: QuickAddAction) => void;
-};
-
-type TodayPlanItem = {
-  id: string;
-  label: string;
-  title: string;
-  body: string;
-  icon: IconName;
-  color: string;
-  action: QuickAddAction;
-  actionLabel: string;
-  progressLabel: string;
 };
 
 const WATER_COLOR = '#2E86AB';
@@ -193,17 +199,18 @@ const quickActions: {
   subtitle: string;
   icon: IconName;
   color: string;
+  premiumOnly?: boolean;
 }[] = [
   { id: 'water', label: 'Water', subtitle: 'Hydration', icon: 'water-outline', color: WATER_COLOR },
   { id: 'meal', label: 'Meal', subtitle: 'Calories', icon: 'fast-food-outline', color: CALORIE_COLOR },
   { id: 'mealPlanner', label: 'Meal Plan', subtitle: 'Planner', icon: 'basket-outline', color: '#0EA5E9' },
   { id: 'mindfulness', label: 'Mindful', subtitle: 'Breathing', icon: 'leaf-outline', color: '#22C55E' },
   { id: 'steps', label: 'Steps', subtitle: 'Counter', icon: 'footsteps-outline', color: '#14B8A6' },
-  { id: 'weight', label: 'Weight', subtitle: 'Profile', icon: 'scale-outline', color: '#8B5CF6' },
-  { id: 'workout', label: 'Workout', subtitle: 'Exercise', icon: 'barbell-outline', color: WORKOUT_COLOR },
+  { id: 'workout', label: 'Workout', subtitle: 'Exercise', icon: 'barbell-outline', color: WORKOUT_COLOR, premiumOnly: true },
   { id: 'appointment', label: 'Appointment', subtitle: 'Doctor', icon: 'calendar-outline', color: APPOINTMENT_COLOR },
   { id: 'chat', label: 'Chat', subtitle: 'Messages', icon: 'chatbubbles-outline', color: CHAT_COLOR },
-  { id: 'note', label: 'Note', subtitle: 'Daily log', icon: 'document-text-outline', color: '#64748B' },
+  { id: 'note', label: 'Notes', subtitle: 'Personal', icon: 'document-text-outline', color: '#64748B' },
+  { id: 'settings', label: 'Settings', subtitle: 'Preferences', icon: 'settings-outline', color: '#8B5CF6' },
 ];
 
 const safeAverage = (values: number[]) => {
@@ -221,51 +228,6 @@ const getLocalDateKey = (value?: string | Date | null) => {
   return `${year}-${month}-${day}`;
 };
 
-const parseAppointmentTime = (time?: string) => {
-  const match = String(time || '').match(/(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?/i);
-  if (!match) return null;
-
-  let hours = Number(match[1]);
-  const minutes = Number(match[2] || 0);
-  const period = match[3]?.toUpperCase();
-
-  if (period === 'PM' && hours < 12) hours += 12;
-  if (period === 'AM' && hours === 12) hours = 0;
-
-  return { hours, minutes };
-};
-
-const getAppointmentDate = (appointment: any) => {
-  const directDate = appointment?.appointmentDateTime || appointment?.scheduledAt || appointment?.startTime;
-  if (directDate) {
-    const parsed = new Date(directDate);
-    if (!Number.isNaN(parsed.getTime())) return parsed;
-  }
-
-  if (!appointment?.date) return null;
-  const parsed = new Date(appointment.date);
-  if (Number.isNaN(parsed.getTime())) return null;
-
-  const time = parseAppointmentTime(appointment.time);
-  if (time) {
-    parsed.setHours(time.hours, time.minutes, 0, 0);
-  }
-
-  return parsed;
-};
-
-const getNextAppointment = (appointments: any[]) => {
-  const now = Date.now();
-  return appointments
-    .map((appointment) => ({ appointment, startsAt: getAppointmentDate(appointment) }))
-    .filter(({ appointment, startsAt }) => {
-      const status = String(appointment?.status || '').toLowerCase();
-      const isClosed = ['cancelled', 'canceled', 'completed', 'rejected'].includes(status);
-      return startsAt && !isClosed && startsAt.getTime() > now - 30 * 60 * 1000;
-    })
-    .sort((a, b) => a.startsAt!.getTime() - b.startsAt!.getTime())[0] || null;
-};
-
 const getDaySteps = (day?: DashboardDay | null) =>
   Math.round(getProgressValue(day?.walkingSteps ?? day?.steps ?? day?.stepCount));
 
@@ -278,31 +240,6 @@ const getDayStepGoal = (day?: DashboardDay | null) => {
 
 const formatStepCount = (value: number) => value.toLocaleString();
 
-const formatAppointmentLabel = (appointment: any) => {
-  const startsAt = getAppointmentDate(appointment);
-  const doctorName =
-    appointment?.doctorName ||
-    appointment?.doctor?.name ||
-    appointment?.doctorId?.name ||
-    appointment?.doctorId?.fullName ||
-    'Doctor';
-
-  if (!startsAt) {
-    return { title: doctorName, subtitle: 'No time set' };
-  }
-
-  return {
-    title: doctorName,
-    subtitle: startsAt.toLocaleString([], {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    }),
-  };
-};
-
 const getTodayDay = (days: DashboardDay[]) => {
   const todayKey = getLocalDateKey();
   return (
@@ -314,27 +251,29 @@ const getTodayDay = (days: DashboardDay[]) => {
   );
 };
 
-const formatScoreMetricAmount = (metric: HealthScoreMetric) => {
-  const achieved = Number(metric.achieved || 0);
-  const target = Number(metric.target || 0);
-  const roundedAchieved = metric.key === 'hydration' ? achieved.toFixed(1) : Math.round(achieved).toLocaleString();
-  const roundedTarget = metric.key === 'hydration' ? target.toFixed(1) : Math.round(target).toLocaleString();
-  const unit =
-    metric.key === 'hydration'
-      ? 'L'
-      : metric.key === 'stepsPreview'
-        ? 'steps'
-        : 'kcal';
+const buildNutritionGoalSummaryFromDay = (
+  day?: DashboardDay | null
+): NutritionGoalSummary | null => {
+  if (!day || Number(day.targetCalories || 0) <= 0) return null;
 
-  if (target <= 0) return `${roundedAchieved} ${unit}`;
-  return `${roundedAchieved}/${roundedTarget} ${unit}`;
-};
-
-const getScoreMetricIcon = (metric: HealthScoreMetric): IconName => {
-  if (metric.key === 'hydration') return 'water-outline';
-  if (metric.key === 'stepsPreview' || metric.key === 'walking') return 'footsteps-outline';
-  if (metric.key === 'workout') return 'barbell-outline';
-  return 'flame-outline';
+  return {
+    dayLogId: day._id,
+    dayNo: day.dayNo,
+    date: day.date,
+    achievedCalories: day.achievedCalories,
+    targetCalories: day.targetCalories,
+    targetCaloriesMin: day.targetCaloriesMin,
+    targetCaloriesMax: day.targetCaloriesMax,
+    achievedHydration: day.achieviedHydration ?? day.achievedHydration,
+    targetHydration: day.targetHydration,
+    calorieGoalDirection: day.calorieGoalDirection,
+    nutritionGapSeverity: day.nutritionGapSeverity,
+    hydrationRiskScore: day.hydrationRiskScore,
+    recoveryNeedScore: day.recoveryNeedScore,
+    goalRiskScore: day.goalRiskScore,
+    nudgePriority: day.nudgePriority,
+    nudgeReason: day.nudgeReason,
+  };
 };
 
 const getReadiness = (
@@ -427,7 +366,7 @@ const getNutritionActionLabel = (action?: string) => {
   if (action === 'mealPlanner') return 'Plan meals';
   if (action === 'mindfulness') return 'Breathe';
   if (action === 'steps') return 'Track steps';
-  if (action === 'note') return 'Reflect';
+  if (action === 'note') return 'Add note';
   return 'Add meal';
 };
 
@@ -521,273 +460,6 @@ const buildNutritionShareMessage = (
     `Upcoming appointments: ${activeAppointments}`,
   ].join('\n');
 
-const getCloseNudge = ({
-  hydrationProgress,
-  calorieProgress,
-  stepsProgress,
-  isPremium,
-}: {
-  hydrationProgress: number;
-  calorieProgress: number;
-  stepsProgress: number;
-  isPremium: boolean;
-}): { label: string; icon: IconName; action: QuickAddAction; message: string } | null => {
-  if (hydrationProgress >= 75 && hydrationProgress < 100) {
-    return {
-      label: 'Finish Water',
-      icon: 'water-outline',
-      action: 'water',
-      message: `You are close on water at ${hydrationProgress}%. One small log can finish that part of the score.`,
-    };
-  }
-
-  if (calorieProgress >= 75 && calorieProgress < 100) {
-    return {
-      label: 'Log Meal',
-      icon: 'fast-food-outline',
-      action: 'meal',
-      message: `Calories are ${calorieProgress}% complete. A simple meal log is today's cleanest next step.`,
-    };
-  }
-
-  if (stepsProgress >= 75 && stepsProgress < 100) {
-    return {
-      label: 'Track Steps',
-      icon: 'footsteps-outline',
-      action: 'steps',
-      message: isPremium
-        ? `Steps are ${stepsProgress}% of goal. A short walk can lift the Full Health Score.`
-        : `The step preview is ${stepsProgress}% complete. A few more steps can lift the Basic Score preview.`,
-    };
-  }
-
-  return null;
-};
-
-const getDailyEncouragement = ({
-  today,
-  overallProgress,
-  hydrationProgress,
-  calorieProgress,
-  closeNudge,
-}: {
-  today: DashboardDay | null;
-  overallProgress: number;
-  hydrationProgress: number;
-  calorieProgress: number;
-  closeNudge: ReturnType<typeof getCloseNudge>;
-}) => {
-  if (closeNudge) return closeNudge.message;
-  if (!today) return 'Start with one meal or water log so FitFaat has a real signal for today.';
-
-  const hasAnyLog =
-    getProgressValue(today.achievedCalories) > 0 ||
-    getHydrationValue(today) > 0 ||
-    getDaySteps(today) > 0 ||
-    getExerciseCaloriesBurned(today) > 0;
-
-  if (!hasAnyLog) {
-    return 'Give today an easy start: log water or your first meal, then let the score update from real data.';
-  }
-
-  if (overallProgress >= 85) {
-    return 'Strong day. Keep it boring and repeatable: one more honest log is better than chasing perfection.';
-  }
-
-  if (hydrationProgress < 50) {
-    return 'Water is the fastest win right now. Add one water log before changing the rest of the plan.';
-  }
-
-  if (calorieProgress < 50) {
-    return 'Food signal is still light. Log the next meal so your targets and coach advice stay useful.';
-  }
-
-  return 'You have enough signal to steer the day. Keep the next action small and specific.';
-};
-
-const buildTodayPlan = ({
-  today,
-  isPremium,
-  selectedMood,
-  hydrationProgress,
-  calorieProgress,
-  stepsProgress,
-  workoutTarget,
-  workoutProgress,
-  overallProgress,
-}: {
-  today: DashboardDay | null;
-  isPremium: boolean;
-  selectedMood: DashboardMoodValue | null;
-  hydrationProgress: number;
-  calorieProgress: number;
-  stepsProgress: number;
-  workoutTarget: number;
-  workoutProgress: number;
-  overallProgress: number;
-}): TodayPlanItem[] => {
-  const planItems: TodayPlanItem[] = [];
-  const addItem = (item: TodayPlanItem) => {
-    if (!planItems.some((existing) => existing.action === item.action || existing.id === item.id)) {
-      planItems.push(item);
-    }
-  };
-  const hasAnyLog =
-    !!today &&
-    (getProgressValue(today.achievedCalories) > 0 ||
-      getHydrationValue(today) > 0 ||
-      getDaySteps(today) > 0 ||
-      getExerciseCaloriesBurned(today) > 0);
-
-  if (!hasAnyLog) {
-    addItem({
-      id: 'prime-day',
-      label: 'Now',
-      title: 'Prime the day',
-      body: 'Add water or the first meal so FitFaat has a real signal.',
-      icon: 'sparkles-outline',
-      color: WATER_COLOR,
-      action: 'water',
-      actionLabel: 'Add water',
-      progressLabel: 'No signal yet',
-    });
-  }
-
-  if (hydrationProgress < 85) {
-    addItem({
-      id: 'hydration-checkpoint',
-      label: planItems.length ? 'Next' : 'Now',
-      title: hydrationProgress >= 70 ? 'Finish hydration' : 'Hydration checkpoint',
-      body: hydrationProgress >= 70
-        ? 'One small water log can finish this part of the day.'
-        : 'Water is the fastest useful improvement right now.',
-      icon: 'water-outline',
-      color: WATER_COLOR,
-      action: 'water',
-      actionLabel: 'Log water',
-      progressLabel: `${hydrationProgress}% water`,
-    });
-  }
-
-  if (calorieProgress < 85) {
-    addItem({
-      id: 'food-signal',
-      label: planItems.length ? 'Next' : 'Now',
-      title: calorieProgress >= 70 ? 'Close the food gap' : 'Log the next meal',
-      body: 'Meal data keeps targets, coach advice, and weekly reports useful.',
-      icon: 'fast-food-outline',
-      color: CALORIE_COLOR,
-      action: 'meal',
-      actionLabel: 'Add meal',
-      progressLabel: `${calorieProgress}% food`,
-    });
-  }
-
-  if (stepsProgress < 100) {
-    addItem({
-      id: 'movement-dose',
-      label: planItems.length ? 'Later' : 'Now',
-      title: stepsProgress >= 70 ? 'Finish steps' : isPremium ? 'Add a short walk' : 'Use the step preview',
-      body: isPremium
-        ? 'A short walk improves movement signal without changing your food target.'
-        : 'The free preview keeps movement visible without changing Goal Achieved.',
-      icon: 'footsteps-outline',
-      color: STEP_COLOR,
-      action: 'steps',
-      actionLabel: 'Track steps',
-      progressLabel: `${stepsProgress}% steps`,
-    });
-  }
-
-  if (isPremium && workoutTarget > 0 && workoutProgress < 70 && selectedMood !== 'sore' && selectedMood !== 'tired') {
-    addItem({
-      id: 'workout-window',
-      label: planItems.length ? 'Later' : 'Now',
-      title: 'Workout window',
-      body: 'Keep the session short and logged so the Full Health Score has activity context.',
-      icon: 'barbell-outline',
-      color: WORKOUT_COLOR,
-      action: 'workout',
-      actionLabel: 'Start',
-      progressLabel: `${workoutProgress}% workout`,
-    });
-  }
-
-  if (selectedMood === 'stressed' || selectedMood === 'tired' || selectedMood === 'sore') {
-    addItem({
-      id: 'recovery-guardrail',
-      label: planItems.length ? 'Later' : 'Now',
-      title: 'Recovery guardrail',
-      body: 'Use a lighter action today so consistency stays realistic.',
-      icon: 'leaf-outline',
-      color: '#10B981',
-      action: 'mindfulness',
-      actionLabel: 'Breathe',
-      progressLabel: selectedMood,
-    });
-  }
-
-  if (overallProgress >= 85) {
-    addItem({
-      id: 'protect-good-day',
-      label: planItems.length ? 'Later' : 'Now',
-      title: 'Protect the good day',
-      body: 'Do one honest final log instead of chasing extra activity.',
-      icon: 'checkmark-done-outline',
-      color: '#10B981',
-      action: 'note',
-      actionLabel: 'Reflect',
-      progressLabel: `${overallProgress}% score`,
-    });
-  }
-
-  while (planItems.length < 3) {
-    const fallback = [
-      {
-        id: 'fallback-water',
-        label: 'Now',
-        title: 'Keep water visible',
-        body: 'A water check-in is quick and keeps the coach grounded.',
-        icon: 'water-outline' as IconName,
-        color: WATER_COLOR,
-        action: 'water' as QuickAddAction,
-        actionLabel: 'Add water',
-        progressLabel: `${hydrationProgress}% water`,
-      },
-      {
-        id: 'fallback-note',
-        label: 'Next',
-        title: 'Add context',
-        body: 'A short note helps explain cravings, energy, or schedule changes.',
-        icon: 'document-text-outline' as IconName,
-        color: '#64748B',
-        action: 'note' as QuickAddAction,
-        actionLabel: 'Note',
-        progressLabel: 'Local history',
-      },
-      {
-        id: 'fallback-plan',
-        label: 'Later',
-        title: 'Plan the next meal',
-        body: 'A simple meal plan makes the next log easier to complete.',
-        icon: 'basket-outline' as IconName,
-        color: '#0EA5E9',
-        action: 'mealPlanner' as QuickAddAction,
-        actionLabel: 'Plan',
-        progressLabel: 'Next meal',
-      },
-    ].find((item) => !planItems.some((existing) => existing.id === item.id || existing.action === item.action));
-
-    if (!fallback) break;
-    planItems.push(fallback);
-  }
-
-  return planItems.slice(0, 3).map((item, index) => ({
-    ...item,
-    label: index === 0 ? 'Now' : index === 1 ? 'Next' : 'Later',
-  }));
-};
-
 const getWeeklyReportCopy = (
   report: WeeklyNutritionReport,
   isPremium: boolean,
@@ -803,13 +475,13 @@ const getWeeklyReportCopy = (
     : 'No active appointment is linked to this week.';
 
   if (!isPremium) {
-    return `This week is averaging ${report.weeklyScore}. Free shows calories, hydration, and basic history. ${bestDay}`;
+    return `This week is averaging ${report.weeklyScore}. ${bestDay}`;
   }
 
   return `This week is averaging ${report.weeklyScore}. ${bestDay} Next focus: ${report.nextWeekFocus.title.toLowerCase()}. ${appointmentCopy}`;
 };
 
-function NutritionScoreCard({
+export function NutritionScoreCard({
   report,
   colors,
   isPremium,
@@ -856,7 +528,7 @@ function NutritionScoreCard({
       value: todayScore ? `${todayScore.loggingScore}%` : '--',
       premiumOnly: false,
     },
-  ].filter((item) => isPremium || !item.premiumOnly);
+  ];
 
   return (
     <View style={styles.nutritionScoreCard}>
@@ -889,16 +561,29 @@ function NutritionScoreCard({
       </View>
 
       <View style={styles.nutritionFactorGrid}>
-        {nutritionFactors.map((item) => (
-          <View key={item.label} style={styles.nutritionFactor}>
-            <Text style={styles.nutritionFactorValue} numberOfLines={1} adjustsFontSizeToFit>
-              {item.value}
-            </Text>
-            <Text style={styles.nutritionFactorLabel} numberOfLines={1}>
-              {item.label === 'Protein' ? proteinLabel : item.label}
-            </Text>
-          </View>
-        ))}
+        {nutritionFactors.map((item) => {
+          const isLockedPremiumFactor = Boolean(item.premiumOnly && !isPremium);
+
+          return (
+            <View
+              key={item.label}
+              style={[
+                styles.nutritionFactor,
+                isLockedPremiumFactor && styles.nutritionFactorLocked,
+              ]}
+            >
+              {isLockedPremiumFactor ? (
+                <Ionicons name="lock-closed-outline" size={Math.min(hp(1.45), wp(3.3))} color={colors.primary} />
+              ) : null}
+              <Text style={styles.nutritionFactorValue} numberOfLines={1} adjustsFontSizeToFit>
+                {isLockedPremiumFactor ? 'Premium' : item.value}
+              </Text>
+              <Text style={styles.nutritionFactorLabel} numberOfLines={1}>
+                {isLockedPremiumFactor ? item.label : item.label === 'Protein' ? proteinLabel : item.label}
+              </Text>
+            </View>
+          );
+        })}
       </View>
 
       <AnimatedPressable
@@ -912,7 +597,58 @@ function NutritionScoreCard({
   );
 }
 
-function HabitMissionCard({
+function NutritionTimingNudgeCard({
+  nudge,
+  colors,
+  onAction,
+}: {
+  nudge: NutritionTimingNudge;
+  colors: any;
+  onAction: (action: QuickAddAction) => void;
+}) {
+  const styles = useMemo(() => getStyles(colors), [colors]);
+  const color =
+    nudge.kind === 'overTargetRisk'
+      ? '#F97316'
+      : nudge.kind === 'underTargetSupport'
+        ? '#16A34A'
+        : WATER_COLOR;
+  const icon: IconName =
+    nudge.kind === 'overTargetRisk'
+      ? 'walk-outline'
+      : nudge.kind === 'underTargetSupport'
+        ? 'restaurant-outline'
+        : 'water-outline';
+
+  return (
+    <View style={styles.timingNudgeCard}>
+      {nudge.showFoodImage ? (
+        <Image
+          source={require('../../assets/images/salad.jpg')}
+          style={styles.timingNudgeImage}
+        />
+      ) : (
+        <View style={[styles.timingNudgeIcon, { backgroundColor: `${color}18` }]}>
+          <Ionicons name={icon} size={Math.min(hp(3.2), wp(7))} color={color} />
+        </View>
+      )}
+      <View style={styles.timingNudgeCopy}>
+        <Text style={[styles.timingNudgeMeta, { color }]}>{nudge.meta}</Text>
+        <Text style={styles.timingNudgeTitle}>{nudge.title}</Text>
+        <Text style={styles.timingNudgeBody}>{nudge.body}</Text>
+      </View>
+      <AnimatedPressable
+        style={[styles.timingNudgeButton, { backgroundColor: `${color}14` }]}
+        onPress={() => onAction(nudge.action)}
+      >
+        <Text style={[styles.timingNudgeButtonText, { color }]}>{nudge.actionLabel}</Text>
+        <Ionicons name="arrow-forward" size={Math.min(hp(1.8), wp(4))} color={color} />
+      </AnimatedPressable>
+    </View>
+  );
+}
+
+export function HabitMissionCard({
   mission,
   streakCount,
   colors,
@@ -1044,17 +780,20 @@ function HabitMissionCard({
 export function DashboardCommandCenter({
   days,
   appointments,
-  chatAlertCount,
-  streak,
   isPremium,
   colors,
   selectedMood,
-  onOpenQuickAdd,
   onQuickAddAction,
+  showStepPermissionPrompt = false,
+  stepCounterReady,
+  onOpenStepPermissions,
   afterCommandCenter,
-  showReadiness = true,
+  showReadiness = false,
   showWeeklyReport = true,
-  goalDisplayMode = "simple",
+  showNutritionScore = true,
+  showHabitMission = false,
+  goalDisplayMode = "exact",
+  fitnessGoal,
   nutritionReport: providedNutritionReport,
   habitMission,
   habitStreakCount = 0,
@@ -1062,150 +801,230 @@ export function DashboardCommandCenter({
   onCompleteHabitMission,
   onToggleHabitReminders,
 }: DashboardCommandCenterProps) {
+  const router = useRouter();
   const styles = useMemo(() => getStyles(colors), [colors]);
-  const [scoreInfoVisible, setScoreInfoVisible] = useState(false);
   const today = useMemo(() => getTodayDay(days), [days]);
+  const [nutritionTimingNudge, setNutritionTimingNudge] =
+    useState<NutritionTimingNudge | null>(null);
   const nutritionReport = useMemo(
     () => providedNutritionReport || buildWeeklyNutritionReport(days),
     [days, providedNutritionReport]
   );
-  const nextAppointment = useMemo(() => getNextAppointment(appointments), [appointments]);
-  const appointmentLabel = nextAppointment ? formatAppointmentLabel(nextAppointment.appointment) : null;
-  const workoutInsightsUnlocked = isPremium;
-  const coachFeedUnlocked = true;
+  const openStepPermissions = onOpenStepPermissions || (() => onQuickAddAction('steps'));
+  const canCoachSteps = stepCounterReady ?? !showStepPermissionPrompt;
+  const goalPlan = isPremium ? "premium" : "free";
+  const rangesEnabled = isRangesGoalDisplayMode(goalDisplayMode);
+  const calorieTargetProgress = today ? getCalorieTargetProgress(today, goalDisplayMode, goalPlan) : null;
+  const hydrationTargetProgress = today ? getHydrationTargetProgress(today, goalDisplayMode, goalPlan) : null;
 
-  const freeStepBurnedCalories = today && !isPremium ? getFreeStepBurnedCalories(today) : 0;
-  const calorieProgress = today
-    ? Math.round(getCalorieScorePercent(today.achievedCalories, today.targetCalories))
-    : 0;
-  const hydrationProgress = today ? getSingleMetricProgress(getHydrationValue(today), today.targetHydration) : 0;
-  const workoutTarget = workoutInsightsUnlocked && today ? getBurnedCaloriesTarget(today) : 0;
-  const workoutCalories = workoutInsightsUnlocked && today ? getExerciseCaloriesBurned(today) : 0;
-  const workoutProgress = workoutInsightsUnlocked && workoutTarget > 0 ? getSingleMetricProgress(workoutCalories, workoutTarget) : 0;
-  const walkingTarget = isPremium && today ? getWalkingCaloriesTarget(today) : 0;
-  const walkingCalories = isPremium && today ? getWalkingCaloriesBurned(today) : 0;
-  const walkingProgress = isPremium && walkingTarget > 0 ? getSingleMetricProgress(walkingCalories, walkingTarget) : 0;
+  useEffect(() => {
+    let active = true;
+    const summary = buildNutritionGoalSummaryFromDay(today);
+
+    if (!summary) {
+      setNutritionTimingNudge(null);
+      return () => {
+        active = false;
+      };
+    }
+
+    buildNutritionProfile()
+      .then((profile) => {
+        if (!active) return;
+        setNutritionTimingNudge(buildNutritionTimingNudge(summary, profile));
+      })
+      .catch((error) => {
+        console.log('[DashboardCommandCenter] Nutrition timing nudge unavailable:', error);
+        if (active) setNutritionTimingNudge(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [
+    today,
+    today?._id,
+    today?.dayNo,
+    today?.date,
+    today?.achievedCalories,
+    today?.targetCalories,
+    today?.targetCaloriesMin,
+    today?.targetCaloriesMax,
+    today?.achieviedHydration,
+    today?.achievedHydration,
+    today?.targetHydration,
+    today?.calorieGoalDirection,
+    today?.hydrationRiskScore,
+    today?.nudgePriority,
+    today?.nudgeReason,
+  ]);
+
+  const calorieProgress = calorieTargetProgress?.percent ?? 0;
+  const hydrationProgress = hydrationTargetProgress?.percent ?? 0;
+  const workoutTarget = isPremium && today ? getBurnedCaloriesTarget(today) : 0;
+  const workoutCalories = isPremium && today ? getExerciseCaloriesBurned(today) : 0;
+  const workoutProgress = isPremium && workoutTarget > 0 ? getSingleMetricProgress(workoutCalories, workoutTarget) : 0;
   const rawSteps = today ? getDaySteps(today) : 0;
-  const stepsTarget = isPremium ? getDayStepGoal(today) : FREE_PLAN_LIMITS.dailyStepCounterPreview;
-  const displayedSteps = isPremium ? rawSteps : Math.min(rawSteps, FREE_PLAN_LIMITS.dailyStepCounterPreview);
+  const stepsTarget = getDayStepGoal(today);
+  const displayedSteps = rawSteps;
   const stepsProgress = getSingleMetricProgress(displayedSteps, stepsTarget);
-  const healthScore = today ? getDashboardHealthScore(today, isPremium) : null;
-  const overallProgress = healthScore?.score || 0;
-  const weeklyScoreTrend = useMemo(
-    () => getWeeklyHealthScoreTrend(days, isPremium),
-    [days, isPremium]
-  );
-  const streakCount = Number(streak?.streakCount || 0);
   const calorieTargetLabel = today
-    ? formatCalorieTarget(today, goalDisplayMode, isPremium ? "premium" : "free")
+    ? formatCalorieTarget(today, goalDisplayMode, goalPlan)
     : "0";
   const hydrationTargetLabel = today
-    ? formatHydrationTarget(today, goalDisplayMode, isPremium ? "premium" : "free")
+    ? formatHydrationTarget(today, goalDisplayMode, goalPlan)
     : "0";
-  const calorieMetricSubtitle = `${calorieProgress}% food | ${calorieTargetLabel} goal`;
-  const closeNudge = getCloseNudge({
-    hydrationProgress,
-    calorieProgress,
-    stepsProgress,
-    isPremium,
-  });
-  const dailyEncouragement = getDailyEncouragement({
-    today,
-    overallProgress,
-    hydrationProgress,
-    calorieProgress,
-    closeNudge,
-  });
-  const todayPlan = useMemo(
+  const calorieMetricSubtitle = rangesEnabled && calorieTargetProgress
+    ? `${calorieTargetProgress.statusLabel} | ${calorieTargetLabel} cal`
+    : `${calorieProgress}% food | ${calorieTargetLabel} goal`;
+  const hydrationMetricSubtitle = rangesEnabled && hydrationTargetProgress
+    ? `${hydrationTargetProgress.statusLabel} | ${hydrationTargetLabel}L`
+    : `${hydrationProgress}% | ${hydrationTargetLabel}L goal`;
+  const goalSpine = useMemo(
     () =>
-      buildTodayPlan({
+      buildGoalSpineSummary({
+        goal: fitnessGoal,
+        days,
         today,
-        isPremium,
-        selectedMood,
-        hydrationProgress,
-        calorieProgress,
-        stepsProgress,
-        workoutTarget,
-        workoutProgress,
-        overallProgress,
-      }),
-    [
-      calorieProgress,
-      hydrationProgress,
-      isPremium,
-      overallProgress,
-      selectedMood,
-      stepsProgress,
-      today,
-      workoutTarget,
-      workoutProgress,
-    ]
+        goalDisplayMode,
+        plan: goalPlan,
+        nutritionReport,
+    }),
+    [days, fitnessGoal, goalDisplayMode, goalPlan, nutritionReport, today]
   );
 
-  const scoreInfoTitle = isPremium ? 'Full Health Score' : 'Basic Score';
-  const freeScoreWeights = HEALTH_SCORE_WEIGHTS.free;
-  const premiumScoreWeights = HEALTH_SCORE_WEIGHTS.premium;
-  const scoreInfoRows = [
-    {
-      icon: 'pulse-outline' as IconName,
-      label: 'Current model',
-      text: getHealthScorePlanExplanation(isPremium),
-    },
-    {
-      icon: 'checkmark-circle-outline' as IconName,
-      label: 'Free weights',
-      text: `calories ${Math.round(freeScoreWeights.calories * 100)}%, hydration ${Math.round(freeScoreWeights.hydration * 100)}%, ${FREE_PLAN_LIMITS.dailyStepCounterPreview}-step preview ${Math.round(freeScoreWeights.stepsPreview * 100)}%`,
-    },
-    {
-      icon: 'diamond-outline' as IconName,
-      label: 'Premium weights',
-      text: `calories ${Math.round(premiumScoreWeights.calories * 100)}%, hydration ${Math.round(premiumScoreWeights.hydration * 100)}%, workouts ${Math.round(premiumScoreWeights.workout * 100)}%, walking/steps ${Math.round(premiumScoreWeights.walking * 100)}%`,
-    },
-    {
-      icon: 'swap-horizontal-outline' as IconName,
-      label: 'Why it changes',
-      text: getPremiumScoreChangeExplanation(),
-    },
-  ];
-  const scoreMetricRows = healthScore?.metrics.filter(
-    (metric) => metric.weight > 0 || metric.hasSignal || metric.hasTarget
-  ) || [];
-  const reliabilityCopy = getHealthScoreReliabilityCopy(healthScore);
-  const scoreInfoNote = isPremium
-    ? `${reliabilityCopy} Weekly trend: ${weeklyScoreTrend.label}. ${HEALTH_SCORE_DISCLAIMER}`
-    : `${reliabilityCopy} The Free model stays useful with a ${FREE_PLAN_LIMITS.dailyStepCounterPreview}-step preview. ${HEALTH_SCORE_DISCLAIMER}`;
+  const openGoalReview = () => {
+    router.push('/(main)/(goal-review)' as any);
+  };
 
-  const mainAction =
-    closeNudge
-      ? { label: closeNudge.label, icon: closeNudge.icon, action: closeNudge.action }
-      : hydrationProgress < 65
-      ? { label: 'Add Water', icon: 'water-outline' as IconName, action: 'water' as QuickAddAction }
-      : calorieProgress < 75
-        ? { label: 'Log Meal', icon: 'fast-food-outline' as IconName, action: 'meal' as QuickAddAction }
-        : workoutInsightsUnlocked && workoutTarget > 0
-          ? { label: 'Start Workout', icon: 'barbell-outline' as IconName, action: 'workout' as QuickAddAction }
-          : stepsProgress < 100
-            ? { label: 'Track Steps', icon: 'footsteps-outline' as IconName, action: 'steps' as QuickAddAction }
-            : { label: 'Reflect', icon: 'document-text-outline' as IconName, action: 'note' as QuickAddAction };
+  const handleGoalSpineAction = (action: GoalSpineAction) => {
+    if (action === 'goalReview') {
+      openGoalReview();
+      return;
+    }
+
+    onQuickAddAction(action as QuickAddAction);
+  };
+
+  const goalKey = goalSpine.goal.key;
+  const todayNutritionScore = nutritionReport.todayScore;
+  const mealCount = Math.max(
+    Array.isArray(today?.meals) ? today?.meals.length || 0 : 0,
+    Number(todayNutritionScore?.mealCount || 0),
+    getProgressValue(today?.achievedCalories) > 0 ? 1 : 0
+  );
+  const proteinGrams = Number(todayNutritionScore?.proteinGrams || 0);
+  const proteinTargetGrams = Number(todayNutritionScore?.proteinTargetGrams || 0);
+  const proteinValue = proteinGrams > 0
+    ? `${proteinGrams}/${proteinTargetGrams || '--'}g`
+    : 'Log protein';
+  const workoutValue = isPremium
+    ? workoutTarget > 0
+      ? `${workoutCalories}/${workoutTarget}`
+      : workoutCalories > 0
+        ? `${workoutCalories} kcal`
+        : 'Open plan'
+    : 'Premium';
+  const stepSubtitle = showStepPermissionPrompt
+    ? 'Enable Step Counter'
+    : canCoachSteps
+      ? `${stepsProgress}% of daily goal`
+      : 'Step signal unavailable';
+  const calorieMetric = {
+    id: 'calories',
+    icon: 'flame-outline' as IconName,
+    label: 'Calories',
+    value: `${Math.round(getProgressValue(today?.achievedCalories))} cal`,
+    color: CALORIE_COLOR,
+    subtitle: calorieMetricSubtitle,
+    onPress: () => onQuickAddAction('meal'),
+  };
+  const hydrationMetric = {
+    id: 'water',
+    icon: 'water-outline' as IconName,
+    label: 'Water',
+    value: `${getHydrationValue(today || {}).toFixed(1)}L`,
+    color: WATER_COLOR,
+    subtitle: hydrationMetricSubtitle,
+    onPress: () => onQuickAddAction('water'),
+  };
+  const stepMetric = {
+    id: 'steps',
+    icon: 'footsteps-outline' as IconName,
+    label: 'Steps',
+    value: `${formatStepCount(displayedSteps)}/${formatStepCount(stepsTarget)}`,
+    color: STEP_COLOR,
+    subtitle: stepSubtitle,
+    onPress: showStepPermissionPrompt ? openStepPermissions : () => onQuickAddAction('steps'),
+  };
+  const workoutMetric = {
+    id: 'workout',
+    icon: 'barbell-outline' as IconName,
+    label: 'Workout',
+    value: workoutValue,
+    color: WORKOUT_COLOR,
+    subtitle: isPremium ? `${workoutProgress}% workout signal` : 'Guided workout plan',
+    onPress: () => onQuickAddAction('workout'),
+  };
+  const proteinMetric = {
+    id: 'protein',
+    icon: 'nutrition-outline' as IconName,
+    label: 'Protein',
+    value: proteinValue,
+    color: '#16A34A',
+    subtitle: proteinGrams > 0 ? 'Fuel for muscle gain' : 'Add protein with a meal',
+    onPress: () => onQuickAddAction('meal'),
+  };
+  const mealMetric = {
+    id: 'meals',
+    icon: 'restaurant-outline' as IconName,
+    label: 'Meals',
+    value: `${mealCount} logged`,
+    color: '#0EA5E9',
+    subtitle: `${goalSpine.stats.mealConsistencyDays}/5 steady days`,
+    onPress: () => onQuickAddAction('meal'),
+  };
+  const coreMetrics =
+    goalKey === 'muscle_gain'
+      ? [proteinMetric, workoutMetric, calorieMetric]
+      : goalKey === 'weight_gain'
+        ? [calorieMetric, mealMetric, workoutMetric]
+        : [calorieMetric, hydrationMetric, stepMetric];
 
   const renderMetric = (
-    icon: IconName,
-    label: string,
-    value: string,
-    color: string,
-    subtitle?: string
-  ) => (
-    <View style={styles.metricCell}>
-      <View style={[styles.metricIcon, { backgroundColor: `${color}18` }]}>
-        <Ionicons name={icon} size={Math.min(hp(2.2), wp(4.9))} color={color} />
+    metric: {
+      id: string;
+      icon: IconName;
+      label: string;
+      value: string;
+      color: string;
+      subtitle?: string;
+      onPress?: () => void;
+    }
+  ) => {
+    const content = (
+      <>
+        <View style={[styles.metricIcon, { backgroundColor: `${metric.color}18` }]}>
+          <Ionicons name={metric.icon} size={Math.min(hp(2.2), wp(4.9))} color={metric.color} />
+        </View>
+        <View style={styles.metricTextWrap}>
+          <Text style={styles.metricLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.72}>{metric.label}</Text>
+          <Text style={styles.metricValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>{metric.value}</Text>
+          {metric.subtitle ? <Text style={styles.metricSubtitle}>{metric.subtitle}</Text> : null}
+        </View>
+      </>
+    );
+
+    return metric.onPress ? (
+      <AnimatedPressable key={metric.id} style={styles.metricCell} onPress={metric.onPress}>
+        {content}
+      </AnimatedPressable>
+    ) : (
+      <View key={metric.id} style={styles.metricCell}>
+        {content}
       </View>
-      <View style={styles.metricTextWrap}>
-        <Text style={styles.metricLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.72}>{label}</Text>
-        <Text style={styles.metricValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>{value}</Text>
-        {subtitle ? <Text style={styles.metricSubtitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.68}>{subtitle}</Text> : null}
-      </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <View style={styles.wrapper}>
@@ -1215,232 +1034,77 @@ export function DashboardCommandCenter({
             <Text style={styles.eyebrow}>Today</Text>
             <Text style={styles.title}>Command Center</Text>
           </View>
-          <AnimatedPressable style={styles.quickAddSmallButton} onPress={onOpenQuickAdd}>
-            <Ionicons name="add" size={Math.min(hp(2.4), wp(5.4))} color={colors.textOnPrimary} />
-            <Text style={styles.quickAddSmallText}>Quick Add</Text>
+        </View>
+
+        <View style={styles.goalHeaderCard}>
+          <View style={styles.goalHeaderTop}>
+            <View style={[styles.goalHeaderIcon, { backgroundColor: `${goalSpine.goal.color}18` }]}>
+              <Ionicons name={goalSpine.goal.icon as IconName} size={Math.min(hp(2.55), wp(5.7))} color={goalSpine.goal.color} />
+            </View>
+            <View style={styles.goalHeaderCopy}>
+              <Text style={styles.goalHeaderEyebrow}>Goal Summary</Text>
+              <Text style={styles.goalHeaderTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.72}>
+                {goalSpine.goal.label}
+              </Text>
+              <Text style={styles.goalHeaderBody}>
+                {goalSpine.dashboardMessage}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.goalNextActionCard}>
+          <View style={[styles.goalNextIcon, { backgroundColor: `${goalSpine.nextAction.color}18` }]}>
+            <Ionicons name={goalSpine.nextAction.icon as IconName} size={Math.min(hp(2.15), wp(4.85))} color={goalSpine.nextAction.color} />
+          </View>
+          <View style={styles.goalNextCopy}>
+            <Text style={styles.goalNextEyebrow}>Next action</Text>
+            <Text style={styles.goalNextTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.76}>
+              {goalSpine.nextAction.title}
+            </Text>
+            <Text style={styles.goalNextBody}>
+              {goalSpine.nextAction.body}
+            </Text>
+          </View>
+          <AnimatedPressable
+            style={styles.goalNextButton}
+            onPress={() => handleGoalSpineAction(goalSpine.nextAction.action)}
+            accessibilityRole="button"
+            accessibilityLabel={goalSpine.nextAction.actionLabel}
+          >
+            <Text style={styles.goalNextButtonText}>{goalSpine.nextAction.actionLabel}</Text>
           </AnimatedPressable>
         </View>
 
-        <View style={styles.heroRow}>
-          <View style={styles.scoreRingWrap}>
-            <ProgressRing
-              progress={overallProgress / 100}
-              size={Math.min(hp(13), wp(28))}
-              strokeWidth={Math.min(hp(1.2), wp(2.7))}
-              color={colors.primary}
-              trackColor={colors.cardBorder || colors.border}
-              icon="pulse-outline"
-              value={`${overallProgress}%`}
-              label={scoreInfoTitle}
-              textColor={colors.textPrimary}
-              mutedTextColor={colors.textSecondary}
-            />
-            <AnimatedPressable
-              style={styles.scoreInfoButton}
-              onPress={() => setScoreInfoVisible(true)}
-              accessibilityRole="button"
-              accessibilityLabel={`Score explained for ${scoreInfoTitle}`}
-            >
-              <Ionicons
-                name="information-circle-outline"
-                size={Math.min(hp(2.35), wp(5.2))}
-                color={colors.primary}
-              />
-            </AnimatedPressable>
+        <View style={styles.coreMetricsCard}>
+          <View style={styles.commandSectionHeader}>
+            <Text style={styles.commandSectionEyebrow}>Today's Core Metrics</Text>
+            <Text style={styles.commandSectionTitle}>{goalSpine.goal.shortLabel} signals</Text>
           </View>
-          <View style={styles.heroCopy}>
-            <Text style={styles.heroTitle} numberOfLines={2}>
-              {today ? `Day ${today.dayNo} is active` : 'Start today strong'}
-            </Text>
-            <Text style={styles.heroMessage}>
-              {dailyEncouragement}
-            </Text>
-            <Text style={styles.scoreSignalText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.72}>
-              {healthScore?.confidenceLabel || 'Needs more logs'} | {weeklyScoreTrend.label}
-            </Text>
-            <AnimatedPressable
-              style={styles.mainActionButton}
-              onPress={() => onQuickAddAction(mainAction.action)}
-            >
-              <Ionicons name={mainAction.icon} size={Math.min(hp(2.25), wp(5))} color={colors.textOnPrimary} />
-              <Text style={styles.mainActionText}>{mainAction.label}</Text>
-            </AnimatedPressable>
+          <View style={styles.metricGrid}>
+            {coreMetrics.map(renderMetric)}
           </View>
         </View>
-
-        <View style={styles.todayPlanCard}>
-          <View style={styles.todayPlanHeader}>
-            <View>
-              <Text style={styles.todayPlanEyebrow}>Smart Plan</Text>
-              <Text style={styles.todayPlanTitle}>Next 3 moves</Text>
-            </View>
-            <View style={styles.todayPlanBadge}>
-              <Ionicons name="bulb-outline" size={Math.min(hp(1.7), wp(3.8))} color={colors.primary} />
-              <Text style={styles.todayPlanBadgeText}>{isPremium ? 'Full context' : 'Core context'}</Text>
-            </View>
-          </View>
-
-          <View style={styles.todayPlanList}>
-            {todayPlan.map((item) => (
-              <AnimatedPressable
-                key={item.id}
-                style={styles.todayPlanItem}
-                onPress={() => onQuickAddAction(item.action)}
-              >
-                <View style={styles.todayPlanLeft}>
-                  <View style={[styles.todayPlanIcon, { backgroundColor: `${item.color}18` }]}>
-                    <Ionicons name={item.icon} size={Math.min(hp(2.05), wp(4.6))} color={item.color} />
-                  </View>
-                  <View style={styles.todayPlanCopy}>
-                    <View style={styles.todayPlanTitleRow}>
-                      <Text style={styles.todayPlanStep}>{item.label}</Text>
-                      <Text style={styles.todayPlanItemTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.78}>
-                        {item.title}
-                      </Text>
-                    </View>
-                    <Text style={styles.todayPlanBody} numberOfLines={2}>
-                      {item.body}
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.todayPlanRight}>
-                  <Text style={styles.todayPlanProgress} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.72}>
-                    {item.progressLabel}
-                  </Text>
-                  <View style={styles.todayPlanActionPill}>
-                    <Text style={styles.todayPlanActionText}>{item.actionLabel}</Text>
-                  </View>
-                </View>
-              </AnimatedPressable>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.metricGrid}>
-          {workoutInsightsUnlocked ? renderMetric(
-            'barbell-outline',
-            'Workout',
-            workoutTarget > 0 ? `${workoutCalories}/${workoutTarget}` : 'Open plan',
-            WORKOUT_COLOR,
-            workoutTarget > 0 ? `${workoutProgress}% burned` : 'Today'
-          ) : null}
-          {isPremium ? renderMetric(
-            'footsteps-outline',
-            'Walking',
-            walkingTarget > 0 ? `${walkingCalories}/${walkingTarget}` : String(walkingCalories),
-            STEP_COLOR,
-            walkingTarget > 0 ? `${walkingProgress}% burned` : 'Today'
-          ) : null}
-          {renderMetric(
-            'footsteps-outline',
-            isPremium ? 'Steps' : 'Steps Preview',
-            `${formatStepCount(displayedSteps)}/${formatStepCount(stepsTarget)}`,
-            STEP_COLOR,
-            isPremium ? `${stepsProgress}% of daily goal` : `${freeStepBurnedCalories} kcal burned`
-          )}
-          {renderMetric('flame-outline', 'Calories', `${Math.round(getProgressValue(today?.achievedCalories))}`, CALORIE_COLOR, `Manual log | ${calorieMetricSubtitle}`)}
-          {renderMetric('water-outline', 'Water', `${getHydrationValue(today || {}).toFixed(1)}L`, WATER_COLOR, `Manual log | ${hydrationProgress}% | ${hydrationTargetLabel}L goal`)}
-          {renderMetric('calendar-outline', 'Next appointment', appointmentLabel?.title || 'None', APPOINTMENT_COLOR, appointmentLabel?.subtitle || 'Book when ready')}
-          {renderMetric('chatbubbles-outline', 'Chat alerts', chatAlertCount > 0 ? String(chatAlertCount) : '0', CHAT_COLOR, chatAlertCount > 0 ? 'Unread messages' : 'All caught up')}
-          {renderMetric('flame', 'Streak', `${streakCount} day${streakCount === 1 ? '' : 's'}`, colors.warning || '#F59E0B', `${Number(streak?.longestStreak || 0)} best`)}
-        </View>
-
-        <View style={styles.sourceRow}>
-          {DASHBOARD_DATA_SOURCE_LABELS.map((source) => (
-            <View key={source.key} style={styles.sourceChip}>
-              <Ionicons
-                name={
-                  source.key === 'manualLog'
-                    ? 'create-outline'
-                    : source.key === 'pedometer'
-                      ? 'phone-portrait-outline'
-                      : 'time-outline'
-                }
-                size={Math.min(hp(1.45), wp(3.3))}
-                color={colors.primary}
-              />
-              <Text style={styles.sourceText}>{source.label}</Text>
-            </View>
-          ))}
-        </View>
-        <Text style={styles.disclaimerText}>{HEALTH_SCORE_DISCLAIMER}</Text>
       </View>
 
-      <Modal
-        visible={scoreInfoVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setScoreInfoVisible(false)}
-      >
-        <Pressable style={styles.scoreInfoBackdrop} onPress={() => setScoreInfoVisible(false)}>
-          <Pressable style={styles.scoreInfoCard} onPress={(event) => event.stopPropagation()}>
-            <View style={styles.scoreInfoHeader}>
-              <View style={styles.scoreInfoIcon}>
-                <Ionicons name="pulse-outline" size={Math.min(hp(2.5), wp(5.5))} color={colors.primary} />
-              </View>
-              <View style={styles.scoreInfoTitleWrap}>
-                <Text style={styles.scoreInfoEyebrow}>{scoreInfoTitle}</Text>
-                <Text style={styles.scoreInfoTitle}>Score explained</Text>
-              </View>
-              <AnimatedPressable
-                style={styles.scoreInfoClose}
-                onPress={() => setScoreInfoVisible(false)}
-                accessibilityRole="button"
-                accessibilityLabel="Close score explanation"
-              >
-                <Ionicons name="close" size={Math.min(hp(2.35), wp(5.2))} color={colors.textPrimary} />
-              </AnimatedPressable>
-            </View>
+      {showNutritionScore ? (
+        <NutritionScoreCard
+          report={nutritionReport}
+          colors={colors}
+          isPremium={isPremium}
+          onAction={onQuickAddAction}
+        />
+      ) : null}
 
-            <View style={styles.scoreInfoRows}>
-              {scoreInfoRows.map((row) => (
-                <View key={row.label} style={styles.scoreInfoRow}>
-                  <View style={styles.scoreInfoRowIcon}>
-                    <Ionicons name={row.icon} size={Math.min(hp(2.1), wp(4.7))} color={colors.primary} />
-                  </View>
-                  <View style={styles.scoreInfoRowTextWrap}>
-                    <Text style={styles.scoreInfoRowLabel}>{row.label}</Text>
-                    <Text style={styles.scoreInfoRowText}>{row.text}</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
+      {nutritionTimingNudge ? (
+        <NutritionTimingNudgeCard
+          nudge={nutritionTimingNudge}
+          colors={colors}
+          onAction={onQuickAddAction}
+        />
+      ) : null}
 
-            {scoreMetricRows.length ? (
-              <View style={styles.scoreMetricSection}>
-                <Text style={styles.scoreMetricHeader}>Today's inputs</Text>
-                {scoreMetricRows.map((metric) => (
-                  <View key={metric.key} style={styles.scoreMetricRow}>
-                    <View style={styles.scoreMetricTop}>
-                      <View style={styles.scoreMetricTitleWrap}>
-                        <Ionicons name={getScoreMetricIcon(metric)} size={Math.min(hp(1.9), wp(4.2))} color={colors.primary} />
-                        <Text style={styles.scoreMetricLabel}>{metric.label}</Text>
-                      </View>
-                      <View style={styles.scoreMetricPill}>
-                        <Text style={styles.scoreMetricPillText}>{metric.sourceLabel}</Text>
-                      </View>
-                    </View>
-                    <Text style={styles.scoreMetricBody}>
-                      {formatScoreMetricAmount(metric)} | {getHealthScoreMetricStatus(metric)} | weight {metric.weightPercent}% | contribution {Math.round(metric.contribution)}%
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            ) : null}
-
-            <Text style={styles.scoreInfoNote}>{scoreInfoNote}</Text>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      <NutritionScoreCard
-        report={nutritionReport}
-        colors={colors}
-        isPremium={isPremium}
-        onAction={onQuickAddAction}
-      />
-
-      {coachFeedUnlocked && habitMission ? (
+      {showHabitMission && habitMission ? (
         <HabitMissionCard
           mission={habitMission}
           streakCount={habitStreakCount}
@@ -1547,6 +1211,10 @@ export function DashboardWeeklyHealthReport({
   colors,
   nutritionReport: providedNutritionReport,
   embedded = false,
+  eyebrow = 'Nutrition',
+  title = 'Weekly Diet Report',
+  onOpenAnalytics,
+  onOpenCharts,
 }: {
   days: DashboardDay[];
   appointments: any[];
@@ -1554,9 +1222,12 @@ export function DashboardWeeklyHealthReport({
   colors: any;
   nutritionReport?: WeeklyNutritionReport | null;
   embedded?: boolean;
+  eyebrow?: string;
+  title?: string;
+  onOpenAnalytics?: () => void;
+  onOpenCharts?: () => void;
 }) {
   const styles = useMemo(() => getStyles(colors), [colors]);
-  const router = useRouter();
   const nutritionReport = useMemo(
     () => providedNutritionReport || buildWeeklyNutritionReport(days),
     [days, providedNutritionReport]
@@ -1569,9 +1240,7 @@ export function DashboardWeeklyHealthReport({
       }).length,
     [appointments]
   );
-  const reportItems = buildNutritionReportItems(nutritionReport).filter((item) =>
-    isPremium || ['Weekly score', 'Hydration', 'Calories'].includes(item.label)
-  );
+  const reportItems = buildNutritionReportItems(nutritionReport);
   const hasReportData = nutritionReport.dailyScores.length > 0;
   const weeklyReportCopy = getWeeklyReportCopy(nutritionReport, isPremium, activeAppointments);
 
@@ -1598,17 +1267,19 @@ export function DashboardWeeklyHealthReport({
       <View style={styles.reportCard}>
         <View style={styles.sectionHeader}>
           <View>
-            <Text style={styles.eyebrow}>Nutrition</Text>
-            <Text style={styles.title}>Weekly Diet Report</Text>
+            <Text style={styles.eyebrow}>{eyebrow}</Text>
+            <Text style={styles.title}>{title}</Text>
           </View>
-          <AnimatedPressable style={styles.shareButton} onPress={shareWeeklyReport}>
-            <Ionicons
-              name={isPremium ? "share-social-outline" : "lock-closed-outline"}
-              size={Math.min(hp(2.1), wp(4.8))}
-              color={colors.primary}
-            />
-            <Text style={styles.shareText}>{isPremium ? 'Share' : 'Premium'}</Text>
-          </AnimatedPressable>
+          <View style={styles.reportHeaderActions}>
+            <AnimatedPressable style={styles.shareButton} onPress={shareWeeklyReport}>
+              <Ionicons
+                name={isPremium ? "share-social-outline" : "lock-closed-outline"}
+                size={Math.min(hp(2.1), wp(4.8))}
+                color={colors.primary}
+              />
+              <Text style={styles.shareText}>{isPremium ? 'Share' : 'Premium'}</Text>
+            </AnimatedPressable>
+          </View>
         </View>
         <View style={styles.reportGrid}>
           {hasReportData ? (
@@ -1627,39 +1298,55 @@ export function DashboardWeeklyHealthReport({
             </View>
           )}
         </View>
-        <View style={[styles.reportFocusBox, (!hasReportData || !isPremium) && styles.reportFocusBoxMuted]}>
+        <View style={[styles.reportFocusBox, !hasReportData && styles.reportFocusBoxMuted]}>
           <View style={[styles.reportFocusIcon, { backgroundColor: `${colors.primary}16` }]}>
             <Ionicons
-              name={isPremium ? "compass-outline" : "lock-closed-outline"}
+              name="compass-outline"
               size={Math.min(hp(2.4), wp(5.4))}
               color={colors.primary}
             />
           </View>
           <View style={styles.reportFocusTextWrap}>
-            <Text style={styles.reportFocusTitle}>{isPremium ? 'Next week focus' : 'Premium report insights'}</Text>
+            <Text style={styles.reportFocusTitle}>Next week focus</Text>
             <Text style={styles.reportFocusBody}>
-              {isPremium
-                ? `${weeklyReportCopy} ${nutritionReport.nextWeekFocus.body}`
-                : `${weeklyReportCopy} Premium adds deeper nutrition insights and report export.`}
+              {`${weeklyReportCopy} ${nutritionReport.nextWeekFocus.body}`}
             </Text>
           </View>
         </View>
-        <View style={styles.reportActionRow}>
-          <AnimatedPressable
-            style={styles.reportSecondaryButton}
-            onPress={() => router.push('/(main)/(weekly-insights)' as any)}
-          >
-            <Ionicons name="analytics-outline" size={Math.min(hp(2), wp(4.5))} color={colors.primary} />
-            <Text style={styles.reportSecondaryText}>Insights</Text>
-          </AnimatedPressable>
-          <AnimatedPressable
-            style={styles.reportPrimaryButton}
-            onPress={() => router.push('/(main)/(doctor-report)' as any)}
-          >
-            <Ionicons name="document-text-outline" size={Math.min(hp(2), wp(4.5))} color={colors.textOnPrimary} />
-            <Text style={styles.reportPrimaryText}>Doctor Report</Text>
-          </AnimatedPressable>
-        </View>
+        {onOpenAnalytics || onOpenCharts ? (
+          <View style={styles.analyticsActionRow}>
+            {onOpenAnalytics ? (
+              <AnimatedPressable
+                style={styles.analyticsActionButton}
+                onPress={onOpenAnalytics}
+                accessibilityRole="button"
+                accessibilityLabel="Open dashboard analytics"
+              >
+                <Ionicons
+                  name="analytics-outline"
+                  size={Math.min(hp(2), wp(4.5))}
+                  color={colors.primary}
+                />
+                <Text style={styles.analyticsActionText} numberOfLines={1}>Analytics</Text>
+              </AnimatedPressable>
+            ) : null}
+            {onOpenCharts ? (
+              <AnimatedPressable
+                style={styles.analyticsActionButton}
+                onPress={onOpenCharts}
+                accessibilityRole="button"
+                accessibilityLabel="Open dashboard charts"
+              >
+                <Ionicons
+                  name="bar-chart-outline"
+                  size={Math.min(hp(2), wp(4.5))}
+                  color={colors.primary}
+                />
+                <Text style={styles.analyticsActionText} numberOfLines={1}>View Charts</Text>
+              </AnimatedPressable>
+            ) : null}
+          </View>
+        ) : null}
       </View>
     </View>
   );
@@ -1670,16 +1357,21 @@ export function QuickAddBottomSheet({
   colors,
   selectedMood,
   isPremium = false,
+  actions,
+  showMoodAction = true,
   onClose,
   onSelectMood,
   onAction,
 }: QuickAddBottomSheetProps) {
   const styles = useMemo(() => getStyles(colors), [colors]);
   const [showMoodPicker, setShowMoodPicker] = useState(false);
-  const visibleQuickActions = useMemo(
-    () => quickActions.filter((action) => isPremium || action.id !== 'workout'),
-    [isPremium]
-  );
+  const visibleQuickActions = useMemo(() => {
+    if (!actions?.length) return quickActions;
+
+    return actions
+      .map((actionId) => quickActions.find((action) => action.id === actionId))
+      .filter((action): action is (typeof quickActions)[number] => Boolean(action));
+  }, [actions]);
 
   useEffect(() => {
     if (!visible) {
@@ -1693,6 +1385,7 @@ export function QuickAddBottomSheet({
       return;
     }
 
+    onClose();
     onAction(action);
   };
 
@@ -1712,29 +1405,38 @@ export function QuickAddBottomSheet({
           </View>
 
           <View style={styles.quickGrid}>
-            {visibleQuickActions.map((action) => (
-              <AnimatedPressable
-                key={action.id}
-                style={styles.quickAction}
-                onPress={() => handleAction(action.id)}
-              >
-                <View style={[styles.quickActionIcon, { backgroundColor: `${action.color}18` }]}>
-                  <Ionicons name={action.icon} size={Math.min(hp(2.8), wp(6))} color={action.color} />
-                </View>
-                <Text style={styles.quickActionLabel} numberOfLines={1}>{action.label}</Text>
-                <Text style={styles.quickActionSubtitle} numberOfLines={1}>{action.subtitle}</Text>
-              </AnimatedPressable>
-            ))}
+            {visibleQuickActions.map((action) => {
+              const isLockedPremiumAction = Boolean(action.premiumOnly && !isPremium);
 
-            <AnimatedPressable style={styles.quickAction} onPress={() => handleAction('mood')}>
-              <View style={[styles.quickActionIcon, { backgroundColor: `${colors.warning || '#F59E0B'}18` }]}>
-                <Ionicons name="happy-outline" size={Math.min(hp(2.8), wp(6))} color={colors.warning || '#F59E0B'} />
-              </View>
-              <Text style={styles.quickActionLabel} numberOfLines={1}>Mood</Text>
-              <Text style={styles.quickActionSubtitle} numberOfLines={1}>
-                {selectedMood ? moodOptions.find((mood) => mood.id === selectedMood)?.label : 'Readiness'}
-              </Text>
-            </AnimatedPressable>
+              return (
+                <AnimatedPressable
+                  key={action.id}
+                  style={[
+                    styles.quickAction,
+                    isLockedPremiumAction && styles.quickActionLocked,
+                  ]}
+                  onPress={() => handleAction(action.id)}
+                >
+                  <View style={[styles.quickActionIcon, { backgroundColor: `${action.color}18` }]}>
+                    <Ionicons name={action.icon} size={Math.min(hp(2.8), wp(6))} color={action.color} />
+                  </View>
+                  <Text style={styles.quickActionLabel} numberOfLines={1}>{action.label}</Text>
+                  <Text style={styles.quickActionSubtitle} numberOfLines={1}>{action.subtitle}</Text>
+                </AnimatedPressable>
+              );
+            })}
+
+            {showMoodAction ? (
+              <AnimatedPressable style={styles.quickAction} onPress={() => handleAction('mood')}>
+                <View style={[styles.quickActionIcon, { backgroundColor: `${colors.warning || '#F59E0B'}18` }]}>
+                  <Ionicons name="happy-outline" size={Math.min(hp(2.8), wp(6))} color={colors.warning || '#F59E0B'} />
+                </View>
+                <Text style={styles.quickActionLabel} numberOfLines={1}>Mood</Text>
+                <Text style={styles.quickActionSubtitle} numberOfLines={1}>
+                  {selectedMood ? moodOptions.find((mood) => mood.id === selectedMood)?.label : 'Readiness'}
+                </Text>
+              </AnimatedPressable>
+            ) : null}
           </View>
 
           {showMoodPicker ? (
@@ -1803,224 +1505,141 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontWeight: '900',
     marginTop: hp(0.2),
   },
-  quickAddSmallButton: {
-    minHeight: hp(4.3),
-    borderRadius: hp(1.4),
-    paddingHorizontal: wp(3.2),
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: wp(1.3),
-    backgroundColor: colors.primary,
-  },
-  quickAddSmallText: {
-    color: colors.textOnPrimary,
-    fontSize: Math.min(hp(1.35), wp(3.2)),
-    fontWeight: '900',
-  },
-  heroRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: wp(4),
-    marginTop: hp(2),
-  },
-  scoreRingWrap: {
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scoreInfoButton: {
-    position: 'absolute',
-    right: -wp(0.8),
-    top: -hp(0.5),
-    width: Math.min(hp(3.6), wp(8)),
-    height: Math.min(hp(3.6), wp(8)),
-    borderRadius: Math.min(hp(1.8), wp(4)),
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.cardBackground,
+  goalHeaderCard: {
+    marginTop: hp(1.35),
+    borderRadius: hp(1.45),
     borderWidth: Math.min(wp(0.24), hp(0.14)),
-    borderColor: `${colors.primary}35`,
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: hp(0.25) },
-    shadowOpacity: 0.1,
-    shadowRadius: wp(1.6),
-    elevation: 3,
-  },
-  heroCopy: {
-    flex: 1,
-  },
-  heroTitle: {
-    color: colors.textPrimary,
-    fontSize: Math.min(hp(2.1), wp(4.8)),
-    fontWeight: '900',
-  },
-  heroMessage: {
-    color: colors.textSecondary,
-    fontSize: Math.min(hp(1.42), wp(3.35)),
-    lineHeight: hp(2.05),
-    fontWeight: '700',
-    marginTop: hp(0.7),
-  },
-  scoreSignalText: {
-    color: colors.primary,
-    fontSize: Math.min(hp(1.16), wp(2.75)),
-    lineHeight: hp(1.55),
-    fontWeight: '900',
-    marginTop: hp(0.55),
-  },
-  mainActionButton: {
-    alignSelf: 'flex-start',
-    minHeight: hp(4.7),
-    borderRadius: hp(1.5),
-    paddingHorizontal: wp(4),
-    marginTop: hp(1.3),
-    backgroundColor: colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: wp(1.6),
-  },
-  mainActionText: {
-    color: colors.textOnPrimary,
-    fontSize: Math.min(hp(1.45), wp(3.45)),
-    fontWeight: '900',
-  },
-  todayPlanCard: {
-    marginTop: hp(1.8),
-    borderRadius: hp(1.6),
-    borderWidth: Math.min(wp(0.28), hp(0.16)),
-    borderColor: colors.cardBorder || colors.border,
-    backgroundColor: colors.surface || colors.cardBackground,
+    borderColor: `${colors.primary}28`,
+    backgroundColor: `${colors.primary}07`,
     paddingHorizontal: wp(3),
-    paddingVertical: hp(1.2),
+    paddingVertical: hp(1.15),
+    gap: hp(1),
   },
-  todayPlanHeader: {
+  goalHeaderTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: wp(2),
-    marginBottom: hp(0.8),
+    gap: wp(2.2),
   },
-  todayPlanEyebrow: {
-    color: colors.textSecondary,
-    fontSize: Math.min(hp(1.05), wp(2.55)),
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  todayPlanTitle: {
-    color: colors.textPrimary,
-    fontSize: Math.min(hp(1.65), wp(3.85)),
-    fontWeight: '900',
-    marginTop: hp(0.12),
-  },
-  todayPlanBadge: {
-    minHeight: hp(2.8),
-    borderRadius: hp(1.4),
-    paddingHorizontal: wp(2),
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: wp(0.8),
-    backgroundColor: `${colors.primary}0D`,
-  },
-  todayPlanBadgeText: {
-    color: colors.primary,
-    fontSize: Math.min(hp(1.05), wp(2.55)),
-    fontWeight: '900',
-  },
-  todayPlanList: {
-    gap: hp(0.75),
-  },
-  todayPlanItem: {
-    minHeight: hp(7.2),
-    borderRadius: hp(1.35),
-    borderWidth: Math.min(wp(0.2), hp(0.12)),
-    borderColor: colors.cardBorder || colors.border,
-    backgroundColor: colors.cardBackground,
-    paddingHorizontal: wp(2.3),
-    paddingVertical: hp(0.75),
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: wp(2),
-  },
-  todayPlanLeft: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: wp(2),
-  },
-  todayPlanIcon: {
-    width: Math.min(hp(4), wp(8.8)),
-    height: Math.min(hp(4), wp(8.8)),
-    borderRadius: Math.min(hp(2), wp(4.4)),
+  goalHeaderIcon: {
+    width: Math.min(hp(4.8), wp(10.5)),
+    height: Math.min(hp(4.8), wp(10.5)),
+    borderRadius: Math.min(hp(2.4), wp(5.25)),
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
-  todayPlanCopy: {
+  goalHeaderCopy: {
     flex: 1,
     minWidth: 0,
   },
-  todayPlanTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: wp(1.2),
-  },
-  todayPlanStep: {
-    color: colors.primary,
-    fontSize: Math.min(hp(1.03), wp(2.45)),
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  todayPlanItemTitle: {
-    flex: 1,
-    minWidth: 0,
-    color: colors.textPrimary,
-    fontSize: Math.min(hp(1.32), wp(3.15)),
-    fontWeight: '900',
-  },
-  todayPlanBody: {
-    color: colors.textSecondary,
-    fontSize: Math.min(hp(1.1), wp(2.65)),
-    lineHeight: hp(1.55),
-    fontWeight: '700',
-    marginTop: hp(0.2),
-  },
-  todayPlanRight: {
-    width: wp(21),
-    alignItems: 'flex-end',
-    gap: hp(0.45),
-  },
-  todayPlanProgress: {
-    width: '100%',
-    color: colors.textTertiary || colors.textSecondary,
-    fontSize: Math.min(hp(1), wp(2.4)),
-    fontWeight: '900',
-    textAlign: 'right',
-  },
-  todayPlanActionPill: {
-    minHeight: hp(2.6),
-    borderRadius: hp(1.3),
-    paddingHorizontal: wp(2),
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: `${colors.primary}12`,
-  },
-  todayPlanActionText: {
+  goalHeaderEyebrow: {
     color: colors.primary,
     fontSize: Math.min(hp(1.02), wp(2.45)),
     fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  goalHeaderTitle: {
+    color: colors.textPrimary,
+    fontSize: Math.min(hp(1.8), wp(4.15)),
+    fontWeight: '900',
+    marginTop: hp(0.1),
+  },
+  goalHeaderBody: {
+    color: colors.textSecondary,
+    fontSize: Math.min(hp(1.08), wp(2.6)),
+    lineHeight: hp(1.55),
+    fontWeight: '700',
+    marginTop: hp(0.25),
+  },
+  goalNextActionCard: {
+    marginTop: hp(1.35),
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: wp(2),
+    borderRadius: hp(1.45),
+    borderWidth: Math.min(wp(0.24), hp(0.14)),
+    borderColor: `${colors.primary}25`,
+    backgroundColor: colors.surface || colors.cardBackground,
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(1.05),
+  },
+  goalNextIcon: {
+    width: Math.min(hp(4.1), wp(9)),
+    height: Math.min(hp(4.1), wp(9)),
+    borderRadius: Math.min(hp(2.05), wp(4.5)),
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  goalNextCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  goalNextTitle: {
+    color: colors.textPrimary,
+    fontSize: Math.min(hp(1.35), wp(3.2)),
+    fontWeight: '900',
+  },
+  goalNextEyebrow: {
+    color: colors.primary,
+    fontSize: Math.min(hp(0.96), wp(2.3)),
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    marginBottom: hp(0.12),
+  },
+  goalNextBody: {
+    color: colors.textSecondary,
+    fontSize: Math.min(hp(1.05), wp(2.5)),
+    lineHeight: hp(1.5),
+    fontWeight: '700',
+    marginTop: hp(0.18),
+  },
+  goalNextButton: {
+    minHeight: hp(3.3),
+    borderRadius: hp(1.15),
+    paddingHorizontal: wp(2.4),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    flexShrink: 0,
+  },
+  goalNextButtonText: {
+    color: colors.textOnPrimary,
+    fontSize: Math.min(hp(1.05), wp(2.55)),
+    fontWeight: '900',
+  },
+  commandSectionHeader: {
+    gap: hp(0.12),
+  },
+  commandSectionEyebrow: {
+    color: colors.textSecondary,
+    fontSize: Math.min(hp(1), wp(2.4)),
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  commandSectionTitle: {
+    color: colors.textPrimary,
+    fontSize: Math.min(hp(1.45), wp(3.45)),
+    fontWeight: '900',
+  },
+  coreMetricsCard: {
+    marginTop: hp(1.35),
+    borderRadius: hp(1.45),
+    borderWidth: Math.min(wp(0.24), hp(0.14)),
+    borderColor: colors.cardBorder || colors.border,
+    backgroundColor: colors.cardBackground,
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(1.1),
   },
   metricGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: wp(2.5),
-    marginTop: hp(2),
+    marginTop: hp(1),
   },
   metricCell: {
     width: '48%',
-    minHeight: hp(8),
+    minHeight: hp(8.8),
     borderRadius: hp(1.4),
     borderWidth: Math.min(wp(0.28), hp(0.16)),
     borderColor: colors.cardBorder || colors.border,
@@ -2028,7 +1647,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     paddingHorizontal: wp(2.7),
     paddingVertical: hp(1),
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: wp(2),
   },
   metricIcon: {
@@ -2056,198 +1675,9 @@ const getStyles = (colors: any) => StyleSheet.create({
   metricSubtitle: {
     color: colors.textTertiary || colors.textSecondary,
     fontSize: Math.min(hp(1.08), wp(2.55)),
+    lineHeight: hp(1.48),
     fontWeight: '700',
     marginTop: hp(0.15),
-  },
-  sourceRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: wp(1.5),
-    marginTop: hp(1.45),
-  },
-  sourceChip: {
-    minHeight: hp(3),
-    borderRadius: hp(1.5),
-    paddingHorizontal: wp(2.2),
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: wp(0.9),
-    backgroundColor: `${colors.primary}0D`,
-    borderWidth: Math.min(wp(0.2), hp(0.1)),
-    borderColor: `${colors.primary}20`,
-  },
-  sourceText: {
-    color: colors.textSecondary,
-    fontSize: Math.min(hp(1.08), wp(2.55)),
-    fontWeight: '900',
-  },
-  disclaimerText: {
-    color: colors.textTertiary || colors.textSecondary,
-    fontSize: Math.min(hp(1.05), wp(2.5)),
-    lineHeight: hp(1.55),
-    fontWeight: '700',
-    marginTop: hp(1),
-  },
-  scoreInfoBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: wp(5),
-  },
-  scoreInfoCard: {
-    width: '100%',
-    maxWidth: wp(92),
-    borderRadius: hp(2),
-    backgroundColor: colors.cardBackground,
-    borderWidth: Math.min(wp(0.28), hp(0.16)),
-    borderColor: colors.cardBorder || colors.border,
-    padding: wp(4),
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: hp(0.8) },
-    shadowOpacity: 0.18,
-    shadowRadius: wp(4),
-    elevation: 8,
-  },
-  scoreInfoHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: wp(2.6),
-    marginBottom: hp(1.6),
-  },
-  scoreInfoIcon: {
-    width: Math.min(hp(4.8), wp(10.6)),
-    height: Math.min(hp(4.8), wp(10.6)),
-    borderRadius: Math.min(hp(2.4), wp(5.3)),
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: `${colors.primary}14`,
-  },
-  scoreInfoTitleWrap: {
-    flex: 1,
-    minWidth: 0,
-  },
-  scoreInfoEyebrow: {
-    color: colors.textSecondary,
-    fontSize: Math.min(hp(1.12), wp(2.7)),
-    fontWeight: '900',
-    textTransform: 'uppercase',
-  },
-  scoreInfoTitle: {
-    color: colors.textPrimary,
-    fontSize: Math.min(hp(2.15), wp(4.9)),
-    fontWeight: '900',
-    marginTop: hp(0.15),
-  },
-  scoreInfoClose: {
-    width: Math.min(hp(4), wp(9)),
-    height: Math.min(hp(4), wp(9)),
-    borderRadius: Math.min(hp(2), wp(4.5)),
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surface || colors.background,
-  },
-  scoreInfoRows: {
-    gap: hp(1),
-  },
-  scoreInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: wp(2.5),
-    paddingVertical: hp(0.9),
-    borderTopWidth: Math.min(wp(0.2), hp(0.12)),
-    borderTopColor: colors.cardBorder || colors.border,
-  },
-  scoreInfoRowIcon: {
-    width: Math.min(hp(3.8), wp(8.5)),
-    height: Math.min(hp(3.8), wp(8.5)),
-    borderRadius: Math.min(hp(1.9), wp(4.25)),
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: `${colors.primary}10`,
-  },
-  scoreInfoRowTextWrap: {
-    flex: 1,
-    minWidth: 0,
-  },
-  scoreInfoRowLabel: {
-    color: colors.textPrimary,
-    fontSize: Math.min(hp(1.42), wp(3.35)),
-    fontWeight: '900',
-  },
-  scoreInfoRowText: {
-    color: colors.textSecondary,
-    fontSize: Math.min(hp(1.18), wp(2.8)),
-    lineHeight: hp(1.75),
-    fontWeight: '700',
-    marginTop: hp(0.25),
-  },
-  scoreMetricSection: {
-    marginTop: hp(1.1),
-    paddingTop: hp(1.1),
-    borderTopWidth: Math.min(wp(0.2), hp(0.12)),
-    borderTopColor: colors.cardBorder || colors.border,
-    gap: hp(0.8),
-  },
-  scoreMetricHeader: {
-    color: colors.textPrimary,
-    fontSize: Math.min(hp(1.28), wp(3.05)),
-    fontWeight: '900',
-  },
-  scoreMetricRow: {
-    borderRadius: hp(1.2),
-    backgroundColor: `${colors.primary}08`,
-    borderWidth: Math.min(wp(0.2), hp(0.12)),
-    borderColor: colors.cardBorder || colors.border,
-    paddingHorizontal: wp(2.4),
-    paddingVertical: hp(0.85),
-  },
-  scoreMetricTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: wp(2),
-  },
-  scoreMetricTitleWrap: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: wp(1.5),
-  },
-  scoreMetricLabel: {
-    color: colors.textPrimary,
-    fontSize: Math.min(hp(1.25), wp(3)),
-    fontWeight: '900',
-  },
-  scoreMetricPill: {
-    borderRadius: hp(1),
-    backgroundColor: `${colors.primary}12`,
-    paddingHorizontal: wp(2),
-    paddingVertical: hp(0.35),
-  },
-  scoreMetricPillText: {
-    color: colors.primary,
-    fontSize: Math.min(hp(1.05), wp(2.55)),
-    fontWeight: '900',
-  },
-  scoreMetricBody: {
-    color: colors.textSecondary,
-    fontSize: Math.min(hp(1.08), wp(2.65)),
-    lineHeight: hp(1.62),
-    fontWeight: '700',
-    marginTop: hp(0.45),
-  },
-  scoreInfoNote: {
-    color: colors.primary,
-    backgroundColor: `${colors.primary}10`,
-    borderRadius: hp(1.2),
-    paddingHorizontal: wp(3),
-    paddingVertical: hp(1.1),
-    fontSize: Math.min(hp(1.22), wp(2.9)),
-    lineHeight: hp(1.8),
-    fontWeight: '800',
-    marginTop: hp(1.3),
   },
   nutritionScoreCard: {
     backgroundColor: colors.cardBackground,
@@ -2295,6 +1725,11 @@ const getStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: wp(1.2),
   },
+  nutritionFactorLocked: {
+    borderColor: `${colors.primary}45`,
+    backgroundColor: `${colors.primary}08`,
+    gap: hp(0.2),
+  },
   nutritionFactorValue: {
     color: colors.textPrimary,
     fontSize: Math.min(hp(1.55), wp(3.6)),
@@ -2320,6 +1755,65 @@ const getStyles = (colors: any) => StyleSheet.create({
   nutritionFocusText: {
     color: colors.primary,
     fontSize: Math.min(hp(1.3), wp(3.05)),
+    fontWeight: '900',
+  },
+  timingNudgeCard: {
+    backgroundColor: colors.cardBackground,
+    borderRadius: hp(2),
+    borderWidth: Math.min(wp(0.28), hp(0.16)),
+    borderColor: colors.cardBorder || colors.border,
+    padding: wp(3.5),
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(3),
+  },
+  timingNudgeImage: {
+    width: Math.min(hp(7.2), wp(16)),
+    height: Math.min(hp(7.2), wp(16)),
+    borderRadius: hp(1.2),
+    backgroundColor: colors.surface || colors.screenColor,
+  },
+  timingNudgeIcon: {
+    width: Math.min(hp(6.2), wp(13.5)),
+    height: Math.min(hp(6.2), wp(13.5)),
+    borderRadius: Math.min(hp(3.1), wp(6.75)),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timingNudgeCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  timingNudgeMeta: {
+    fontSize: Math.min(hp(1.02), wp(2.45)),
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  timingNudgeTitle: {
+    color: colors.textPrimary,
+    fontSize: Math.min(hp(1.72), wp(4)),
+    fontWeight: '900',
+    marginTop: hp(0.15),
+  },
+  timingNudgeBody: {
+    color: colors.textSecondary,
+    fontSize: Math.min(hp(1.18), wp(2.85)),
+    lineHeight: hp(1.72),
+    fontWeight: '700',
+    marginTop: hp(0.35),
+  },
+  timingNudgeButton: {
+    minHeight: hp(3.7),
+    borderRadius: hp(1.35),
+    paddingHorizontal: wp(2.5),
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: wp(1),
+    flexShrink: 0,
+  },
+  timingNudgeButtonText: {
+    fontSize: Math.min(hp(1.12), wp(2.7)),
     fontWeight: '900',
   },
   habitMissionCard: {
@@ -2650,6 +2144,13 @@ const getStyles = (colors: any) => StyleSheet.create({
   reportEmbeddedSection: {
     marginTop: hp(0.2),
   },
+  reportHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: wp(1.7),
+    flexShrink: 0,
+  },
   shareButton: {
     minHeight: hp(4),
     borderRadius: hp(1.3),
@@ -2767,6 +2268,30 @@ const getStyles = (colors: any) => StyleSheet.create({
     gap: wp(2.4),
     marginTop: hp(1.3),
   },
+  analyticsActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: wp(2.2),
+    marginTop: hp(1.15),
+  },
+  analyticsActionButton: {
+    flex: 1,
+    minHeight: hp(4.5),
+    maxWidth: wp(42),
+    borderRadius: hp(1.35),
+    paddingHorizontal: wp(2.4),
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: wp(1.2),
+    backgroundColor: colors.primarySoft || `${colors.primary}14`,
+  },
+  analyticsActionText: {
+    color: colors.primary,
+    fontSize: Math.min(hp(1.35), wp(3.15)),
+    fontWeight: '900',
+  },
   reportSecondaryButton: {
     flex: 1,
     minHeight: hp(4.5),
@@ -2862,8 +2387,13 @@ const getStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.surface || colors.cardBackground,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
     paddingHorizontal: wp(1.2),
     paddingVertical: hp(1),
+  },
+  quickActionLocked: {
+    borderColor: `${colors.primary}55`,
+    backgroundColor: `${colors.primary}08`,
   },
   quickActionIcon: {
     width: Math.min(hp(4.7), wp(10.5)),

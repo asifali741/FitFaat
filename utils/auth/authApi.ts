@@ -361,16 +361,6 @@ export const authApi = {
     await tokenStorage.clearAll();
   },
 
-  // Permanently delete current user account
-  deleteAccount: async () => {
-    try {
-      const response = await api.delete('/user/account');
-      return response.data;
-    } catch (error: any) {
-      throw error.response?.data || error.message;
-    }
-  },
-
   // Check if user is authenticated
   isAuthenticated: async () => {
     const token = await tokenStorage.getToken();

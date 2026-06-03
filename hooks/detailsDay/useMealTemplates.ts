@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useFocusEffect } from "expo-router";
 
 import { pakistaniDishes } from "@/app/Dataset/dataSet";
 import {
@@ -13,32 +12,18 @@ import {
 } from "@/constants/foodDatabase";
 import { customRecipesApi, type CustomRecipeData } from "@/utils/customRecipesApi";
 import { getStoredDashboardCache } from "@/utils/dashboardStorage";
-import { localSyncEvents } from "@/utils/localSyncEvents";
 
 import {
   buildMealDraftFromStoredMeal,
   getFoodTitle,
-  getMealDisplayName,
   isDietPreference,
   type MealLogDraft,
-  type MealTemplate,
-  toMealNumber,
 } from "./detailsDayNutritionUtils";
 
-const MEAL_TEMPLATES_STORAGE_KEY = "fitfaat_meal_templates";
-
 type UseMealTemplatesParams = {
-  calorieInput: string;
-  mealQuantity: string;
-  selectedFoodItem: any;
-  detectedDishName: string;
   foodSearch: string;
-  descriptionInput: string;
   dayData: any;
-  setTrackingMode: (mode: "meal" | "hydration") => void;
   setSelectedFoodItem: (food: any) => void;
-  setMealQuantity: (quantity: string) => void;
-  setCalorieInput: (calories: string) => void;
   setFoodSearch: (search: string) => void;
   logMealDrafts: (
     drafts: MealLogDraft[],
@@ -47,134 +32,17 @@ type UseMealTemplatesParams = {
 };
 
 export function useMealTemplates({
-  calorieInput,
-  mealQuantity,
-  selectedFoodItem,
-  detectedDishName,
   foodSearch,
-  descriptionInput,
   dayData,
-  setTrackingMode,
   setSelectedFoodItem,
-  setMealQuantity,
-  setCalorieInput,
   setFoodSearch,
   logMealDrafts,
 }: UseMealTemplatesParams) {
   const [dietPreference, setDietPreference] = useState<DietPreference>("all");
   const [userCustomRecipes, setUserCustomRecipes] = useState<CustomRecipeData[]>([]);
-  const [mealTemplates, setMealTemplates] = useState<MealTemplate[]>([]);
   const [isRepeatingYesterday, setIsRepeatingYesterday] = useState(false);
   const [filteredFoods, setFilteredFoods] = useState<any[]>([]);
   const [showFoodSearch, setShowFoodSearch] = useState(false);
-
-  const loadMealTemplates = useCallback(async () => {
-    try {
-      const storedTemplates = await AsyncStorage.getItem(MEAL_TEMPLATES_STORAGE_KEY);
-      const parsedTemplates = storedTemplates ? JSON.parse(storedTemplates) : [];
-      setMealTemplates(Array.isArray(parsedTemplates) ? parsedTemplates.slice(0, 12) : []);
-    } catch (error) {
-      console.error("Error loading meal templates:", error);
-      setMealTemplates([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadMealTemplates();
-  }, [loadMealTemplates]);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadMealTemplates();
-    }, [loadMealTemplates])
-  );
-
-  useEffect(() => {
-    const unsubscribe = localSyncEvents.subscribe((event) => {
-      if (event.restoredKeys.includes(MEAL_TEMPLATES_STORAGE_KEY)) {
-        loadMealTemplates();
-      }
-    });
-
-    return unsubscribe;
-  }, [loadMealTemplates]);
-
-  const persistMealTemplates = useCallback(async (templates: MealTemplate[]) => {
-    const nextTemplates = templates.slice(0, 12);
-    setMealTemplates(nextTemplates);
-    await AsyncStorage.setItem(MEAL_TEMPLATES_STORAGE_KEY, JSON.stringify(nextTemplates));
-  }, []);
-
-  const buildCurrentMealTemplate = useCallback((): MealTemplate | null => {
-    const totalCalories = Math.round(toMealNumber(calorieInput));
-    if (totalCalories <= 0) return null;
-
-    const quantity = Math.max(0.5, toMealNumber(mealQuantity, 1));
-    const baseCalories = toMealNumber(
-      selectedFoodItem?.calories_kcal ?? selectedFoodItem?.calories,
-      totalCalories / quantity
-    );
-    const templateName =
-      (selectedFoodItem ? getMealDisplayName(selectedFoodItem) : "") ||
-      detectedDishName ||
-      foodSearch.trim() ||
-      descriptionInput.trim() ||
-      "Custom Meal";
-
-    return {
-      id: `${Date.now()}-${templateName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
-      name: templateName,
-      servingSize: selectedFoodItem?.serving_size || selectedFoodItem?.servingSize || "portion",
-      quantity,
-      caloriesPerServing: Math.max(1, Math.round(baseCalories)),
-      proteinPerServing: toMealNumber(selectedFoodItem?.protein_g),
-      carbsPerServing: toMealNumber(selectedFoodItem?.carbs_g ?? selectedFoodItem?.carbohydrates_g),
-      fatsPerServing: toMealNumber(selectedFoodItem?.fat_g),
-      createdAt: new Date().toISOString(),
-    };
-  }, [calorieInput, descriptionInput, detectedDishName, foodSearch, mealQuantity, selectedFoodItem]);
-
-  const applyTemplateToForm = useCallback(
-    (template: MealTemplate) => {
-      setTrackingMode("meal");
-      setSelectedFoodItem({
-        food_name: template.name,
-        serving_size: template.servingSize,
-        calories_kcal: template.caloriesPerServing,
-        calories: template.caloriesPerServing,
-        protein_g: template.proteinPerServing,
-        carbs_g: template.carbsPerServing,
-        fat_g: template.fatsPerServing,
-        isMealTemplate: true,
-      });
-      setMealQuantity(String(template.quantity || 1));
-      setCalorieInput(String(Math.round(template.caloriesPerServing * (template.quantity || 1))));
-      setFoodSearch("");
-      setShowFoodSearch(false);
-    },
-    [setCalorieInput, setFoodSearch, setMealQuantity, setSelectedFoodItem, setTrackingMode]
-  );
-
-  const saveCurrentMealAsTemplate = useCallback(async () => {
-    const template = buildCurrentMealTemplate();
-    if (!template) {
-      Alert.alert("Select a meal first", "Choose a food or enter calories before saving a meal template.");
-      return;
-    }
-
-    const withoutDuplicate = mealTemplates.filter(
-      (item) => item.name.trim().toLowerCase() !== template.name.trim().toLowerCase()
-    );
-    await persistMealTemplates([template, ...withoutDuplicate]);
-    Alert.alert("Template Saved", `${template.name} is now available for one-tap meal logging.`);
-  }, [buildCurrentMealTemplate, mealTemplates, persistMealTemplates]);
-
-  const removeMealTemplate = useCallback(
-    async (templateId: string) => {
-      await persistMealTemplates(mealTemplates.filter((template) => template.id !== templateId));
-    },
-    [mealTemplates, persistMealTemplates]
-  );
 
   useEffect(() => {
     const loadDietPreference = async () => {
@@ -339,15 +207,11 @@ export function useMealTemplates({
     dietPreferenceOptions,
     userCustomRecipes,
     setUserCustomRecipes,
-    mealTemplates,
     filteredFoods,
     showFoodSearch,
     setShowFoodSearch,
     isRepeatingYesterday,
     quickPickFoods,
-    applyTemplateToForm,
-    saveCurrentMealAsTemplate,
-    removeMealTemplate,
     handleDietPreferenceChange,
     handleRepeatYesterday,
   };

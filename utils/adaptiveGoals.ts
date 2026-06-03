@@ -3,7 +3,6 @@ import {
   buildCalorieTargetRange,
   buildHydrationTargetRange,
 } from "@/utils/goalTargetDisplay";
-import { getStoredDashboardCache } from "@/utils/dashboardStorage";
 
 type DayStatus = "locked" | "active" | "finished";
 type GapDirection = "missed" | "exceeded" | "onTarget" | "unknown";
@@ -116,28 +115,10 @@ export type AdaptiveGoalOptions = {
   weightTrendCalibration?: WeeklyWeightTrendCalibration | null;
 };
 
-export type AdaptiveGoalCarryForward = {
-  sourceUserId?: string;
-  sourceWeeklyTrackingId?: string | null;
-  sourceDayNo?: number;
-  sourceDate?: string;
-  targetCalories: number;
-  achievedCalories: number;
-  targetHydration: number;
-  achievedHydration: number;
-  createdAt: string;
-};
-
-export const ADAPTIVE_GOAL_CARRY_FORWARD_STORAGE_KEY = "fitfaat_adaptive_goal_carry_forward";
 export const HEALTH_METRICS_STORAGE_KEY = "fitfaat_health_metrics";
 export const WEIGHT_TREND_LOGS_STORAGE_KEY = "fitfaat_weight_logs";
 
-type CalorieCarryGoalKey = 1 | 2 | 3 | "default";
-
-type CalorieCarryPolicy = {
-  missed: number[];
-  exceeded: number[];
-};
+type CalorieGoalKey = 1 | 2 | 3 | "default";
 
 type GoalAdjustmentConfig = {
   ratio: number;
@@ -151,31 +132,12 @@ const OTHER_CALORIE_MIN = 1300;
 const CALORIE_MAX = 6000;
 const HYDRATION_MIN = 1.2;
 const HYDRATION_MAX = 5.5;
-const PREMIUM_ACTIVITY_HYDRATION_L_PER_500_KCAL = 0.35;
-const CALORIE_CARRY_NOISE_BAND = 75;
+const CALORIE_GAP_NOISE_BAND = 75;
 const MIN_MEANINGFUL_FOOD_LOG = 400;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEIGHT_TREND_LOOKBACK_DAYS = 35;
 const WEIGHT_TREND_MIN_SPAN_DAYS = 6;
 const WEIGHT_TREND_MAX_LOGS = 120;
-
-const CALORIE_CARRY_POLICIES: Record<
-  AdaptiveGoalPlan,
-  Record<CalorieCarryGoalKey, CalorieCarryPolicy>
-> = {
-  premium: {
-    1: { missed: [0, 75, 125, 175], exceeded: [0, -100, -175, -250] },
-    2: { missed: [75, 150, 250, 350], exceeded: [0, -100, -175, -250] },
-    3: { missed: [100, 200, 325, 450], exceeded: [0, -75, -125, -175] },
-    default: { missed: [50, 125, 200, 275], exceeded: [0, -75, -125, -175] },
-  },
-  free: {
-    1: { missed: [0, 40, 75, 100], exceeded: [0, -60, -100, -150] },
-    2: { missed: [50, 100, 150, 200], exceeded: [0, -60, -100, -140] },
-    3: { missed: [75, 125, 200, 275], exceeded: [0, -40, -75, -100] },
-    default: { missed: [25, 75, 125, 175], exceeded: [0, -50, -85, -120] },
-  },
-};
 
 const ACTIVITY_LEVELS: ActivityLevelKey[] = [
   "sedentary",
@@ -314,20 +276,7 @@ const normalizeGoal = (goal?: AdaptiveGoalMetrics["fitnessGoal"]) => {
   return 0;
 };
 
-const getCalorieCarryPolicy = (
-  plan: AdaptiveGoalPlan,
-  goal?: AdaptiveGoalMetrics["fitnessGoal"]
-) => {
-  const normalizedGoal = normalizeGoal(goal);
-  const goalKey: CalorieCarryGoalKey =
-    normalizedGoal === 1 || normalizedGoal === 2 || normalizedGoal === 3
-      ? normalizedGoal
-      : "default";
-
-  return CALORIE_CARRY_POLICIES[plan][goalKey];
-};
-
-const getCalorieCarryGoalKey = (goal?: AdaptiveGoalMetrics["fitnessGoal"]): CalorieCarryGoalKey => {
+const getCalorieGoalKey = (goal?: AdaptiveGoalMetrics["fitnessGoal"]): CalorieGoalKey => {
   const normalizedGoal = normalizeGoal(goal);
   return normalizedGoal === 1 || normalizedGoal === 2 || normalizedGoal === 3
     ? normalizedGoal
@@ -336,7 +285,7 @@ const getCalorieCarryGoalKey = (goal?: AdaptiveGoalMetrics["fitnessGoal"]): Calo
 
 const getCalorieGapTier = (gap: number) => {
   const absoluteGap = Math.abs(gap);
-  if (absoluteGap < CALORIE_CARRY_NOISE_BAND) return -1;
+  if (absoluteGap < CALORIE_GAP_NOISE_BAND) return -1;
   if (absoluteGap < 200) return 0;
   if (absoluteGap < 450) return 1;
   if (absoluteGap < 750) return 2;
@@ -880,55 +829,11 @@ const getAchievedHydration = (day: AdaptiveGoalDay) =>
 const getFoodCaloriesFromDay = (day?: AdaptiveGoalDay | null) =>
   roundCalories(day?.achievedCalories);
 
-const getExerciseCaloriesBurnedFromDay = (day?: AdaptiveGoalDay | null) =>
-  roundCalories(
-    firstPositiveNumber(
-      day?.exerciseCaloriesBurned,
-      day?.exerciseCalories,
-      day?.exerciseCaloriesBurnt,
-      day?.caloriesBurnedFromExercise,
-      day?.exerciseBurnedCalories
-    )
-  );
-
-const getWalkingCaloriesBurnedFromDay = (day?: AdaptiveGoalDay | null) =>
-  roundCalories(
-    firstPositiveNumber(
-      day?.walkingCaloriesBurned,
-      day?.stepCaloriesBurned,
-      day?.walkingCalories,
-      day?.caloriesBurnedFromWalking
-    )
-  );
-
-const getActivityCaloriesBurnedFromDay = (day?: AdaptiveGoalDay | null) =>
-  getExerciseCaloriesBurnedFromDay(day) + getWalkingCaloriesBurnedFromDay(day);
-
 const getNetCaloriesForPlan = (
   day: AdaptiveGoalDay,
-  plan: AdaptiveGoalPlan
+  _plan: AdaptiveGoalPlan
 ) => {
-  const foodCalories = getFoodCaloriesFromDay(day);
-  if (plan !== "premium") return foodCalories;
-  return Math.max(0, foodCalories - getActivityCaloriesBurnedFromDay(day));
-};
-
-const getActivityHydrationAdjustment = (
-  day: AdaptiveGoalDay,
-  plan: AdaptiveGoalPlan
-) => {
-  if (plan !== "premium") return 0;
-
-  const activityCalories = getActivityCaloriesBurnedFromDay(day);
-  if (activityCalories <= 0) return 0;
-
-  return roundHydration(
-    clamp(
-      (activityCalories / 500) * PREMIUM_ACTIVITY_HYDRATION_L_PER_500_KCAL,
-      0,
-      1.2
-    )
-  );
+  return getFoodCaloriesFromDay(day);
 };
 
 const getLifestyleHydrationAdjustment = (
@@ -1089,7 +994,7 @@ const getExpectedWeeklyWeightChangeKg = (
 const getWeightTrendGoalDirection = (
   goal?: AdaptiveGoalMetrics["fitnessGoal"]
 ): WeightTrendGoalDirection => {
-  const goalKey = getCalorieCarryGoalKey(goal);
+  const goalKey = getCalorieGoalKey(goal);
   if (goalKey === 1) return "weightLoss";
   if (goalKey === 2) return "muscleGain";
   if (goalKey === 3) return "weightGain";
@@ -1388,37 +1293,6 @@ export const applyWeeklyWeightTrendCalibrationToCalories = (
   return roundCalories(clampCaloriesForMetrics(target + adjustment, metrics));
 };
 
-const isPastLocalDay = (date?: string) => {
-  if (!date) return false;
-  const parsed = new Date(date);
-  if (Number.isNaN(parsed.getTime())) return false;
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  parsed.setHours(0, 0, 0, 0);
-
-  return parsed.getTime() < today.getTime();
-};
-
-const canCarryForwardFromDay = (day: AdaptiveGoalDay) => {
-  if (day.status === "locked") return false;
-  return day.status === "finished" || day.status === "completed" || isPastLocalDay(day.date);
-};
-
-const toCarryForwardDay = (carryForward?: AdaptiveGoalCarryForward | null): AdaptiveGoalDay | null => {
-  if (!carryForward) return null;
-
-  return {
-    dayNo: carryForward.sourceDayNo,
-    date: carryForward.sourceDate,
-    achievedCalories: carryForward.achievedCalories,
-    achieviedHydration: carryForward.achievedHydration,
-    targetCalories: carryForward.targetCalories,
-    targetHydration: carryForward.targetHydration,
-    status: "finished",
-  };
-};
-
 const resolveBaseGoals = (day: AdaptiveGoalDay, metricsBase: ReturnType<typeof calculateMifflinStJeorBaseGoals>) => ({
   calories: roundCalories(
     firstPositiveNumber(
@@ -1462,190 +1336,8 @@ const resolveFixedHydrationBase = (
   return firstHydrationGoal || 0;
 };
 
-const getRecentSameDirectionCount = (
-  recentDays: AdaptiveGoalDay[],
-  plan: AdaptiveGoalPlan,
-  direction: "missed" | "exceeded"
-) =>
-  recentDays.filter((day) => {
-    const target = toNumber(day.targetCalories);
-    if (target <= 0 || getFoodCaloriesFromDay(day) < MIN_MEANINGFUL_FOOD_LOG) return false;
-
-    const gap = target - getNetCaloriesForPlan(day, plan);
-    if (Math.abs(gap) < CALORIE_CARRY_NOISE_BAND) return false;
-    return direction === "missed" ? gap > 0 : gap < 0;
-  }).length;
-
-const getPatternAdjustment = (
-  goalKey: CalorieCarryGoalKey,
-  plan: AdaptiveGoalPlan,
-  direction: "missed" | "exceeded",
-  recentSameDirectionCount: number
-) => {
-  if (recentSameDirectionCount < 2) return 0;
-
-  const premium = plan === "premium";
-
-  if (direction === "missed") {
-    if (goalKey === 3) return premium ? 90 : 55;
-    if (goalKey === 2) return premium ? 70 : 45;
-    if (goalKey === 1) return premium ? 25 : 0;
-    return premium ? 50 : 30;
-  }
-
-  if (goalKey === 1) return premium ? -90 : -55;
-  if (goalKey === 2) return premium ? -50 : -30;
-  if (goalKey === 3) return premium ? -25 : 0;
-  return premium ? -45 : -25;
-};
-
-const getActivityRecoveryAdjustment = (
-  previousDay: AdaptiveGoalDay,
-  goalKey: CalorieCarryGoalKey,
-  plan: AdaptiveGoalPlan,
-  direction: "missed" | "exceeded"
-) => {
-  if (plan !== "premium" || direction !== "missed") return 0;
-
-  const activityCalories = getActivityCaloriesBurnedFromDay(previousDay);
-  if (activityCalories < 250) return 0;
-
-  if (goalKey === 3) return 125;
-  if (goalKey === 2) return 90;
-  if (goalKey === 1) return 60;
-  return 75;
-};
-
-const getMissedDayCount = (recentDays: AdaptiveGoalDay[]) =>
-  recentDays.filter(
-    (day) =>
-      canCarryForwardFromDay(day) &&
-      getFoodCaloriesFromDay(day) < MIN_MEANINGFUL_FOOD_LOG &&
-      getAchievedHydration(day) <= 0
-  ).length;
-
-const getRecentConsistencyScore = (
-  recentDays: AdaptiveGoalDay[],
-  plan: AdaptiveGoalPlan
-) => {
-  const usableDays = recentDays.filter(
-    (day) => canCarryForwardFromDay(day) && toNumber(day.targetCalories) > 0
-  );
-  if (!usableDays.length) return 50;
-
-  const dayScores = usableDays.map((day) => {
-    const calorieTarget = toNumber(day.targetCalories);
-    const hydrationTarget = toNumber(day.targetHydration);
-    const calories = getNetCaloriesForPlan(day, plan);
-    const hydration = getAchievedHydration(day);
-    const hasNutritionSignal = calories >= MIN_MEANINGFUL_FOOD_LOG || hydration > 0;
-
-    if (!hasNutritionSignal) return 20;
-
-    const calorieRatio = calorieTarget > 0 ? calories / calorieTarget : 0;
-    const calorieScore =
-      calorieRatio <= 1
-        ? clamp(calorieRatio * 100, 0, 100)
-        : clamp(100 - Math.max(0, calorieRatio - 1.1) * 120, 0, 100);
-    const hydrationScore =
-      hydrationTarget > 0 ? clamp((hydration / hydrationTarget) * 100, 0, 100) : 50;
-
-    return Math.round(calorieScore * 0.65 + hydrationScore * 0.35);
-  });
-
-  return Math.round(
-    dayScores.reduce((sum, score) => sum + score, 0) / dayScores.length
-  );
-};
-
-const getConsistencyAdjustmentFactor = (
-  recentConsistencyScore: number,
-  missedDayCount: number
-) => {
-  if (missedDayCount >= 2) return 0.55;
-  if (recentConsistencyScore < 40) return 0.7;
-  if (recentConsistencyScore < 60) return 0.85;
-  return 1;
-};
-
-const getSmartCalorieBehaviorAdjustment = ({
-  previousDay,
-  plan,
-  metrics,
-  calorieGap,
-  recentDays,
-}: {
-  previousDay: AdaptiveGoalDay;
-  plan: AdaptiveGoalPlan;
-  metrics?: AdaptiveGoalMetrics | null;
-  calorieGap: number;
-  recentDays: AdaptiveGoalDay[];
-}) => {
-  const tier = getCalorieGapTier(calorieGap);
-  if (tier < 0) return 0;
-
-  const foodCalories = getFoodCaloriesFromDay(previousDay);
-  if (foodCalories < MIN_MEANINGFUL_FOOD_LOG) return 0;
-
-  const goalKey = getCalorieCarryGoalKey(metrics?.fitnessGoal);
-  const direction = calorieGap > 0 ? "missed" : "exceeded";
-  const policy = getCalorieCarryPolicy(plan, metrics?.fitnessGoal);
-  const baseAdjustment = direction === "missed"
-    ? policy.missed[tier]
-    : policy.exceeded[tier];
-  const recentSameDirectionCount = getRecentSameDirectionCount(recentDays, plan, direction);
-  const patternAdjustment = getPatternAdjustment(goalKey, plan, direction, recentSameDirectionCount);
-  const activityAdjustment = getActivityRecoveryAdjustment(previousDay, goalKey, plan, direction);
-  const recentConsistencyScore = getRecentConsistencyScore(recentDays, plan);
-  const missedDayCount = getMissedDayCount(recentDays);
-  const consistencyFactor = getConsistencyAdjustmentFactor(recentConsistencyScore, missedDayCount);
-
-  return roundToNearest(
-    (baseAdjustment + patternAdjustment + activityAdjustment) * consistencyFactor,
-    25
-  );
-};
-
-const getCalorieBehaviorAdjustment = (
-  previousDay: AdaptiveGoalDay,
-  plan: AdaptiveGoalPlan,
-  metrics?: AdaptiveGoalMetrics | null,
-  recentDays: AdaptiveGoalDay[] = []
-) => {
-  const previousTarget = toNumber(previousDay.targetCalories);
-  if (previousTarget <= 0) return 0;
-
-  const previousActual = getNetCaloriesForPlan(previousDay, plan);
-  const calorieGap = previousTarget - previousActual;
-
-  return getSmartCalorieBehaviorAdjustment({
-    previousDay,
-    plan,
-    metrics,
-    calorieGap,
-    recentDays,
-  });
-};
-
-const getHydrationBehaviorAdjustment = (
-  base: number,
-  previousDay: AdaptiveGoalDay | null,
-  plan: AdaptiveGoalPlan
-) => {
-  if (base <= 0 || !previousDay || plan !== "premium") return 0;
-
-  const previousTarget = toNumber(previousDay.targetHydration);
-  const previousActual = getAchievedHydration(previousDay);
-  if (previousTarget <= 0 || previousActual <= 0) return 0;
-
-  const completionRatio = previousActual / previousTarget;
-  return roundHydration(
-    completionRatio < 0.75 ? 0.3 : completionRatio < 0.9 ? 0.15 : completionRatio > 1.35 ? -0.1 : 0
-  );
-};
-
 const getGapDirection = (gap: number): GapDirection => {
-  if (Math.abs(gap) < CALORIE_CARRY_NOISE_BAND) return "onTarget";
+  if (Math.abs(gap) < CALORIE_GAP_NOISE_BAND) return "onTarget";
   return gap > 0 ? "missed" : "exceeded";
 };
 
@@ -1659,12 +1351,10 @@ const getSeverityScore = (severity: GapSeverity) => {
 
 const getNudgeReason = (
   direction: GapDirection,
-  goalKey: CalorieCarryGoalKey,
-  hydrationAdjustment: number,
-  recoveryNeedScore: number
+  goalKey: CalorieGoalKey,
+  hydrationGap: number
 ) => {
-  if (recoveryNeedScore >= 55) return "post-workout recovery support";
-  if (hydrationAdjustment >= 0.25) return "hydration routine support";
+  if (hydrationGap >= 0.25) return "hydration routine support";
   if (direction === "missed") {
     if (goalKey === 3) return "weight gain surplus support";
     if (goalKey === 2) return "muscle gain fuel timing";
@@ -1681,19 +1371,21 @@ const getNudgeReason = (
 };
 
 const buildBehaviorGuidance = ({
-  previousDay,
+  day,
   plan,
   metrics,
+  targetCalories,
+  targetHydration,
   behaviorCaloriesAdjustment,
   behaviorHydrationAdjustment,
-  activityHydration,
 }: {
-  previousDay: AdaptiveGoalDay | null;
+  day: AdaptiveGoalDay;
   plan: AdaptiveGoalPlan;
   metrics?: AdaptiveGoalMetrics | null;
+  targetCalories: number;
+  targetHydration: number;
   behaviorCaloriesAdjustment: number;
   behaviorHydrationAdjustment: number;
-  activityHydration: number;
 }): Pick<
   AdaptiveGoalDay,
   | "behaviorCaloriesAdjustment"
@@ -1708,28 +1400,23 @@ const buildBehaviorGuidance = ({
   | "nudgePriority"
   | "nudgeReason"
 > => {
-  const goalKey = getCalorieCarryGoalKey(metrics?.fitnessGoal);
-  const previousCalorieTarget = toNumber(previousDay?.targetCalories);
-  const previousCalorieActual = previousDay ? getNetCaloriesForPlan(previousDay, plan) : 0;
-  const calorieGap = previousCalorieTarget > 0 ? previousCalorieTarget - previousCalorieActual : 0;
-  const direction = previousDay ? getGapDirection(calorieGap) : "unknown";
-  const severity = previousDay ? getGapSeverity(calorieGap) : "none";
-  const previousHydrationTarget = toNumber(previousDay?.targetHydration);
-  const previousHydrationActual = previousDay ? getAchievedHydration(previousDay) : 0;
+  const goalKey = getCalorieGoalKey(metrics?.fitnessGoal);
+  const sameDayCalorieActual = getNetCaloriesForPlan(day, plan);
+  const calorieGap = targetCalories > 0 ? targetCalories - sameDayCalorieActual : 0;
+  const direction = targetCalories > 0 ? getGapDirection(calorieGap) : "unknown";
+  const severity = targetCalories > 0 ? getGapSeverity(calorieGap) : "none";
+  const sameDayHydrationActual = getAchievedHydration(day);
   const hydrationGap =
-    previousHydrationTarget > 0 ? roundHydration(previousHydrationTarget - previousHydrationActual) : 0;
+    targetHydration > 0 ? roundHydration(targetHydration - sameDayHydrationActual) : 0;
   const hydrationRiskScore =
-    previousHydrationTarget > 0 && hydrationGap > 0
-      ? clamp(Math.round((hydrationGap / previousHydrationTarget) * 100), 0, 100)
+    targetHydration > 0 && hydrationGap > 0
+      ? clamp(Math.round((hydrationGap / targetHydration) * 100), 0, 100)
       : 0;
-  const activityCalories = getActivityCaloriesBurnedFromDay(previousDay);
-  const recoveryNeedScore =
-    plan === "premium" ? clamp(Math.round(activityCalories / 6), 0, 100) : 0;
+  const recoveryNeedScore = 0;
   const goalRiskScore = clamp(
     getSeverityScore(severity) +
       Math.round(Math.abs(behaviorCaloriesAdjustment) / 12) +
-      Math.round(hydrationRiskScore * 0.22) +
-      Math.round(recoveryNeedScore * 0.28),
+      Math.round(hydrationRiskScore * 0.22),
     0,
     100
   );
@@ -1750,25 +1437,19 @@ const buildBehaviorGuidance = ({
     recoveryNeedScore,
     goalRiskScore,
     nudgePriority,
-    nudgeReason: getNudgeReason(direction, goalKey, behaviorHydrationAdjustment || activityHydration, recoveryNeedScore),
+    nudgeReason: getNudgeReason(direction, goalKey, hydrationGap),
   };
 };
 
 export const applyAdaptiveGoalsToDays = <T extends AdaptiveGoalDay>(
   days: T[],
   metrics?: AdaptiveGoalMetrics | null,
-  carryForward?: AdaptiveGoalCarryForward | null,
   options: AdaptiveGoalOptions = {}
 ): T[] => {
   const plan = options.plan === "premium" ? "premium" : "free";
   const weightTrendCalibration = options.weightTrendCalibration ?? null;
   const metricsBase = calculateMifflinStJeorBaseGoals(metrics, { plan });
   const fixedHydrationBase = resolveFixedHydrationBase(days, metricsBase);
-  let previousDay: (AdaptiveGoalDay & Required<Pick<AdaptiveGoalDay, "targetCalories" | "targetHydration">>) | null =
-    toCarryForwardDay(carryForward) as
-      | (AdaptiveGoalDay & Required<Pick<AdaptiveGoalDay, "targetCalories" | "targetHydration">>)
-      | null;
-  const carryHistory: AdaptiveGoalDay[] = previousDay ? [previousDay] : [];
 
   return [...days]
     .sort((a, b) => getDayTime(a) - getDayTime(b))
@@ -1779,7 +1460,6 @@ export const applyAdaptiveGoalsToDays = <T extends AdaptiveGoalDay>(
         weightTrendCalibration,
         metrics
       );
-      const activityHydration = getActivityHydrationAdjustment(day, plan);
       const lifestyleHydration = getLifestyleHydrationAdjustment(metrics, plan);
       const idealHydration = roundHydration(
         clamp(
@@ -1788,38 +1468,24 @@ export const applyAdaptiveGoalsToDays = <T extends AdaptiveGoalDay>(
           HYDRATION_MAX
         )
       );
-      let behaviorCaloriesAdjustment = 0;
-      let behaviorHydrationAdjustment = activityHydration;
-      const recentHistory = carryHistory.slice(-3);
-
-      if (previousDay && canCarryForwardFromDay(previousDay)) {
-        behaviorCaloriesAdjustment = getCalorieBehaviorAdjustment(
-          previousDay,
-          plan,
-          metrics,
-          recentHistory
-        );
-        behaviorHydrationAdjustment = roundHydration(
-          behaviorHydrationAdjustment + getHydrationBehaviorAdjustment(idealHydration, previousDay, plan)
-        );
-      }
+      const behaviorCaloriesAdjustment = 0;
+      const behaviorHydrationAdjustment = 0;
       const personalizedCalories = roundCalories(
-        clampCaloriesForMetrics(calibratedCalories + behaviorCaloriesAdjustment, metrics)
+        clampCaloriesForMetrics(calibratedCalories, metrics)
       );
       const personalizedHydration = roundHydration(
-        clamp(idealHydration + behaviorHydrationAdjustment, HYDRATION_MIN, HYDRATION_MAX)
+        clamp(idealHydration, HYDRATION_MIN, HYDRATION_MAX)
       );
       const calorieRange = buildCalorieTargetRange(personalizedCalories, plan);
       const hydrationRange = buildHydrationTargetRange(personalizedHydration, plan);
-      const recentConsistencyScore = getRecentConsistencyScore(recentHistory, plan);
-      const missedDayCount = getMissedDayCount(recentHistory);
       const behaviorGuidance = buildBehaviorGuidance({
-        previousDay: previousDay && canCarryForwardFromDay(previousDay) ? previousDay : null,
+        day,
         plan,
         metrics,
+        targetCalories: personalizedCalories,
+        targetHydration: personalizedHydration,
         behaviorCaloriesAdjustment,
         behaviorHydrationAdjustment,
-        activityHydration,
       });
 
       const adjustedDay = {
@@ -1844,16 +1510,11 @@ export const applyAdaptiveGoalsToDays = <T extends AdaptiveGoalDay>(
         weightTrendGoalDirection: weightTrendCalibration?.goalDirection,
         adaptiveCaloriesAdjustment: behaviorCaloriesAdjustment,
         adaptiveHydrationAdjustment: behaviorHydrationAdjustment,
-        recentConsistencyScore,
-        missedDayCount,
+        recentConsistencyScore: 50,
+        missedDayCount: 0,
         activityLevelHydrationAdjustment: lifestyleHydration,
         ...behaviorGuidance,
       } as T & Required<Pick<AdaptiveGoalDay, "targetCalories" | "targetHydration">>;
-
-      previousDay = adjustedDay;
-      if (canCarryForwardFromDay(adjustedDay)) {
-        carryHistory.push(adjustedDay);
-      }
 
       return adjustedDay;
     });
@@ -1862,13 +1523,11 @@ export const applyAdaptiveGoalsToDays = <T extends AdaptiveGoalDay>(
 export const applyAdaptiveGoalsToJsonResponse = <T extends Record<string, AdaptiveGoalDay>>(
   data: T,
   metrics?: AdaptiveGoalMetrics | null,
-  carryForward?: AdaptiveGoalCarryForward | null,
   options: AdaptiveGoalOptions = {}
 ): T => {
   const adjustedDays = applyAdaptiveGoalsToDays(
     Object.values(data) as AdaptiveGoalDay[],
     metrics,
-    carryForward,
     options
   );
   const byDayNo = new Map(adjustedDays.map((day) => [getDayNo(day), day]));
@@ -1881,103 +1540,166 @@ export const applyAdaptiveGoalsToJsonResponse = <T extends Record<string, Adapti
   }, {} as T);
 };
 
-const getCarryForwardCandidate = (data: AdaptiveGoalDay[] | Record<string, AdaptiveGoalDay>) => {
-  const days = (Array.isArray(data) ? data : Object.values(data))
-    .filter(Boolean)
-    .sort((a, b) => getDayTime(a) - getDayTime(b));
-
-  if (!days.length) return null;
-
-  return [...days]
-    .reverse()
-    .find((day) => day.status !== "locked" && firstPositiveNumber(day.targetCalories, day.targetHydration) > 0);
+const qaMetrics: AdaptiveGoalMetrics = {
+  height: 175,
+  weight: 82,
+  age: 34,
+  gender: "male",
+  activityLevel: "moderate",
+  fitnessGoal: 1,
+  goalPace: "standard",
 };
 
-export const buildAdaptiveGoalCarryForward = (
-  data: AdaptiveGoalDay[] | Record<string, AdaptiveGoalDay>,
-  options: { userId?: string; weeklyTrackingId?: string | null } = {}
-): AdaptiveGoalCarryForward | null => {
-  const latestDay = getCarryForwardCandidate(data);
-  if (!latestDay) return null;
+const buildQaDays = (day3: Partial<AdaptiveGoalDay> = {}): AdaptiveGoalDay[] =>
+  [1, 2, 3, 4].map((dayNo) => ({
+    dayNo,
+    date: `2026-05-${String(20 + dayNo).padStart(2, "0")}`,
+    status: dayNo < 4 ? "finished" : "active",
+    achievedCalories: dayNo === 3 ? 0 : 1200,
+    achievedHydration: dayNo === 3 ? 0 : 1.5,
+    ...(dayNo === 3 ? day3 : {}),
+  }));
 
-  const targetCalories = roundCalories(firstPositiveNumber(latestDay.targetCalories));
-  const targetHydration = roundHydration(firstPositiveNumber(latestDay.targetHydration));
+const buildQaNewWeekDays = (): AdaptiveGoalDay[] => [
+  {
+    dayNo: 1,
+    date: "2026-05-28",
+    status: "active",
+    achievedCalories: 0,
+    achievedHydration: 0,
+  },
+];
 
-  if (targetCalories <= 0 && targetHydration <= 0) return null;
+const hasFreshTargets = (
+  days: AdaptiveGoalDay[],
+  calories: number,
+  hydration: number
+) => days.every((day) =>
+  day.targetCalories === calories &&
+  day.targetHydration === hydration &&
+  day.adaptiveCaloriesAdjustment === 0 &&
+  day.adaptiveHydrationAdjustment === 0
+);
 
-  return {
-    sourceUserId: options.userId,
-    sourceWeeklyTrackingId: options.weeklyTrackingId,
-    sourceDayNo: getDayNo(latestDay),
-    sourceDate: latestDay.date,
-    targetCalories,
-    achievedCalories: roundCalories(toNumber(latestDay.achievedCalories)),
-    targetHydration,
-    achievedHydration: roundHydration(getAchievedHydration(latestDay)),
-    createdAt: new Date().toISOString(),
+export const runAdaptiveGoalFreshTargetQaCases = () => {
+  const freeBase = calculateMifflinStJeorBaseGoals(qaMetrics, { plan: "free" });
+  const premiumBase = calculateMifflinStJeorBaseGoals(qaMetrics, { plan: "premium" });
+  const freeTargets = {
+    calories: freeBase?.calories || 0,
+    hydration: roundHydration(
+      clamp(
+        (freeBase?.hydration || 0) + getLifestyleHydrationAdjustment(qaMetrics, "free"),
+        HYDRATION_MIN,
+        HYDRATION_MAX
+      )
+    ),
   };
-};
-
-export const saveAdaptiveGoalCarryForward = async (
-  data: AdaptiveGoalDay[] | Record<string, AdaptiveGoalDay> | null | undefined,
-  options: { userId?: string; weeklyTrackingId?: string | null } = {}
-) => {
-  if (!data) return null;
-
-  const carryForward = buildAdaptiveGoalCarryForward(data, options);
-  if (!carryForward) return null;
-
-  await AsyncStorage.setItem(
-    ADAPTIVE_GOAL_CARRY_FORWARD_STORAGE_KEY,
-    JSON.stringify(carryForward)
+  const premiumTargets = {
+    calories: premiumBase?.calories || 0,
+    hydration: roundHydration(
+      clamp(
+        (premiumBase?.hydration || 0) + getLifestyleHydrationAdjustment(qaMetrics, "premium"),
+        HYDRATION_MIN,
+        HYDRATION_MAX
+      )
+    ),
+  };
+  const calibration: WeeklyWeightTrendCalibration = {
+    status: "adjusting",
+    goalDirection: "weightLoss",
+    confidence: 85,
+    observedKgPerWeek: 0,
+    expectedKgPerWeek: -0.3,
+    calorieAdjustment: 100,
+    nutritionAdherenceScore: 80,
+    weightLogCount: 4,
+    spanDays: 14,
+    message: "QA calibration",
+  };
+  const calibratedCalories = applyWeeklyWeightTrendCalibrationToCalories(
+    freeTargets.calories,
+    calibration,
+    qaMetrics
   );
 
-  return carryForward;
-};
+  const cases = [
+    {
+      name: "free-missed-day-does-not-change-next-target",
+      actual: applyAdaptiveGoalsToDays(
+        buildQaDays({ achievedCalories: 500, achievedHydration: 0.4 }),
+        qaMetrics,
+        { plan: "free" }
+      ),
+      expectedCalories: freeTargets.calories,
+      expectedHydration: freeTargets.hydration,
+    },
+    {
+      name: "free-exceeded-day-does-not-change-next-target",
+      actual: applyAdaptiveGoalsToDays(
+        buildQaDays({ achievedCalories: 4200, achievedHydration: 5.4 }),
+        qaMetrics,
+        { plan: "free" }
+      ),
+      expectedCalories: freeTargets.calories,
+      expectedHydration: freeTargets.hydration,
+    },
+    {
+      name: "premium-hydration-miss-does-not-change-next-target",
+      actual: applyAdaptiveGoalsToDays(
+        buildQaDays({ achievedCalories: 1200, achievedHydration: 0.2 }),
+        qaMetrics,
+        { plan: "premium" }
+      ),
+      expectedCalories: premiumTargets.calories,
+      expectedHydration: premiumTargets.hydration,
+    },
+    {
+      name: "premium-hydration-excess-does-not-change-next-target",
+      actual: applyAdaptiveGoalsToDays(
+        buildQaDays({ achievedCalories: 1200, achievedHydration: 5.4 }),
+        qaMetrics,
+        { plan: "premium" }
+      ),
+      expectedCalories: premiumTargets.calories,
+      expectedHydration: premiumTargets.hydration,
+    },
+    {
+      name: "new-week-starts-with-fresh-target",
+      actual: applyAdaptiveGoalsToDays(
+        buildQaNewWeekDays(),
+        qaMetrics,
+        { plan: "free" }
+      ),
+      expectedCalories: freeTargets.calories,
+      expectedHydration: freeTargets.hydration,
+    },
+    {
+      name: "weight-trend-calibration-stays-independent-of-daily-gaps",
+      actual: applyAdaptiveGoalsToDays(
+        buildQaDays({ achievedCalories: 4200, achievedHydration: 0.2 }),
+        qaMetrics,
+        { plan: "free", weightTrendCalibration: calibration }
+      ),
+      expectedCalories: calibratedCalories,
+      expectedHydration: freeTargets.hydration,
+    },
+  ];
 
-export const saveAdaptiveGoalCarryForwardFromStorage = async (
-  options: { userId?: string; weeklyTrackingId?: string | null } = {}
-) => {
-  const cached = await getStoredDashboardCache<AdaptiveGoalDay[] | Record<string, AdaptiveGoalDay>>(
-    undefined,
-    options.weeklyTrackingId
-  );
-  if (!cached) return null;
-
-  try {
-    return saveAdaptiveGoalCarryForward(cached.data, options);
-  } catch {
-    return null;
-  }
-};
-
-export const loadAdaptiveGoalCarryForward = async (
-  options: { userId?: string; currentWeeklyTrackingId?: string | null } = {}
-): Promise<AdaptiveGoalCarryForward | null> => {
-  const cached = await AsyncStorage.getItem(ADAPTIVE_GOAL_CARRY_FORWARD_STORAGE_KEY);
-  if (!cached) return null;
-
-  try {
-    const carryForward = JSON.parse(cached) as AdaptiveGoalCarryForward;
-
-    if (
-      options.userId &&
-      carryForward.sourceUserId &&
-      carryForward.sourceUserId !== options.userId
-    ) {
-      return null;
-    }
-
-    if (
-      options.currentWeeklyTrackingId &&
-      carryForward.sourceWeeklyTrackingId &&
-      carryForward.sourceWeeklyTrackingId === options.currentWeeklyTrackingId
-    ) {
-      return null;
-    }
-
-    return carryForward;
-  } catch {
-    return null;
-  }
+  return cases.map((qaCase) => ({
+    name: qaCase.name,
+    passed: hasFreshTargets(
+      qaCase.actual,
+      qaCase.expectedCalories,
+      qaCase.expectedHydration
+    ),
+    expectedCalories: qaCase.expectedCalories,
+    expectedHydration: qaCase.expectedHydration,
+    actual: qaCase.actual.map((day) => ({
+      dayNo: day.dayNo,
+      targetCalories: day.targetCalories,
+      targetHydration: day.targetHydration,
+      adaptiveCaloriesAdjustment: day.adaptiveCaloriesAdjustment,
+      adaptiveHydrationAdjustment: day.adaptiveHydrationAdjustment,
+    })),
+  }));
 };

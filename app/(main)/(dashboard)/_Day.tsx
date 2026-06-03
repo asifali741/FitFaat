@@ -1,6 +1,6 @@
 import { useTheme } from "@/contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, {
   Easing,
@@ -12,39 +12,49 @@ import Animated, {
 } from "react-native-reanimated";
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from "react-native-responsive-screen";
 import Svg, { Circle, Defs, LinearGradient, Stop } from "react-native-svg";
+import FitFaatCalculationInfoModal from "@/components/dashboard/FitFaatCalculationInfoModal";
 import {
   getDashboardGoalProgress,
   getHydrationValue,
 } from "@/utils/dashboardProgress";
 import { getExerciseCaloriesBurned } from "@/utils/localExerciseProgress";
-import { getWalkingCaloriesBurned } from "@/utils/localWalkingProgress";
 import {
   formatCalorieTarget,
   formatHydrationTarget,
+  getCalorieTargetProgress,
+  getHydrationTargetProgress,
+  isRangesGoalDisplayMode,
   type GoalDisplayMode,
 } from "@/utils/goalTargetDisplay";
 import { Day } from "./types";
+import {
+  cleanWalkingSteps,
+  DEFAULT_STEP_GOAL,
+  getWalkingCaloriesBurned,
+} from "@/utils/localWalkingProgress";
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 export const Days = ({
   props,
   onDayPress,
   showExerciseProgress = false,
-  goalDisplayMode = "simple",
+  goalDisplayMode = "exact",
+  onActiveDayExpired,
 }: {
   props: Day,
   onDayPress: (dayNo : number) => void,
   showExerciseProgress?: boolean,
   goalDisplayMode?: GoalDisplayMode,
+  onActiveDayExpired?: () => void,
 }) => {
   if(props.status === 'locked'){ //props false = locked day
     return <LockedDay info={props} />;
   }
   else if(props.status === 'finished'){ //props duration null = finished day
-    return <FinishedDay info={props} Press={onDayPress} showExerciseProgress={showExerciseProgress}/>;
+    return <FinishedDay info={props} Press={onDayPress} showExerciseProgress={showExerciseProgress} goalDisplayMode={goalDisplayMode}/>;
   }
   else{
-    return <ActiveDay info={props} Press={onDayPress} showExerciseProgress={showExerciseProgress} goalDisplayMode={goalDisplayMode}/>;
+    return <ActiveDay info={props} Press={onDayPress} showExerciseProgress={showExerciseProgress} goalDisplayMode={goalDisplayMode} onExpired={onActiveDayExpired}/>;
   }
 }
 
@@ -53,24 +63,39 @@ const ActiveDay = ({
   Press,
   showExerciseProgress,
   goalDisplayMode,
+  onExpired,
 }: {
   info: Day,
   Press: (dayNo : number) => void,
   showExerciseProgress: boolean,
   goalDisplayMode: GoalDisplayMode,
+  onExpired?: () => void,
 }) => {
   const { colors } = useTheme();
   const scale = useSharedValue(1);
   const shouldShowExerciseProgress = showExerciseProgress === true;
-  const finalProgress : number = getDashboardGoalProgress(info);
+  const finalProgress : number = getDashboardGoalProgress(info, goalDisplayMode);
   const exerciseCaloriesBurned = shouldShowExerciseProgress ? getExerciseCaloriesBurned(info) : 0;
-  const walkingCaloriesBurned = shouldShowExerciseProgress ? getWalkingCaloriesBurned(info) : 0;
+  const walkingSteps = cleanWalkingSteps((info as any).walkingSteps ?? (info as any).steps ?? (info as any).stepCount);
+  const walkingStepGoal =
+    cleanWalkingSteps(
+      (info as any).walkingStepGoal ??
+        (info as any).stepGoal ??
+        (info as any).targetSteps ??
+        (info as any).dailyStepGoal
+    ) || DEFAULT_STEP_GOAL;
+  const walkingProgress = Math.min(100, Math.max(0, Math.round((walkingSteps / walkingStepGoal) * 100)));
+  const walkingCaloriesBurned = getWalkingCaloriesBurned(info);
+  const statusMetricCount = shouldShowExerciseProgress ? 4 : 3;
+  const useCompactStatusLayout = statusMetricCount >= 3;
   const hydrationAmount = getHydrationValue(info);
   const plan = shouldShowExerciseProgress ? "premium" : "free";
   const calorieTargetLabel = formatCalorieTarget(info, goalDisplayMode, plan);
   const hydrationTargetLabel = formatHydrationTarget(info, goalDisplayMode, plan);
+  const calorieTargetProgress = getCalorieTargetProgress(info, goalDisplayMode, plan);
+  const hydrationTargetProgress = getHydrationTargetProgress(info, goalDisplayMode, plan);
   const metricIconSize = Math.min(hp(2), wp(4.4));
-  const showTargetRanges = goalDisplayMode === "advanced";
+  const showTargetRanges = isRangesGoalDisplayMode(goalDisplayMode);
   const animatedContainerStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
@@ -84,23 +109,28 @@ const ActiveDay = ({
       <View style={styles.modernTopHeader}>
         <View style={styles.modernDayInfo}>
           <Text style={styles.modernDayNumber}>0{info.dayNo}</Text>
-          <View style={styles.modernDayDetails}>
+        <View style={styles.modernDayDetails}>
             <Text style={styles.modernDayText}>Day {info.dayNo}</Text>
             <Text style={styles.modernDateText}>{info.date}</Text>
           </View>
         </View>
-        <ProgressCircle finalProgress={finalProgress}/>
+        <View style={styles.goalProgressCluster}>
+          <ProgressCircle finalProgress={finalProgress}/>
+          <Text style={styles.dailyRingLabel}>Daily Ring</Text>
+          <Text style={styles.dailyRingHint}>Food + Water</Text>
+          <CalculationInfoButton />
+        </View>
       </View>
 
       {/* Progress Status */}
-      <View style={[styles.modernStatusSection, shouldShowExerciseProgress && styles.modernStatusSectionPremium]}>
-        <View style={[styles.modernStatusItem, shouldShowExerciseProgress && styles.modernStatusItemPremium]}>
-          <View style={[styles.calorieIconBox, shouldShowExerciseProgress && styles.statusIconBoxPremium]}>
+      <View style={[styles.modernStatusSection, useCompactStatusLayout && styles.modernStatusSectionPremium]}>
+        <View style={[styles.modernStatusItem, useCompactStatusLayout && styles.modernStatusItemPremium]}>
+          <View style={[styles.calorieIconBox, useCompactStatusLayout && styles.statusIconBoxPremium]}>
             <Ionicons name="flame" size={metricIconSize} color="#FFFFFF" />
           </View>
-          <View style={[styles.statusContent, shouldShowExerciseProgress && styles.statusContentPremium]}>
+          <View style={[styles.statusContent, useCompactStatusLayout && styles.statusContentPremium]}>
             <Text
-              style={[styles.statusLabel, shouldShowExerciseProgress && styles.statusLabelPremium]}
+              style={[styles.statusLabel, useCompactStatusLayout && styles.statusLabelPremium]}
               numberOfLines={1}
               adjustsFontSizeToFit
               minimumFontScale={0.7}
@@ -109,17 +139,22 @@ const ActiveDay = ({
             </Text>
             {showTargetRanges ? (
               <View style={styles.statusValueGroup}>
-                <Text style={[styles.statusValue, shouldShowExerciseProgress && styles.statusValuePremium]}>
+                <Text style={[styles.statusValue, useCompactStatusLayout && styles.statusValuePremium]}>
                   {info.achievedCalories}
                 </Text>
-                <Text style={[styles.statusTargetValue, shouldShowExerciseProgress && styles.statusTargetValuePremium]}>
+                <Text style={[styles.statusTargetValue, useCompactStatusLayout && styles.statusTargetValuePremium]}>
                   of {calorieTargetLabel}
+                </Text>
+                <Text style={[styles.statusTargetHint, useCompactStatusLayout && styles.statusTargetValuePremium]}>
+                  {calorieTargetProgress.statusLabel}
                 </Text>
               </View>
             ) : (
               <Text
-                style={[styles.statusValue, shouldShowExerciseProgress && styles.statusValuePremium]}
+                style={[styles.statusValue, useCompactStatusLayout && styles.statusValuePremium]}
                 numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.5}
               >
                 {info.achievedCalories}/{calorieTargetLabel}
               </Text>
@@ -151,38 +186,41 @@ const ActiveDay = ({
             </View>
           </View>
         )}
-        {shouldShowExerciseProgress && (
-          <View style={[styles.modernStatusItem, styles.modernStatusItemPremium]}>
-            <View style={[styles.walkingIconBox, styles.statusIconBoxPremium]}>
-              <Ionicons name="footsteps" size={metricIconSize} color="#FFFFFF" />
-            </View>
-            <View style={[styles.statusContent, styles.statusContentPremium]}>
-              <Text
-                style={[styles.statusLabel, styles.statusLabelPremium]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.7}
-              >
-                Walking
-              </Text>
-              <Text
-                style={[styles.statusValue, styles.statusValuePremium]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.72}
-              >
+        <View style={[styles.modernStatusItem, useCompactStatusLayout && styles.modernStatusItemPremium]}>
+          <View style={[styles.walkingIconBox, useCompactStatusLayout && styles.statusIconBoxPremium]}>
+            <Ionicons name="footsteps" size={metricIconSize} color="#FFFFFF" />
+          </View>
+          <View style={[styles.statusContent, useCompactStatusLayout && styles.statusContentPremium]}>
+            <Text
+              style={[styles.statusLabel, useCompactStatusLayout && styles.statusLabelPremium]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+            >
+              Walking
+            </Text>
+            <Text
+              style={[styles.statusValue, useCompactStatusLayout && styles.statusValuePremium]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.62}
+            >
+              {walkingSteps.toLocaleString()}/{walkingStepGoal.toLocaleString()}
+            </Text>
+            {walkingCaloriesBurned > 0 ? (
+              <Text style={[styles.statusTargetHint, useCompactStatusLayout && styles.statusTargetValuePremium]}>
                 {walkingCaloriesBurned} kcal
               </Text>
-            </View>
+            ) : null}
           </View>
-        )}
-        <View style={[styles.modernStatusItem, shouldShowExerciseProgress && styles.modernStatusItemPremium, !shouldShowExerciseProgress && styles.statusDivider]}>
-          <View style={[styles.hydrationIconBox, shouldShowExerciseProgress && styles.statusIconBoxPremium]}>
+        </View>
+        <View style={[styles.modernStatusItem, useCompactStatusLayout && styles.modernStatusItemPremium, !useCompactStatusLayout && styles.statusDivider]}>
+          <View style={[styles.hydrationIconBox, useCompactStatusLayout && styles.statusIconBoxPremium]}>
             <Ionicons name="water" size={metricIconSize} color="#FFFFFF" />
           </View>
-          <View style={[styles.statusContent, shouldShowExerciseProgress && styles.statusContentPremium]}>
+          <View style={[styles.statusContent, useCompactStatusLayout && styles.statusContentPremium]}>
             <Text
-              style={[styles.statusLabel, shouldShowExerciseProgress && styles.statusLabelPremium]}
+              style={[styles.statusLabel, useCompactStatusLayout && styles.statusLabelPremium]}
               numberOfLines={1}
               adjustsFontSizeToFit
               minimumFontScale={0.7}
@@ -191,22 +229,40 @@ const ActiveDay = ({
             </Text>
             {showTargetRanges ? (
               <View style={styles.statusValueGroup}>
-                <Text style={[styles.statusValue, shouldShowExerciseProgress && styles.statusValuePremium]}>
+                <Text style={[styles.statusValue, useCompactStatusLayout && styles.statusValuePremium]}>
                   {hydrationAmount}
                 </Text>
-                <Text style={[styles.statusTargetValue, shouldShowExerciseProgress && styles.statusTargetValuePremium]}>
+                <Text style={[styles.statusTargetValue, useCompactStatusLayout && styles.statusTargetValuePremium]}>
                   of {hydrationTargetLabel} L
+                </Text>
+                <Text style={[styles.statusTargetHint, useCompactStatusLayout && styles.statusTargetValuePremium]}>
+                  {hydrationTargetProgress.statusLabel}
                 </Text>
               </View>
             ) : (
               <Text
-                style={[styles.statusValue, shouldShowExerciseProgress && styles.statusValuePremium]}
+                style={[styles.statusValue, useCompactStatusLayout && styles.statusValuePremium]}
                 numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.5}
               >
                 {hydrationAmount}/{hydrationTargetLabel} L
               </Text>
             )}
           </View>
+        </View>
+      </View>
+
+      <View style={styles.modernWalkingProgress}>
+        <View style={styles.modernWalkingProgressHeader}>
+          <View style={styles.modernWalkingProgressTitle}>
+            <Ionicons name="footsteps-outline" size={Math.min(hp(1.8), wp(4))} color="#22C55E" />
+            <Text style={styles.modernWalkingProgressLabel}>Steps Progress</Text>
+          </View>
+          <Text style={styles.modernWalkingProgressValue}>{walkingProgress}%</Text>
+        </View>
+        <View style={styles.modernWalkingProgressTrack}>
+          <View style={[styles.modernWalkingProgressFill, { width: `${walkingProgress}%` }]} />
         </View>
       </View>
 
@@ -221,7 +277,7 @@ const ActiveDay = ({
       {/* Action Section */}
       <View style={styles.modernActionSection}>
         {/**Countdown goes here */}
-        <InfoTray duration={info.duration}/>
+        <InfoTray duration={info.duration} onExpired={onExpired}/>
         <Pressable 
           onPress={() => Press(info.dayNo)} 
           style={styles.modernViewButton}
@@ -245,14 +301,17 @@ const FinishedDay = ({
   info,
   Press,
   showExerciseProgress = false,
+  goalDisplayMode = "exact",
 }: {
   info: Day,
   Press: (dayNo : number) => void,
   showExerciseProgress?: boolean,
+  goalDisplayMode?: GoalDisplayMode,
 }) => {
   const { colors } = useTheme();
   const scale = useSharedValue(1);
-  const finalProgress : number = getDashboardGoalProgress(info);
+  const finalProgress : number = getDashboardGoalProgress(info, goalDisplayMode);
+  const finishedProgressLabel = finalProgress >= 100 ? "Goal Achieved" : "Almost Done";
   const styles = getStyles(colors);
   
   useEffect(() => {
@@ -305,6 +364,8 @@ const FinishedDay = ({
         </View>
         
         <View style={styles.modernFinishedProgress}>
+          <CalculationInfoButton compact />
+          <Text style={styles.modernFinishedRingLabel}>Daily Ring</Text>
           <View style={styles.modernFinishedProgressIcon}>
             <Ionicons name="trophy" size={Math.min(hp(1.7), wp(3.8))} color={colors.success} />
           </View>
@@ -322,7 +383,7 @@ const FinishedDay = ({
             adjustsFontSizeToFit
             minimumFontScale={0.65}
           >
-            Goal Achieved
+            {finishedProgressLabel}
           </Text>
         </View>
       </View>
@@ -344,6 +405,38 @@ const FinishedDay = ({
     </Animated.View>
   );
 }
+
+const CalculationInfoButton = ({ compact = false }: { compact?: boolean }) => {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
+  const [visible, setVisible] = useState(false);
+
+  return (
+    <>
+      <Pressable
+        style={[
+          styles.calculationInfoButton,
+          compact && styles.calculationInfoButtonCompact,
+        ]}
+        onPress={() => setVisible(true)}
+        accessibilityRole="button"
+        accessibilityLabel="How FitFaat calculates this"
+        hitSlop={8}
+      >
+        <Ionicons
+          name="information-circle-outline"
+          size={compact ? Math.min(hp(1.75), wp(3.9)) : Math.min(hp(2.05), wp(4.6))}
+          color={colors.primary}
+        />
+      </Pressable>
+      <FitFaatCalculationInfoModal
+        visible={visible}
+        onClose={() => setVisible(false)}
+        colors={colors}
+      />
+    </>
+  );
+};
 
 const LockedDay = ({info} : {info: Day}) => {
   const { colors } = useTheme();
@@ -444,10 +537,17 @@ const ProgressCircle = React.memo(({finalProgress}: {finalProgress: number})=>{
 ProgressCircle.displayName = 'ProgressCircle';
 
 
-const InfoTray = React.memo(({ duration }: { duration: number }) => {
+const InfoTray = React.memo(({
+  duration,
+  onExpired,
+}: {
+  duration: number;
+  onExpired?: () => void;
+}) => {
   const { colors } = useTheme();
   const styles = getStyles(colors);
   const [timeRemaining, setTimeRemaining] = useState<string>('00:00:00');
+  const hasNotifiedExpired = useRef(false);
   
   const formatDuration = (totalSeconds: number): string => {
     const seconds = Math.max(0, Math.floor(totalSeconds));
@@ -471,24 +571,36 @@ const InfoTray = React.memo(({ duration }: { duration: number }) => {
   };
 
   useEffect(() => {
+    hasNotifiedExpired.current = false;
     const durationSeconds = Number(duration);
-    let secondsRemaining = Number.isFinite(durationSeconds) && durationSeconds > 0
-      ? Math.floor(durationSeconds)
+    let secondsRemaining = Number.isFinite(durationSeconds)
+      ? Math.max(0, Math.floor(durationSeconds))
       : calculateTimeUntilEndOfDay();
 
+    const notifyExpired = () => {
+      if (hasNotifiedExpired.current) return;
+      hasNotifiedExpired.current = true;
+      onExpired?.();
+    };
+
     setTimeRemaining(formatDuration(secondsRemaining));
+    if (secondsRemaining === 0) {
+      notifyExpired();
+      return;
+    }
 
     const interval = setInterval(() => {
       secondsRemaining = Math.max(0, secondsRemaining - 1);
       setTimeRemaining(formatDuration(secondsRemaining));
       
       if (secondsRemaining === 0) {
+        notifyExpired();
         clearInterval(interval);
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [duration]);
+  }, [duration, onExpired]);
 
   return (
     <View style={styles.modernNextMeal}>
@@ -729,6 +841,33 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontWeight: '500',
     letterSpacing: 0.2,
   },
+
+  goalProgressCluster: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: wp(2),
+    minWidth: Math.min(wp(22), hp(11.5)),
+  },
+
+  dailyRingLabel: {
+    color: colors.textPrimary,
+    fontSize: Math.min(hp(1.08), wp(2.55)),
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 0,
+    marginTop: hp(0.35),
+    includeFontPadding: false,
+  },
+
+  dailyRingHint: {
+    color: colors.textSecondary,
+    fontSize: Math.min(hp(0.95), wp(2.25)),
+    fontWeight: '800',
+    letterSpacing: 0,
+    marginTop: hp(0.1),
+    includeFontPadding: false,
+  },
   
   modernProgressWrapper: {
     alignItems: 'center',
@@ -744,6 +883,33 @@ const getStyles = (colors: any) => StyleSheet.create({
     textAlign: 'center',
     fontWeight: '800',
     includeFontPadding: false,
+  },
+
+  calculationInfoButton: {
+    position: 'absolute',
+    top: -hp(0.8),
+    right: -wp(1.3),
+    width: Math.min(hp(3.1), wp(6.9)),
+    height: Math.min(hp(3.1), wp(6.9)),
+    borderRadius: Math.min(hp(1.55), wp(3.45)),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.cardBackground,
+    borderWidth: 1,
+    borderColor: `${colors.primary}44`,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.18,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+
+  calculationInfoButtonCompact: {
+    top: hp(0.35),
+    right: wp(0.7),
+    width: Math.min(hp(2.45), wp(5.4)),
+    height: Math.min(hp(2.45), wp(5.4)),
+    borderRadius: Math.min(hp(1.225), wp(2.7)),
   },
   
   modernStatusSection: {
@@ -878,13 +1044,16 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   
   statusValue: {
+    width: '100%',
     fontSize: hp(1.8),
     color: colors.textPrimary,
     fontWeight: '700',
     marginTop: hp(0.2),
+    includeFontPadding: false,
   },
 
   statusValueGroup: {
+    width: '100%',
     marginTop: hp(0.2),
     minWidth: 0,
   },
@@ -895,6 +1064,14 @@ const getStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
     fontWeight: '700',
     marginTop: hp(0.05),
+  },
+
+  statusTargetHint: {
+    color: colors.primary,
+    fontSize: Math.min(hp(1.02), wp(2.35)),
+    lineHeight: Math.min(hp(1.32), wp(3)),
+    fontWeight: '800',
+    marginTop: hp(0.12),
   },
 
   statusValuePremium: {
@@ -911,6 +1088,59 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontSize: Math.min(hp(1.28), wp(2.9)),
     lineHeight: Math.min(hp(1.6), wp(3.5)),
     includeFontPadding: false,
+  },
+
+  modernWalkingProgress: {
+    marginTop: -wp(2.4),
+    marginBottom: wp(4.3),
+    backgroundColor: '#ECFDF5',
+    borderRadius: wp(3.2),
+    paddingHorizontal: wp(3.2),
+    paddingVertical: hp(1.05),
+    borderWidth: 1,
+    borderColor: '#22C55E33',
+  },
+
+  modernWalkingProgressHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: wp(2),
+    marginBottom: hp(0.65),
+  },
+
+  modernWalkingProgressTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(1.2),
+    minWidth: 0,
+    flex: 1,
+  },
+
+  modernWalkingProgressLabel: {
+    color: colors.textPrimary,
+    fontSize: Math.min(hp(1.28), wp(3)),
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+
+  modernWalkingProgressValue: {
+    color: '#22C55E',
+    fontSize: Math.min(hp(1.38), wp(3.2)),
+    fontWeight: '900',
+  },
+
+  modernWalkingProgressTrack: {
+    height: hp(0.85),
+    borderRadius: hp(0.45),
+    overflow: 'hidden',
+    backgroundColor: '#BBF7D0',
+  },
+
+  modernWalkingProgressFill: {
+    height: '100%',
+    borderRadius: hp(0.45),
+    backgroundColor: '#22C55E',
   },
   
   modernStatusText: {
@@ -1137,6 +1367,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   modernFinishedProgress: {
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
     paddingVertical: hp(0.85),
     paddingHorizontal: wp(2.5),
     backgroundColor: colors.primarySoft,
@@ -1156,6 +1387,18 @@ const getStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: `${colors.success}16`,
     marginBottom: hp(0.45),
+  },
+
+  modernFinishedRingLabel: {
+    width: '100%',
+    color: colors.textSecondary,
+    textAlign: 'center',
+    fontSize: Math.min(hp(1.05), wp(2.5)),
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 0,
+    marginBottom: hp(0.45),
+    includeFontPadding: false,
   },
   
   modernFinishedPercentage: {

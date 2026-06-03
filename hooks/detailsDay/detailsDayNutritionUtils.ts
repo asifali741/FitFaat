@@ -1,17 +1,5 @@
 import type { DietPreference } from "@/constants/foodDatabase";
 
-export type MealTemplate = {
-  id: string;
-  name: string;
-  servingSize: string;
-  quantity: number;
-  caloriesPerServing: number;
-  proteinPerServing: number;
-  carbsPerServing: number;
-  fatsPerServing: number;
-  createdAt: string;
-};
-
 export type MealLogDraft = {
   foodName: string;
   quantity: number;
@@ -21,6 +9,7 @@ export type MealLogDraft = {
   carbs: number;
   fats: number;
   description?: string;
+  eatenAt?: string;
 };
 
 export const isDietPreference = (value: string | null): value is DietPreference =>
@@ -104,21 +93,6 @@ export const getMealDisplayName = (meal: any) =>
 
 export const getMealServingSize = (meal: any) =>
   String(meal?.servingSize || meal?.serving_size || meal?.portion || "portion");
-
-export const buildMealDraftFromTemplate = (template: MealTemplate): MealLogDraft => {
-  const quantity = Math.max(0.5, toMealNumber(template.quantity, 1));
-
-  return {
-    foodName: template.name,
-    quantity,
-    servingSize: template.servingSize || "portion",
-    calories: Math.round(template.caloriesPerServing * quantity),
-    protein: Math.round(template.proteinPerServing * quantity),
-    carbs: Math.round(template.carbsPerServing * quantity),
-    fats: Math.round(template.fatsPerServing * quantity),
-    description: "Added from meal template",
-  };
-};
 
 export const buildMealDraftFromStoredMeal = (meal: any): MealLogDraft | null => {
   const quantity = Math.max(0.5, toMealNumber(meal?.quantity ?? meal?.servings, 1));

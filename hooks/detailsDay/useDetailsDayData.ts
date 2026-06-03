@@ -2,12 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   applyAdaptiveGoalsToJsonResponse,
-  loadAdaptiveGoalCarryForward,
   loadAdaptiveGoalMetrics,
   loadWeeklyWeightTrendCalibration,
-  saveAdaptiveGoalCarryForward,
 } from "@/utils/adaptiveGoals";
 import { dailyLogsApi } from "@/utils/dailyLogsApi";
+import {
+  mergeDailyProgressDay,
+  mergeDailyProgressMap,
+} from "@/utils/dailyProgressSync";
 import {
   getExerciseCaloriesBurned,
   mergeExerciseProgressIntoDay,
@@ -50,7 +52,7 @@ export function useDetailsDayData({
   const [isLoading, setIsLoading] = useState(false);
   const [isCompletingDay, setIsCompletingDay] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
-  const [goalDisplayMode, setGoalDisplayMode] = useState<GoalDisplayMode>("simple");
+  const [goalDisplayMode, setGoalDisplayMode] = useState<GoalDisplayMode>("exact");
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [completionModalType, setCompletionModalType] = useState<CompletionModalType>("confirm");
   const [completionModalData, setCompletionModalData] = useState<any>({});
@@ -65,9 +67,19 @@ export function useDetailsDayData({
         if (!isActive) return;
 
         setIsPremium(premiumActive);
-        loadGoalDisplayMode().then(setGoalDisplayMode).catch(() => setGoalDisplayMode("simple"));
+        loadGoalDisplayMode().then(setGoalDisplayMode).catch(() => setGoalDisplayMode("exact"));
 
-        let dayWithExerciseProgress: any = await mergeExerciseProgressIntoDay(initialDayData);
+        const freshDayData = initialDayData?._id
+          ? await dailyLogsApi.getDailyLogFresh(String(initialDayData._id)).catch((error) => {
+              console.log("[DetailsDay] Fresh daily log unavailable:", error);
+              return null;
+            })
+          : null;
+        const authoritativeDayData = freshDayData
+          ? mergeDailyProgressDay(initialDayData, freshDayData, { preferIncomingWhenUnclear: true })
+          : initialDayData;
+
+        let dayWithExerciseProgress: any = await mergeExerciseProgressIntoDay(authoritativeDayData);
         if (premiumActive) {
           dayWithExerciseProgress = await mergeWalkingProgressIntoDay(dayWithExerciseProgress);
         }
@@ -77,6 +89,13 @@ export function useDetailsDayData({
           ...dayWithExerciseProgress,
           achievedCalories: dayWithExerciseProgress.achievedCalories || 0,
           achieviedHydration: dayWithExerciseProgress.achieviedHydration || 0,
+          achievedHydration:
+            dayWithExerciseProgress.achievedHydration ??
+            dayWithExerciseProgress.achieviedHydration ??
+            0,
+          dateKey: dayWithExerciseProgress.dateKey,
+          updatedAt: dayWithExerciseProgress.updatedAt,
+          savedAt: dayWithExerciseProgress.savedAt,
           targetCalories: dayWithExerciseProgress.targetCalories,
           targetHydration: dayWithExerciseProgress.targetHydration,
           targetCaloriesMin: dayWithExerciseProgress.targetCaloriesMin,
@@ -97,7 +116,9 @@ export function useDetailsDayData({
           targetWalkingCaloriesBurned: premiumActive ? getWalkingCaloriesTarget(dayWithExerciseProgress) : 0,
           walkingSteps: premiumActive ? dayWithExerciseProgress.walkingSteps || 0 : 0,
           meals: dayWithExerciseProgress.meals || [],
+          waterIntake: dayWithExerciseProgress.waterIntake || [],
           remarks: dayWithExerciseProgress.remarks,
+          notes: dayWithExerciseProgress.notes,
           status: dayWithExerciseProgress.status,
           isCompleted: dayWithExerciseProgress.isCompleted || false,
           completionPercentage: dayWithExerciseProgress.completionPercentage || 0,
@@ -126,23 +147,23 @@ export function useDetailsDayData({
         if (!cached) return updatedDayData;
 
         const cachedData = cached.data;
-        const dayKey = `day0${updatedDayData.dayNo}`;
+        const dayNo = Number(updatedDayData?.dayNo ?? updatedDayData?.dayNumber);
+        const dayKey =
+          Number.isFinite(dayNo) && dayNo > 0
+            ? `day0${Math.round(dayNo)}`
+            : updatedDayData?._id
+              ? `log:${updatedDayData._id}`
+              : "updated-day";
 
-        if (!cachedData?.[dayKey]) return updatedDayData;
+        if (!cachedData || typeof cachedData !== "object") return updatedDayData;
 
-        const carryForward = await loadAdaptiveGoalCarryForward({
-          userId: user?.id,
-          currentWeeklyTrackingId: weeklyTrackingId,
-        });
         const adaptiveMetrics = await loadAdaptiveGoalMetrics(user);
         const adaptivePlan = isPremium ? "premium" : "free";
-        const mergedCache = {
-          ...cachedData,
-          [dayKey]: {
-            ...cachedData[dayKey],
-            ...updatedDayData,
-          },
-        };
+        const mergedCache = mergeDailyProgressMap(
+          cachedData,
+          { [dayKey]: updatedDayData },
+          { preferIncomingWhenUnclear: true }
+        );
         const weightTrendCalibration = await loadWeeklyWeightTrendCalibration(
           adaptiveMetrics,
           mergedCache,
@@ -155,10 +176,16 @@ export function useDetailsDayData({
         const nextData = applyAdaptiveGoalsToJsonResponse(
           mergedCache,
           adaptiveMetrics,
-          carryForward,
           { plan: adaptivePlan, weightTrendCalibration }
         );
-        const nextDayData = nextData[dayKey] || updatedDayData;
+        const nextDayEntry = Object.entries(nextData).find(([key, day]: [string, any]) => {
+          if (key === dayKey) return true;
+          if (updatedDayData?._id && day?._id && String(updatedDayData._id) === String(day._id)) {
+            return true;
+          }
+          return Number(updatedDayData?.dayNo) > 0 && Number(day?.dayNo) === Number(updatedDayData.dayNo);
+        });
+        const nextDayData = nextDayEntry?.[1] || updatedDayData;
         const nextStore = { data: nextData, timestamp: new Date() };
 
         await setStoredDashboardCache(nextStore, user, weeklyTrackingId);
@@ -222,24 +249,6 @@ export function useDetailsDayData({
             setCompletionModalData({ message: "Weekly tracking ID not found. Please restart the app." });
             setShowCompletionModal(true);
             return;
-          }
-
-          if (Number(dayData.dayNo) >= 7) {
-            const cached = await getStoredDashboardCache<any>(user, weeklyTrackingId);
-            const cachedData = cached?.data || {};
-            const dayKey = `day0${dayData.dayNo}`;
-
-            await saveAdaptiveGoalCarryForward(
-              {
-                ...cachedData,
-                [dayKey]: {
-                  ...(cachedData?.[dayKey] || {}),
-                  ...dayData,
-                  status: "finished",
-                },
-              },
-              { userId: user?.id, weeklyTrackingId }
-            );
           }
 
           const result = await dailyLogsApi.completeDay(weeklyTrackingId, dayData.dayNo);

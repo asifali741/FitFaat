@@ -408,7 +408,6 @@ export default function ProfileInformation() {
 
   useEffect(() => {
     if (Platform.OS === "android") {
-      NavigationBar.setBackgroundColorAsync("#FFFFFF").catch(() => {});
       NavigationBar.setButtonStyleAsync("dark").catch(() => {});
       try {
         NavigationBar.setStyle("light");

@@ -1380,20 +1380,6 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
             >
               {userRole === 'user' && (
                 <AnimatedPressable
-                  style={styles.quickReplyChip}
-                  onPress={() => router.push('/(main)/(doctor-report)' as any)}
-                  activeScale={0.96}
-                >
-                  <Ionicons
-                    name="document-text-outline"
-                    size={Math.min(hp(1.9), wp(4.2))}
-                    color={colors.primary}
-                  />
-                  <Text style={styles.quickReplyText}>Doctor Report</Text>
-                </AnimatedPressable>
-              )}
-              {userRole === 'user' && (
-                <AnimatedPressable
                   style={[
                     styles.quickReplyChip,
                     styles.progressShareChip,

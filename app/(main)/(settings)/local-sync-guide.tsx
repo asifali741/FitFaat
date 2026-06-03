@@ -29,7 +29,7 @@ const exportSteps = [
 const verifySteps = [
   "Tap Test File after exporting.",
   "Choose the same folder that contains the .ffsync file.",
-  "Backup Center checks the passcode, account match, file format, checksum, and missing photo assets.",
+  "Backup Center checks the passcode, account match, file format, and checksum.",
   "If the test passes, move the file to your second phone as a document or file.",
   "If the test fails, create a fresh export before deleting anything.",
 ];
@@ -57,17 +57,22 @@ const backupIncludes = [
   "Behavior Coach missions, habit streaks, cravings, reflections, mini-lessons, and coach preferences.",
   "Steps, walking calories, step goal, workouts, exercise progress, and favorites.",
   "Weight logs, health metrics, adaptive targets, and dashboard progress.",
-  "Progress photo metadata and readable local progress photo files.",
   "Settings, privacy choices, notification preferences, notes, badges, and local app state.",
 ];
 
 const backupTools = [
   "Export creates one encrypted .ffsync file with the categories you selected.",
   "Preview opens the file and shows what will restore before anything is applied.",
-  "Test File checks the passcode, account match, file format, checksum, and missing photo assets.",
+  "Test File checks the passcode, account match, file format, and checksum.",
   "Restore Selected applies only the categories that are both selected and present in the previewed file.",
   "Backup History records local export, import, and test activity for the current account.",
   "Last test shows whether the newest verification passed or failed.",
+];
+
+const qrTransferTips = [
+  "Use QR Transfer for quick recent activity, intake, weight, Meal Planner, notes, and Emergency WhatsApp moves.",
+  "Use Backup Center when you want a fuller encrypted file that can be saved, tested, and restored by category.",
+  "If a QR is too dense to scan, use Send on QR Transfer or create a full backup file instead.",
 ];
 
 const securityRules = [
@@ -96,16 +101,10 @@ export default function LocalSyncGuideScreen() {
   useEffect(() => {
     if (Platform.OS !== "android") return;
 
-    NavigationBar.setPositionAsync("absolute").catch(() => {});
-    NavigationBar.setBackgroundColorAsync("#00000000").catch(() => {});
-    NavigationBar.setBorderColorAsync("#00000000").catch(() => {});
     NavigationBar.setButtonStyleAsync("dark").catch(() => {});
     NavigationBar.setStyle("light");
 
     return () => {
-      NavigationBar.setPositionAsync("relative").catch(() => {});
-      NavigationBar.setBackgroundColorAsync(SYSTEM_BAR_BACKGROUND).catch(() => {});
-      NavigationBar.setBorderColorAsync(SYSTEM_BAR_BACKGROUND).catch(() => {});
       NavigationBar.setButtonStyleAsync("dark").catch(() => {});
       NavigationBar.setStyle("light");
     };
@@ -193,6 +192,7 @@ export default function LocalSyncGuideScreen() {
           <TipSection title="Security Rules" icon="lock-closed-outline" tips={securityRules} />
           <TipSection title="What Gets Backed Up" icon="archive-outline" tips={backupIncludes} />
           <TipSection title="Backup Center Tools" icon="shield-checkmark-outline" tips={backupTools} />
+          <TipSection title="QR Or Backup" icon="qr-code-outline" tips={qrTransferTips} />
           <StepList title="Create Backup" icon="download-outline" steps={exportSteps} />
           <StepList title="Test Backup" icon="shield-checkmark-outline" steps={verifySteps} />
           <StepList title="Move The File" icon="document-attach-outline" steps={moveSteps} />

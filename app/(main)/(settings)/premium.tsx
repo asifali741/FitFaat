@@ -1,21 +1,18 @@
 import AppHeader from "@/components/AppHeader";
-import { FeatureAccessBadge } from "@/components/common/FeatureAccessBadge";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
 import {
-  FEATURE_LABELS,
   FREE_PLAN_LIMITS,
-  PREMIUM_FEATURES,
-  buildFeatureAccessStatusesForPlan,
-  getFeatureAccessStatuses,
-  type FeatureAccessBadgeTone,
-  type FeatureAccessStatus,
   type PremiumFeature,
 } from "@/utils/featureAccess";
+import {
+  getGoalExperience,
+} from "@/utils/goalExperience";
+import { getGoalOutcomePremiumCopy } from "@/utils/goalAdaptivePlan";
+import { loadGoalSpineKey, type GoalSpineKey } from "@/utils/goalSpine";
 import { isPremiumStatusActive } from "@/utils/premiumAccess";
 import { Ionicons } from "@expo/vector-icons";
-import { BlurView } from "expo-blur";
 import { useFocusEffect } from "@react-navigation/native";
 import { CardField, useStripe } from "@stripe/stripe-react-native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -67,72 +64,20 @@ const PREMIUM_PLAN_PRICE_DOLLARS = 10;
 const PREMIUM_PLAN_PRICE_LABEL = `$${PREMIUM_PLAN_PRICE_DOLLARS}`;
 const PREMIUM_PLAN_PRICE_WITH_CENTS = `$${PREMIUM_PLAN_PRICE_DOLLARS.toFixed(2)}`;
 
-const premiumPreviewItems = [
-  { icon: 'nutrition-outline', title: 'Smart Meal Planner', text: 'Premium adds smart meal plans, macros, and grocery automation.' },
-  { icon: 'chatbubbles-outline', title: 'Unlimited AI Coach', text: `Free includes ${FREE_PLAN_LIMITS.aiCoachDailyMessages} coach messages/day. Premium makes coaching Unlimited.` },
-  { icon: 'barbell-outline', title: 'Workout Module', text: 'Unlock the full workout module with plans, history, and favorites.' },
-  { icon: 'document-text-outline', title: 'Reports + Exports', text: 'Export progress reports and HeaLora chat history when needed.' },
-];
-
-const comparisonRows: {
+const premiumFeatureItems: {
   icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  free: string;
-  premium: string;
-  freeTone: FeatureAccessBadgeTone;
-  freeBadge: string;
-  premiumTone: FeatureAccessBadgeTone;
-  premiumBadge: string;
+  title: string;
+  feature: PremiumFeature;
+  text?: string;
 }[] = [
-  { icon: 'speedometer-outline', label: 'Dashboard', free: 'Basic Score + daily essentials', premium: 'Full Health Score + deeper tools', freeTone: 'free', freeBadge: 'Free', premiumTone: 'premium', premiumBadge: 'Premium' },
-  { icon: 'nutrition-outline', label: 'Meal Planner', free: 'Basic planner', premium: 'Smart plans + macros', freeTone: 'free', freeBadge: 'Free', premiumTone: 'premium', premiumBadge: 'Premium' },
-  { icon: 'basket-outline', label: 'Grocery Lists', free: 'Manual lists', premium: 'Automated from plans', freeTone: 'free', freeBadge: 'Free', premiumTone: 'premium', premiumBadge: 'Premium' },
-  { icon: 'analytics-outline', label: 'Nutrition Score', free: 'Basic Score history', premium: 'Deep insights', freeTone: 'free', freeBadge: 'Free', premiumTone: 'premium', premiumBadge: 'Premium' },
-  { icon: 'sparkles-outline', label: 'Personal Coach Feed', free: 'Basic tips', premium: 'Personalized missions', freeTone: 'free', freeBadge: 'Free', premiumTone: 'premium', premiumBadge: 'Premium' },
-  { icon: 'trending-up-outline', label: 'Adaptive Goals', free: 'Basic targets', premium: 'Advanced adjustment', freeTone: 'free', freeBadge: 'Free', premiumTone: 'premium', premiumBadge: 'Premium' },
-  { icon: 'battery-charging-outline', label: 'Readiness Recovery', free: 'Basic score', premium: 'Full recovery cues', freeTone: 'free', freeBadge: 'Free', premiumTone: 'premium', premiumBadge: 'Premium' },
-  { icon: 'leaf-outline', label: 'Mindfulness Library', free: 'Core sessions', premium: 'Full library + history', freeTone: 'free', freeBadge: 'Free', premiumTone: 'premium', premiumBadge: 'Premium' },
-  { icon: 'grid-outline', label: 'Heatmap Filters', free: 'Basic filters', premium: 'Advanced filters', freeTone: 'free', freeBadge: 'Free', premiumTone: 'premium', premiumBadge: 'Premium' },
-  { icon: 'document-text-outline', label: 'Reports Export', free: 'Premium feature', premium: 'Included', freeTone: 'locked', freeBadge: 'Locked', premiumTone: 'premium', premiumBadge: 'Premium' },
-  { icon: 'chatbubbles-outline', label: 'AI Coach', free: `${FREE_PLAN_LIMITS.aiCoachDailyMessages} messages/day`, premium: 'Unlimited', freeTone: 'free', freeBadge: 'Free', premiumTone: 'unlimited', premiumBadge: 'Unlimited' },
-  { icon: 'footsteps-outline', label: 'Steps', free: `${FREE_PLAN_LIMITS.dailyStepCounterPreview}-step preview`, premium: 'Goals + calories + trends', freeTone: 'free', freeBadge: 'Free', premiumTone: 'premium', premiumBadge: 'Premium' },
-  { icon: 'barbell-outline', label: 'Workout Module', free: 'Premium feature', premium: 'Full access', freeTone: 'locked', freeBadge: 'Locked', premiumTone: 'premium', premiumBadge: 'Premium' },
-  { icon: 'calendar-outline', label: 'Doctor Appointments', free: `${FREE_PLAN_LIMITS.activeDoctorAppointments} active booking`, premium: 'Unlimited active', freeTone: 'free', freeBadge: 'Free', premiumTone: 'unlimited', premiumBadge: 'Unlimited' },
-  { icon: 'download-outline', label: 'Chat History Export', free: 'Premium feature', premium: 'Included', freeTone: 'locked', freeBadge: 'Locked', premiumTone: 'premium', premiumBadge: 'Premium' },
-  { icon: 'cloud-done-outline', label: 'Backup Center', free: 'Included', premium: 'Included', freeTone: 'free', freeBadge: 'Free', premiumTone: 'premium', premiumBadge: 'Premium' },
+  { icon: 'trending-up-outline', title: 'Weekly Goal Adjustment Plan', feature: 'adaptiveGoalsPro' },
+  { icon: 'analytics-outline', title: 'Deep Nutrition Insights', feature: 'nutritionInsights' },
+  { icon: 'barbell-outline', title: 'Goal-Based Workout Progression', feature: 'workoutModule' },
+  { icon: 'document-text-outline', title: 'Reports Export', feature: 'reportsExport' },
+  { icon: 'download-outline', title: 'Chat History Export', feature: 'chatExport', text: 'Export HeaLora chat history when you need a saved record.' },
+  { icon: 'chatbubbles-outline', title: 'Unlimited AI Coach', feature: 'aiCoach', text: `Send more than ${FREE_PLAN_LIMITS.aiCoachDailyMessages} HeaLora messages per day.` },
+  { icon: 'calendar-outline', title: 'Unlimited Doctor Bookings', feature: 'appointments', text: `Keep more than ${FREE_PLAN_LIMITS.activeDoctorAppointments} active doctor appointment at a time.` },
 ];
-
-const premiumFeatureItems = [
-  { icon: 'nutrition-outline', title: 'Smart Meal Planner + Macros', text: 'Go beyond basic planning with smarter meal plans, macro guidance, and automated grocery lists.' },
-  { icon: 'sparkles-outline', title: 'Personalized Coach Missions', text: 'Premium adds deeper coach missions, adaptive adjustments, readiness cues, and better next actions.' },
-  { icon: 'leaf-outline', title: 'Full Mindfulness Library', text: 'Unlock the full mindfulness library with custom sessions and saved history.' },
-  { icon: 'document-text-outline', title: 'Reports + Chat Export', text: 'Export progress reports and HeaLora chat history for review or sharing.' },
-  { icon: 'chatbubbles-outline', title: 'Unlimited AI Coach', text: `Free includes ${FREE_PLAN_LIMITS.aiCoachDailyMessages} HeaLora messages each day. Premium unlocks unlimited daily coaching.` },
-  { icon: 'footsteps-outline', title: 'Steps Pro', text: `Keep the ${FREE_PLAN_LIMITS.dailyStepCounterPreview}-step preview free, then unlock goals, step calories, and trends with Premium.` },
-  { icon: 'barbell-outline', title: 'Workout Module', text: 'Unlock the full workout module with guided plans, favorites, history, and body-part training.' },
-  { icon: 'calendar-outline', title: 'Unlimited Doctor Appointments', text: `Free includes ${FREE_PLAN_LIMITS.activeDoctorAppointments} active appointment. Premium unlocks unlimited active bookings.` },
-];
-
-const premiumFeatureIcons: Record<PremiumFeature, keyof typeof Ionicons.glyphMap> = {
-  stepsTracking: 'footsteps-outline',
-  mindfulness: 'leaf-outline',
-  advancedCharts: 'analytics-outline',
-  mealPlanner: 'basket-outline',
-  mealPlannerPro: 'nutrition-outline',
-  groceryAutomation: 'basket-outline',
-  nutritionInsights: 'analytics-outline',
-  coachMissions: 'sparkles-outline',
-  adaptiveGoalsPro: 'trending-up-outline',
-  readinessRecoveryPro: 'battery-charging-outline',
-  mindfulnessPro: 'leaf-outline',
-  heatmapFiltersPro: 'grid-outline',
-  reportsExport: 'document-text-outline',
-  workoutModule: 'barbell-outline',
-  aiCoach: 'chatbubbles-outline',
-  appointments: 'calendar-outline',
-  chatExport: 'download-outline',
-  stepsPro: 'footsteps-outline',
-};
 
 export default function PremiumScreen() {
   const { colors } = useTheme();
@@ -144,10 +89,8 @@ export default function PremiumScreen() {
 
   const [loading, setLoading] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
+  const [goalKey, setGoalKey] = useState<GoalSpineKey>("unset");
   const [premiumStatusData, setPremiumStatusData] = useState<any>(null);
-  const [featureAccesses, setFeatureAccesses] = useState<
-    Partial<Record<PremiumFeature, FeatureAccessStatus>>
-  >({});
   const [processing, setProcessing] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
@@ -192,12 +135,12 @@ export default function PremiumScreen() {
     }
   }, [API_URL]);
 
-  const refreshFeatureAccesses = useCallback(async () => {
+  const refreshGoalContext = useCallback(async () => {
     try {
-      const statuses = await getFeatureAccessStatuses(PREMIUM_FEATURES);
-      setFeatureAccesses(statuses);
-    } catch (error: any) {
-      console.error("Error fetching premium feature access:", error?.message || error);
+      setGoalKey(await loadGoalSpineKey());
+    } catch (error) {
+      console.log("Premium goal context unavailable:", error);
+      setGoalKey("unset");
     }
   }, []);
 
@@ -241,20 +184,19 @@ export default function PremiumScreen() {
   useEffect(() => {
     checkPremiumStatus();
     fetchPaymentMethods();
-    refreshFeatureAccesses();
+    refreshGoalContext();
     if (Platform.OS === 'android') {
-      NavigationBar.setBackgroundColorAsync('#FFFFFF').catch(() => {});
       NavigationBar.setButtonStyleAsync('dark').catch(() => {});
       NavigationBar.setStyle('light');
     }
-  }, [checkPremiumStatus, fetchPaymentMethods, refreshFeatureAccesses]);
+  }, [checkPremiumStatus, fetchPaymentMethods, refreshGoalContext]);
 
   useFocusEffect(
     useCallback(() => {
       checkPremiumStatus();
       fetchPaymentMethods();
-      refreshFeatureAccesses();
-    }, [checkPremiumStatus, fetchPaymentMethods, refreshFeatureAccesses])
+      refreshGoalContext();
+    }, [checkPremiumStatus, fetchPaymentMethods, refreshGoalContext])
   );
 
   useEffect(() => {
@@ -422,18 +364,15 @@ export default function PremiumScreen() {
         isPremium: true,
         memberSince: current?.memberSince || current?.premiumSince || new Date().toISOString(),
       }));
-      setFeatureAccesses(buildFeatureAccessStatusesForPlan(PREMIUM_FEATURES, true));
       setShowPaymentForm(false);
       setCardDetails(null);
       setUseNewCard(false);
       await fetchPaymentMethods();
       setTimeout(() => {
         checkPremiumStatus();
-        refreshFeatureAccesses();
       }, 1500);
       setTimeout(() => {
         checkPremiumStatus();
-        refreshFeatureAccesses();
       }, 5000);
       await sendSubscriptionAlert(
         'Premium Activated',
@@ -451,7 +390,6 @@ export default function PremiumScreen() {
             onPress: () => {
               setTimeout(() => {
                 checkPremiumStatus();
-                refreshFeatureAccesses();
               }, 1000);
             },
           },
@@ -507,8 +445,6 @@ export default function PremiumScreen() {
                 }));
                 setShowPaymentForm(false);
                 setCardDetails(null);
-                setFeatureAccesses(buildFeatureAccessStatusesForPlan(PREMIUM_FEATURES, false));
-                await refreshFeatureAccesses();
                 await sendSubscriptionAlert(
                   'Premium Cancelled',
                   'Your FitFaat Premium subscription has been cancelled.'
@@ -532,6 +468,7 @@ export default function PremiumScreen() {
   };
 
   const styles = getStyles(colors);
+  const goalExperience = getGoalExperience(goalKey);
   const upgradeButtonIconSize = Math.min(hp(3.2), wp(7));
   const upgradeButtonChevronSize = Math.min(hp(2.8), wp(6.2));
   const selectedPaymentMethod = paymentMethods.find(
@@ -541,85 +478,25 @@ export default function PremiumScreen() {
   const canPayForPremium = useNewCard
     ? Boolean(cardDetails?.complete)
     : Boolean(selectedSavedPaymentStripeId);
-  const premiumAccessList = PREMIUM_FEATURES.map((feature) => featureAccesses[feature]);
-  const lockedFeatureCount = premiumAccessList.filter((access) => access?.isLocked).length;
   const subscriptionStatusLabel = isPremium ? "Premium Active" : "Free Plan";
   const subscriptionStatusText = isPremium
-    ? "Smart planning, deeper insights, exports, unlimited AI coaching, workouts, and unlimited active bookings are active."
-    : `Basic health tracking stays useful with Basic Score, Basic counter, and the ${FREE_PLAN_LIMITS.dailyStepCounterPreview}-step preview. Premium adds smarter planning, exports, unlimited usage, and full workouts.`;
+    ? "Workouts, deeper insights, exports, unlimited AI, and unlimited active bookings are active."
+    : `Free includes the dashboard, steps, charts, meal planning, grocery lists, and mindfulness for ${goalExperience.label}.`;
+  const goalPremiumFeatureItems = premiumFeatureItems.map((feature) => ({
+    ...feature,
+    text: feature.text || getGoalOutcomePremiumCopy(goalKey, feature.feature),
+  }));
   const memberSince =
     premiumStatusData?.memberSince ||
     premiumStatusData?.premiumSince ||
     premiumStatusData?.subscription?.createdAt ||
     premiumStatusData?.subscription?.startedAt;
-  const renderComparisonTable = () => (
-    <View style={styles.comparisonCard}>
-      <View style={styles.comparisonHeader}>
-        <View style={styles.comparisonTitleWrap}>
-          <Text style={styles.comparisonEyebrow}>Plan access</Text>
-          <Text style={styles.comparisonTitle}>Free vs Premium</Text>
-          <Text style={styles.comparisonSubtitle}>
-            {`Free includes Basic Score, Basic counter, and the ${FREE_PLAN_LIMITS.dailyStepCounterPreview}-step preview. Premium adds the deeper health model, automation, exports, and Unlimited access.`}
-          </Text>
-        </View>
-        <View style={styles.comparisonHeaderIcon}>
-          <Ionicons name="diamond-outline" size={Math.min(hp(2.6), wp(5.8))} color={colors.primary} />
-        </View>
-      </View>
-
-      <View style={styles.comparisonLegend}>
-        <FeatureAccessBadge tone="free" label="Free" />
-        <FeatureAccessBadge tone="premium" label="Premium" />
-        <FeatureAccessBadge tone="locked" label="Locked" />
-        <FeatureAccessBadge tone="unlimited" label="Unlimited" />
-      </View>
-
-      <View style={styles.comparisonPlanHeader}>
-        <View style={styles.comparisonPlanHeaderCell}>
-          <Text style={styles.comparisonPlanKicker}>Free</Text>
-          <Text style={styles.comparisonPlanName}>Basic access</Text>
-        </View>
-        <View style={[styles.comparisonPlanHeaderCell, styles.comparisonPlanHeaderPremiumCell]}>
-          <Text style={[styles.comparisonPlanKicker, { color: colors.primary }]}>Premium</Text>
-          <Text style={styles.comparisonPlanName}>Full access</Text>
-        </View>
-      </View>
-
-      {comparisonRows.map((row) => (
-        <View key={row.label} style={styles.comparisonRow}>
-          <View style={styles.comparisonFeatureHeader}>
-            <View style={styles.comparisonFeatureIcon}>
-              <Ionicons name={row.icon} size={Math.min(hp(2.05), wp(4.6))} color={colors.primary} />
-            </View>
-            <Text style={styles.comparisonLabel}>{row.label}</Text>
-          </View>
-
-          <View style={styles.comparisonAccessGrid}>
-            <View style={styles.comparisonAccessCell}>
-              <View style={styles.comparisonAccessHeader}>
-                <Text style={styles.comparisonAccessPlan}>Free</Text>
-                <FeatureAccessBadge tone={row.freeTone} label={row.freeBadge} />
-              </View>
-              <Text style={styles.comparisonFree}>{row.free}</Text>
-            </View>
-            <View style={[styles.comparisonAccessCell, styles.comparisonPremiumAccessCell]}>
-              <View style={styles.comparisonAccessHeader}>
-                <Text style={[styles.comparisonAccessPlan, { color: colors.primary }]}>Premium</Text>
-                <FeatureAccessBadge tone={row.premiumTone} label={row.premiumBadge} />
-              </View>
-              <Text style={styles.comparisonPremium}>{row.premium}</Text>
-            </View>
-          </View>
-        </View>
-      ))}
-    </View>
-  );
 
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
-        <AppHeader title="Premium" />
+        <AppHeader title="Premium Membership" />
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
@@ -648,10 +525,10 @@ export default function PremiumScreen() {
                     minimumFontScale={0.84}
                     style={styles.heroTitle}
                   >
-                    Free basics, Premium depth
+                    {goalExperience.premium.headline}
                   </Text>
                   <Text style={styles.heroSubtitle}>
-                    A simple split: useful daily essentials now, then deeper Premium tools when users are ready.
+                    {goalExperience.premium.body}
                   </Text>
                 </View>
               </View>
@@ -662,51 +539,47 @@ export default function PremiumScreen() {
                   <Text style={styles.heroStatLabel}>{subscriptionStatusText}</Text>
                 </View>
                 <View style={styles.heroStat}>
-                  <Text style={styles.heroStatValue}>{isPremium ? 0 : lockedFeatureCount || PREMIUM_FEATURES.length}</Text>
-                  <Text style={styles.heroStatLabel}>Premium upgrades</Text>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.trialCard}>
-              <View style={styles.trialHeader}>
-                <View>
-                  <Text style={styles.trialTitle}>Premium Feature Access</Text>
-                  <Text style={styles.trialSubtitle}>
-                    {`Free stays practical with Basic Score, Basic counter, and the ${FREE_PLAN_LIMITS.dailyStepCounterPreview}-step preview. Premium adds advanced planning, exports, unlimited AI coaching, Steps Pro, full workouts, and unlimited active doctor appointments.`}
+                  <Text style={styles.heroStatValue}>{PREMIUM_PLAN_PRICE_LABEL}/mo</Text>
+                  <Text style={styles.heroStatLabel}>
+                    {isPremium ? "membership active" : `${premiumFeatureItems.length} focused upgrades`}
                   </Text>
                 </View>
-                <View style={styles.trialCountPill}>
-                  <Text style={styles.trialCountText}>{isPremium ? 0 : lockedFeatureCount || PREMIUM_FEATURES.length}</Text>
-                  <Text style={styles.trialCountLabel}>premium</Text>
-                </View>
               </View>
-
-              {PREMIUM_FEATURES.map((feature) => {
-                const access = featureAccesses[feature];
-
-                return (
-                  <View key={feature} style={styles.trialRow}>
-                    <View style={styles.trialIconWrap}>
-                      <Ionicons name={premiumFeatureIcons[feature]} size={Math.min(hp(2.4), wp(5.2))} color={colors.primary} />
-                    </View>
-                    <View style={styles.trialCopy}>
-                      <Text style={styles.trialFeatureName}>{FEATURE_LABELS[feature]}</Text>
-                      <Text style={styles.trialFeatureMeta}>
-                        {access?.accessSource === "premium"
-                          ? "Included in your membership"
-                          : !access
-                            ? "Checking membership status"
-                          : "Premium Membership feature"}
-                      </Text>
-                    </View>
-                    <FeatureAccessBadge access={access} compact={false} />
-                  </View>
-                );
-              })}
             </View>
 
-            {renderComparisonTable()}
+            <View style={styles.goalPremiumCard}>
+              <View style={styles.goalPremiumHeader}>
+                <View style={[styles.goalPremiumIcon, { backgroundColor: `${goalExperience.color}18` }]}>
+                  <Ionicons
+                    name={goalExperience.icon as keyof typeof Ionicons.glyphMap}
+                    size={Math.min(hp(2.8), wp(6.2))}
+                    color={goalExperience.color}
+                  />
+                </View>
+                <View style={styles.goalPremiumCopy}>
+                  <Text style={[styles.goalPremiumEyebrow, { color: goalExperience.color }]}>
+                    Premium for {goalExperience.label}
+                  </Text>
+                  <Text style={styles.goalPremiumTitle}>{goalExperience.premium.headline}</Text>
+                  <Text style={styles.goalPremiumBody}>{goalExperience.premium.body}</Text>
+                </View>
+              </View>
+              <View style={styles.goalPremiumFeatureList}>
+                {goalPremiumFeatureItems.slice(0, 5).map((feature) => (
+                  <View key={feature.feature} style={styles.goalPremiumFeatureRow}>
+                    <Ionicons
+                      name={feature.icon}
+                      size={Math.min(hp(2), wp(4.5))}
+                      color={goalExperience.color}
+                    />
+                    <Text style={styles.goalPremiumFeatureText}>
+                      {feature.text}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+
           </>
         ) : null}
 
@@ -714,24 +587,6 @@ export default function PremiumScreen() {
           <>
             {!showPaymentForm ? (
               <>
-                <View style={styles.previewHeader}>
-                  <Text style={styles.previewTitle}>Premium Highlights</Text>
-                  <Text style={styles.previewSubtitle}>The Premium layer focuses on automation, depth, unlimited use, and exports.</Text>
-                </View>
-
-                <View style={styles.previewGrid}>
-                  {premiumPreviewItems.map((item) => (
-                    <View key={item.title} style={styles.previewCard}>
-                      <Ionicons name={item.icon as any} size={Math.min(hp(3.2), wp(6.8))} color={colors.primary} />
-                      <Text style={styles.previewCardTitle}>{item.title}</Text>
-                      <Text style={styles.previewCardText}>{item.text}</Text>
-                      <BlurView intensity={18} tint="light" style={styles.previewLockOverlay}>
-                        <Ionicons name="lock-closed" size={Math.min(hp(2.2), wp(4.8))} color={colors.textOnPrimary} />
-                      </BlurView>
-                    </View>
-                  ))}
-                </View>
-
                 {/* Price Card */}
                 <View style={[styles.card, { borderColor: colors.primary }]}>
                   <Text style={styles.priceLabel}>Monthly Plan</Text>
@@ -741,14 +596,14 @@ export default function PremiumScreen() {
                     <Text style={styles.period}>/month</Text>
                   </View>
                   <Text style={styles.priceDescription}>
-                    Unlock smart plans, deeper insights, exports, unlimited AI coaching, Steps Pro, full workouts, and unlimited active bookings.
+                    Free users already get dashboard journey tools, steps, charts, meal planning, grocery lists, and mindfulness. Premium adds guided workouts, deeper goal review, exports, unlimited AI coaching, and unlimited active bookings.
                   </Text>
                 </View>
 
                 {/* Features List */}
                 <View style={styles.featuresContainer}>
                   <Text style={styles.featuresTitle}>Premium Benefits Include:</Text>
-                  {premiumFeatureItems.map((feature) => (
+                  {goalPremiumFeatureItems.map((feature) => (
                     <View key={feature.title} style={styles.featureItem}>
                       <View style={styles.featureIconWrap}>
                         <Ionicons name={feature.icon as any} size={Math.min(hp(2.35), wp(5.2))} color={colors.primary} />
@@ -1047,7 +902,7 @@ export default function PremiumScreen() {
                 <Text style={styles.premiumActiveTitle}>You're a Premium Member!</Text>
               </View>
               <Text style={styles.premiumActiveSubtitle}>
-                Your Premium benefits are active: smart plans, deeper insights, exports, unlimited AI coaching, Steps Pro, full workouts, and unlimited active doctor appointments.
+                Your Premium benefits are active: FitFaat now adds guided workouts, deeper paid insights, exports, unlimited AI coaching, adaptive goal review, and unlimited active bookings.
               </Text>
             </View>
 
@@ -1072,7 +927,7 @@ export default function PremiumScreen() {
             {/* Premium Features Available */}
             <View style={styles.featuresContainer}>
               <Text style={styles.featuresTitle}>Your Premium Benefits:</Text>
-              {premiumFeatureItems.map((feature) => (
+              {goalPremiumFeatureItems.map((feature) => (
                 <View key={feature.title} style={styles.featureItem}>
                   <View style={styles.featureIconWrap}>
                     <Ionicons name={feature.icon as any} size={Math.min(hp(2.35), wp(5.2))} color={colors.primary} />
@@ -1215,6 +1070,72 @@ const getStyles = (colors: any) =>
       fontSize: Math.min(hp(1.22), wp(2.85)),
       lineHeight: hp(1.65),
       fontWeight: "700",
+    },
+    goalPremiumCard: {
+      backgroundColor: colors.cardBackground || "#FFFFFF",
+      borderRadius: hp(2),
+      padding: wp(4),
+      marginBottom: hp(2),
+      borderWidth: 1,
+      borderColor: colors.cardBorder || "#E8EEF3",
+      gap: hp(1.2),
+    },
+    goalPremiumHeader: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: wp(2.8),
+    },
+    goalPremiumIcon: {
+      width: Math.min(hp(5.2), wp(11.5)),
+      height: Math.min(hp(5.2), wp(11.5)),
+      borderRadius: Math.min(hp(2.6), wp(5.75)),
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0,
+    },
+    goalPremiumCopy: {
+      flex: 1,
+      minWidth: 0,
+    },
+    goalPremiumEyebrow: {
+      fontSize: Math.min(hp(1.08), wp(2.55)),
+      fontWeight: "900",
+      textTransform: "uppercase",
+    },
+    goalPremiumTitle: {
+      color: colors.textPrimary,
+      fontSize: Math.min(hp(1.75), wp(4)),
+      lineHeight: hp(2.35),
+      fontWeight: "900",
+      marginTop: hp(0.25),
+    },
+    goalPremiumBody: {
+      color: colors.textSecondary,
+      fontSize: Math.min(hp(1.22), wp(2.85)),
+      lineHeight: hp(1.75),
+      fontWeight: "700",
+      marginTop: hp(0.35),
+    },
+    goalPremiumFeatureList: {
+      gap: hp(0.75),
+    },
+    goalPremiumFeatureRow: {
+      minHeight: hp(4.6),
+      borderRadius: hp(1.25),
+      backgroundColor: colors.primarySoft || `${colors.primary}12`,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: wp(2),
+      paddingHorizontal: wp(2.6),
+      paddingVertical: hp(0.75),
+    },
+    goalPremiumFeatureText: {
+      flex: 1,
+      minWidth: 0,
+      color: colors.textPrimary,
+      fontSize: Math.min(hp(1.1), wp(2.65)),
+      lineHeight: hp(1.55),
+      fontWeight: "800",
     },
     trialCard: {
       backgroundColor: colors.cardBackground || "#FFFFFF",

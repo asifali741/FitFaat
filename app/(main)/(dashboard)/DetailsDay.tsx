@@ -1,5 +1,6 @@
 import { drinksDataSet } from '@/app/Dataset/waterDataSet';
 import BackButton from '@/components/BackButton';
+import FitFaatCalculationInfoModal from '@/components/dashboard/FitFaatCalculationInfoModal';
 import PatientDietPlanViewer from '@/components/PatientDietPlanViewer';
 import { KeyboardAwareModalContent } from '@/components/themed';
 import {
@@ -11,10 +12,8 @@ import { HEADER_PADDING_HORIZONTAL } from '@/constants/ui';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { useTheme } from "@/contexts/ThemeContext";
 import {
-    buildMealDraftFromTemplate,
     getDrinkHydrationLiters,
     toMealNumber,
-    type MealTemplate,
 } from '@/hooks/detailsDay/detailsDayNutritionUtils';
 import { calculatePercentage, useDetailsDayData } from '@/hooks/detailsDay/useDetailsDayData';
 import { useFoodDetection } from '@/hooks/detailsDay/useFoodDetection';
@@ -22,12 +21,27 @@ import { useMealTemplates } from '@/hooks/detailsDay/useMealTemplates';
 import { useNutritionLogger } from '@/hooks/detailsDay/useNutritionLogger';
 import { customRecipesApi } from '@/utils/customRecipesApi';
 import { getExerciseCaloriesBurned } from '@/utils/localExerciseProgress';
+import {
+    cleanWalkingSteps,
+    DEFAULT_STEP_GOAL,
+    getWalkingCaloriesBurned,
+} from '@/utils/localWalkingProgress';
 import { getDashboardCalorieSummary } from '@/utils/dashboardProgress';
+import {
+    getGoalExperience,
+    getGoalProgressStatusLabel,
+} from '@/utils/goalExperience';
+import { buildGoalProgressInterpretation } from '@/utils/goalAdaptivePlan';
+import { loadGoalSpineKey, type GoalSpineKey } from '@/utils/goalSpine';
 import {
     formatCalorieTarget,
     formatHydrationTarget,
+    getCalorieTargetProgress,
+    getHydrationTargetProgress,
+    isRangesGoalDisplayMode,
 } from '@/utils/goalTargetDisplay';
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import * as NavigationBar from 'expo-navigation-bar';
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -45,6 +59,43 @@ interface ProgressCircleProps {
   targetHydration: number;
 };
 
+const getLocalDateFromDayValue = (value?: string | Date | null) => {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  }
+
+  const text = String(value || "");
+  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  }
+
+  const parsed = value ? new Date(value) : new Date();
+  if (Number.isNaN(parsed.getTime())) {
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  }
+
+  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+};
+
+const isSameLocalDate = (left: Date, right: Date) =>
+  left.getFullYear() === right.getFullYear() &&
+  left.getMonth() === right.getMonth() &&
+  left.getDate() === right.getDate();
+
+const buildMealEatenAtDate = (dayData: any, fallbackDay: any, time: Date) => {
+  const baseDate = getLocalDateFromDayValue(
+    dayData?.date || dayData?.dateKey || fallbackDay?.date || fallbackDay?.dateKey
+  );
+  const eatenAt = new Date(baseDate);
+  eatenAt.setHours(time.getHours(), time.getMinutes(), 0, 0);
+  return eatenAt;
+};
+
+const formatMealTimeLabel = (date: Date) =>
+  date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
 export default function DetailsDay () {
     const { colors } = useTheme();
     const { sendFitFaatNotification, scheduleFitFaatNotification, cancelScheduledNotification } = useNotifications();
@@ -52,6 +103,7 @@ export default function DetailsDay () {
     const router = useRouter();
     const props: typeDay = useMemo(() => JSON.parse(selectedDay), [selectedDay]);
     const initialTrackingMode: 'meal' | 'hydration' = quickMode === 'hydration' ? 'hydration' : 'meal';
+    const [calculationInfoVisible, setCalculationInfoVisible] = useState(false);
     const {
       dayData,
       setDayData,
@@ -103,6 +155,9 @@ export default function DetailsDay () {
     const [mealQuantity, setMealQuantity] = useState<string>('1');
     const [waterInput, setWaterInput] = useState<string>('0'); // Default to 0
     const [trackingMode, setTrackingMode] = useState<'meal' | 'hydration'>(initialTrackingMode);
+    const [goalKey, setGoalKey] = useState<GoalSpineKey>('unset');
+    const [eatenAtTime, setEatenAtTime] = useState<Date>(() => new Date());
+    const [showEatenAtPicker, setShowEatenAtPicker] = useState(false);
     
     // Drink search states
     const [drinkSearch, setDrinkSearch] = useState<string>('');
@@ -164,14 +219,21 @@ export default function DetailsDay () {
     }, [fade, quickMode]);
 
     useEffect(() => {
+      loadGoalSpineKey()
+        .then(setGoalKey)
+        .catch((error) => {
+          console.log('[DetailsDay] Unable to load goal context:', error);
+          setGoalKey('unset');
+        });
+    }, []);
+
+    useEffect(() => {
       if (Platform.OS !== 'android') return;
 
       if (showCustomRecipeModal) {
-        NavigationBar.setBackgroundColorAsync('#FFFFFF').catch(() => {});
         NavigationBar.setButtonStyleAsync('dark').catch(() => {});
         NavigationBar.setStyle('light');
       } else {
-        NavigationBar.setBackgroundColorAsync(colors.screenColor || '#FFFFFF').catch(() => {});
         NavigationBar.setButtonStyleAsync('dark').catch(() => {});
       }
     }, [colors.screenColor, showCustomRecipeModal]);
@@ -199,6 +261,8 @@ export default function DetailsDay () {
       setCalorieInput('');
       setMealQuantity('1');
       setDescriptionInput('');
+      setEatenAtTime(new Date());
+      setShowEatenAtPicker(false);
     }, []);
 
     const resetNutritionForm = useCallback(() => {
@@ -228,30 +292,16 @@ export default function DetailsDay () {
     const {
       dietPreference,
       dietPreferenceOptions,
-      mealTemplates,
       filteredFoods,
       showFoodSearch,
       setShowFoodSearch,
-      isRepeatingYesterday,
       quickPickFoods,
-      applyTemplateToForm,
-      saveCurrentMealAsTemplate,
-      removeMealTemplate,
       handleDietPreferenceChange,
-      handleRepeatYesterday,
       setUserCustomRecipes,
     } = useMealTemplates({
-      calorieInput,
-      mealQuantity,
-      selectedFoodItem,
-      detectedDishName: '',
       foodSearch,
-      descriptionInput,
       dayData,
-      setTrackingMode,
       setSelectedFoodItem,
-      setMealQuantity,
-      setCalorieInput,
       setFoodSearch,
       logMealDrafts,
     });
@@ -265,42 +315,67 @@ export default function DetailsDay () {
       setShowFoodSearch,
     });
 
-    const handleTemplateOneTap = useCallback(async (template: MealTemplate) => {
-      await logMealDrafts([buildMealDraftFromTemplate(template)], {
-        title: 'Template Added',
-      });
-    }, [logMealDrafts]);
-
     //functions
     const handleUpdate = () => {
         //Main api calling
     }
 
     const styles = useMemo(() => getStyles(colors, insets.bottom), [colors, insets.bottom]);
-    const workoutAccessUnlocked = isPremium;
-    const calorieSummary = getDashboardCalorieSummary(dayData, isPremium);
-    const exerciseCaloriesBurned = workoutAccessUnlocked ? getExerciseCaloriesBurned(dayData) : 0;
-    const walkingCaloriesBurned = isPremium ? calorieSummary.walkingCalories : 0;
-    const walkingCaloriesTarget = isPremium ? calorieSummary.walkingTarget : 0;
-    const netCalories = workoutAccessUnlocked
+    const showPremiumActivityMetrics = isPremium === true;
+    const calorieSummary = getDashboardCalorieSummary(dayData, showPremiumActivityMetrics);
+    const exerciseCaloriesBurned = showPremiumActivityMetrics ? getExerciseCaloriesBurned(dayData) : 0;
+    const walkingSteps = cleanWalkingSteps((dayData as any).walkingSteps ?? (dayData as any).steps ?? (dayData as any).stepCount);
+    const walkingStepGoal =
+      cleanWalkingSteps(
+        (dayData as any).walkingStepGoal ??
+          (dayData as any).stepGoal ??
+          (dayData as any).targetSteps ??
+          (dayData as any).dailyStepGoal
+      ) || DEFAULT_STEP_GOAL;
+    const walkingProgressPercent = calculatePercentage(walkingSteps, walkingStepGoal);
+    const walkingCaloriesBurned = getWalkingCaloriesBurned(dayData);
+    const netCalories = showPremiumActivityMetrics
       ? calorieSummary.netCalories
       : Number(dayData.achievedCalories || 0);
     const goalPlan = isPremium ? "premium" : "free";
-    const showEstimatedRanges = goalDisplayMode === "advanced";
+    const showEstimatedRanges = isRangesGoalDisplayMode(goalDisplayMode);
     const goalCardLabel = showEstimatedRanges ? "Estimated Ranges" : "Goal";
     const calorieTargetLabel = formatCalorieTarget(dayData, goalDisplayMode, goalPlan);
     const hydrationTargetLabel = formatHydrationTarget(dayData, goalDisplayMode, goalPlan);
     const renderGoalTargetValue = (label: string) => {
       const shouldStackRange = showEstimatedRanges && label.length > 8 && label.includes('-');
       if (!shouldStackRange) {
-        return <Text style={styles.statValue} numberOfLines={1}>{label}</Text>;
+        return (
+          <Text
+            style={[styles.statValue, styles.goalTargetText]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.48}
+          >
+            {label}
+          </Text>
+        );
       }
 
       const [minLabel, maxLabel] = label.split('-');
       return (
         <View style={styles.goalRangeValue}>
-          <Text style={styles.statValue} numberOfLines={1}>{minLabel}-</Text>
-          <Text style={styles.statValue} numberOfLines={1}>{maxLabel}</Text>
+          <Text
+            style={[styles.statValue, styles.goalTargetText]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.48}
+          >
+            {minLabel}-
+          </Text>
+          <Text
+            style={[styles.statValue, styles.goalTargetText]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.48}
+          >
+            {maxLabel}
+          </Text>
         </View>
       );
     };
@@ -316,6 +391,81 @@ export default function DetailsDay () {
     const calorieInputValue = Math.max(0, Math.round(toMealNumber(calorieInput, 0)));
     const targetCaloriesValue = Math.max(0, toMealNumber(dayData.targetCalories, 0));
     const canSubmitNutritionEntry = calorieInput.trim().length > 0 || waterInputValue > 0;
+    const mealEatenAtDate = useMemo(
+      () => buildMealEatenAtDate(dayData, props, eatenAtTime),
+      [dayData, eatenAtTime, props]
+    );
+    const mealEatenAtIsFutureToday = useMemo(() => {
+      const now = new Date();
+      return isSameLocalDate(mealEatenAtDate, now) && mealEatenAtDate.getTime() > now.getTime();
+    }, [mealEatenAtDate]);
+    const mealEatenAtLabel = formatMealTimeLabel(mealEatenAtDate);
+
+    const updateEatenAtShortcut = useCallback(
+      (minutesAgo: number) => {
+        const candidate = new Date(Date.now() - minutesAgo * 60 * 1000);
+        const combined = buildMealEatenAtDate(dayData, props, candidate);
+        const now = new Date();
+
+        setEatenAtTime(isSameLocalDate(combined, now) && combined > now ? now : candidate);
+      },
+      [dayData, props]
+    );
+
+    const handleEatenAtPickerChange = useCallback(
+      (event: DateTimePickerEvent, selectedTime?: Date) => {
+        if (Platform.OS !== 'ios') {
+          setShowEatenAtPicker(false);
+        }
+
+        if (event.type === 'dismissed' || !selectedTime) return;
+        setEatenAtTime(selectedTime);
+      },
+      []
+    );
+    const calorieTargetProgress = getCalorieTargetProgress(dayData, goalDisplayMode, goalPlan);
+    const hydrationTargetProgress = getHydrationTargetProgress(dayData, goalDisplayMode, goalPlan);
+    const calorieProgressPercent = calorieTargetProgress.percent;
+    const hydrationProgressPercent = hydrationTargetProgress.percent;
+    const calorieProgressTargetValue = showEstimatedRanges
+      ? calorieTargetProgress.status === 'below'
+        ? calorieTargetProgress.range.min
+        : Math.max(1, dayData.achievedCalories)
+      : dayData.targetCalories;
+    const hydrationProgressTargetValue = showEstimatedRanges
+      ? hydrationTargetProgress.status === 'below'
+        ? hydrationTargetProgress.range.min
+        : Math.max(0.1, achievedHydrationValue)
+      : dayData.targetHydration;
+    const goalsComplete = showEstimatedRanges
+      ? calorieTargetProgress.isComplete && hydrationTargetProgress.isComplete
+      : dayData.achievedCalories >= dayData.targetCalories && dayData.achieviedHydration >= dayData.targetHydration;
+    const projectedHydrationProgress = getHydrationTargetProgress(
+      { ...dayData, achieviedHydration: projectedHydration, achievedHydration: projectedHydration },
+      goalDisplayMode,
+      goalPlan
+    );
+    const calorieDraftProgress = getCalorieTargetProgress(
+      { ...dayData, achievedCalories: calorieInputValue },
+      goalDisplayMode,
+      goalPlan
+    );
+    const calorieDraftRemaining = showEstimatedRanges
+      ? Math.max(0, calorieDraftProgress.range.min - calorieInputValue)
+      : Math.max(0, targetCaloriesValue - calorieInputValue);
+    const goalExperience = getGoalExperience(goalKey);
+    const dailyGoalStatus = getGoalProgressStatusLabel({
+      goal: goalKey,
+      rangeStatus: showEstimatedRanges ? calorieTargetProgress.status : null,
+      progressPercent: Math.min(calorieProgressPercent, hydrationProgressPercent),
+      trackedDays: dayData.achievedCalories > 0 || achievedHydrationValue > 0 ? 1 : 0,
+    });
+    const dailyGoalInterpretation = buildGoalProgressInterpretation({
+      goal: goalKey,
+      days: [dayData],
+      today: dayData,
+      isPremium,
+    });
     //output
     return (
   <View style={{ flex: 1, paddingTop: insets.top, backgroundColor: colors.screenColor }}>
@@ -354,10 +504,28 @@ export default function DetailsDay () {
                 <ProgressCircle
                   achievedCalories={dayData.achievedCalories}
                   achieviedHydration={dayData.achieviedHydration}
-                  targetCalories={dayData.targetCalories}
-                  targetHydration={dayData.targetHydration}
+                  targetCalories={calorieProgressTargetValue}
+                  targetHydration={hydrationProgressTargetValue}
                 />
               </Pressable>
+              <Pressable
+                style={styles.calculationInfoButton}
+                onPress={() => setCalculationInfoVisible(true)}
+                accessibilityRole="button"
+                accessibilityLabel="How FitFaat calculates this"
+                hitSlop={8}
+              >
+                <Ionicons
+                  name="information-circle-outline"
+                  size={Math.min(hp(2.2), wp(5))}
+                  color={colors.primary}
+                />
+              </Pressable>
+              <FitFaatCalculationInfoModal
+                visible={calculationInfoVisible}
+                onClose={() => setCalculationInfoVisible(false)}
+                colors={colors}
+              />
             </View>
 
             {dayData.remarks && (
@@ -365,6 +533,30 @@ export default function DetailsDay () {
                 <Text style={styles.remarksText}>{String(dayData.remarks)}</Text>
               </View>
             )}
+          </View>
+
+          <View style={[styles.goalStatusCard, { borderColor: `${goalExperience.color}42` }]}>
+            <View style={[styles.goalStatusIcon, { backgroundColor: `${goalExperience.color}18` }]}>
+              <Ionicons
+                name={goalExperience.icon as keyof typeof Ionicons.glyphMap}
+                size={Math.min(hp(2.4), wp(5.4))}
+                color={goalExperience.color}
+              />
+            </View>
+            <View style={styles.goalStatusCopy}>
+              <Text style={[styles.goalStatusEyebrow, { color: goalExperience.color }]}>
+                {goalExperience.label}
+              </Text>
+              <Text style={styles.goalStatusTitle}>{dailyGoalStatus}</Text>
+              <Text style={styles.goalStatusBody}>
+                {goalExperience.progress.withinRange === dailyGoalStatus
+                  ? "This day is counting toward the goal. Keep it repeatable."
+                  : goalExperience.meal.body}
+              </Text>
+              <Text style={styles.goalStatusInsight} numberOfLines={2}>
+                Helping: {dailyGoalInterpretation.helping.join(", ")}. Blocking: {dailyGoalInterpretation.blocking.join(", ")}.
+              </Text>
+            </View>
           </View>
 
           {/**Determine whether to display Update Button or not */}
@@ -404,7 +596,7 @@ export default function DetailsDay () {
                     <Text style={styles.statUnit}>cals</Text>
                   </View>
 
-                  {workoutAccessUnlocked && (
+                  {showPremiumActivityMetrics && (
                     <View style={styles.statCard}>
                       <View style={styles.statCardContent}>
                         <Ionicons name="fitness" size={Math.min(hp(2.2), wp(5.5))} color="#10B981" />
@@ -415,16 +607,18 @@ export default function DetailsDay () {
                     </View>
                   )}
 
-                  {isPremium && (
-                    <View style={styles.statCard}>
-                      <View style={styles.statCardContent}>
-                        <Ionicons name="footsteps" size={Math.min(hp(2.2), wp(5.5))} color="#22C55E" />
-                        <Text style={styles.statLabel}>Walking</Text>
-                      </View>
-                      <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{walkingCaloriesBurned}</Text>
-                      <Text style={styles.statUnit}>cals</Text>
+                  <View style={styles.statCard}>
+                    <View style={styles.statCardContent}>
+                      <Ionicons name="footsteps" size={Math.min(hp(2.2), wp(5.5))} color="#22C55E" />
+                      <Text style={styles.statLabel}>Walking</Text>
                     </View>
-                  )}
+                    <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.52}>
+                      {walkingSteps.toLocaleString()}/{walkingStepGoal.toLocaleString()}
+                    </Text>
+                    <Text style={styles.statUnit}>
+                      {walkingCaloriesBurned > 0 ? `${walkingCaloriesBurned} walking cals` : 'steps'}
+                    </Text>
+                  </View>
 
                   <View style={styles.statCard}>
                     <View style={styles.statCardContent}>
@@ -435,7 +629,7 @@ export default function DetailsDay () {
                     <Text style={styles.statUnit}>liters</Text>
                   </View>
 
-                  {workoutAccessUnlocked && (
+                  {showPremiumActivityMetrics && (
                     <View style={styles.statCard}>
                       <View style={styles.statCardContent}>
                         <Ionicons name="analytics" size={Math.min(hp(2.2), wp(5.5))} color="#14B8A6" />
@@ -468,18 +662,18 @@ export default function DetailsDay () {
                         style={[
                           styles.progressBar, 
                           { 
-                            width: `${Math.min((dayData.achievedCalories / dayData.targetCalories) * 100, 100)}%`,
+                            width: `${calorieProgressPercent}%`,
                             backgroundColor: '#F97316'
                           }
                         ]} 
                       />
                     </View>
-                    <Text style={styles.progressPercentage}>
-                      {calculatePercentage(dayData.achievedCalories, dayData.targetCalories)}%
+                    <Text style={styles.progressPercentage} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62}>
+                      {showEstimatedRanges ? calorieTargetProgress.statusLabel : `${calorieProgressPercent}%`}
                     </Text>
                   </View>
 
-                  {workoutAccessUnlocked && (
+                  {showPremiumActivityMetrics && (
                     <View style={styles.progressItem}>
                       <View style={styles.progressHeader}>
                         <Ionicons name="analytics-outline" size={16} color="#14B8A6" />
@@ -497,35 +691,33 @@ export default function DetailsDay () {
                           ]}
                         />
                       </View>
-                      <Text style={styles.progressPercentage}>
+                      <Text style={styles.progressPercentage} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62}>
                         {calculatePercentage(netCalories, dayData.targetCalories)}%
                       </Text>
                     </View>
                   )}
 
-                  {isPremium && (
-                    <View style={styles.progressItem}>
-                      <View style={styles.progressHeader}>
-                        <Ionicons name="footsteps-outline" size={16} color="#22C55E" />
-                        <Text style={styles.progressLabel}>Walking Calories</Text>
-                      </View>
-                      <View style={styles.progressBarContainer}>
-                        <View
-                          key={`walking-active-${walkingCaloriesBurned}`}
-                          style={[
-                            styles.progressBar,
-                            {
-                              width: `${calculatePercentage(walkingCaloriesBurned, walkingCaloriesTarget)}%`,
-                              backgroundColor: '#22C55E'
-                            }
-                          ]}
-                        />
-                      </View>
-                      <Text style={styles.progressPercentage}>
-                        {calculatePercentage(walkingCaloriesBurned, walkingCaloriesTarget)}%
-                      </Text>
+                  <View style={styles.progressItem}>
+                    <View style={styles.progressHeader}>
+                      <Ionicons name="footsteps-outline" size={16} color="#22C55E" />
+                      <Text style={styles.progressLabel}>Steps Progress</Text>
                     </View>
-                  )}
+                    <View style={styles.progressBarContainer}>
+                      <View
+                        key={`walking-active-${walkingSteps}-${walkingStepGoal}`}
+                        style={[
+                          styles.progressBar,
+                          {
+                            width: `${walkingProgressPercent}%`,
+                            backgroundColor: '#22C55E'
+                          }
+                        ]}
+                      />
+                    </View>
+                    <Text style={styles.progressPercentage} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62}>
+                      {walkingProgressPercent}%
+                    </Text>
+                  </View>
                    
                   <View style={styles.progressItem}>
                     <View style={styles.progressHeader}>
@@ -538,14 +730,14 @@ export default function DetailsDay () {
                         style={[
                           styles.progressBar, 
                           { 
-                            width: `${Math.min((dayData.achieviedHydration / dayData.targetHydration) * 100, 100)}%`,
+                            width: `${hydrationProgressPercent}%`,
                             backgroundColor: '#2E86AB'
                           }
                         ]} 
                       />
                     </View>
-                    <Text style={styles.progressPercentage}>
-                      {calculatePercentage(dayData.achieviedHydration, dayData.targetHydration)}%
+                    <Text style={styles.progressPercentage} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62}>
+                      {showEstimatedRanges ? hydrationTargetProgress.statusLabel : `${hydrationProgressPercent}%`}
                     </Text>
                   </View>
                 </View>
@@ -614,7 +806,7 @@ export default function DetailsDay () {
                     <Text style={styles.statUnit}>cals</Text>
                   </View>
 
-                  {workoutAccessUnlocked && (
+                  {showPremiumActivityMetrics && (
                     <View style={styles.statCard}>
                       <View style={styles.statCardContent}>
                         <Ionicons name="fitness" size={Math.min(hp(2.2), wp(5.5))} color="#10B981" />
@@ -625,16 +817,18 @@ export default function DetailsDay () {
                     </View>
                   )}
 
-                  {isPremium && (
-                    <View style={styles.statCard}>
-                      <View style={styles.statCardContent}>
-                        <Ionicons name="footsteps" size={Math.min(hp(2.2), wp(5.5))} color="#22C55E" />
-                        <Text style={styles.statLabel}>Walking</Text>
-                      </View>
-                      <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>{walkingCaloriesBurned}</Text>
-                      <Text style={styles.statUnit}>cals</Text>
+                  <View style={styles.statCard}>
+                    <View style={styles.statCardContent}>
+                      <Ionicons name="footsteps" size={Math.min(hp(2.2), wp(5.5))} color="#22C55E" />
+                      <Text style={styles.statLabel}>Walking</Text>
                     </View>
-                  )}
+                    <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.52}>
+                      {walkingSteps.toLocaleString()}/{walkingStepGoal.toLocaleString()}
+                    </Text>
+                    <Text style={styles.statUnit}>
+                      {walkingCaloriesBurned > 0 ? `${walkingCaloriesBurned} walking cals` : 'steps'}
+                    </Text>
+                  </View>
 
                   <View style={styles.statCard}>
                     <View style={styles.statCardContent}>
@@ -645,7 +839,7 @@ export default function DetailsDay () {
                     <Text style={styles.statUnit}>liters</Text>
                   </View>
 
-                  {workoutAccessUnlocked && (
+                  {showPremiumActivityMetrics && (
                     <View style={styles.statCard}>
                       <View style={styles.statCardContent}>
                         <Ionicons name="analytics" size={Math.min(hp(2.2), wp(5.5))} color="#14B8A6" />
@@ -678,18 +872,18 @@ export default function DetailsDay () {
                         style={[
                           styles.progressBar, 
                           { 
-                            width: `${Math.min((dayData.achievedCalories / dayData.targetCalories) * 100, 100)}%`,
+                            width: `${calorieProgressPercent}%`,
                             backgroundColor: '#F97316'
                           }
                         ]} 
                       />
                     </View>
-                    <Text style={styles.progressPercentage}>
-                      {calculatePercentage(dayData.achievedCalories, dayData.targetCalories)}%
+                    <Text style={styles.progressPercentage} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62}>
+                      {showEstimatedRanges ? calorieTargetProgress.statusLabel : `${calorieProgressPercent}%`}
                     </Text>
                   </View>
 
-                  {workoutAccessUnlocked && (
+                  {showPremiumActivityMetrics && (
                     <View style={styles.progressItem}>
                       <View style={styles.progressHeader}>
                         <Ionicons name="analytics-outline" size={16} color="#14B8A6" />
@@ -707,35 +901,33 @@ export default function DetailsDay () {
                           ]}
                         />
                       </View>
-                      <Text style={styles.progressPercentage}>
+                      <Text style={styles.progressPercentage} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62}>
                         {calculatePercentage(netCalories, dayData.targetCalories)}%
                       </Text>
                     </View>
                   )}
 
-                  {isPremium && (
-                    <View style={styles.progressItem}>
-                      <View style={styles.progressHeader}>
-                        <Ionicons name="footsteps-outline" size={16} color="#22C55E" />
-                        <Text style={styles.progressLabel}>Walking Calories</Text>
-                      </View>
-                      <View style={styles.progressBarContainer}>
-                        <View
-                          key={`walking-inactive-${walkingCaloriesBurned}`}
-                          style={[
-                            styles.progressBar,
-                            {
-                              width: `${calculatePercentage(walkingCaloriesBurned, walkingCaloriesTarget)}%`,
-                              backgroundColor: '#22C55E'
-                            }
-                          ]}
-                        />
-                      </View>
-                      <Text style={styles.progressPercentage}>
-                        {calculatePercentage(walkingCaloriesBurned, walkingCaloriesTarget)}%
-                      </Text>
+                  <View style={styles.progressItem}>
+                    <View style={styles.progressHeader}>
+                      <Ionicons name="footsteps-outline" size={16} color="#22C55E" />
+                      <Text style={styles.progressLabel}>Steps Progress</Text>
                     </View>
-                  )}
+                    <View style={styles.progressBarContainer}>
+                      <View
+                        key={`walking-inactive-${walkingSteps}-${walkingStepGoal}`}
+                        style={[
+                          styles.progressBar,
+                          {
+                            width: `${walkingProgressPercent}%`,
+                            backgroundColor: '#22C55E'
+                          }
+                        ]}
+                      />
+                    </View>
+                    <Text style={styles.progressPercentage} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62}>
+                      {walkingProgressPercent}%
+                    </Text>
+                  </View>
                    
                   <View style={styles.progressItem}>
                     <View style={styles.progressHeader}>
@@ -748,27 +940,26 @@ export default function DetailsDay () {
                         style={[
                           styles.progressBar, 
                           { 
-                            width: `${Math.min((dayData.achieviedHydration / dayData.targetHydration) * 100, 100)}%`,
+                            width: `${hydrationProgressPercent}%`,
                             backgroundColor: '#2E86AB'
                           }
                         ]} 
                       />
                     </View>
-                    <Text style={styles.progressPercentage}>
-                      {calculatePercentage(dayData.achieviedHydration, dayData.targetHydration)}%
+                    <Text style={styles.progressPercentage} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62}>
+                      {showEstimatedRanges ? hydrationTargetProgress.statusLabel : `${hydrationProgressPercent}%`}
                     </Text>
                   </View>
                 </View>
               </View>
 
               {/* Congratulations Message for 100% Completion */}
-              {dayData.achievedCalories >= dayData.targetCalories && 
-               dayData.achieviedHydration >= dayData.targetHydration && (
+              {goalsComplete && (
                 <View style={styles.congratsContainer}>
                   <Ionicons name="trophy" size={Math.min(hp(4), wp(10))} color="#FFA500" />
                   <Text style={styles.congratsTitle}>Congratulations! 🎉</Text>
                   <Text style={styles.congratsText}>
-                    You've achieved your daily goals! Keep up the great work!
+                    {dailyGoalStatus}. This day supports {goalExperience.label}. Keep it repeatable.
                   </Text>
                 </View>
               )}
@@ -792,7 +983,7 @@ export default function DetailsDay () {
             Track Your Progress
           </Text>
           <Text style={styles.menuSubtitle}>
-            Choose what you'd like to log
+            {dailyGoalStatus}. Choose what helps your goal next.
           </Text>
         </View>
 
@@ -875,102 +1066,6 @@ export default function DetailsDay () {
                     );
                   })}
                 </View>
-              </View>
-
-              <View style={styles.mealTemplateSection}>
-                <View style={styles.sectionHeaderRow}>
-                  <View>
-                    <Text style={styles.sectionLabel}>Meal Templates</Text>
-                    <Text style={styles.templateSubtitle}>Save common meals and log them fast.</Text>
-                  </View>
-                  <TouchableOpacity
-                    style={[
-                      styles.saveTemplateButton,
-                      !calorieInput.trim() && styles.saveTemplateButtonDisabled,
-                    ]}
-                    onPress={saveCurrentMealAsTemplate}
-                    disabled={!calorieInput.trim()}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="bookmark-outline" size={Math.min(hp(1.8), wp(4))} color="#FFFFFF" />
-                    <Text style={styles.saveTemplateText}>Save</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <TouchableOpacity
-                  style={[
-                    styles.repeatYesterdayButton,
-                    (isRepeatingYesterday || isLoading) && { opacity: 0.65 },
-                  ]}
-                  onPress={handleRepeatYesterday}
-                  disabled={isRepeatingYesterday || isLoading}
-                  activeOpacity={0.82}
-                >
-                  <View style={styles.repeatYesterdayIcon}>
-                    <Ionicons name="refresh" size={Math.min(hp(2.4), wp(5.4))} color={colors.primary} />
-                  </View>
-                  <View style={styles.repeatYesterdayCopy}>
-                    <Text style={styles.repeatYesterdayTitle}>
-                      {isRepeatingYesterday ? 'Repeating meals...' : 'Repeat Yesterday'}
-                    </Text>
-                    <Text style={styles.repeatYesterdaySubtitle}>Add yesterday's saved meals to today</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={Math.min(hp(2.1), wp(4.8))} color={colors.textSecondary} />
-                </TouchableOpacity>
-
-                {mealTemplates.length > 0 ? (
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.mealTemplateList}
-                  >
-                    {mealTemplates.map((template) => {
-                      const totalCalories = Math.round(
-                        template.caloriesPerServing * (template.quantity || 1)
-                      );
-
-                      return (
-                        <View key={template.id} style={styles.mealTemplateCard}>
-                          <TouchableOpacity
-                            style={styles.templateRemoveButton}
-                            onPress={() => removeMealTemplate(template.id)}
-                            hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-                          >
-                            <Ionicons name="close" size={Math.min(hp(1.7), wp(3.8))} color={colors.textSecondary} />
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={styles.mealTemplateBody}
-                            onPress={() => applyTemplateToForm(template)}
-                            activeOpacity={0.78}
-                          >
-                            <View style={styles.mealTemplateIcon}>
-                              <Ionicons name="restaurant-outline" size={Math.min(hp(2.4), wp(5.3))} color={colors.primary} />
-                            </View>
-                            <Text style={styles.mealTemplateName} numberOfLines={2}>{template.name}</Text>
-                            <Text style={styles.mealTemplateMeta} numberOfLines={1}>
-                              {template.quantity}x | {totalCalories} cal
-                            </Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={styles.templateAddButton}
-                            onPress={() => handleTemplateOneTap(template)}
-                            disabled={isLoading}
-                            activeOpacity={0.82}
-                          >
-                            <Text style={styles.templateAddText}>Add</Text>
-                          </TouchableOpacity>
-                        </View>
-                      );
-                    })}
-                  </ScrollView>
-                ) : (
-                  <View style={styles.emptyTemplateCard}>
-                    <Ionicons name="bookmark-outline" size={Math.min(hp(2.5), wp(5.6))} color={colors.textSecondary} />
-                    <Text style={styles.emptyTemplateText}>
-                      Select any meal, then tap Save to create your first template.
-                    </Text>
-                  </View>
-                )}
               </View>
 
               {/* Search Food Field */}
@@ -1431,8 +1526,8 @@ export default function DetailsDay () {
               <View style={styles.progressContainer}>
                 <View style={styles.hydProgressHeader}>
                   <Text style={styles.progressTitle}>Today's Progress</Text>
-                  <Text style={styles.progressPercent}>
-                    {calculatePercentage(projectedHydration, targetHydrationValue)}%
+                  <Text style={styles.progressPercent} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62}>
+                    {showEstimatedRanges ? projectedHydrationProgress.statusLabel : `${calculatePercentage(projectedHydration, targetHydrationValue)}%`}
                   </Text>
                 </View>
                 <View style={styles.progressBarBg}>
@@ -1440,7 +1535,7 @@ export default function DetailsDay () {
                     style={[
                       styles.progressBarFg,
                       {
-                        width: `${targetHydrationValue > 0 ? Math.min((projectedHydration / targetHydrationValue) * 100, 100) : 0}%`,
+                        width: `${showEstimatedRanges ? projectedHydrationProgress.percent : targetHydrationValue > 0 ? Math.min((projectedHydration / targetHydrationValue) * 100, 100) : 0}%`,
                         backgroundColor: '#2E86AB'
                       }
                     ]}
@@ -1448,7 +1543,7 @@ export default function DetailsDay () {
                 </View>
                 <View style={styles.progressStats}>
                   <Text style={styles.progressCurrent}>
-                    {projectedHydration.toFixed(2)}L of {dayData.targetHydration}L
+                    {projectedHydration.toFixed(2)}L of {showEstimatedRanges ? `${hydrationTargetLabel}L range` : `${dayData.targetHydration}L`}
                   </Text>
                 </View>
               </View>
@@ -1561,15 +1656,23 @@ export default function DetailsDay () {
               {calorieInput && (
                 <View style={styles.calorieInfo}>
                   <Text style={styles.calorieInfoText}>
-                    Remaining: {targetCaloriesValue - calorieInputValue} / {dayData.targetCalories} cals
+                    {showEstimatedRanges
+                      ? calorieDraftProgress.status === 'below'
+                        ? `To healthy range: ${calorieDraftRemaining} cals`
+                        : calorieDraftProgress.statusLabel
+                      : `Remaining: ${calorieDraftRemaining} / ${dayData.targetCalories} cals`}
                   </Text>
                   <View style={styles.calorieBar}>
                     <View 
                       style={[
                         styles.calorieBarFill,
                         {
-                          width: `${targetCaloriesValue > 0 ? Math.min((calorieInputValue / targetCaloriesValue) * 100, 100) : 0}%`,
-                          backgroundColor: calorieInputValue > targetCaloriesValue ? '#F97316' : '#2E86AB'
+                          width: `${showEstimatedRanges ? calorieDraftProgress.percent : targetCaloriesValue > 0 ? Math.min((calorieInputValue / targetCaloriesValue) * 100, 100) : 0}%`,
+                          backgroundColor: showEstimatedRanges && calorieDraftProgress.status === 'within'
+                            ? '#10B981'
+                            : calorieInputValue > targetCaloriesValue
+                              ? '#F97316'
+                              : '#2E86AB'
                         }
                       ]}
                     />
@@ -1578,6 +1681,70 @@ export default function DetailsDay () {
               )}
             </View>
           </View>
+          )}
+
+          {trackingMode === 'meal' && (
+            <View style={styles.inputGroup}>
+              <View style={styles.labelRow}>
+                <Ionicons name="time-outline" size={20} color={colors.primary} />
+                <Text style={styles.label}>Ate at</Text>
+              </View>
+              <View style={styles.ateAtCard}>
+                <TouchableOpacity
+                  style={styles.timePickerButton}
+                  onPress={() => setShowEatenAtPicker(true)}
+                  activeOpacity={0.8}
+                >
+                  <View>
+                    <Text style={styles.ateAtValue}>{mealEatenAtLabel}</Text>
+                    <Text style={styles.ateAtHint}>Used for your eating-time profile</Text>
+                  </View>
+                  <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+
+                <View style={styles.ateAtShortcutRow}>
+                  {[
+                    { label: 'Now', minutes: 0 },
+                    { label: '30 min ago', minutes: 30 },
+                    { label: '1 hr ago', minutes: 60 },
+                  ].map((shortcut) => (
+                    <TouchableOpacity
+                      key={shortcut.label}
+                      style={styles.ateAtShortcut}
+                      onPress={() => updateEatenAtShortcut(shortcut.minutes)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.ateAtShortcutText}>{shortcut.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {mealEatenAtIsFutureToday && (
+                  <Text style={styles.ateAtWarning}>
+                    Choose a time that has already happened today.
+                  </Text>
+                )}
+              </View>
+
+              {showEatenAtPicker && (
+                <View style={styles.timePickerWrap}>
+                  <DateTimePicker
+                    mode="time"
+                    value={eatenAtTime}
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleEatenAtPickerChange}
+                  />
+                  {Platform.OS === 'ios' && (
+                    <TouchableOpacity
+                      style={styles.timeDoneButton}
+                      onPress={() => setShowEatenAtPicker(false)}
+                    >
+                      <Text style={styles.timeDoneText}>Done</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+            </View>
           )}
 
           {/* Notes */}
@@ -1607,15 +1774,26 @@ export default function DetailsDay () {
           <TouchableOpacity
             style={[styles.submitMenuButton, ((!canSubmitNutritionEntry) || isLoading) && {opacity: 0.5}]}
             disabled={((!canSubmitNutritionEntry) || isLoading)}
-            onPress={() => handleSubmitNutritionEntry({
-              calorieInput,
-              waterInput,
-              selectedFoodItem,
-              selectedDrink,
-              drinkQuantity,
-              mealQuantity,
-              descriptionInput,
-            })}
+            onPress={() => {
+              if (trackingMode === 'meal' && mealEatenAtIsFutureToday) {
+                Alert.alert(
+                  'Choose an earlier time',
+                  'The meal time cannot be in the future for today.'
+                );
+                return;
+              }
+
+              handleSubmitNutritionEntry({
+                calorieInput,
+                waterInput,
+                selectedFoodItem,
+                selectedDrink,
+                drinkQuantity,
+                mealQuantity,
+                descriptionInput,
+                eatenAt: trackingMode === 'meal' ? mealEatenAtDate.toISOString() : undefined,
+              });
+            }}
           >
             <Text style={styles.submitMenuText}>Save Entry</Text>
             <Ionicons name="checkmark" size={Math.min(hp(2.2), wp(5))} color="white" />
@@ -2250,6 +2428,7 @@ const getStyles = (colors: any, bottomInset = 0) => StyleSheet.create({
     circleWrapper: {
         alignItems: 'center',
         justifyContent: 'center',
+        position: 'relative',
         shadowColor: "#000",
         shadowOpacity: 0.1,
         shadowRadius: 12,
@@ -2259,6 +2438,24 @@ const getStyles = (colors: any, bottomInset = 0) => StyleSheet.create({
     circleButton: {
         height: Math.min(hp(20), wp(40)),
         width: Math.min(hp(20), wp(40)),
+    },
+    calculationInfoButton: {
+        position: 'absolute',
+        top: hp(0.5),
+        right: -wp(1.2),
+        width: Math.min(hp(3.6), wp(8)),
+        height: Math.min(hp(3.6), wp(8)),
+        borderRadius: Math.min(hp(1.8), wp(4)),
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.cardBackground,
+        borderWidth: 1,
+        borderColor: `${colors.primary}44`,
+        shadowColor: colors.primary,
+        shadowOpacity: 0.18,
+        shadowRadius: 5,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 3,
     },
     remarksContainer: {
         marginTop: hp(1.5),
@@ -2282,6 +2479,55 @@ const getStyles = (colors: any, bottomInset = 0) => StyleSheet.create({
         color: colors.textPrimary,
         textAlign: 'center',
         fontWeight: '500',
+    },
+    goalStatusCard: {
+        marginHorizontal: wp(4),
+        marginBottom: hp(1),
+        borderRadius: 14,
+        borderWidth: 1,
+        backgroundColor: colors.cardBackground,
+        paddingHorizontal: wp(3.4),
+        paddingVertical: hp(1.2),
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: wp(2.4),
+    },
+    goalStatusIcon: {
+        width: hp(4.4),
+        height: hp(4.4),
+        borderRadius: hp(2.2),
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+    },
+    goalStatusCopy: {
+        flex: 1,
+        minWidth: 0,
+    },
+    goalStatusEyebrow: {
+        fontSize: Math.min(hp(1), wp(2.4)),
+        fontWeight: '900',
+        textTransform: 'uppercase',
+    },
+    goalStatusTitle: {
+        color: colors.textPrimary,
+        fontSize: Math.min(hp(1.55), wp(3.65)),
+        fontWeight: '900',
+        marginTop: hp(0.15),
+    },
+    goalStatusBody: {
+        color: colors.textSecondary,
+        fontSize: Math.min(hp(1.1), wp(2.65)),
+        lineHeight: hp(1.55),
+        fontWeight: '700',
+        marginTop: hp(0.2),
+    },
+    goalStatusInsight: {
+        color: colors.primary,
+        fontSize: Math.min(hp(1.05), wp(2.5)),
+        lineHeight: hp(1.5),
+        fontWeight: '800',
+        marginTop: hp(0.35),
     },
     infoOuterBox:{
         paddingHorizontal: wp(4),
@@ -2334,11 +2580,13 @@ const getStyles = (colors: any, bottomInset = 0) => StyleSheet.create({
     goalItem: {
         alignItems: 'center',
         flex: 1,
+        minWidth: 0,
     },
     goalRangeValue: {
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: Math.min(hp(5.1), wp(11.5)),
+        width: '100%',
     },
     goalDivider: {
         width: 1.5,
@@ -2365,6 +2613,12 @@ const getStyles = (colors: any, bottomInset = 0) => StyleSheet.create({
         fontWeight: 'bold',
         color: colors.textPrimary,
         marginBottom: hp(0.1),
+    },
+    goalTargetText: {
+        width: '100%',
+        textAlign: 'center',
+        includeFontPadding: false,
+        letterSpacing: 0,
     },
     statValueLarge: {
         fontSize: Math.min(hp(2), wp(4.5)),
@@ -2868,10 +3122,63 @@ const getStyles = (colors: any, bottomInset = 0) => StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        gap: wp(3),
     },
     timePickerText: {
         fontSize: 16,
         color: colors.textPrimary,
+    },
+    timePickerWrap: {
+        marginTop: hp(1),
+        backgroundColor: colors.cardBackground,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: colors.gray + '35',
+        overflow: 'hidden',
+    },
+    ateAtCard: {
+        backgroundColor: colors.cardBackground,
+        borderWidth: 1,
+        borderColor: colors.gray + '35',
+        borderRadius: 14,
+        padding: wp(3.5),
+        gap: hp(1.2),
+    },
+    ateAtValue: {
+        color: colors.textPrimary,
+        fontSize: Math.min(hp(1.9), wp(4.4)),
+        fontWeight: '800',
+    },
+    ateAtHint: {
+        color: colors.textSecondary,
+        fontSize: Math.min(hp(1.25), wp(3)),
+        fontWeight: '600',
+        marginTop: hp(0.2),
+    },
+    ateAtShortcutRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: wp(2),
+    },
+    ateAtShortcut: {
+        minHeight: hp(3.8),
+        borderRadius: 999,
+        paddingHorizontal: wp(3),
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.surface || colors.primary + '10',
+        borderWidth: 1,
+        borderColor: colors.primary + '20',
+    },
+    ateAtShortcutText: {
+        color: colors.primary,
+        fontSize: Math.min(hp(1.25), wp(3)),
+        fontWeight: '800',
+    },
+    ateAtWarning: {
+        color: colors.error || '#EF4444',
+        fontSize: Math.min(hp(1.25), wp(3)),
+        fontWeight: '700',
     },
     timeDoneButton: {
         backgroundColor: colors.primary,
@@ -4489,38 +4796,6 @@ const getStyles = (colors: any, bottomInset = 0) => StyleSheet.create({
         fontSize: Math.min(hp(1), wp(2.5)),
         color: colors.textSecondary,
     },
-    mealTemplateSection: {
-        backgroundColor: colors.cardBackground,
-        borderRadius: wp(4),
-        padding: wp(4),
-        marginBottom: hp(2),
-        borderWidth: 1,
-        borderColor: colors.cardBorder || colors.gray + '20',
-    },
-    templateSubtitle: {
-        marginTop: hp(0.2),
-        color: colors.textSecondary,
-        fontSize: Math.min(hp(1.18), wp(2.8)),
-        fontWeight: '700',
-    },
-    saveTemplateButton: {
-        minHeight: hp(3.8),
-        borderRadius: hp(1.9),
-        paddingHorizontal: wp(3),
-        backgroundColor: colors.primary,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: wp(1),
-    },
-    saveTemplateButtonDisabled: {
-        backgroundColor: colors.gray + '70',
-    },
-    saveTemplateText: {
-        color: '#FFFFFF',
-        fontSize: Math.min(hp(1.22), wp(2.9)),
-        fontWeight: '900',
-    },
     repeatYesterdayButton: {
         minHeight: hp(7),
         borderRadius: hp(1.6),
@@ -4533,6 +4808,7 @@ const getStyles = (colors: any, bottomInset = 0) => StyleSheet.create({
         paddingHorizontal: wp(3),
         paddingVertical: hp(1),
         marginTop: hp(1.3),
+        marginBottom: hp(2),
     },
     repeatYesterdayIcon: {
         width: Math.min(hp(4.8), wp(10.5)),
@@ -4557,95 +4833,6 @@ const getStyles = (colors: any, bottomInset = 0) => StyleSheet.create({
         fontSize: Math.min(hp(1.12), wp(2.65)),
         fontWeight: '700',
     },
-    mealTemplateList: {
-        paddingTop: hp(1.4),
-        gap: wp(2.5),
-        paddingRight: wp(2),
-    },
-    mealTemplateCard: {
-        width: wp(34),
-        minHeight: hp(15),
-        borderRadius: hp(1.6),
-        borderWidth: 1,
-        borderColor: colors.cardBorder || colors.gray + '20',
-        backgroundColor: colors.surface || colors.screenColor,
-        padding: wp(2.4),
-        position: 'relative',
-    },
-    templateRemoveButton: {
-        position: 'absolute',
-        top: hp(0.7),
-        right: wp(1.7),
-        zIndex: 2,
-        width: hp(2.5),
-        height: hp(2.5),
-        borderRadius: hp(1.25),
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: colors.cardBackground,
-        borderWidth: 1,
-        borderColor: colors.cardBorder || colors.gray + '20',
-    },
-    mealTemplateBody: {
-        flex: 1,
-        paddingTop: hp(0.4),
-    },
-    mealTemplateIcon: {
-        width: Math.min(hp(4), wp(8.8)),
-        height: Math.min(hp(4), wp(8.8)),
-        borderRadius: Math.min(hp(2), wp(4.4)),
-        backgroundColor: colors.primary + '16',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: hp(0.8),
-    },
-    mealTemplateName: {
-        color: colors.textPrimary,
-        fontSize: Math.min(hp(1.35), wp(3.2)),
-        fontWeight: '900',
-        lineHeight: hp(1.85),
-        paddingRight: wp(3),
-    },
-    mealTemplateMeta: {
-        marginTop: hp(0.35),
-        color: colors.textSecondary,
-        fontSize: Math.min(hp(1.08), wp(2.55)),
-        fontWeight: '800',
-    },
-    templateAddButton: {
-        minHeight: hp(3.4),
-        borderRadius: hp(1.7),
-        backgroundColor: colors.primary,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: hp(1),
-    },
-    templateAddText: {
-        color: '#FFFFFF',
-        fontSize: Math.min(hp(1.18), wp(2.8)),
-        fontWeight: '900',
-    },
-    emptyTemplateCard: {
-        minHeight: hp(7),
-        borderRadius: hp(1.4),
-        borderWidth: 1,
-        borderStyle: 'dashed',
-        borderColor: colors.cardBorder || colors.gray + '30',
-        backgroundColor: colors.surface || colors.screenColor,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: wp(2),
-        paddingHorizontal: wp(3),
-        marginTop: hp(1.3),
-    },
-    emptyTemplateText: {
-        flex: 1,
-        color: colors.textSecondary,
-        fontSize: Math.min(hp(1.2), wp(2.85)),
-        fontWeight: '700',
-        lineHeight: hp(1.8),
-    },
-    
     // Beautiful Completion Modal Styles
     modalOverlay: {
         flex: 1,

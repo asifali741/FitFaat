@@ -4,9 +4,11 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { getIsPremiumUser } from "@/utils/premiumAccess";
 import { Ionicons } from "@expo/vector-icons";
 import { DrawerActions, useNavigation } from "@react-navigation/native";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
-import { Alert, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, ScrollView, Share, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -24,6 +26,7 @@ export default function ChatHistoryScreen() {
   } = useChatbotStorage();
   const [selectedSession, setSelectedSession] = useState<string | null>(currentSession?.id || null);
   const [isPremium, setIsPremium] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -91,6 +94,8 @@ export default function ChatHistoryScreen() {
   };
 
   const handleExportChats = async () => {
+    if (exporting) return;
+
     if (!isPremium) {
       Alert.alert(
         "Premium Feature",
@@ -104,15 +109,34 @@ export default function ChatHistoryScreen() {
     }
 
     try {
+      setExporting(true);
       const exportData = await exportChats();
-      Alert.alert(
-        "Export Successful",
-        "Your chat data has been prepared for export. (In a real app, this would trigger a file download or share dialog)",
-        [{ text: "OK" }]
-      );
-      console.log("Export data:", exportData);
-    } catch {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const fileName = `healora-chat-export-${timestamp}.json`;
+      const canShareFile = await Sharing.isAvailableAsync().catch(() => false);
+
+      if (canShareFile && FileSystem.documentDirectory) {
+        const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+        await FileSystem.writeAsStringAsync(fileUri, exportData, {
+          encoding: FileSystem.EncodingType.UTF8,
+        });
+        await Sharing.shareAsync(fileUri, {
+          mimeType: "application/json",
+          dialogTitle: "Export HeaLora Chat History",
+          UTI: "public.json",
+        });
+        return;
+      }
+
+      await Share.share({
+        title: "HeaLora Chat History Export",
+        message: exportData,
+      });
+    } catch (error) {
+      console.log("Export chat history failed:", error);
       Alert.alert("Export Failed", "Failed to export chat data");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -158,11 +182,12 @@ export default function ChatHistoryScreen() {
           {/* Action Buttons */}
           <View style={styles.actionButtons}>
             <TouchableOpacity
-              style={styles.actionButton}
+              style={[styles.actionButton, exporting && styles.disabledActionButton]}
               onPress={handleExportChats}
+              disabled={exporting}
             >
               <Ionicons name="download" size={20} color={colors.primary} />
-              <Text style={styles.actionButtonText}>Export</Text>
+              <Text style={styles.actionButtonText}>{exporting ? "Exporting..." : "Export"}</Text>
             </TouchableOpacity>
 
               <TouchableOpacity
@@ -288,6 +313,9 @@ const getStyles = (colors: any) => StyleSheet.create({
     borderRadius: wp(4),
     flex: 0.48,
     justifyContent: "center",
+  },
+  disabledActionButton: {
+    opacity: 0.62,
   },
   clearButton: {
     backgroundColor: colors.error + "20",

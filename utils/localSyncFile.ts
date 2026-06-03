@@ -14,6 +14,7 @@ import {
   LEGACY_WEEKLY_TRACKING_ID_KEY,
   WEEKLY_TRACKING_ID_KEY_PREFIX,
 } from './dashboardStorage';
+import { EMERGENCY_WHATSAPP_STORAGE_PREFIX } from './emergencyWhatsApp';
 
 const BACKUP_KIND = 'fitfaat-local-sync';
 const BACKUP_SCHEMA_VERSION = 1;
@@ -23,16 +24,14 @@ const ENCRYPTION_VERSION_V1 = 'fitfaat-passcode-sha256-stream-v1';
 const ENCRYPTION_VERSION_V2 = 'fitfaat-account-passcode-sha256-stream-v2';
 const ENCRYPTION_VERSION = ENCRYPTION_VERSION_V2;
 const UTF8 = FileSystem.EncodingType.UTF8;
-const BASE64 = FileSystem.EncodingType.Base64;
-const PROGRESS_PHOTO_STORAGE_PREFIX = 'fitfaat_progress_photos:';
-const PROGRESS_PHOTO_DIRECTORY = `${FileSystem.documentDirectory || ''}progress-photos/`;
+const REMOVED_STORAGE_KEYS = ['fitfaat_meal_templates'];
+const REMOVED_STORAGE_PREFIXES = ['fitfaat_progress_photos:'];
 
 export type LocalSyncCategory =
   | 'meals'
   | 'steps'
   | 'workouts'
   | 'weight'
-  | 'progressPhotos'
   | 'settings';
 
 export type LocalSyncCategoryOption = {
@@ -63,14 +62,9 @@ export const LOCAL_SYNC_CATEGORY_OPTIONS: LocalSyncCategoryOption[] = [
     description: 'Health metrics, weight logs, adaptive targets, and dashboard health progress',
   },
   {
-    key: 'progressPhotos',
-    label: 'Progress Photos',
-    description: 'Progress photo metadata and embedded local photo files',
-  },
-  {
     key: 'settings',
     label: 'Settings',
-    description: 'App preferences, privacy settings, notifications, notes, badges, and local app state',
+    description: 'App preferences, emergency WhatsApp, privacy settings, notifications, notes, badges, and local app state',
   },
 ];
 
@@ -90,26 +84,14 @@ export type LocalSyncBackupPreview = {
   exportedAt: string;
   userIdentity?: string | null;
   itemCount: number;
-  assetCount: number;
   categories: LocalSyncCategory[];
   categoryCounts: LocalSyncCategoryCounts;
-  missingProgressPhotoAssets: number;
 };
 
 export type LocalSyncPreparedImport = {
   candidateUri: string;
   payload: LocalSyncPayload;
   preview: LocalSyncBackupPreview;
-};
-
-type LocalSyncPhotoAsset = {
-  id: string;
-  storageKey: string;
-  photoId: string;
-  originalUri: string;
-  fileName: string;
-  mimeType: string;
-  data: string;
 };
 
 type LocalSyncPayload = {
@@ -119,7 +101,6 @@ type LocalSyncPayload = {
   userIdentity?: string | null;
   categories?: LocalSyncCategory[];
   items: AccountScopedStorageExportItem[];
-  assets?: LocalSyncPhotoAsset[];
 };
 
 type LocalSyncEnvelope = {
@@ -146,7 +127,6 @@ const CATEGORY_RULES: Record<LocalSyncCategory, { keys: string[]; prefixes: stri
   meals: {
     keys: [
       'fitfaat_diet_preference',
-      'fitfaat_meal_templates',
       'fitfaat_meal_plans',
       'fitfaat_grocery_lists',
       'fitfaat_nutrition_reports_v1',
@@ -158,6 +138,7 @@ const CATEGORY_RULES: Record<LocalSyncCategory, { keys: string[]; prefixes: stri
     prefixes: [
       'fitfaat_nutrition_profile_entries:',
       'fitfaat_nutrition_profile_notifications:',
+      'fitfaat_nutrition_nudge_responses:',
     ],
   },
   steps: {
@@ -183,15 +164,10 @@ const CATEGORY_RULES: Record<LocalSyncCategory, { keys: string[]; prefixes: stri
       'fitfaat_health_metrics',
       'fitfaat_weight_logs',
       'fitfaat_early_logs',
-      'fitfaat_adaptive_goal_carry_forward',
       'fitfaat_nutrition_reports_v1',
       'fitfaat_weekly_scores_v1',
     ],
     prefixes: [WEEKLY_TRACKING_ID_KEY_PREFIX, DASHBOARD_CACHE_KEY_PREFIX],
-  },
-  progressPhotos: {
-    keys: [],
-    prefixes: [PROGRESS_PHOTO_STORAGE_PREFIX],
   },
   settings: {
     keys: [
@@ -213,6 +189,7 @@ const CATEGORY_RULES: Record<LocalSyncCategory, { keys: string[]; prefixes: stri
     prefixes: [
       'dashboardMood:',
       'fitfaat_end_day_recap_seen:',
+      `${EMERGENCY_WHATSAPP_STORAGE_PREFIX}:`,
     ],
   },
 };
@@ -223,12 +200,23 @@ const emptyCategoryCounts = (): LocalSyncCategoryCounts =>
     return counts;
   }, {} as LocalSyncCategoryCounts);
 
+const isLocalSyncCategory = (category: unknown): category is LocalSyncCategory =>
+  DEFAULT_LOCAL_SYNC_CATEGORIES.includes(category as LocalSyncCategory);
+
+const isRemovedStorageKey = (key?: string | null) =>
+  !!key && (
+    REMOVED_STORAGE_KEYS.includes(key) ||
+    REMOVED_STORAGE_PREFIXES.some((prefix) => key.startsWith(prefix))
+  );
+
+const getRestorableBackupItems = (items: AccountScopedStorageExportItem[]) =>
+  items.filter((item) => item?.key && !isRemovedStorageKey(item.key));
+
 const normalizeCategories = (categories?: LocalSyncCategory[]) => {
-  const allowedCategories = new Set(DEFAULT_LOCAL_SYNC_CATEGORIES);
   const normalized = Array.from(
     new Set(
       (categories?.length ? categories : DEFAULT_LOCAL_SYNC_CATEGORIES)
-        .filter((category): category is LocalSyncCategory => allowedCategories.has(category))
+        .filter(isLocalSyncCategory)
     )
   );
 
@@ -265,6 +253,10 @@ const assertPayloadMatchesCurrentAccount = (
 };
 
 const getItemCategories = (key: string): LocalSyncCategory[] => {
+  if (isRemovedStorageKey(key)) {
+    return [];
+  }
+
   const categories: LocalSyncCategory[] = [];
 
   if (DASHBOARD_PROGRESS_KEYS.includes(key)) {
@@ -291,15 +283,12 @@ const filterItemsByCategories = (
   const selectedCategories = normalizeCategories(categories);
   const selectedSet = new Set(selectedCategories);
 
-  return items.filter((item) =>
+  return getRestorableBackupItems(items).filter((item) =>
     item?.key && getItemCategories(item.key).some((category) => selectedSet.has(category))
   );
 };
 
-const getBackupCategoryCounts = (
-  items: AccountScopedStorageExportItem[],
-  assets: LocalSyncPhotoAsset[] = []
-) => {
+const getBackupCategoryCounts = (items: AccountScopedStorageExportItem[]) => {
   const counts = emptyCategoryCounts();
 
   items.forEach((item) => {
@@ -308,15 +297,11 @@ const getBackupCategoryCounts = (
     });
   });
 
-  counts.progressPhotos += assets.length;
   return counts;
 };
 
-const getBackupCategories = (
-  items: AccountScopedStorageExportItem[],
-  assets: LocalSyncPhotoAsset[] = []
-) => {
-  const counts = getBackupCategoryCounts(items, assets);
+const getBackupCategories = (items: AccountScopedStorageExportItem[]) => {
+  const counts = getBackupCategoryCounts(items);
   return DEFAULT_LOCAL_SYNC_CATEGORIES.filter((category) => counts[category] > 0);
 };
 
@@ -334,7 +319,7 @@ const SHA256_K = [
 const rightRotate = (value: number, bits: number) =>
   (value >>> bits) | (value << (32 - bits));
 
-const encodeUtf8 = (value: string) => {
+export const encodeUtf8 = (value: string) => {
   const bytes: number[] = [];
 
   for (let index = 0; index < value.length; index += 1) {
@@ -371,7 +356,7 @@ const encodeUtf8 = (value: string) => {
   return bytes;
 };
 
-const decodeUtf8 = (bytes: number[]) => {
+export const decodeUtf8 = (bytes: number[]) => {
   let output = '';
 
   for (let index = 0; index < bytes.length;) {
@@ -412,7 +397,7 @@ const decodeUtf8 = (bytes: number[]) => {
   return output;
 };
 
-const sha256 = (bytes: number[]) => {
+export const sha256 = (bytes: number[]) => {
   const data = bytes.slice();
   const bitLength = data.length * 8;
   const words = new Array(64).fill(0);
@@ -508,10 +493,10 @@ const sha256 = (bytes: number[]) => {
   ]);
 };
 
-const bytesToHex = (bytes: number[]) =>
+export const bytesToHex = (bytes: number[]) =>
   bytes.map((byte) => byte.toString(16).padStart(2, '0')).join('');
 
-const hexToBytes = (hex: string) => {
+export const hexToBytes = (hex: string) => {
   const bytes: number[] = [];
   for (let index = 0; index < hex.length; index += 2) {
     bytes.push(parseInt(hex.slice(index, index + 2), 16));
@@ -526,7 +511,7 @@ const getCounterBytes = (counter: number) => [
   counter & 0xff,
 ];
 
-const xorWithPasscodeStream = (bytes: number[], passcode: string, saltHex: string) => {
+export const xorWithPasscodeStream = (bytes: number[], passcode: string, saltHex: string) => {
   const output = new Array(bytes.length);
   const passcodeBytes = encodeUtf8(passcode);
   const saltBytes = hexToBytes(saltHex);
@@ -546,126 +531,10 @@ const xorWithPasscodeStream = (bytes: number[], passcode: string, saltHex: strin
   return output;
 };
 
-const createSaltHex = () =>
+export const createSaltHex = () =>
   bytesToHex(
     sha256(encodeUtf8(`${Date.now()}:${Math.random()}:${Math.random()}`))
   ).slice(0, 32);
-
-const isLocalDeviceUri = (uri?: string | null) => !!uri && /^(file|content|ph):/i.test(uri);
-
-const getImageFileInfo = (uri: string) => {
-  const cleanUri = uri.split('?')[0].split('#')[0];
-  const rawExtension = cleanUri.includes('.') ? cleanUri.split('.').pop()?.toLowerCase() || 'jpg' : 'jpg';
-  const extension = ['jpg', 'jpeg', 'png', 'webp', 'heic'].includes(rawExtension) ? rawExtension : 'jpg';
-  const normalizedExtension = extension === 'jpeg' ? 'jpg' : extension;
-  const mimeType =
-    normalizedExtension === 'jpg'
-      ? 'image/jpeg'
-      : normalizedExtension === 'heic'
-        ? 'image/heic'
-        : `image/${normalizedExtension}`;
-
-  return { extension: normalizedExtension, mimeType };
-};
-
-const sanitizeFileSegment = (value: string) =>
-  value.replace(/[^a-z0-9_-]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'photo';
-
-const ensureProgressPhotoDirectory = async () => {
-  if (!FileSystem.documentDirectory) return null;
-
-  const directoryInfo = await FileSystem.getInfoAsync(PROGRESS_PHOTO_DIRECTORY);
-  if (!directoryInfo.exists) {
-    await FileSystem.makeDirectoryAsync(PROGRESS_PHOTO_DIRECTORY, { intermediates: true });
-  }
-
-  return PROGRESS_PHOTO_DIRECTORY;
-};
-
-const canReadLocalPhoto = async (uri: string) => {
-  if (!uri.startsWith('file:')) return true;
-
-  try {
-    const fileInfo = await FileSystem.getInfoAsync(uri);
-    return fileInfo.exists;
-  } catch {
-    return false;
-  }
-};
-
-const buildProgressPhotoAssets = async (items: AccountScopedStorageExportItem[]) => {
-  const assets: LocalSyncPhotoAsset[] = [];
-
-  for (const item of items) {
-    if (!item.key.startsWith(PROGRESS_PHOTO_STORAGE_PREFIX)) continue;
-
-    try {
-      const photos = JSON.parse(item.value);
-      if (!Array.isArray(photos)) continue;
-
-      for (const photo of photos) {
-        const photoId = String(photo?.id || '');
-        const uri = typeof photo?.uri === 'string' ? photo.uri : '';
-        if (!photoId || !isLocalDeviceUri(uri) || !(await canReadLocalPhoto(uri))) continue;
-
-        try {
-          const { extension, mimeType } = getImageFileInfo(uri);
-          const data = await FileSystem.readAsStringAsync(uri, { encoding: BASE64 });
-          const assetId = `${sanitizeFileSegment(item.key)}-${sanitizeFileSegment(photoId)}`;
-
-          assets.push({
-            id: assetId,
-            storageKey: item.key,
-            photoId,
-            originalUri: uri,
-            fileName: `${assetId}.${extension}`,
-            mimeType,
-            data,
-          });
-        } catch {
-          // If a local photo is no longer readable, export the metadata but skip the missing file.
-        }
-      }
-    } catch {
-      // Ignore malformed progress photo entries.
-    }
-  }
-
-  return assets;
-};
-
-const getMissingProgressPhotoAssetCount = (
-  items: AccountScopedStorageExportItem[],
-  assets: LocalSyncPhotoAsset[] = []
-) => {
-  const assetKeys = new Set(
-    assets
-      .filter((asset) => asset?.storageKey && asset?.photoId)
-      .map((asset) => `${asset.storageKey}:${asset.photoId}`)
-  );
-  let missingCount = 0;
-
-  for (const item of items) {
-    if (!item.key.startsWith(PROGRESS_PHOTO_STORAGE_PREFIX)) continue;
-
-    try {
-      const photos = JSON.parse(item.value);
-      if (!Array.isArray(photos)) continue;
-
-      photos.forEach((photo) => {
-        const photoId = String(photo?.id || '');
-        const uri = typeof photo?.uri === 'string' ? photo.uri : '';
-        if (photoId && isLocalDeviceUri(uri) && !assetKeys.has(`${item.key}:${photoId}`)) {
-          missingCount += 1;
-        }
-      });
-    } catch {
-      // Malformed metadata will be skipped during restore too.
-    }
-  }
-
-  return missingCount;
-};
 
 const getFileNameFromUri = (uri?: string | null) => {
   if (!uri) return undefined;
@@ -678,11 +547,14 @@ const buildBackupPreview = (
   payload: LocalSyncPayload,
   fileUri?: string
 ): LocalSyncBackupPreview => {
-  const items = Array.isArray(payload.items) ? payload.items : [];
-  const assets = Array.isArray(payload.assets) ? payload.assets : [];
-  const categories = payload.categories?.length
-    ? payload.categories
-    : getBackupCategories(items, assets);
+  const items = getRestorableBackupItems(Array.isArray(payload.items) ? payload.items : []);
+  const categoryCounts = getBackupCategoryCounts(items);
+  const declaredCategories = Array.isArray(payload.categories)
+    ? payload.categories.filter(isLocalSyncCategory)
+    : [];
+  const categories = declaredCategories.length
+    ? declaredCategories.filter((category) => categoryCounts[category] > 0)
+    : getBackupCategories(items);
 
   return {
     fileUri,
@@ -690,89 +562,9 @@ const buildBackupPreview = (
     exportedAt: payload.exportedAt,
     userIdentity: payload.userIdentity,
     itemCount: items.length,
-    assetCount: assets.length,
     categories,
-    categoryCounts: getBackupCategoryCounts(items, assets),
-    missingProgressPhotoAssets: getMissingProgressPhotoAssetCount(items, assets),
+    categoryCounts,
   };
-};
-
-const writeImportedProgressPhotoAsset = async (asset: LocalSyncPhotoAsset) => {
-  const directory = await ensureProgressPhotoDirectory();
-  if (!directory || !asset.data) return null;
-
-  const { extension } = getImageFileInfo(asset.fileName || asset.originalUri || 'photo.jpg');
-  const fileName = `${Date.now()}-${sanitizeFileSegment(asset.id || asset.photoId)}.${extension}`;
-  const fileUri = `${directory}${fileName}`;
-  await FileSystem.writeAsStringAsync(fileUri, asset.data, { encoding: BASE64 });
-  return fileUri;
-};
-
-const restoreProgressPhotoAssets = async (
-  items: AccountScopedStorageExportItem[],
-  assets: LocalSyncPhotoAsset[] = []
-) => {
-  if (!items.length) return items;
-
-  const assetByPhoto = new Map<string, LocalSyncPhotoAsset>();
-  assets.forEach((asset) => {
-    if (asset?.storageKey && asset?.photoId) {
-      assetByPhoto.set(`${asset.storageKey}:${asset.photoId}`, asset);
-    }
-  });
-
-  const nextItems: AccountScopedStorageExportItem[] = [];
-
-  for (const item of items) {
-    if (!item.key.startsWith(PROGRESS_PHOTO_STORAGE_PREFIX)) {
-      nextItems.push(item);
-      continue;
-    }
-
-    try {
-      const photos = JSON.parse(item.value);
-      if (!Array.isArray(photos)) {
-        nextItems.push(item);
-        continue;
-      }
-
-      const restoredPhotos = [];
-
-      for (const photo of photos) {
-        if (!photo?.uri || !photo?.createdAt) continue;
-
-        const photoId = String(photo.id || '');
-        const asset = assetByPhoto.get(`${item.key}:${photoId}`);
-
-        if (asset) {
-          const importedUri = await writeImportedProgressPhotoAsset(asset);
-          if (importedUri) {
-            restoredPhotos.push({
-              ...photo,
-              uri: importedUri,
-              isLocalOnly: true,
-            });
-            continue;
-          }
-        }
-
-        if (isLocalDeviceUri(photo.uri) && !(await canReadLocalPhoto(photo.uri))) {
-          continue;
-        }
-
-        restoredPhotos.push(photo);
-      }
-
-      nextItems.push({
-        ...item,
-        value: JSON.stringify(restoredPhotos),
-      });
-    } catch {
-      nextItems.push(item);
-    }
-  }
-
-  return nextItems;
 };
 
 const encryptPayload = (
@@ -908,6 +700,14 @@ const getBackupCandidatesFromDirectory = async (
   return candidates;
 };
 
+const readBackupFileRaw = async (uri: string) => {
+  if (Platform.OS === 'android' && !uri.toLowerCase().startsWith('file://')) {
+    return FileSystem.StorageAccessFramework.readAsStringAsync(uri, { encoding: UTF8 });
+  }
+
+  return FileSystem.readAsStringAsync(uri, { encoding: UTF8 });
+};
+
 const getNewestBackupCandidate = async () => {
   let candidates: BackupCandidate[] = [];
 
@@ -945,9 +745,6 @@ export const exportLocalSyncFile = async (
   }
 
   const filteredItems = filterItemsByCategories(items, selectedCategories);
-  const assets = selectedCategories.includes('progressPhotos')
-    ? await buildProgressPhotoAssets(filteredItems)
-    : [];
   const exportedAt = new Date().toISOString();
   const payload: LocalSyncPayload = {
     schemaVersion: BACKUP_SCHEMA_VERSION,
@@ -956,12 +753,11 @@ export const exportLocalSyncFile = async (
     userIdentity: backupUserIdentity,
     categories: selectedCategories,
     items: filteredItems,
-    assets,
   };
   const fileName = getBackupFileName();
   const envelope = encryptPayload(payload, passcode, backupUserIdentity);
   const uri = await writeBackupFile(fileName, JSON.stringify(envelope));
-  const itemCount = filteredItems.length + assets.length;
+  const itemCount = filteredItems.length;
 
   await addBackupHistoryRecord({
     action: 'export',
@@ -971,7 +767,7 @@ export const exportLocalSyncFile = async (
     fileUri: uri,
     exportedAt,
     itemCount,
-    assetCount: assets.length,
+    assetCount: 0,
     categories: selectedCategories,
   }).catch(() => {});
 
@@ -979,7 +775,7 @@ export const exportLocalSyncFile = async (
     fileName,
     uri,
     itemCount,
-    assetCount: assets.length,
+    assetCount: 0,
     categories: selectedCategories,
     exportedAt,
   };
@@ -1016,12 +812,10 @@ export const testNewestLocalSyncFile = async (passcode: string) => {
       fileName: prepared.preview.fileName,
       fileUri: prepared.candidateUri,
       exportedAt: prepared.preview.exportedAt,
-      itemCount: prepared.preview.itemCount + prepared.preview.assetCount,
-      assetCount: prepared.preview.assetCount,
+      itemCount: prepared.preview.itemCount,
+      assetCount: 0,
       categories: prepared.preview.categories,
-      message: prepared.preview.missingProgressPhotoAssets
-        ? `${prepared.preview.missingProgressPhotoAssets} progress photo files are missing from this backup.`
-        : 'Backup integrity check passed.',
+      message: 'Backup integrity check passed.',
     }).catch(() => {});
 
     return prepared.preview;
@@ -1037,6 +831,41 @@ export const testNewestLocalSyncFile = async (passcode: string) => {
   }
 };
 
+export const testLocalSyncFileUri = async (passcode: string, fileUri: string) => {
+  try {
+    const currentUserIdentity = await getRequiredCurrentUserIdentity();
+    const raw = await readBackupFileRaw(fileUri);
+    const payload = decryptEnvelope(raw, passcode, currentUserIdentity);
+    const preview = buildBackupPreview(payload, fileUri);
+
+    await addBackupHistoryRecord({
+      action: 'test',
+      status: 'success',
+      verificationStatus: 'verified',
+      verifiedAt: new Date().toISOString(),
+      fileName: preview.fileName,
+      fileUri,
+      exportedAt: preview.exportedAt,
+      itemCount: preview.itemCount,
+      assetCount: 0,
+      categories: preview.categories,
+      message: 'Backup integrity check passed.',
+    }).catch(() => {});
+
+    return preview;
+  } catch (error: any) {
+    await addBackupHistoryRecord({
+      action: 'test',
+      status: 'failed',
+      verificationStatus: 'failed',
+      verifiedAt: new Date().toISOString(),
+      fileUri,
+      message: error?.message || 'Backup integrity check failed.',
+    }).catch(() => {});
+    throw error;
+  }
+};
+
 export const applyPreparedLocalSyncImport = async (
   prepared: LocalSyncPreparedImport,
   options: LocalSyncOptions = {}
@@ -1045,14 +874,10 @@ export const applyPreparedLocalSyncImport = async (
     options.categories?.length ? options.categories : prepared.preview.categories
   );
   const filteredItems = filterItemsByCategories(prepared.payload.items, selectedCategories);
-  const filteredAssets = selectedCategories.includes('progressPhotos')
-    ? prepared.payload.assets || []
-    : [];
-  const restoredItems = await restoreProgressPhotoAssets(filteredItems, filteredAssets);
-  const result = await restoreAccountScopedStorageItems(restoredItems);
+  const result = await restoreAccountScopedStorageItems(filteredItems);
   const restoredKeys = Array.from(
     new Set(
-      restoredItems
+      filteredItems
         .map((item) => item?.key)
         .filter((key): key is string => typeof key === 'string')
     )
@@ -1071,7 +896,7 @@ export const applyPreparedLocalSyncImport = async (
     fileUri: prepared.candidateUri,
     exportedAt: prepared.payload.exportedAt,
     itemCount: result.restoredItemCount,
-    assetCount: filteredAssets.length,
+    assetCount: 0,
     categories: selectedCategories,
   }).catch(() => {});
 

@@ -113,7 +113,6 @@ export default function PatientManagementScreen() {
 
     StatusBar.setBackgroundColor('#FFFFFF');
     StatusBar.setTranslucent(false);
-    NavigationBar.setBackgroundColorAsync('#FFFFFF').catch(() => {});
     NavigationBar.setButtonStyleAsync('dark').catch(() => {});
     NavigationBar.setStyle('light');
   }, []);

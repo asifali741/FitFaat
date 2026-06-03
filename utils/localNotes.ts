@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { queueAccountScopedStorageCloudSync } from './auth/accountScopedStorageSyncQueue';
 
 export const FITFAAT_NOTES_STORAGE_KEY = 'fitfaat_notes';
 
@@ -85,6 +86,7 @@ export const saveFitFaatNotes = async (notes: FitFaatNote[]) => {
     FITFAAT_NOTES_STORAGE_KEY,
     JSON.stringify(sortFitFaatNotes(normalizedNotes))
   );
+  queueAccountScopedStorageCloudSync('notes');
 };
 
 export const upsertFitFaatNote = async (input: FitFaatNoteInput) => {

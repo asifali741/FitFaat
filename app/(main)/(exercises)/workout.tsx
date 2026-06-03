@@ -1,6 +1,12 @@
 import { ScreenSceneWrapper } from "@/components/common/ScreenTiltAnimation";
 import { useTheme } from "@/contexts/ThemeContext";
-import { getIsPremiumUser } from "@/utils/premiumAccess";
+import { getFeatureAccessStatus, type FeatureAccessStatus } from "@/utils/featureAccess";
+import {
+  getGoalExperience,
+  getGoalPremiumFeatureCopy,
+} from "@/utils/goalExperience";
+import { buildGoalWorkoutProgram } from "@/utils/goalAdaptivePlan";
+import { loadGoalSpineKey, type GoalSpineKey } from "@/utils/goalSpine";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
@@ -34,19 +40,7 @@ const recoveryGroups = [
   { id: 'cardio', label: 'Cardio', match: ['cardio'] },
 ];
 
-const programFocusCycle = ['Chest', 'Back', 'Upper Arms', 'Waist', 'Upper Legs', 'Shoulder', 'Cardio'];
 const dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-
-const getDateKey = (date: Date) => date.toISOString().slice(0, 10);
-
-const getStartOfWeek = (date: Date) => {
-  const start = new Date(date);
-  const day = start.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  start.setDate(start.getDate() + diff);
-  start.setHours(0, 0, 0, 0);
-  return start;
-};
 
 const getDaysSince = (dateString?: string) => {
   if (!dateString) return null;
@@ -72,9 +66,12 @@ export default function WorkoutScreen() {
   const insets = useSafeAreaInsets();
   const [favoritesCount, setFavoritesCount] = useState(0);
   const [isPremium, setIsPremium] = useState(false);
+  const [workoutAccess, setWorkoutAccess] = useState<FeatureAccessStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [workoutHistory, setWorkoutHistory] = useState<WorkoutHistoryEntry[]>([]);
+  const [goalKey, setGoalKey] = useState<GoalSpineKey>('unset');
+  const goalExperience = useMemo(() => getGoalExperience(goalKey), [goalKey]);
 
   console.log('🎬 WorkoutScreen rendered. Loading:', loading, 'isPremium:', isPremium);
 
@@ -83,16 +80,24 @@ export default function WorkoutScreen() {
     React.useCallback(() => {
       getFavoritesCount();
       loadWorkoutHistory();
+      loadGoalSpineKey()
+        .then(setGoalKey)
+        .catch((error) => {
+          console.log('Workout goal context unavailable:', error);
+          setGoalKey('unset');
+        });
     }, [])
   );
 
   const refreshPremiumAccess = React.useCallback(async () => {
     setLoading(true);
     try {
-      const premiumActive = await getIsPremiumUser();
-      setIsPremium(premiumActive);
+      const access = await getFeatureAccessStatus("workoutModule");
+      setWorkoutAccess(access);
+      setIsPremium(access.hasAccess);
     } catch (error) {
       console.error('Premium access refresh failed:', (error as any)?.message || String(error));
+      setWorkoutAccess(null);
       setIsPremium(false);
     } finally {
       setLoading(false);
@@ -176,42 +181,31 @@ export default function WorkoutScreen() {
   }, [workoutHistory]);
 
   const programWeeks = useMemo(() => {
-    const today = new Date();
-    const todayKey = getDateKey(today);
-    const startDate = getStartOfWeek(today);
-    const completedDateKeys = new Set(
-      workoutHistory
-        .map((entry) => entry.completedAt ? getDateKey(new Date(entry.completedAt)) : '')
-        .filter(Boolean)
-    );
-
-    return Array.from({ length: 4 }, (_, weekIndex) => {
-      const days = Array.from({ length: 7 }, (_, dayIndex) => {
-        const date = new Date(startDate);
-        date.setDate(startDate.getDate() + weekIndex * 7 + dayIndex);
-        const dateKey = getDateKey(date);
-        const isRestDay = dayIndex === 2 || dayIndex === 6;
-        const focus = isRestDay
-          ? 'Rest'
-          : programFocusCycle[(weekIndex * 5 + dayIndex) % programFocusCycle.length];
-
-        return {
-          date,
-          dateKey,
-          focus,
-          isToday: dateKey === todayKey,
-          isRestDay,
-          isCompleted: completedDateKeys.has(dateKey),
-          isPast: date < today && dateKey !== todayKey,
-        };
-      });
-
-      return {
-        label: `Week ${weekIndex + 1}`,
-        days,
-      };
+    const program = buildGoalWorkoutProgram({
+      goal: goalKey,
+      workoutHistory,
+      isPremium,
     });
-  }, [workoutHistory]);
+
+    return Array.from({ length: 4 }, (_, weekIndex) => ({
+      label: `Week ${weekIndex + 1}`,
+      days: program.sessions
+        .filter((session) => session.week === weekIndex + 1)
+        .map((session) => ({
+          ...session,
+          date: new Date(`${session.dateKey}T12:00:00`),
+        })),
+    }));
+  }, [goalKey, isPremium, workoutHistory]);
+  const adaptiveWorkoutProgram = useMemo(
+    () =>
+      buildGoalWorkoutProgram({
+        goal: goalKey,
+        workoutHistory,
+        isPremium,
+      }),
+    [goalKey, isPremium, workoutHistory]
+  );
 
   const handleFavoritesPress = () => {
     console.log('Opening favorites list');
@@ -287,26 +281,20 @@ export default function WorkoutScreen() {
                 <Ionicons name="star" size={60} color="#FFD700" />
               </View>
 
-              <Text style={styles.modalTitle}>Premium Feature</Text>
-              <Text style={styles.modalSubtitle}>Unlock Advanced Workouts</Text>
+              <Text style={styles.modalTitle}>Workout Module supports {goalExperience.label}</Text>
+              <Text style={styles.modalSubtitle}>{workoutAccess?.statusLabel || "Premium required"}</Text>
 
-              <Text style={styles.modalDescription}>
-                Get access to personalized workout plans, advanced tracking, and exclusive training programs designed by fitness experts.
+                <Text style={styles.modalDescription}>
+                {getGoalPremiumFeatureCopy(goalKey, "workoutModule") || workoutAccess?.lockedReason || "Upgrade for guided workouts, body-part plans, favorites, recovery maps, and workout history."}
               </Text>
 
               <View style={styles.featuresList}>
-                <View style={styles.featureItem}>
-                  <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-                  <Text style={styles.featureText}>Personalized workout plans</Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-                  <Text style={styles.featureText}>Advanced progress tracking</Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-                  <Text style={styles.featureText}>Exclusive training programs</Text>
-                </View>
+                {goalExperience.workout.premiumBullets.map((bullet) => (
+                  <View key={bullet} style={styles.featureItem}>
+                    <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+                    <Text style={styles.featureText}>{bullet}</Text>
+                  </View>
+                ))}
               </View>
 
               <View style={styles.priceTag}>
@@ -390,11 +378,28 @@ export default function WorkoutScreen() {
       {/* Main Content */}
       <View style={styles.content}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          <View style={[styles.goalWorkoutCard, { borderColor: `${goalExperience.color}42` }]}>
+            <View style={[styles.goalWorkoutIcon, { backgroundColor: `${goalExperience.color}18` }]}>
+              <Ionicons
+                name={goalExperience.icon as keyof typeof Ionicons.glyphMap}
+                size={Math.min(hp(2.8), wp(6.2))}
+                color={goalExperience.color}
+              />
+            </View>
+            <View style={styles.goalWorkoutCopy}>
+              <Text style={[styles.goalWorkoutEyebrow, { color: goalExperience.color }]}>
+                Recommended for your goal
+              </Text>
+              <Text style={styles.goalWorkoutTitle}>{adaptiveWorkoutProgram.progressionLabel}</Text>
+              <Text style={styles.goalWorkoutBody}>{adaptiveWorkoutProgram.body}</Text>
+            </View>
+          </View>
+
           <View style={styles.recoverySection}>
             <View style={styles.sectionHeaderRow}>
               <View>
                 <Text style={styles.sectionTitleSmall}>Muscle Recovery Map</Text>
-                <Text style={styles.sectionSubtitle}>Plan around muscles you trained recently.</Text>
+                <Text style={styles.sectionSubtitle}>{goalExperience.workout.recoverySubtitle}</Text>
               </View>
               <View style={styles.recoveryBadge}>
                 <Ionicons name="body-outline" size={Math.min(hp(2.2), wp(4.8))} color={colors.primary} />
@@ -442,7 +447,7 @@ export default function WorkoutScreen() {
             <View style={styles.sectionHeaderRow}>
               <View>
                 <Text style={styles.sectionTitleSmall}>Workout Program Calendar</Text>
-                <Text style={styles.sectionSubtitle}>A 4-week training view with rest and completion badges.</Text>
+                <Text style={styles.sectionSubtitle}>{adaptiveWorkoutProgram.title} | {adaptiveWorkoutProgram.weeklyTarget}</Text>
               </View>
               <Ionicons name="calendar-outline" size={Math.min(hp(2.8), wp(6.2))} color={colors.primary} />
             </View>
@@ -471,7 +476,7 @@ export default function WorkoutScreen() {
                               backgroundColor: day.isCompleted ? `${colors.success}18` : colors.cardBackground,
                             },
                           ]}
-                          onPress={() => !day.isRestDay && handleBodyPartPress({ name: day.focus })}
+                          onPress={() => !day.isRestDay && handleBodyPartPress({ name: day.bodyPart })}
                           disabled={day.isRestDay}
                         >
                           <Text style={styles.programDayLabel}>{dayLabels[index]}</Text>
@@ -483,6 +488,9 @@ export default function WorkoutScreen() {
                           />
                           <Text style={styles.programFocusText} numberOfLines={1}>
                             {day.focus}
+                          </Text>
+                          <Text style={styles.programCueText} numberOfLines={2}>
+                            {day.progressionCue}
                           </Text>
                         </TouchableOpacity>
                       );
@@ -665,6 +673,47 @@ const getStyles = (colors: any, topInset: number, statusBarBackground: string) =
   scrollContent: {
     paddingBottom: hp(2),
   },
+  goalWorkoutCard: {
+    marginHorizontal: wp(4),
+    marginTop: hp(1.6),
+    borderRadius: hp(1.6),
+    borderWidth: 1,
+    backgroundColor: colors.cardBackground,
+    padding: hp(1.4),
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2.6),
+  },
+  goalWorkoutIcon: {
+    width: hp(5.2),
+    height: hp(5.2),
+    borderRadius: hp(2.6),
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  goalWorkoutCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  goalWorkoutEyebrow: {
+    fontSize: Math.min(hp(1.02), wp(2.45)),
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  goalWorkoutTitle: {
+    color: colors.textPrimary,
+    fontSize: Math.min(hp(1.72), wp(3.95)),
+    fontWeight: '900',
+    marginTop: hp(0.2),
+  },
+  goalWorkoutBody: {
+    color: colors.textSecondary,
+    fontSize: Math.min(hp(1.22), wp(2.9)),
+    lineHeight: hp(1.75),
+    fontWeight: '700',
+    marginTop: hp(0.25),
+  },
   recoverySection: {
     paddingHorizontal: wp(4),
     paddingTop: hp(2),
@@ -814,7 +863,7 @@ const getStyles = (colors: any, topInset: number, statusBarBackground: string) =
   },
   programDayCell: {
     flex: 1,
-    minHeight: hp(9),
+    minHeight: hp(11.4),
     borderRadius: hp(1.2),
     borderWidth: 1,
     alignItems: 'center',
@@ -837,6 +886,14 @@ const getStyles = (colors: any, topInset: number, statusBarBackground: string) =
     fontSize: Math.min(hp(0.95), wp(2.35)),
     fontWeight: '800',
     color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  programCueText: {
+    marginTop: hp(0.2),
+    fontSize: Math.min(hp(0.82), wp(2.05)),
+    lineHeight: hp(1.08),
+    fontWeight: '700',
+    color: colors.textTertiary || colors.textSecondary,
     textAlign: 'center',
   },
   sectionTitle: {

@@ -20,9 +20,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { PremiumTeaserCard } from "@/components/common/PremiumTeaserCard";
 import { useLiveWalkingProgress } from "@/hooks/useLiveWalkingProgress";
-import { FREE_PLAN_LIMITS } from "@/utils/featureAccess";
 import {
   DEFAULT_STEP_GOAL,
   STEP_GOAL_INCREMENT,
@@ -32,8 +30,6 @@ import {
   type WalkingProgressScope,
 } from "@/utils/localWalkingProgress";
 import { saveLiveWalkingGoal } from "@/utils/liveWalkingProgress";
-
-const FREE_DAILY_STEP_LIMIT = FREE_PLAN_LIMITS.dailyStepCounterPreview;
 const STEP_COLOR = "#22C55E";
 const STEP_COLOR_DARK = "#15803D";
 const STEP_ACCENT = "#14B8A6";
@@ -55,7 +51,6 @@ type StepHistoryEntry = {
 };
 
 type StepCounterCardProps = {
-  isPremium: boolean;
   colors: any;
 };
 
@@ -203,7 +198,7 @@ function StepRing({
   );
 }
 
-export function StepCounterCard({ isPremium, colors }: StepCounterCardProps) {
+export function StepCounterCard({ colors }: StepCounterCardProps) {
   const styles = useMemo(() => getStyles(colors), [colors]);
   const walkingProgress = useLiveWalkingProgress();
   const [goalDraft, setGoalDraft] = useState(String(DEFAULT_STEP_GOAL));
@@ -218,8 +213,8 @@ export function StepCounterCard({ isPremium, colors }: StepCounterCardProps) {
     calorieMetrics,
   } = walkingProgress;
 
-  const displayedGoal = isPremium ? goal : FREE_DAILY_STEP_LIMIT;
-  const displayedSteps = isPremium ? cleanSteps(steps) : Math.min(cleanSteps(steps), FREE_DAILY_STEP_LIMIT);
+  const displayedGoal = goal;
+  const displayedSteps = cleanSteps(steps);
 
   useEffect(() => {
     if (!isEditingGoal) {
@@ -268,8 +263,8 @@ export function StepCounterCard({ isPremium, colors }: StepCounterCardProps) {
               <Ionicons name="footsteps-outline" size={Math.min(hp(2.5), wp(5.6))} color={STEP_COLOR} />
             </View>
             <View style={styles.titleCopy}>
-              <Text style={styles.eyebrow}>{isPremium ? "Premium Steps" : "Basic Step Counter"}</Text>
-              <Text style={styles.title}>{isPremium ? "Daily Step Ring" : `${FREE_DAILY_STEP_LIMIT}/day Preview`}</Text>
+              <Text style={styles.eyebrow}>Steps</Text>
+              <Text style={styles.title}>Daily Step Ring</Text>
             </View>
           </View>
           <View style={[styles.statusPill, sensorStatus === "ready" && styles.statusPillReady]}>
@@ -300,7 +295,7 @@ export function StepCounterCard({ isPremium, colors }: StepCounterCardProps) {
           <View style={styles.statsColumn}>
             <View style={styles.progressBlock}>
               <Text style={styles.progressValue}>{progressPercent}%</Text>
-              <Text style={styles.progressLabel}>{isPremium ? "of daily goal" : "of free daily preview"}</Text>
+              <Text style={styles.progressLabel}>of daily goal</Text>
             </View>
 
             <View style={styles.metricGrid}>
@@ -309,21 +304,19 @@ export function StepCounterCard({ isPremium, colors }: StepCounterCardProps) {
                 <Text style={styles.metricValue}>{remainingSteps.toLocaleString()}</Text>
                 <Text style={styles.metricLabel}>left</Text>
               </View>
-              {isPremium ? (
-                <View style={styles.metricTile}>
-                  <Ionicons name="flame-outline" size={Math.min(hp(1.95), wp(4.4))} color="#F97316" />
-                  <Text style={styles.metricValue}>{stepCalories}</Text>
-                  <Text style={styles.metricLabel}>step kcal</Text>
-                </View>
-              ) : null}
+              <View style={styles.metricTile}>
+                <Ionicons name="flame-outline" size={Math.min(hp(1.95), wp(4.4))} color="#F97316" />
+                <Text style={styles.metricValue}>{stepCalories}</Text>
+                <Text style={styles.metricLabel}>step kcal</Text>
+              </View>
             </View>
           </View>
         </View>
 
         <View style={styles.goalPanel}>
           <View style={styles.goalCopy}>
-            <Text style={styles.goalLabel}>{isPremium ? "Daily goal" : "Basic Step Counter"}</Text>
-            {isPremium && isEditingGoal ? (
+            <Text style={styles.goalLabel}>Daily goal</Text>
+            {isEditingGoal ? (
               <TextInput
                 style={styles.goalInput}
                 keyboardType="number-pad"
@@ -335,12 +328,11 @@ export function StepCounterCard({ isPremium, colors }: StepCounterCardProps) {
               />
             ) : (
               <Text style={styles.goalValue}>
-                {isPremium ? `${displayedGoal.toLocaleString()} steps` : `${displayedGoal.toLocaleString()}/day preview`}
+                {displayedGoal.toLocaleString()} steps
               </Text>
             )}
           </View>
 
-          {isPremium ? (
           <View style={styles.goalControls}>
             <TouchableOpacity
               style={styles.goalIconButton}
@@ -371,11 +363,8 @@ export function StepCounterCard({ isPremium, colors }: StepCounterCardProps) {
               <Ionicons name="add" size={Math.min(hp(1.9), wp(4.3))} color={colors.textPrimary} />
             </TouchableOpacity>
           </View>
-          ) : null}
         </View>
 
-        {isPremium ? (
-          <>
         <View style={styles.weekHeader}>
           <View>
             <Text style={styles.weekTitle}>Weekly steps</Text>
@@ -404,24 +393,6 @@ export function StepCounterCard({ isPremium, colors }: StepCounterCardProps) {
             </View>
           ))}
         </View>
-          </>
-        ) : (
-          <View style={styles.freeUpgradeWrap}>
-            <PremiumTeaserCard
-              title="Unlock Steps Pro"
-              subtitle={`Your Basic counter includes a ${FREE_DAILY_STEP_LIMIT.toLocaleString()}-step daily preview. Premium adds custom goals, step calories, and weekly rhythm.`}
-              previewTitle="Premium walking ring"
-              icon="footsteps-outline"
-              compact
-              metrics={[
-                { label: "Goal", value: "Custom", icon: "flag-outline", color: STEP_COLOR },
-                { label: "Step kcal", value: "Live", icon: "flame-outline", color: "#F97316" },
-                { label: "Week", value: "7d", icon: "bar-chart-outline", color: STEP_ACCENT },
-              ]}
-              bullets={["Custom goals", "Step kcal", "Weekly chart"]}
-            />
-          </View>
-        )}
 
         {sensorStatus !== "ready" ? (
           <View style={styles.noticeRow}>
@@ -687,9 +658,6 @@ const getStyles = (colors: any) =>
       color: colors.textSecondary,
       fontSize: Math.min(hp(1), wp(2.38)),
       fontWeight: "900",
-    },
-    freeUpgradeWrap: {
-      marginTop: hp(1.8),
     },
     weekChart: {
       height: hp(10.8),

@@ -21,6 +21,7 @@ export type DashboardPendingMutation = {
   entryId?: string | null;
   occurredAt: string;
   confirmedAt: string;
+  loggedAt?: string;
   calories?: number;
   hydrationAmount?: number;
   achievedCaloriesAfter?: number;
@@ -152,6 +153,22 @@ const getDayEntriesForMutation = (day: any, mutation: DashboardPendingMutation) 
       ? day.waterIntake
       : [];
 
+const getDayCalories = (day: any) =>
+  toNumber(day?.achievedCalories ?? day?.calorieIntake ?? day?.caloriesIntake);
+
+const getDayHydration = (day: any) =>
+  toNumber(day?.achieviedHydration ?? day?.achievedHydration ?? day?.hydrationIntake);
+
+const isMutationFinalTotalObserved = (day: any, mutation: DashboardPendingMutation) => {
+  if (mutation.type === "meal") {
+    const achievedCaloriesAfter = Math.max(0, Math.round(toNumber(mutation.achievedCaloriesAfter)));
+    return achievedCaloriesAfter > 0 && getDayCalories(day) >= achievedCaloriesAfter;
+  }
+
+  const achievedHydrationAfter = Math.max(0, toNumber(mutation.achievedHydrationAfter));
+  return achievedHydrationAfter > 0 && getDayHydration(day) >= achievedHydrationAfter;
+};
+
 const isMutationObservedInDay = (day: any, mutation: DashboardPendingMutation) => {
   const entries = getDayEntriesForMutation(day, mutation);
   const mutationEntryId = mutation.entryId || getEntryId(mutation.entry);
@@ -171,40 +188,71 @@ const isMutationObservedInDay = (day: any, mutation: DashboardPendingMutation) =
     return true;
   }
 
-  return false;
+  return isMutationFinalTotalObserved(day, mutation);
 };
 
 const applyMutationToDay = (day: any, mutation: DashboardPendingMutation) => {
   if (mutation.type === "meal") {
     const calories = Math.max(0, Math.round(toNumber(mutation.calories)));
+    const achievedCaloriesAfter = Math.max(0, Math.round(toNumber(mutation.achievedCaloriesAfter)));
     const meals = Array.isArray(day?.meals) ? day.meals : [];
-    const entry = mutation.entry || {
-      _id: mutation.entryId,
-      calories,
-      createdAt: mutation.confirmedAt,
-    };
+    const loggedAt = mutation.loggedAt || mutation.confirmedAt || mutation.occurredAt;
+    const entry = mutation.entry
+      ? {
+          ...mutation.entry,
+          loggedAt: mutation.entry.loggedAt || mutation.entry.timestamp || loggedAt,
+          timestamp: mutation.entry.timestamp || mutation.entry.loggedAt || loggedAt,
+          createdAt: mutation.entry.createdAt || loggedAt,
+        }
+      : {
+          _id: mutation.entryId,
+          calories,
+          createdAt: loggedAt,
+          loggedAt,
+          timestamp: loggedAt,
+        };
     const entryId = getEntryId(entry);
     const nextMeals =
       entryId && meals.some((meal: any) => getEntryId(meal) === entryId)
         ? meals
         : [...meals, entry];
+    const nextCalories =
+      achievedCaloriesAfter > 0
+        ? Math.max(getDayCalories(day), achievedCaloriesAfter)
+        : getDayCalories(day) + calories;
 
     return {
       ...day,
-      achievedCalories: toNumber(day?.achievedCalories) + calories,
+      achievedCalories: nextCalories,
+      calorieIntake: nextCalories,
+      caloriesIntake: nextCalories,
       meals: nextMeals,
     };
   }
 
   const hydrationAmount = Math.max(0, toNumber(mutation.hydrationAmount));
-  const previousHydration = toNumber(day?.achieviedHydration ?? day?.achievedHydration);
-  const nextHydration = previousHydration + hydrationAmount;
+  const previousHydration = getDayHydration(day);
+  const achievedHydrationAfter = Math.max(0, toNumber(mutation.achievedHydrationAfter));
+  const nextHydration =
+    achievedHydrationAfter > 0
+      ? Math.max(previousHydration, achievedHydrationAfter)
+      : previousHydration + hydrationAmount;
   const waterIntake = Array.isArray(day?.waterIntake) ? day.waterIntake : [];
-  const entry = mutation.entry || {
-    _id: mutation.entryId,
-    amount: hydrationAmount,
-    createdAt: mutation.confirmedAt,
-  };
+  const loggedAt = mutation.loggedAt || mutation.confirmedAt || mutation.occurredAt;
+  const entry = mutation.entry
+    ? {
+        ...mutation.entry,
+        loggedAt: mutation.entry.loggedAt || mutation.entry.timestamp || loggedAt,
+        timestamp: mutation.entry.timestamp || mutation.entry.loggedAt || loggedAt,
+        createdAt: mutation.entry.createdAt || loggedAt,
+      }
+    : {
+        _id: mutation.entryId,
+        amount: hydrationAmount,
+        createdAt: loggedAt,
+        loggedAt,
+        timestamp: loggedAt,
+      };
   const entryId = getEntryId(entry);
   const nextWaterIntake =
     entryId && waterIntake.some((item: any) => getEntryId(item) === entryId)
@@ -215,6 +263,7 @@ const applyMutationToDay = (day: any, mutation: DashboardPendingMutation) => {
     ...day,
     achieviedHydration: nextHydration,
     achievedHydration: nextHydration,
+    hydrationIntake: nextHydration,
     waterIntake: nextWaterIntake,
   };
 };
@@ -232,6 +281,7 @@ export const recordDashboardPendingMutation = async (input: PendingMutationInput
     entryId: input.entryId || getEntryId(input.entry),
     occurredAt: input.occurredAt || now,
     confirmedAt: input.confirmedAt || now,
+    loggedAt: input.loggedAt || input.confirmedAt || input.occurredAt || now,
   };
   const mutations = await readMutationStore();
   const nextMutations = [
@@ -294,4 +344,21 @@ export const applyPendingDashboardMutations = async <T extends Record<string, an
   }
 
   return nextData as T;
+};
+
+export const getDashboardPendingMutationCount = async (
+  options: Pick<ApplyPendingDashboardMutationsOptions, "userId" | "weeklyTrackingId"> = {}
+) => {
+  const currentScope =
+    !options.userId || !options.weeklyTrackingId ? await getCurrentScope() : null;
+  const scope = {
+    userId: options.userId ?? currentScope?.userId,
+    weeklyTrackingId: options.weeklyTrackingId ?? currentScope?.weeklyTrackingId,
+  };
+  const now = Date.now();
+  const mutations = await readMutationStore();
+
+  return mutations.filter(
+    (mutation) => !isMutationExpired(mutation, now) && isSameScope(mutation, scope.userId, scope.weeklyTrackingId)
+  ).length;
 };

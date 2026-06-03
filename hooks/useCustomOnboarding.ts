@@ -25,6 +25,7 @@ export const useCustomOnboarding = () => {
 
       const heightInCmRounded = Math.round(heightInCm * 10) / 10;
       const weightInKg = parseFloat(userInfo.weight);
+      const startingWeightRecordedAt = new Date().toISOString();
 
       const response = await authApi.completeOnboarding({
         name: userInfo.name.trim(),
@@ -43,6 +44,10 @@ export const useCustomOnboarding = () => {
       await AsyncStorage.setItem('fitfaat_health_metrics', JSON.stringify({
         height: heightInCmRounded,
         weight: weightInKg,
+        weightKg: weightInKg,
+        currentWeight: weightInKg,
+        startingWeightKg: weightInKg,
+        startingWeightRecordedAt,
         gender: userInfo.selectedGender,
         birthDate: {
           day: parseInt(userInfo.birthDate.day, 10),
@@ -57,7 +62,19 @@ export const useCustomOnboarding = () => {
       const savedUser = await tokenStorage.getUser();
       const updatedUser = response?.user || response?.data?.user;
       if (updatedUser) {
-        await tokenStorage.saveUser(updatedUser);
+        await tokenStorage.saveUser({
+          ...updatedUser,
+          healthMetrics: {
+            ...(updatedUser.healthMetrics || {}),
+            startingWeightKg: weightInKg,
+            startingWeightRecordedAt,
+          },
+          userInfo: {
+            ...(updatedUser.userInfo || {}),
+            startingWeightKg: weightInKg,
+            startingWeightRecordedAt,
+          },
+        });
       } else if (savedUser) {
         await tokenStorage.saveUser({
           ...savedUser,
@@ -66,6 +83,10 @@ export const useCustomOnboarding = () => {
             name: userInfo.name.trim(),
             height: heightInCmRounded,
             weight: weightInKg,
+            weightKg: weightInKg,
+            currentWeight: weightInKg,
+            startingWeightKg: weightInKg,
+            startingWeightRecordedAt,
             gender: userInfo.selectedGender,
             birthDate: {
               day: parseInt(userInfo.birthDate.day, 10),
@@ -77,6 +98,8 @@ export const useCustomOnboarding = () => {
           },
         });
       }
+
+      await AsyncStorage.setItem('fitfaat_onboarding_first_log_nudge', '1');
 
       // Navigate to dashboard after successful onboarding
       router.replace('/(main)/(dashboard)');

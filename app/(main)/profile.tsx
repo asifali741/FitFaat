@@ -3,7 +3,6 @@ import AnimatedPressable from "@/components/common/AnimatedPressable";
 import ProgressRing from "@/components/common/ProgressRing";
 import { ScreenSceneWrapper } from "@/components/common/ScreenTiltAnimation";
 import SmartEmptyState from "@/components/common/SmartEmptyState";
-import ProgressPhotoGallery from "@/components/profile/ProgressPhotoGallery";
 import {
   calculateAchievementBadges,
   type AchievementBadge,
@@ -11,14 +10,9 @@ import {
 } from "@/constants/achievementBadges";
 import { authApi } from "@/utils/auth/authApi";
 import {
-  applyAdaptiveGoalsToJsonResponse,
   applyAdaptiveGoalsToDays,
   buildAdaptiveGoalMetrics,
   HEALTH_METRICS_STORAGE_KEY,
-  loadAdaptiveGoalCarryForward,
-  loadWeeklyWeightTrendCalibration,
-  recordWeightTrendSnapshot,
-  type AdaptiveGoalCarryForward,
 } from "@/utils/adaptiveGoals";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
@@ -38,12 +32,20 @@ import { streakApi } from '@/utils/streakApi';
 import { exerciseApi } from '@/utils/exerciseApi';
 import { dailyLogsApi } from '@/utils/dailyLogsApi';
 import {
+  getDashboardUserIdentity,
   getStoredDashboardCache,
   getStoredWeeklyTrackingId,
   setStoredDashboardCache,
 } from '@/utils/dashboardStorage';
 import { cachedRequestJson } from '@/utils/apiHelper';
 import { loadAchievementLocalStats } from '@/utils/achievementStorage';
+import { mergeDailyProgressMap } from '@/utils/dailyProgressSync';
+import { applyPendingDashboardMutations } from '@/utils/dashboardPendingMutations';
+import {
+  LOCAL_EXERCISE_PROGRESS_KEY,
+  mergeExerciseProgressIntoJsonResponse,
+} from '@/utils/localExerciseProgress';
+import { mergeWalkingProgressIntoJsonResponse } from '@/utils/localWalkingProgress';
 import {
   clearCachedProfileImage,
   buildStableBackendProfileImageUrl,
@@ -55,7 +57,14 @@ import {
   writeCachedProfileImage,
 } from '@/utils/profileImage';
 import { profileImageEvents, type ProfileImageUpdateEvent } from '@/utils/profileImageEvents';
-import { queueHealthDataCloudSync, syncLatestHealthData } from '@/utils/healthDataSync';
+import { syncLatestHealthData } from '@/utils/healthDataSync';
+import { openReportProblemOptions } from '@/utils/reportProblem';
+import {
+  formatWhatsAppNumber,
+  loadEmergencyWhatsAppRecord,
+  normalizeWhatsAppNumber,
+  saveEmergencyWhatsAppNumber,
+} from '@/utils/emergencyWhatsApp';
 
 const ENV = Constants.expoConfig?.extra;
 
@@ -116,12 +125,15 @@ type HealthRecordSummary = {
   weight?: number;
   goalCalories?: number;
   hydrationGoal?: number;
+  trackedDays: number;
   completedDays: number;
   activeDays: number;
   totalCalories: number;
   targetCalories: number;
   totalHydration: number;
   targetHydration: number;
+  hydrationLoggedDays: number;
+  hydrationTargetForLoggedDays: number;
   days: any[];
 };
 
@@ -244,12 +256,13 @@ const formatMetric = (value: number | undefined, unit: string) => {
 };
 
 const formatGoalLabel = (value?: any) => {
-  if (!value) return 'Build Consistency';
-  return String(value)
+  if (!value) return null;
+  const label = String(value)
     .replace(/[_-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
     .replace(/\b\w/g, (char) => char.toUpperCase());
+  return label || null;
 };
 
 const readTextMetric = (sources: any[], keys: string[]) => {
@@ -272,41 +285,145 @@ const getBmiCategory = (bmi?: number) => {
 
 const getHealthDays = (
   payload: any,
-  userData: any,
-  carryForward?: AdaptiveGoalCarryForward | null
+  userData: any
 ): any[] => {
   const source = payload?.data || payload;
   const metrics = buildAdaptiveGoalMetrics(userData);
   if (!source) return [];
-  if (Array.isArray(source)) return applyAdaptiveGoalsToDays(source, metrics, carryForward);
-  if (Array.isArray(source.dailyLogs)) return applyAdaptiveGoalsToDays(source.dailyLogs, metrics, carryForward);
+  if (Array.isArray(source)) return applyAdaptiveGoalsToDays(source, metrics);
+  if (Array.isArray(source.dailyLogs)) return applyAdaptiveGoalsToDays(source.dailyLogs, metrics);
 
   const sourceDays = Object.values(source).filter(
     (entry: any) => entry && typeof entry === 'object'
   ) as any[];
 
-  return applyAdaptiveGoalsToDays(sourceDays, metrics, carryForward);
+  return applyAdaptiveGoalsToDays(sourceDays, metrics);
+};
+
+const isUnlockedHealthDay = (day: any) =>
+  day && String(day?.status || '').toLowerCase() !== 'locked';
+
+const getDayCalories = (day: any) =>
+  readNumber(day?.achievedCalories, day?.calorieIntake, day?.caloriesIntake);
+
+const getDayHydration = (day: any) =>
+  readNumber(day?.achievedHydration, day?.achieviedHydration, day?.hydrationIntake);
+
+const getDaySteps = (day: any) =>
+  readNumber(day?.walkingSteps, day?.steps, day?.stepCount);
+
+const getDayWorkoutSignal = (day: any) =>
+  readNumber(day?.exerciseCaloriesBurned, day?.workoutCalories, day?.caloriesBurnedFromExercise) ||
+  readNumber(day?.exerciseDurationSeconds, day?.exerciseSeconds, day?.exerciseDuration) ||
+  (Array.isArray(day?.exerciseEntries) ? day.exerciseEntries.length : 0);
+
+const hasTrackedHealthSignal = (day: any) =>
+  getDayCalories(day) > 0 ||
+  getDayHydration(day) > 0 ||
+  getDaySteps(day) > 0 ||
+  getDayWorkoutSignal(day) > 0 ||
+  ['finished', 'completed'].includes(String(day?.status || '').toLowerCase());
+
+const getProgressSourceDays = (payload: any): any[] => {
+  const source = payload?.data || payload;
+  if (!source) return [];
+  if (Array.isArray(source)) return source;
+  if (Array.isArray(source.dailyLogs)) return source.dailyLogs;
+  return Object.values(source).filter((entry: any) => entry && typeof entry === 'object') as any[];
+};
+
+const buildProgressMap = (payload: any): Record<string, any> => {
+  const days = getProgressSourceDays(payload);
+
+  return days.reduce((data: Record<string, any>, day: any, index: number) => {
+    const dayNo = Number(day?.dayNo ?? day?.dayNumber);
+    const dateKey = String(day?.dateKey || day?.date || '').match(/^(\d{4}-\d{2}-\d{2})/)?.[1];
+    const id = day?._id || day?.id || day?.dailyLogId || day?.dayLogId;
+    const key = id
+      ? `log:${id}`
+      : dateKey
+        ? `date:${dateKey}`
+        : Number.isFinite(dayNo) && dayNo > 0
+          ? `day0${Math.round(dayNo)}`
+          : `day:${index + 1}`;
+
+    data[key] = {
+      ...day,
+      ...(dateKey ? { dateKey, date: day?.date || dateKey } : {}),
+      ...(Number.isFinite(dayNo) && dayNo > 0 ? { dayNo: Math.round(dayNo) } : {}),
+    };
+
+    return data;
+  }, {});
+};
+
+const parseStoredJson = (value: string | null) => {
+  if (!value) return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+};
+
+const getScopedLocalExerciseSessionCount = (
+  rawStore: string | null,
+  userData: any,
+  weeklyTrackingId?: string | null
+) => {
+  const parsed = parseStoredJson(rawStore);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return 0;
+
+  const userId = getDashboardUserIdentity(userData);
+  const seenRecords = new Set<string>();
+
+  return Object.entries(parsed).reduce((count, [key, record]: [string, any]) => {
+    if (!record || typeof record !== 'object') return count;
+    if (record.userId && userId && record.userId !== userId) return count;
+    if (record.weeklyTrackingId && weeklyTrackingId && record.weeklyTrackingId !== weeklyTrackingId) return count;
+
+    const recordKey = [
+      record.userId || userId || '',
+      record.weeklyTrackingId || weeklyTrackingId || '',
+      record.dayLogId || record.dateKey || key,
+    ].join(':');
+    if (seenRecords.has(recordKey)) return count;
+    seenRecords.add(recordKey);
+
+    const entriesCount = Array.isArray(record.entries) ? record.entries.length : 0;
+    return count + (entriesCount || (readNumber(record.caloriesBurned, record.durationSeconds) > 0 ? 1 : 0));
+  }, 0);
 };
 
 const buildHealthRecordSummary = (
   payload: any,
-  userData: any,
-  carryForward?: AdaptiveGoalCarryForward | null
+  userData: any
 ): HealthRecordSummary => {
-  const days = getHealthDays(payload, userData, carryForward);
+  const days = getHealthDays(payload, userData)
+    .filter(isUnlockedHealthDay)
+    .sort((left: any, right: any) => {
+      const leftTime = left?.date ? new Date(left.date).getTime() : Number(left?.dayNo || 0);
+      const rightTime = right?.date ? new Date(right.date).getTime() : Number(right?.dayNo || 0);
+      return (Number.isFinite(leftTime) ? leftTime : 0) - (Number.isFinite(rightTime) ? rightTime : 0);
+    })
+    .slice(-7);
   const metricSources = getMetricSources(userData);
+  const hydrationDays = days.filter((day: any) => getDayHydration(day) > 0);
 
   return {
     height: normalizeHeightCm(readMetric(metricSources, ['height', 'heightCm', 'heightInCm'])),
     weight: readMetric(metricSources, ['weight', 'weightKg', 'currentWeight']),
     goalCalories: readNumber(...metricSources.flatMap(source => [source.goalCalories, source.targetCalories])),
     hydrationGoal: readNumber(...metricSources.flatMap(source => [source.hydrationGoal, source.targetHydration])),
-    completedDays: days.filter((day: any) => ['finished', 'completed'].includes(day?.status)).length,
-    activeDays: days.filter((day: any) => day?.status === 'active').length,
-    totalCalories: days.reduce((sum, day: any) => sum + readNumber(day?.achievedCalories, day?.achieviedCalories), 0),
+    trackedDays: days.filter(hasTrackedHealthSignal).length,
+    completedDays: days.filter((day: any) => ['finished', 'completed'].includes(String(day?.status || '').toLowerCase())).length,
+    activeDays: days.filter((day: any) => String(day?.status || '').toLowerCase() === 'active').length,
+    totalCalories: days.reduce((sum, day: any) => sum + getDayCalories(day), 0),
     targetCalories: days.reduce((sum, day: any) => sum + readNumber(day?.targetCalories), 0),
-    totalHydration: days.reduce((sum, day: any) => sum + readNumber(day?.achievedHydration, day?.achieviedHydration), 0),
+    totalHydration: hydrationDays.reduce((sum, day: any) => sum + getDayHydration(day), 0),
     targetHydration: days.reduce((sum, day: any) => sum + readNumber(day?.targetHydration), 0),
+    hydrationLoggedDays: hydrationDays.length,
+    hydrationTargetForLoggedDays: hydrationDays.reduce((sum, day: any) => sum + readNumber(day?.targetHydration), 0),
     days,
   };
 };
@@ -334,9 +451,9 @@ export default function ProfileScreen() {
   const [showHealthRecords, setShowHealthRecords] = useState(false);
   const [healthRecords, setHealthRecords] = useState<HealthRecordSummary | null>(null);
   const [healthRecordsLoading, setHealthRecordsLoading] = useState(false);
-  const [showWeightLogModal, setShowWeightLogModal] = useState(false);
-  const [weightInput, setWeightInput] = useState('');
-  const [isSavingWeightLog, setIsSavingWeightLog] = useState(false);
+  const [showEmergencyContactModal, setShowEmergencyContactModal] = useState(false);
+  const [emergencyContactInput, setEmergencyContactInput] = useState('');
+  const [emergencyWhatsAppNumber, setEmergencyWhatsAppNumber] = useState<string | null>(null);
   const [achievementLocalStats, setAchievementLocalStats] = useState<AchievementLocalStats>({});
   const [doctorStatus, setDoctorStatus] = useState<string | null>(null);
   const profileImageLoadId = React.useRef(0);
@@ -354,6 +471,27 @@ export default function ProfileScreen() {
       }
     }
   };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadEmergencyContact = async () => {
+      try {
+        const savedRecord = await loadEmergencyWhatsAppRecord(user);
+        if (!isMounted) return;
+        setEmergencyWhatsAppNumber(savedRecord?.number || null);
+        setEmergencyContactInput(savedRecord?.number ? formatWhatsAppNumber(savedRecord.number) : '');
+      } catch (error) {
+        console.log('Error loading emergency WhatsApp contact:', error);
+      }
+    };
+
+    loadEmergencyContact();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
 
   const refreshProfileImageFromBackend = React.useCallback(async (
     userData: any,
@@ -539,42 +677,14 @@ export default function ProfileScreen() {
         setHealthRecordsLoading(true);
         try {
           const metricSources = [userData];
+          const weeklyTrackingId = await getStoredWeeklyTrackingId(userData);
           const [storedMetrics, storedRecords] = await Promise.all([
             AsyncStorage.getItem(HEALTH_METRICS_STORAGE_KEY),
-            getStoredDashboardCache(),
+            getStoredDashboardCache(userData, weeklyTrackingId),
           ]);
 
           if (storedMetrics) {
             metricSources.push(JSON.parse(storedMetrics));
-          }
-
-          const weeklyTrackingId = await getStoredWeeklyTrackingId(userData);
-          const carryForward = await loadAdaptiveGoalCarryForward({
-            userId: userData?.id,
-            currentWeeklyTrackingId: weeklyTrackingId,
-          });
-
-          if (storedRecords?.data) {
-            const parsedRecords = { data: storedRecords.data };
-            if (isActive) {
-              setHealthRecords(buildHealthRecordSummary(parsedRecords, metricSources, carryForward));
-              setHealthRecordsLoading(false);
-            }
-
-            authApi.getOnboardingStatus()
-              .then((onboardingStatus) => {
-                if (isActive) {
-                  setHealthRecords(buildHealthRecordSummary(
-                    parsedRecords,
-                    [...metricSources, onboardingStatus],
-                    carryForward
-                  ));
-                }
-              })
-              .catch(() => {
-                // Existing stored profile data is enough when this lightweight refresh is unavailable.
-              });
-            return;
           }
 
           try {
@@ -584,16 +694,41 @@ export default function ProfileScreen() {
             // Existing stored profile data is enough when this lightweight refresh is unavailable.
           }
 
+          let dashboardData = storedRecords?.data
+            ? buildProgressMap(storedRecords.data)
+            : {};
+          let hasFreshProgress = false;
+
           if (weeklyTrackingId) {
-            const progress = await dailyLogsApi.getWeeklyProgress(weeklyTrackingId);
-            if (isActive) {
-              setHealthRecords(buildHealthRecordSummary(progress, metricSources, carryForward));
+            try {
+              const progress = await dailyLogsApi.getWeeklyProgressFresh(weeklyTrackingId);
+              dashboardData = mergeDailyProgressMap(
+                dashboardData,
+                buildProgressMap(progress),
+                { preferIncomingWhenUnclear: true }
+              );
+              hasFreshProgress = true;
+            } catch (progressError) {
+              console.log('Fresh profile progress unavailable:', progressError);
             }
-            return;
+          }
+
+          if (Object.keys(dashboardData).length) {
+            dashboardData = await mergeExerciseProgressIntoJsonResponse(dashboardData);
+            dashboardData = await mergeWalkingProgressIntoJsonResponse(dashboardData);
+            dashboardData = await applyPendingDashboardMutations(dashboardData, {
+              userId: getDashboardUserIdentity(userData),
+              weeklyTrackingId,
+              source: hasFreshProgress ? 'server' : 'local',
+            });
+            await setStoredDashboardCache({ data: dashboardData, timestamp: new Date() }, userData, weeklyTrackingId);
           }
 
           if (isActive) {
-            setHealthRecords(buildHealthRecordSummary(null, metricSources));
+            setHealthRecords(buildHealthRecordSummary(
+              Object.keys(dashboardData).length ? { data: dashboardData } : null,
+              metricSources
+            ));
           }
         } catch (error) {
           console.log('Error loading health records:', error);
@@ -692,15 +827,20 @@ export default function ProfileScreen() {
           try {
             // Local workouts
             let localWorkoutsCount = 0;
-            const completed = await AsyncStorage.getItem('completedWorkouts');
+            const weeklyTrackingId = await getStoredWeeklyTrackingId(userData);
+            const [completed, localAchievementStats, localExerciseStore] = await Promise.all([
+              AsyncStorage.getItem('completedWorkouts'),
+              loadAchievementLocalStats(),
+              AsyncStorage.getItem(LOCAL_EXERCISE_PROGRESS_KEY),
+            ]);
             if (completed) {
               localWorkoutsCount = JSON.parse(completed).length;
             }
 
-            const localAchievementStats = await loadAchievementLocalStats();
             localWorkoutsCount = Math.max(
               localWorkoutsCount,
-              localAchievementStats.completedWorkouts || 0
+              localAchievementStats.completedWorkouts || 0,
+              getScopedLocalExerciseSessionCount(localExerciseStore, userData, weeklyTrackingId)
             );
 
             if (isActive) {
@@ -804,15 +944,16 @@ export default function ProfileScreen() {
     : undefined;
   const bmiValue = derivedBmi || readMetric(profileMetricSources, ['bmi', 'bodyMassIndex']);
   const bmiDisplay = bmiValue ? bmiValue.toFixed(1) : '--';
-  const weeklyLoggedDays = healthRecords?.days.length || 0;
-  const weeklyCompletedDays = healthRecords?.completedDays || 0;
-  const hydrationAverage = weeklyLoggedDays ? (healthRecords?.totalHydration || 0) / weeklyLoggedDays : 0;
-  const hydrationTargetAverage = weeklyLoggedDays && healthRecords?.targetHydration
-    ? healthRecords.targetHydration / weeklyLoggedDays
+  const weeklyLoggedDays = Math.min(7, healthRecords?.trackedDays || 0);
+  const weeklyCompletedDays = Math.min(7, healthRecords?.completedDays || 0);
+  const hydrationLoggedDays = healthRecords?.hydrationLoggedDays || 0;
+  const hydrationAverage = hydrationLoggedDays ? (healthRecords?.totalHydration || 0) / hydrationLoggedDays : 0;
+  const hydrationTargetAverage = hydrationLoggedDays && healthRecords?.hydrationTargetForLoggedDays
+    ? healthRecords.hydrationTargetForLoggedDays / hydrationLoggedDays
     : healthRecords?.hydrationGoal || 0;
   const dailyGoalCalories = healthRecords?.goalCalories
-    || (weeklyLoggedDays && healthRecords?.targetCalories
-      ? Math.round(healthRecords.targetCalories / weeklyLoggedDays)
+    || (healthRecords?.days.length && healthRecords?.targetCalories
+      ? Math.round(healthRecords.targetCalories / healthRecords.days.length)
       : 0);
   const goalLabel = formatGoalLabel(
     readTextMetric(profileMetricSources, [
@@ -843,7 +984,7 @@ export default function ProfileScreen() {
     {
       label: 'Weekly stats',
       value: `${weeklyCompletedDays}/7`,
-      detail: `${weeklyLoggedDays} days logged`,
+      detail: `${weeklyLoggedDays} days tracked`,
       icon: 'calendar-number-outline',
       color: colors.primary,
     },
@@ -863,16 +1004,65 @@ export default function ProfileScreen() {
     },
   ];
 
-  const openEmergencyContact = async () => {
-    const whatsappNumber = '923325563373';
-    const whatsappUrl = `whatsapp://send?phone=${whatsappNumber}`;
-    const fallbackUrl = `https://wa.me/${whatsappNumber}`;
+  const openSavedEmergencyWhatsApp = async (whatsappNumber: string) => {
+    const message = encodeURIComponent('Emergency help needed. Please contact me.');
+    const whatsappUrl = `whatsapp://send?phone=${whatsappNumber}&text=${message}`;
+    const fallbackUrl = `https://wa.me/${whatsappNumber}?text=${message}`;
 
     try {
       await Linking.openURL(whatsappUrl);
     } catch {
       await Linking.openURL(fallbackUrl);
     }
+  };
+
+  const saveEmergencyWhatsAppContact = async () => {
+    const normalizedNumber = normalizeWhatsAppNumber(emergencyContactInput);
+
+    if (normalizedNumber.length < 8 || normalizedNumber.length > 15) {
+      Alert.alert('Invalid WhatsApp Number', 'Enter a valid WhatsApp number with country code, or a local number like 03325563373.');
+      return;
+    }
+
+    try {
+      const { record } = await saveEmergencyWhatsAppNumber(normalizedNumber, user);
+      setEmergencyWhatsAppNumber(record.number);
+      setEmergencyContactInput(formatWhatsAppNumber(record.number));
+      setShowEmergencyContactModal(false);
+      Alert.alert('Emergency WhatsApp Saved', `${formatWhatsAppNumber(record.number)} is now your emergency WhatsApp contact.`);
+    } catch (error) {
+      console.log('Error saving emergency WhatsApp contact:', error);
+      Alert.alert('Could Not Save', 'Please try saving the emergency WhatsApp number again.');
+    }
+  };
+
+  const openEmergencyContactEditor = () => {
+    setEmergencyContactInput(emergencyWhatsAppNumber ? formatWhatsAppNumber(emergencyWhatsAppNumber) : '');
+    setShowEmergencyContactModal(true);
+  };
+
+  const openEmergencyContact = () => {
+    if (!emergencyWhatsAppNumber) {
+      openEmergencyContactEditor();
+      return;
+    }
+
+    Alert.alert(
+      'Emergency WhatsApp',
+      `Saved contact: ${formatWhatsAppNumber(emergencyWhatsAppNumber)}`,
+      [
+        {
+          text: 'Open WhatsApp',
+          onPress: () => {
+            openSavedEmergencyWhatsApp(emergencyWhatsAppNumber).catch(() => {
+              Alert.alert('Could Not Open WhatsApp', 'Please check that WhatsApp is installed and the number is valid.');
+            });
+          },
+        },
+        { text: 'Edit Number', onPress: openEmergencyContactEditor },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
   };
 
   const openDoctorPortal = () => {
@@ -897,124 +1087,13 @@ export default function ProfileScreen() {
         action: openDoctorPortal,
       };
 
-  const openWeightLogModal = () => {
-    const currentWeight = healthRecords?.weight || user?.userInfo?.weight || user?.weight;
-    setWeightInput(currentWeight ? String(Math.round(Number(currentWeight) * 10) / 10) : '');
-    setShowWeightLogModal(true);
-  };
-
-  const saveWeightLog = async () => {
-    const nextWeight = Number(weightInput);
-
-    if (!Number.isFinite(nextWeight) || nextWeight < 20 || nextWeight > 350) {
-      Alert.alert('Invalid Weight', 'Enter a weight between 20 kg and 350 kg.');
-      return;
-    }
-
-    setIsSavingWeightLog(true);
-    try {
-      const storedMetricsRaw = await AsyncStorage.getItem(HEALTH_METRICS_STORAGE_KEY);
-      const storedMetrics = storedMetricsRaw ? JSON.parse(storedMetricsRaw) : {};
-      const nextMetrics = {
-        ...storedMetrics,
-        weight: Math.round(nextWeight * 10) / 10,
-        currentWeight: Math.round(nextWeight * 10) / 10,
-        updatedAt: new Date().toISOString(),
-      };
-      await AsyncStorage.setItem(HEALTH_METRICS_STORAGE_KEY, JSON.stringify(nextMetrics));
-
-      const latestUser = await tokenStorage.getUser();
-      const updatedUser = latestUser
-        ? {
-            ...latestUser,
-            userInfo: {
-              ...(latestUser.userInfo || {}),
-              weight: nextMetrics.weight,
-            },
-          }
-        : user
-          ? {
-              ...user,
-              userInfo: {
-                ...(user.userInfo || {}),
-                weight: nextMetrics.weight,
-              },
-            }
-          : null;
-
-      if (updatedUser) {
-        await tokenStorage.saveUser(updatedUser);
-        setUser(updatedUser);
-      }
-
-      const weeklyTrackingId = await getStoredWeeklyTrackingId(updatedUser);
-      const adaptiveMetrics = buildAdaptiveGoalMetrics(updatedUser, nextMetrics);
-      const userId = updatedUser?.id || updatedUser?._id;
-      await recordWeightTrendSnapshot(adaptiveMetrics || { weight: nextMetrics.weight }, {
-        userId,
-        weeklyTrackingId,
-      });
-
-      const cachedRecords = await getStoredDashboardCache(undefined, weeklyTrackingId);
-      if (cachedRecords?.data) {
-        const recordsData = cachedRecords.data;
-        const carryForward = await loadAdaptiveGoalCarryForward({
-          userId,
-          currentWeeklyTrackingId: weeklyTrackingId,
-        });
-        const weightTrendCalibration = await loadWeeklyWeightTrendCalibration(
-          adaptiveMetrics,
-          recordsData,
-          {
-            userId,
-            weeklyTrackingId,
-          }
-        );
-        const adjustedRecords = applyAdaptiveGoalsToJsonResponse(
-          recordsData,
-          adaptiveMetrics,
-          carryForward,
-          { weightTrendCalibration }
-        );
-
-        await setStoredDashboardCache(
-          { data: adjustedRecords, timestamp: new Date() },
-          updatedUser,
-          weeklyTrackingId
-        );
-        setHealthRecords(buildHealthRecordSummary(
-          { data: adjustedRecords },
-          [updatedUser, nextMetrics],
-          carryForward
-        ));
-      } else {
-        setHealthRecords((previous) =>
-          previous
-            ? {
-                ...previous,
-                weight: nextMetrics.weight,
-              }
-            : buildHealthRecordSummary(null, [updatedUser, nextMetrics])
-        );
-      }
-
-      queueHealthDataCloudSync();
-      setShowWeightLogModal(false);
-    } catch (error) {
-      console.error('Error saving weight log:', error);
-      Alert.alert('Could Not Save', 'Please try logging your weight again.');
-    } finally {
-      setIsSavingWeightLog(false);
-    }
-  };
-
   const quickActions = [
     { title: "Book Appointment", iconName: "calendar", color: colors.primary, action: () => router.push('/(main)/(conference)') },
     { title: "Chat History", iconName: "chatbubbles", color: colors.info, action: () => router.push('/(main)/(chatbot)/chat-history') },
     { title: "Health Records", iconName: "clipboard", color: colors.secondary, action: () => setShowHealthRecords(true) },
-    { title: "Log Weight", iconName: "scale", color: '#8B5CF6', action: openWeightLogModal },
     { title: "Achievement Badges", iconName: "trophy", color: colors.warning, action: () => setSelectedTab('achievements') },
-    { title: "Emergency Contact", iconName: "alert-circle", color: colors.error, action: openEmergencyContact },
+    { title: "Report Problem", iconName: "bug", color: colors.primary, action: () => openReportProblemOptions("Profile") },
+    { title: "Emergency WhatsApp", iconName: "logo-whatsapp", color: colors.error, action: openEmergencyContact },
   ];
 
   return (
@@ -1191,18 +1270,20 @@ export default function ProfileScreen() {
                       </View>
                     </View>
 
-                    <View style={styles.snapshotGoalCard}>
-                      <View style={styles.snapshotGoalIcon}>
-                        <Ionicons name="flag-outline" size={Math.min(hp(2.8), wp(6.2))} color={colors.textOnPrimary} />
+                    {goalLabel ? (
+                      <View style={styles.snapshotGoalCard}>
+                        <View style={styles.snapshotGoalIcon}>
+                          <Ionicons name="flag-outline" size={Math.min(hp(2.8), wp(6.2))} color={colors.textOnPrimary} />
+                        </View>
+                        <Text style={styles.snapshotCardTitle}>Goal</Text>
+                        <Text style={styles.snapshotGoalTitle} numberOfLines={2} adjustsFontSizeToFit>
+                          {goalLabel}
+                        </Text>
+                        <Text style={styles.snapshotCardMeta}>
+                          {dailyGoalCalories ? `${dailyGoalCalories} kcal daily target` : 'Add a goal to personalize tracking'}
+                        </Text>
                       </View>
-                      <Text style={styles.snapshotCardTitle}>Goal</Text>
-                      <Text style={styles.snapshotGoalTitle} numberOfLines={2} adjustsFontSizeToFit>
-                        {goalLabel}
-                      </Text>
-                      <Text style={styles.snapshotCardMeta}>
-                        {dailyGoalCalories ? `${dailyGoalCalories} kcal daily target` : 'Add a goal to personalize tracking'}
-                      </Text>
-                    </View>
+                    ) : null}
                   </View>
 
                   <View style={styles.snapshotMetricGrid}>
@@ -1239,11 +1320,6 @@ export default function ProfileScreen() {
                 </>
               )}
             </View>
-
-            <ProgressPhotoGallery
-              userId={user?.id || user?._id || displayEmail}
-              colors={colors}
-            />
 
             {/* Health Statistics */}
             <View style={styles.statsSection}>
@@ -1567,15 +1643,6 @@ export default function ProfileScreen() {
                   </View>
                 </View>
 
-                <TouchableOpacity
-                  style={styles.recordActionButton}
-                  onPress={openWeightLogModal}
-                  activeOpacity={0.85}
-                >
-                  <Ionicons name="scale-outline" size={Math.min(hp(2.2), wp(5))} color={colors.textOnPrimary} />
-                  <Text style={styles.recordActionText}>Log Weight</Text>
-                </TouchableOpacity>
-
                 <View style={styles.recordSummaryCard}>
                   <Text style={styles.recordSummaryTitle}>Weekly Nutrition</Text>
                   <Text style={styles.recordSummaryText}>
@@ -1585,7 +1652,7 @@ export default function ProfileScreen() {
                     Hydration: {healthRecords?.totalHydration || 0} / {healthRecords?.targetHydration || healthRecords?.hydrationGoal || 0} L
                   </Text>
                   <Text style={styles.recordSummaryText}>
-                    Logged days: {healthRecords?.days.length || 0}
+                    Tracked days: {healthRecords?.trackedDays || 0}
                   </Text>
                 </View>
 
@@ -1606,41 +1673,39 @@ export default function ProfileScreen() {
       </Modal>
 
       <Modal
-        visible={showWeightLogModal}
+        visible={showEmergencyContactModal}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowWeightLogModal(false)}
+        onRequestClose={() => setShowEmergencyContactModal(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.weightLogModal}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Log Weight</Text>
-              <TouchableOpacity onPress={() => setShowWeightLogModal(false)}>
+              <Text style={styles.modalTitle}>Emergency WhatsApp</Text>
+              <TouchableOpacity onPress={() => setShowEmergencyContactModal(false)}>
                 <Ionicons name="close" size={24} color={colors.textPrimary} />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.weightLogLabel}>Weight (kg)</Text>
+            <Text style={styles.weightLogLabel}>WhatsApp number</Text>
             <TextInput
               style={styles.weightLogInput}
-              value={weightInput}
-              onChangeText={setWeightInput}
-              keyboardType="decimal-pad"
-              placeholder="70.0"
+              value={emergencyContactInput}
+              onChangeText={setEmergencyContactInput}
+              keyboardType="phone-pad"
+              placeholder="03325563373 or +923325563373"
               placeholderTextColor={colors.textSecondary}
             />
+            <Text style={styles.emergencyContactHint}>
+              This contact opens in WhatsApp only. FitFaat will not place phone calls from this button.
+            </Text>
 
             <TouchableOpacity
-              style={[styles.weightLogButton, isSavingWeightLog && styles.weightLogButtonDisabled]}
-              onPress={saveWeightLog}
-              disabled={isSavingWeightLog}
+              style={styles.weightLogButton}
+              onPress={saveEmergencyWhatsAppContact}
               activeOpacity={0.85}
             >
-              {isSavingWeightLog ? (
-                <ActivityIndicator size="small" color={colors.textOnPrimary} />
-              ) : (
-                <Text style={styles.weightLogButtonText}>Save Weight</Text>
-              )}
+              <Text style={styles.weightLogButtonText}>Save WhatsApp Contact</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -2365,21 +2430,6 @@ const getStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
   },
-  recordActionButton: {
-    minHeight: hp(5),
-    borderRadius: hp(1.4),
-    backgroundColor: colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: wp(2),
-    marginBottom: hp(1.5),
-  },
-  recordActionText: {
-    fontSize: hp(1.55),
-    fontWeight: '800',
-    color: colors.textOnPrimary,
-  },
   recordSummaryCard: {
     backgroundColor: colors.primarySoft,
     borderRadius: hp(1.6),
@@ -2417,15 +2467,19 @@ const getStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.surface || colors.screenColor,
     marginBottom: hp(1.6),
   },
+  emergencyContactHint: {
+    color: colors.textSecondary,
+    fontSize: hp(1.28),
+    fontWeight: '700',
+    lineHeight: hp(1.85),
+    marginBottom: hp(1.6),
+  },
   weightLogButton: {
     minHeight: hp(5.2),
     borderRadius: hp(1.4),
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  weightLogButtonDisabled: {
-    opacity: 0.7,
   },
   weightLogButtonText: {
     color: colors.textOnPrimary,

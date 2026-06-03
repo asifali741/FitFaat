@@ -49,7 +49,6 @@ function ThemedApp() {
 function AuthGate() {
   const router = useRouter();
   const segments = useSegments();
-  const segmentKey = segments.join("/");
   const rootSegment = segments[0];
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const hasRefreshedSessionRef = useRef(false);
@@ -149,7 +148,7 @@ function AuthGate() {
     return () => {
       isActive = false;
     };
-  }, [router, rootSegment, segmentKey]);
+  }, [router, rootSegment]);
 
   if (isCheckingAuth) {
     return (

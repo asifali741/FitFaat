@@ -103,7 +103,7 @@ export default function DoctorPortal() {
 
   const handleDoctorButtonPress = () => {
     if (doctorStatus === 'approved') {
-      Alert.alert('Already Registered', 'You are already registered as a doctor!');
+      router.push('/(main)/(doctor-portal)/patient-management');
       return;
     }
 
@@ -121,6 +121,26 @@ export default function DoctorPortal() {
     // No previous application
     router.push('/(main)/(doctor-portal)/register-form');
   };
+
+  const doctorButtonLabel = (() => {
+    if (isLoadingStatus) return 'Loading...';
+    if (doctorStatus === 'approved') {
+      return doctorName ? `Welcome Dr. ${doctorName}` : 'Doctor Dashboard';
+    }
+    if (doctorStatus === 'pending') return 'Application Pending';
+    if (doctorStatus === 'rejected') return 'Resubmit Application';
+    return 'Join as Doctor';
+  })();
+  const doctorButtonIcon: keyof typeof Ionicons.glyphMap =
+    isLoadingStatus
+      ? 'hourglass-outline'
+      : doctorStatus === 'approved'
+        ? 'checkmark-circle'
+        : doctorStatus === 'pending'
+          ? 'time-outline'
+          : doctorStatus === 'rejected'
+            ? 'refresh-circle'
+            : 'add-circle';
 
   const analytics = React.useMemo(() => {
     const patientCount = new Set(doctorAppointments.map(getPatientKey).filter(Boolean)).size;
@@ -362,13 +382,18 @@ export default function DoctorPortal() {
               style={styles.gradientButton}
             >
               <Ionicons 
-                name={doctorStatus === 'approved' ? "checkmark-circle" : "add-circle"} 
+                name={doctorButtonIcon} 
                 size={24} 
                 color={colors.surface} 
                 style={styles.buttonIcon}
               />
-              <Text style={styles.gradientButtonText}>
-                {isLoadingStatus ? 'Loading...' : doctorStatus === 'approved' && doctorName ? `Welcome Dr. ${doctorName}` : 'Join as Doctor'}
+              <Text
+                style={styles.gradientButtonText}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.72}
+              >
+                {doctorButtonLabel}
               </Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -590,6 +615,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     ...theme.shadows.large,
   },
   gradientButton: {
+    minHeight: hp(6.8),
     paddingVertical: hp(2.2),
     paddingHorizontal: wp(8),
     borderRadius: 18,
@@ -600,11 +626,15 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   buttonIcon: {
     marginRight: wp(1),
+    flexShrink: 0,
   },
   gradientButtonText: {
+    flexShrink: 1,
+    minWidth: 0,
     color: colors.surface,
-    fontSize: hp(2.2),
+    fontSize: Math.min(hp(2.2), wp(5)),
     fontWeight: "700",
     letterSpacing: 0.3,
+    textAlign: "center",
   },
 });

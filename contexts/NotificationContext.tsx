@@ -6,6 +6,12 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { AppState, Platform } from 'react-native';
 import { tokenStorage } from '@/utils/auth/tokenStorage';
 import { getBackendBaseUrl } from '@/utils/config';
+import {
+  getGoalMotivationQuotes,
+  getGoalNotificationCopy,
+} from '@/utils/goalExperience';
+import { loadGoalSpineKey, type GoalSpineKey } from '@/utils/goalSpine';
+import { recordNutritionNudgeOpen } from '@/utils/nutritionProfile';
 
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 let Notifications: typeof import('expo-notifications') | null = null;
@@ -130,6 +136,9 @@ export interface NotificationData {
   challengeId?: string;
   subscriptionId?: string;
   route?: string;
+  nutritionNudgeId?: string;
+  nutritionNudgeKind?: string;
+  scheduledForHour?: number;
 }
 
 type NotificationTypeConfig = {
@@ -563,6 +572,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return settingKey ? notificationSettings[settingKey] : true;
   };
 
+  const getCurrentGoal = async (): Promise<GoalSpineKey> =>
+    loadGoalSpineKey().catch(() => 'unset' as GoalSpineKey);
+
   const createTrigger = async (request: FitFaatNotificationRequest) => {
     const mod = await getNotificationsModule();
     if (!mod) return null;
@@ -696,29 +708,40 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     hour = 7,
     minute = 0,
     workoutName = 'today workout'
-  ): Promise<string | null> =>
-    scheduleFitFaatNotification({
+  ): Promise<string | null> => {
+    const goal = await getCurrentGoal();
+    const goalBody = getGoalNotificationCopy(goal, 'workout');
+
+    return scheduleFitFaatNotification({
       type: 'workout',
       title: 'Workout Reminder',
-      body: `It is time for your ${workoutName}.`,
+      body: `${goalBody} Time for your ${workoutName}.`,
       daily: { hour, minute },
     });
+  };
 
-  const scheduleMealReminder = async (mealName: string, hour: number, minute: number): Promise<string | null> =>
-    scheduleFitFaatNotification({
+  const scheduleMealReminder = async (mealName: string, hour: number, minute: number): Promise<string | null> => {
+    const goal = await getCurrentGoal();
+    const goalBody = getGoalNotificationCopy(goal, 'meal');
+
+    return scheduleFitFaatNotification({
       type: 'meal',
       title: `${mealName} Reminder`,
-      body: `Remember to log your ${mealName.toLowerCase()} in FitFaat.`,
+      body: `${goalBody} Remember to log your ${mealName.toLowerCase()} in FitFaat.`,
       daily: { hour, minute },
     });
+  };
 
-  const scheduleMissedActivityReminder = async (hour = 21, minute = 0): Promise<string | null> =>
-    scheduleFitFaatNotification({
+  const scheduleMissedActivityReminder = async (hour = 21, minute = 0): Promise<string | null> => {
+    const goal = await getCurrentGoal();
+
+    return scheduleFitFaatNotification({
       type: 'missedActivity',
       title: 'Activity Check-In',
-      body: 'You still have time to complete or log your activity today.',
+      body: getGoalNotificationCopy(goal, 'missedActivity'),
       daily: { hour, minute },
     });
+  };
 
   const scheduleHealthTrackingReminder = async (
     title: string,
@@ -734,7 +757,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     });
 
   const sendGoalProgressNotification = async (title: string, body: string) => {
-    await sendFitFaatNotification('goal', title, body);
+    const goal = await getCurrentGoal();
+    await sendFitFaatNotification('goal', title, `${body} ${getGoalNotificationCopy(goal, 'goal')}`);
   };
 
   const sendBookingUpdateNotification = async (title: string, body: string, appointmentId?: string) => {
@@ -784,7 +808,11 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       const existingId = await AsyncStorage.getItem(HOURLY_MOTIVATION_NOTIFICATION_KEY);
       if (existingId) return existingId;
 
-      const quote = MOTIVATIONAL_QUOTES[new Date().getHours() % MOTIVATIONAL_QUOTES.length];
+      const goal = await getCurrentGoal();
+      const goalQuotes = getGoalMotivationQuotes(goal);
+      const quote =
+        goalQuotes[new Date().getHours() % goalQuotes.length] ||
+        MOTIVATIONAL_QUOTES[new Date().getHours() % MOTIVATIONAL_QUOTES.length];
       const notificationId = await scheduleFitFaatNotification({
         type: 'motivation',
         title: 'FitFaat Motivation',
@@ -865,6 +893,12 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const handleNotificationTap = (data: NotificationData) => {
     if (!data?.type) return;
+
+    if (data.nutritionNudgeId) {
+      recordNutritionNudgeOpen(data).catch((error) => {
+        console.error('Error recording nutrition nudge open:', error);
+      });
+    }
 
     switch (data.type) {
       case 'appointment':

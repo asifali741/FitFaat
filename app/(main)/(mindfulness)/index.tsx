@@ -1,4 +1,3 @@
-import { PremiumTeaserCard } from "@/components/common/PremiumTeaserCard";
 import { FeatureLimitBanner } from "@/components/common/FeatureLimitBanner";
 import { useTheme } from "@/contexts/ThemeContext";
 import { getFeatureAccessStatus, type FeatureAccessStatus } from "@/utils/featureAccess";
@@ -34,8 +33,6 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 const BREATHING_HISTORY_KEY = "fitfaat_breathing_sessions";
-const FREE_MINDFULNESS_MINUTES = 1;
-
 type BreathPhaseName = "Inhale" | "Hold" | "Exhale" | "Rest";
 
 type BreathPhase = {
@@ -142,8 +139,7 @@ export default function MindfulnessScreen() {
   const [sessionHistory, setSessionHistory] = useState<SessionHistoryItem[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [customMinuteInput, setCustomMinuteInput] = useState("3");
-  const [isPremium, setIsPremium] = useState(false);
-  const [isPremiumLoading, setIsPremiumLoading] = useState(true);
+  const [isAccessLoading, setIsAccessLoading] = useState(true);
   const [mindfulnessAccess, setMindfulnessAccess] = useState<FeatureAccessStatus | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const didSaveCurrentSession = useRef(false);
@@ -154,10 +150,7 @@ export default function MindfulnessScreen() {
     () => techniques.find((technique) => technique.id === selectedTechniqueId) || techniques[0],
     [selectedTechniqueId]
   );
-  const visibleTechniques = useMemo(
-    () => (isPremium ? techniques : techniques.slice(0, 1)),
-    [isPremium]
-  );
+  const visibleTechniques = techniques;
 
   const currentPhase = selectedTechnique.phases[phaseIndex] || selectedTechnique.phases[0];
   const sessionTotalSeconds = sessionMinutes * 60;
@@ -200,42 +193,25 @@ export default function MindfulnessScreen() {
     loadHistory();
   }, []);
 
-  const loadPremiumState = useCallback(async () => {
-    setIsPremiumLoading(true);
+  const loadAccessState = useCallback(async () => {
+    setIsAccessLoading(true);
 
     try {
-      const featureAccess = await getFeatureAccessStatus("mindfulness");
+      const featureAccess = await getFeatureAccessStatus("mindfulnessPro");
       setMindfulnessAccess(featureAccess);
-      setIsPremium(featureAccess.isPremium);
     } catch (error) {
-      console.log("[Mindfulness] Failed to check premium state:", error);
+      console.log("[Mindfulness] Failed to check mindfulness access:", error);
       setMindfulnessAccess(null);
-      setIsPremium(false);
     } finally {
-      setIsPremiumLoading(false);
+      setIsAccessLoading(false);
     }
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      loadPremiumState();
-    }, [loadPremiumState])
+      loadAccessState();
+    }, [loadAccessState])
   );
-
-  useEffect(() => {
-    if (isPremium || isPremiumLoading) return;
-    setShowHistory(false);
-    setSelectedTechniqueId(techniques[0].id);
-    const freeDurations = getInitialDurations(techniques[0]);
-    setPhaseDurations(freeDurations);
-    setPhaseIndex(0);
-    setRemainingSeconds(freeDurations[0]);
-    setElapsedSeconds(0);
-    setCompletedCycles(0);
-    setIsRunning(false);
-    setSessionMinutes(FREE_MINDFULNESS_MINUTES);
-    setCustomMinuteInput(String(FREE_MINDFULNESS_MINUTES));
-  }, [isPremium, isPremiumLoading]);
 
   useEffect(() => {
     breathScale.value = withTiming(currentPhase.scale, {
@@ -261,7 +237,7 @@ export default function MindfulnessScreen() {
     setIsRunning(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
 
-    if (!isPremium || finalElapsedSeconds < 15) return;
+    if (finalElapsedSeconds < 15) return;
 
     const historyItem: SessionHistoryItem = {
       id: `${Date.now()}-${selectedTechnique.id}`,
@@ -280,7 +256,6 @@ export default function MindfulnessScreen() {
     completedCycles,
     elapsedSeconds,
     persistHistory,
-    isPremium,
     selectedTechnique.id,
     selectedTechnique.name,
     sessionHistory,
@@ -330,11 +305,6 @@ export default function MindfulnessScreen() {
   };
 
   const handleTechniqueSelect = (technique: Technique) => {
-    if (!isPremium && technique.id !== techniques[0].id) {
-      router.push("/(main)/(settings)/premium" as any);
-      return;
-    }
-
     const nextDurations = getInitialDurations(technique);
     setSelectedTechniqueId(technique.id);
     setPhaseDurations(nextDurations);
@@ -342,11 +312,6 @@ export default function MindfulnessScreen() {
   };
 
   const handleStartPause = () => {
-    if (!isPremium && mindfulnessAccess?.isLocked) {
-      router.push("/(main)/(settings)/premium" as any);
-      return;
-    }
-
     if (!isRunning) {
       didSaveCurrentSession.current = false;
       Haptics.selectionAsync().catch(() => {});
@@ -422,19 +387,12 @@ export default function MindfulnessScreen() {
           </View>
           <TouchableOpacity
             style={styles.iconButton}
-            onPress={() => {
-              if (isPremium) {
-                setShowHistory(true);
-                return;
-              }
-
-              router.push("/(main)/(settings)/premium" as any);
-            }}
+            onPress={() => setShowHistory(true)}
             accessibilityRole="button"
-            accessibilityLabel={isPremium ? "Open breathing history" : "Upgrade to Premium"}
+            accessibilityLabel="Open breathing history"
           >
             <Ionicons
-              name={isPremium ? "time-outline" : "lock-closed-outline"}
+              name="time-outline"
               size={Math.min(hp(2.8), wp(6))}
               color={colors.textPrimary}
             />
@@ -445,30 +403,11 @@ export default function MindfulnessScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          {isPremiumLoading ? (
+          {isAccessLoading ? (
             <View style={styles.loadingPanel}>
               <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={styles.loadingText}>Checking Premium access</Text>
+              <Text style={styles.loadingText}>Loading mindfulness</Text>
             </View>
-          ) : mindfulnessAccess?.isLocked ? (
-            <>
-              <FeatureLimitBanner access={mindfulnessAccess} />
-              <View style={styles.lockedPanel}>
-                <PremiumTeaserCard
-                  title="Mindfulness Locked"
-                  subtitle={mindfulnessAccess.lockedReason || "Mindfulness is a Premium feature. Upgrade to unlock breathing sessions and programs."}
-                  previewTitle="Premium breathing room"
-                  icon="leaf-outline"
-                  compact
-                  metrics={[
-                    { label: "Modes", value: "3", icon: "sparkles-outline", color: selectedTechnique.color },
-                    { label: "Timer", value: "Custom", icon: "timer-outline", color: "#6366F1" },
-                    { label: "History", value: "Local", icon: "time-outline", color: "#10B981" },
-                  ]}
-                  bullets={["Full library", "Custom timing", "Session history"]}
-                />
-              </View>
-            </>
           ) : (
             <>
           <FeatureLimitBanner access={mindfulnessAccess} />
@@ -586,7 +525,6 @@ export default function MindfulnessScreen() {
             </View>
           </View>
 
-          {isPremium ? (
           <View style={styles.settingsPanel}>
             <View style={styles.sectionHeader}>
               <View>
@@ -637,28 +575,11 @@ export default function MindfulnessScreen() {
               </View>
             ))}
           </View>
-          ) : (
-            <View style={styles.lockedPanel}>
-              <PremiumTeaserCard
-                title="Unlock Full Mindfulness Library"
-                subtitle="Mindfulness is Premium. Upgrade for breathing programs, custom timers, and saved session history."
-                previewTitle="Premium breathing room"
-                icon="leaf-outline"
-                compact
-                metrics={[
-                  { label: "Modes", value: "3", icon: "sparkles-outline", color: selectedTechnique.color },
-                  { label: "Timer", value: "Custom", icon: "timer-outline", color: "#6366F1" },
-                  { label: "History", value: "Local", icon: "time-outline", color: "#10B981" },
-                ]}
-                bullets={["Full library", "Custom timing", "Session history"]}
-              />
-            </View>
-          )}
             </>
           )}
         </ScrollView>
 
-        <Modal visible={showHistory && isPremium} transparent animationType="slide" onRequestClose={() => setShowHistory(false)}>
+        <Modal visible={showHistory} transparent animationType="slide" onRequestClose={() => setShowHistory(false)}>
           <View style={styles.modalOverlay}>
             <View style={styles.historySheet}>
               <View style={styles.historyHeader}>

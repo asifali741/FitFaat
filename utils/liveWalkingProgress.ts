@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AppState, type AppStateStatus } from "react-native";
 import { Pedometer } from "expo-sensors";
+import { queueAccountScopedStorageCloudSync } from "@/utils/auth/accountScopedStorageSyncQueue";
 import {
   DEFAULT_STEP_GOAL,
   WALKING_PEDOMETER_PERMISSION_STORAGE_KEY,
@@ -171,9 +172,11 @@ const updateSnapshot = (partial: Partial<WalkingProgressSnapshot>) => {
 };
 
 const savePermissionStatus = (status: string) => {
-  AsyncStorage.setItem(WALKING_PEDOMETER_PERMISSION_STORAGE_KEY, status).catch((error) => {
-    console.log("[LiveWalkingProgress] Failed to save permission status:", error);
-  });
+  AsyncStorage.setItem(WALKING_PEDOMETER_PERMISSION_STORAGE_KEY, status)
+    .then(() => queueAccountScopedStorageCloudSync("step-permission"))
+    .catch((error) => {
+      console.log("[LiveWalkingProgress] Failed to save permission status:", error);
+    });
 };
 
 const persistCurrentSteps = (force = false) => {
@@ -202,11 +205,11 @@ const persistCurrentSteps = (force = false) => {
 
   const nextHistory = mergeHistoryEntry(snapshot.history, todayEntry);
   updateSnapshot({ history: nextHistory });
-  AsyncStorage.setItem(WALKING_PROGRESS_STORAGE_KEY, JSON.stringify(nextHistory)).catch(
-    (error) => {
+  AsyncStorage.setItem(WALKING_PROGRESS_STORAGE_KEY, JSON.stringify(nextHistory))
+    .then(() => queueAccountScopedStorageCloudSync("live-steps"))
+    .catch((error) => {
       console.log("[LiveWalkingProgress] Failed to save step history:", error);
-    }
-  );
+    });
 };
 
 const getRecentPedometerDates = () => {
@@ -334,19 +337,19 @@ const startLiveWalkingProgressNow = async () => {
     }
 
     const currentPermission = await Pedometer.getPermissionsAsync();
-    let hasPermission = currentPermission.granted;
-
-    if (!hasPermission && currentPermission.canAskAgain !== false) {
-      const requestedPermission = await Pedometer.requestPermissionsAsync();
-      hasPermission = requestedPermission.granted;
-    }
-
-    if (!hasPermission) {
-      savePermissionStatus("denied");
+    if (!currentPermission.granted) {
+      const nextPermissionStatus =
+        currentPermission.canAskAgain === false
+          ? "blocked"
+          : String(currentPermission.status || "undetermined").toLowerCase();
+      savePermissionStatus(nextPermissionStatus);
       updateSnapshot({
         status: "denied",
-        message: "Motion permission is needed for live steps",
-        permissionStatus: "denied",
+        message:
+          nextPermissionStatus === "undetermined"
+            ? "Enable Step Counter to start live steps"
+            : "Motion permission is needed for live steps",
+        permissionStatus: nextPermissionStatus,
         hasPedometerPermission: false,
       });
       hasStarted = true;
@@ -378,11 +381,11 @@ const startLiveWalkingProgressNow = async () => {
     });
 
     if (syncResult.syncedCount > 0) {
-      AsyncStorage.setItem(WALKING_PROGRESS_STORAGE_KEY, JSON.stringify(syncResult.history)).catch(
-        (error) => {
+      AsyncStorage.setItem(WALKING_PROGRESS_STORAGE_KEY, JSON.stringify(syncResult.history))
+        .then(() => queueAccountScopedStorageCloudSync("pedometer-history"))
+        .catch((error) => {
           console.log("[LiveWalkingProgress] Failed to save synced history:", error);
-        }
-      );
+        });
     }
 
     watchSubscription?.remove();
@@ -445,6 +448,7 @@ export const refreshLiveWalkingProgress = () => startLiveWalkingProgress({ force
 export const saveLiveWalkingGoal = async (nextGoalValue: number) => {
   const nextGoal = clampStepGoal(nextGoalValue);
   await AsyncStorage.setItem(WALKING_STEP_GOAL_STORAGE_KEY, String(nextGoal));
+  queueAccountScopedStorageCloudSync("step-goal");
   updateSnapshot({ goal: nextGoal });
   persistCurrentSteps(true);
   return nextGoal;

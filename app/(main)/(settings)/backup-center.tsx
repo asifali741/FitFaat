@@ -7,6 +7,7 @@ import {
   exportLocalSyncFile,
   LOCAL_SYNC_CATEGORY_OPTIONS,
   prepareLocalSyncImport,
+  testLocalSyncFileUri,
   testNewestLocalSyncFile,
   type LocalSyncBackupPreview,
   type LocalSyncCategory,
@@ -44,7 +45,6 @@ const categoryIcons: Record<LocalSyncCategory, keyof typeof Ionicons.glyphMap> =
   steps: "footsteps-outline",
   workouts: "barbell-outline",
   weight: "scale-outline",
-  progressPhotos: "images-outline",
   settings: "settings-outline",
 };
 
@@ -196,10 +196,10 @@ export default function BackupCenterScreen() {
       const result = await exportLocalSyncFile(exportPasscode, {
         categories: selectedCategories,
       });
-      let testMessage = "FitFaat also tested the newest backup successfully.";
+      let testMessage = "FitFaat also tested this backup file successfully.";
 
       try {
-        await testNewestLocalSyncFile(exportPasscode);
+        await testLocalSyncFileUri(exportPasscode, result.uri);
       } catch (testError: any) {
         testMessage = testError?.message
           ? `Export succeeded, but the automatic test failed: ${testError.message}`
@@ -249,9 +249,7 @@ export default function BackupCenterScreen() {
       await refreshHistory();
       Alert.alert(
         "Backup File Is Valid",
-        testPreview.missingProgressPhotoAssets
-          ? `The backup opens correctly, but ${testPreview.missingProgressPhotoAssets} progress photo files are missing.`
-          : `The backup opens correctly and contains ${testPreview.itemCount + testPreview.assetCount} items.`
+        `The backup opens correctly and contains ${testPreview.itemCount} items.`
       );
     } catch (error: any) {
       await refreshHistory();
@@ -420,13 +418,22 @@ export default function BackupCenterScreen() {
               Export a .ffsync file, test it, preview what will restore, then restore only the selected categories.
             </Text>
           </View>
-          <TouchableOpacity
-            activeOpacity={0.78}
-            onPress={() => router.push("/(main)/(settings)/local-sync-guide" as any)}
-            style={styles.noticeButton}
-          >
-            <Text style={styles.noticeButtonText}>Guide</Text>
-          </TouchableOpacity>
+          <View style={styles.noticeActions}>
+            <TouchableOpacity
+              activeOpacity={0.78}
+              onPress={() => router.push("/(main)/(settings)/local-sync-guide" as any)}
+              style={styles.noticeButton}
+            >
+              <Text style={styles.noticeButtonText}>Guide</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.78}
+              onPress={() => router.push("/(main)/(qr-transfer)" as any)}
+              style={styles.noticeButton}
+            >
+              <Text style={styles.noticeButtonText}>Quick QR</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.section}>
@@ -629,10 +636,6 @@ export default function BackupCenterScreen() {
                   <Text style={styles.previewStatLabel}>Items</Text>
                 </View>
                 <View style={styles.previewStat}>
-                  <Text style={styles.previewStatValue}>{preview?.assetCount || 0}</Text>
-                  <Text style={styles.previewStatLabel}>Photos</Text>
-                </View>
-                <View style={styles.previewStat}>
                   <Text style={styles.previewStatValue}>{preview?.categories.length || 0}</Text>
                   <Text style={styles.previewStatLabel}>Types</Text>
                 </View>
@@ -660,15 +663,6 @@ export default function BackupCenterScreen() {
                   </Text>
                 </View>
               </View>
-
-              {!!preview?.missingProgressPhotoAssets && (
-                <View style={styles.warningBox}>
-                  <Ionicons name="warning-outline" size={hp(2.2)} color="#D97706" />
-                  <Text style={styles.warningText}>
-                    {preview.missingProgressPhotoAssets} progress photo files are missing from this backup.
-                  </Text>
-                </View>
-              )}
 
               <View style={styles.previewCategoryList}>
                 {LOCAL_SYNC_CATEGORY_OPTIONS.map((category) => {
@@ -779,6 +773,10 @@ const getStyles = (colors: any) => StyleSheet.create({
   noticeTextWrap: {
     flex: 1,
     paddingRight: wp(2),
+  },
+  noticeActions: {
+    alignItems: "stretch",
+    gap: hp(0.8),
   },
   noticeTitle: {
     color: colors.textPrimary,
@@ -1134,22 +1132,6 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontSize: hp(1.35),
     lineHeight: hp(1.85),
     fontWeight: "600",
-  },
-  warningBox: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: wp(2),
-    backgroundColor: "#FEF3C7",
-    borderRadius: hp(1),
-    padding: wp(3),
-    marginBottom: hp(1.1),
-  },
-  warningText: {
-    color: "#92400E",
-    flex: 1,
-    fontSize: hp(1.42),
-    lineHeight: hp(1.95),
-    fontWeight: "700",
   },
   previewCategoryList: {
     borderTopWidth: 1,

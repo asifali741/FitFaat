@@ -111,11 +111,9 @@ const PatientDietPlanViewer: React.FC<PatientDietPlanViewerProps> = ({
     if (Platform.OS !== 'android') return;
 
     if (visible) {
-      NavigationBar.setBackgroundColorAsync(colors.surface || colors.screenColor || '#FFFFFF').catch(() => {});
       NavigationBar.setButtonStyleAsync(isDarkMode ? 'light' : 'dark').catch(() => {});
       NavigationBar.setStyle(isDarkMode ? 'dark' : 'light');
     } else {
-      NavigationBar.setBackgroundColorAsync(colors.screenColor || '#FFFFFF').catch(() => {});
       NavigationBar.setButtonStyleAsync(isDarkMode ? 'light' : 'dark').catch(() => {});
       NavigationBar.setStyle(isDarkMode ? 'dark' : 'light');
     }

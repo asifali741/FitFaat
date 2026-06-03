@@ -267,7 +267,7 @@ export default function NotesScreen() {
         <Text style={styles.emptySubtitle}>
           {isSearching
             ? "Try a different word or clear the search."
-            : "Create quick health reminders, symptoms, questions for doctors, or daily thoughts."}
+            : "Create reminders, ideas, checklists, or anything you want to keep handy."}
         </Text>
         {!isSearching && (
           <TouchableOpacity style={styles.emptyButton} onPress={openNewNote}>
@@ -450,7 +450,7 @@ export default function NotesScreen() {
                   {editingNote ? "Edit Note" : "New Note"}
                 </Text>
                 <Text style={styles.editorSubtitle}>
-                  Saved locally and included in sync export
+                  Saved privately and included in sync export
                 </Text>
               </View>
               <TouchableOpacity
