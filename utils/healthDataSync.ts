@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import {
-  ADAPTIVE_GOAL_CARRY_FORWARD_STORAGE_KEY,
   HEALTH_METRICS_STORAGE_KEY,
   WEIGHT_TREND_LOGS_STORAGE_KEY,
   type WeightTrendLogEntry,
@@ -19,7 +18,6 @@ export const HEALTH_SYNC_STORAGE_KEYS = [
   HEALTH_SYNC_SNAPSHOT_KEY,
   HEALTH_METRICS_STORAGE_KEY,
   WEIGHT_TREND_LOGS_STORAGE_KEY,
-  ADAPTIVE_GOAL_CARRY_FORWARD_STORAGE_KEY,
 ];
 
 const HEALTH_SYNC_TIMEOUT_MS = 3600;
@@ -40,8 +38,6 @@ export type HealthDataSyncSnapshot = {
   metricsUpdatedAt?: string | null;
   weightLogs?: WeightTrendLogEntry[];
   weightLogsUpdatedAt?: string | null;
-  carryForward?: Record<string, any> | null;
-  carryForwardUpdatedAt?: string | null;
 };
 
 type CloudSnapshotResult = {
@@ -157,6 +153,20 @@ const normalizeMetrics = (value: unknown) => {
   const weight = normalizeWeightKg(
     nextMetrics.weight ?? nextMetrics.weightKg ?? nextMetrics.currentWeight
   );
+  const startingWeight = normalizeWeightKg(
+    nextMetrics.startingWeightKg ??
+      nextMetrics.startingWeight ??
+      nextMetrics.startWeightKg ??
+      nextMetrics.startWeight ??
+      nextMetrics.initialWeightKg ??
+      nextMetrics.initialWeight ??
+      nextMetrics.originalWeightKg ??
+      nextMetrics.originalWeight ??
+      nextMetrics.onboardingWeightKg ??
+      nextMetrics.onboardingWeight ??
+      nextMetrics.baselineWeightKg ??
+      nextMetrics.baselineWeight
+  );
   const targetWeight = normalizeWeightKg(
     nextMetrics.targetWeight ??
       nextMetrics.targetWeightKg ??
@@ -174,6 +184,11 @@ const normalizeMetrics = (value: unknown) => {
     nextMetrics.weight = weight;
     nextMetrics.weightKg = weight;
     nextMetrics.currentWeight = weight;
+  }
+
+  if (startingWeight) {
+    nextMetrics.startingWeightKg = startingWeight;
+    nextMetrics.startingWeight = startingWeight;
   }
 
   if (targetWeight) {
@@ -246,20 +261,6 @@ const getWeightLogsUpdatedAt = (logs: WeightTrendLogEntry[], fallback?: unknown)
   return latestLogTime > 0 ? toIso(latestLogTime) : fallback ? String(fallback) : null;
 };
 
-const normalizeCarryForward = (value: unknown) => {
-  const carryForward = parseJsonValue(value);
-  if (!carryForward || typeof carryForward !== 'object' || Array.isArray(carryForward)) {
-    return null;
-  }
-
-  return { ...(carryForward as Record<string, any>) };
-};
-
-const getCarryForwardUpdatedAt = (
-  carryForward: Record<string, any> | null | undefined,
-  fallback?: unknown
-) => carryForward?.updatedAt || carryForward?.createdAt || fallback || null;
-
 const normalizeSnapshot = (value: unknown): HealthDataSyncSnapshot | null => {
   const parsed = parseJsonValue(value);
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
@@ -267,9 +268,8 @@ const normalizeSnapshot = (value: unknown): HealthDataSyncSnapshot | null => {
   const rawSnapshot = parsed as Partial<HealthDataSyncSnapshot>;
   const metrics = normalizeMetrics(rawSnapshot.metrics);
   const weightLogs = normalizeWeightLogs(rawSnapshot.weightLogs);
-  const carryForward = normalizeCarryForward(rawSnapshot.carryForward);
 
-  if (!metrics && !weightLogs.length && !carryForward) return null;
+  if (!metrics && !weightLogs.length) return null;
 
   const metricsUpdatedAt = metrics
     ? String(rawSnapshot.metricsUpdatedAt || getMetricsUpdatedAt(metrics) || rawSnapshot.updatedAt || '')
@@ -277,14 +277,10 @@ const normalizeSnapshot = (value: unknown): HealthDataSyncSnapshot | null => {
   const weightLogsUpdatedAt = weightLogs.length
     ? String(rawSnapshot.weightLogsUpdatedAt || getWeightLogsUpdatedAt(weightLogs) || rawSnapshot.updatedAt || '')
     : null;
-  const carryForwardUpdatedAt = carryForward
-    ? String(rawSnapshot.carryForwardUpdatedAt || getCarryForwardUpdatedAt(carryForward) || rawSnapshot.updatedAt || '')
-    : null;
   const updatedAt = getLatestIso(
     rawSnapshot.updatedAt,
     metricsUpdatedAt,
-    weightLogsUpdatedAt,
-    carryForwardUpdatedAt
+    weightLogsUpdatedAt
   );
 
   return {
@@ -295,8 +291,6 @@ const normalizeSnapshot = (value: unknown): HealthDataSyncSnapshot | null => {
     metricsUpdatedAt,
     weightLogs,
     weightLogsUpdatedAt,
-    carryForward,
-    carryForwardUpdatedAt,
   };
 };
 
@@ -306,16 +300,13 @@ const buildSnapshotFromValues = async (
     metricsUpdatedAt?: unknown;
     weightLogs?: unknown;
     weightLogsUpdatedAt?: unknown;
-    carryForward?: unknown;
-    carryForwardUpdatedAt?: unknown;
   },
   user?: any
 ): Promise<HealthDataSyncSnapshot | null> => {
   const metrics = normalizeMetrics(values.metrics);
   const weightLogs = normalizeWeightLogs(values.weightLogs);
-  const carryForward = normalizeCarryForward(values.carryForward);
 
-  if (!metrics && !weightLogs.length && !carryForward) return null;
+  if (!metrics && !weightLogs.length) return null;
 
   const metricsUpdatedAt = metrics
     ? String(getMetricsUpdatedAt(metrics, values.metricsUpdatedAt) || new Date(0).toISOString())
@@ -323,20 +314,15 @@ const buildSnapshotFromValues = async (
   const weightLogsUpdatedAt = weightLogs.length
     ? String(getWeightLogsUpdatedAt(weightLogs, values.weightLogsUpdatedAt) || new Date(0).toISOString())
     : null;
-  const carryForwardUpdatedAt = carryForward
-    ? String(getCarryForwardUpdatedAt(carryForward, values.carryForwardUpdatedAt) || new Date(0).toISOString())
-    : null;
 
   return {
     schemaVersion: 1,
     userId: getUserIdentity(user),
-    updatedAt: getLatestIso(metricsUpdatedAt, weightLogsUpdatedAt, carryForwardUpdatedAt),
+    updatedAt: getLatestIso(metricsUpdatedAt, weightLogsUpdatedAt),
     metrics,
     metricsUpdatedAt,
     weightLogs,
     weightLogsUpdatedAt,
-    carryForward,
-    carryForwardUpdatedAt,
   };
 };
 
@@ -363,19 +349,6 @@ const mergeWeightLogs = (...sources: Array<HealthDataSyncSnapshot | null | undef
     sources.flatMap((source) => source?.weightLogs || [])
   );
 
-const chooseNewerCarryForward = (
-  current?: HealthDataSyncSnapshot | null,
-  incoming?: HealthDataSyncSnapshot | null
-) => {
-  if (!current?.carryForward) return incoming?.carryForward || null;
-  if (!incoming?.carryForward) return current.carryForward;
-
-  return toTime(incoming.carryForwardUpdatedAt || incoming.updatedAt) >=
-    toTime(current.carryForwardUpdatedAt || current.updatedAt)
-    ? incoming.carryForward
-    : current.carryForward;
-};
-
 const mergeSnapshots = (
   current?: HealthDataSyncSnapshot | null,
   incoming?: HealthDataSyncSnapshot | null
@@ -396,14 +369,8 @@ const mergeSnapshots = (
         incoming.weightLogsUpdatedAt
       ))
     : null;
-  const carryForward = chooseNewerCarryForward(current, incoming);
-  const carryForwardUpdatedAt = carryForward
-    ? toTime(incoming.carryForwardUpdatedAt || incoming.updatedAt) >= toTime(current.carryForwardUpdatedAt || current.updatedAt)
-      ? incoming.carryForwardUpdatedAt || incoming.updatedAt
-      : current.carryForwardUpdatedAt || current.updatedAt
-    : null;
 
-  if (!metrics && !weightLogs.length && !carryForward) return null;
+  if (!metrics && !weightLogs.length) return null;
 
   return {
     schemaVersion: 1,
@@ -412,24 +379,20 @@ const mergeSnapshots = (
       current.updatedAt,
       incoming.updatedAt,
       metricsUpdatedAt,
-      weightLogsUpdatedAt,
-      carryForwardUpdatedAt
+      weightLogsUpdatedAt
     ),
     metrics,
     metricsUpdatedAt: metricsUpdatedAt ? String(metricsUpdatedAt) : null,
     weightLogs,
     weightLogsUpdatedAt,
-    carryForward,
-    carryForwardUpdatedAt: carryForwardUpdatedAt ? String(carryForwardUpdatedAt) : null,
   };
 };
 
 export const readLocalHealthDataSnapshot = async () => {
-  const [snapshotRaw, metricsRaw, logsRaw, carryForwardRaw, user] = await Promise.all([
+  const [snapshotRaw, metricsRaw, logsRaw, user] = await Promise.all([
     AsyncStorage.getItem(HEALTH_SYNC_SNAPSHOT_KEY),
     AsyncStorage.getItem(HEALTH_METRICS_STORAGE_KEY),
     AsyncStorage.getItem(WEIGHT_TREND_LOGS_STORAGE_KEY),
-    AsyncStorage.getItem(ADAPTIVE_GOAL_CARRY_FORWARD_STORAGE_KEY),
     getStoredUser(),
   ]);
 
@@ -438,7 +401,6 @@ export const readLocalHealthDataSnapshot = async () => {
     {
       metrics: metricsRaw,
       weightLogs: logsRaw,
-      carryForward: carryForwardRaw,
     },
     user
   );
@@ -460,6 +422,22 @@ const applyMetricsToStoredUser = async (metrics?: Record<string, any> | null) =>
     'weight',
     'weightKg',
     'currentWeight',
+    'startingWeight',
+    'startingWeightKg',
+    'startWeight',
+    'startWeightKg',
+    'initialWeight',
+    'initialWeightKg',
+    'originalWeight',
+    'originalWeightKg',
+    'onboardingWeight',
+    'onboardingWeightKg',
+    'baselineWeight',
+    'baselineWeightKg',
+    'startingWeightRecordedAt',
+    'startWeightRecordedAt',
+    'initialWeightRecordedAt',
+    'onboardingWeightRecordedAt',
     'age',
     'gender',
     'activityLevel',
@@ -552,13 +530,6 @@ export const writeLocalHealthDataSnapshot = async (
     ]);
   }
 
-  if (snapshot.carryForward) {
-    writes.push([
-      ADAPTIVE_GOAL_CARRY_FORWARD_STORAGE_KEY,
-      JSON.stringify(snapshot.carryForward),
-    ]);
-  }
-
   await AsyncStorage.multiSet(writes);
   await applyMetricsToStoredUser(snapshot.metrics);
   return snapshot;
@@ -601,8 +572,6 @@ const buildSnapshotFromStorageItems = async (items: StorageItem[]) => {
       metricsUpdatedAt: getStorageUpdatedAt(items, HEALTH_METRICS_STORAGE_KEY),
       weightLogs: getStorageValue(items, WEIGHT_TREND_LOGS_STORAGE_KEY),
       weightLogsUpdatedAt: getStorageUpdatedAt(items, WEIGHT_TREND_LOGS_STORAGE_KEY),
-      carryForward: getStorageValue(items, ADAPTIVE_GOAL_CARRY_FORWARD_STORAGE_KEY),
-      carryForwardUpdatedAt: getStorageUpdatedAt(items, ADAPTIVE_GOAL_CARRY_FORWARD_STORAGE_KEY),
     },
     user
   );
@@ -649,14 +618,6 @@ export const buildHealthDataCloudItems = (snapshot: HealthDataSyncSnapshot | nul
       key: WEIGHT_TREND_LOGS_STORAGE_KEY,
       value: JSON.stringify(snapshot.weightLogs),
       updatedAt: snapshot.weightLogsUpdatedAt || snapshot.updatedAt,
-    });
-  }
-
-  if (snapshot.carryForward) {
-    items.push({
-      key: ADAPTIVE_GOAL_CARRY_FORWARD_STORAGE_KEY,
-      value: JSON.stringify(snapshot.carryForward),
-      updatedAt: snapshot.carryForwardUpdatedAt || snapshot.updatedAt,
     });
   }
 

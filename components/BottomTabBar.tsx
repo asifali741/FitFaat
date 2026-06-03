@@ -368,6 +368,10 @@ export function BottomTabBar() {
 
     const segmentsStr = segments.join('/');
     const hiddenTabRouteMarkers = [
+      'doctor-report',
+      '(doctor-report)',
+      'weekly-insights',
+      '(weekly-insights)',
       'meal-planner',
       '(meal-planner)',
     ];

@@ -2,13 +2,16 @@ import AppHeader from "@/components/AppHeader";
 import { legalDocuments } from "@/constants/legalContent";
 import { useTheme } from "@/contexts/ThemeContext";
 import { authApi } from "@/utils/auth/authApi";
-import { tokenStorage } from "@/utils/auth/tokenStorage";
 import {
   loadGoalDisplayMode,
   saveGoalDisplayMode,
   type GoalDisplayMode,
 } from "@/utils/goalTargetDisplay";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  FITFAAT_SUPPORT_EMAIL,
+  FITFAAT_SUPPORT_WHATSAPP_DISPLAY,
+  openReportProblemOptions,
+} from "@/utils/reportProblem";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -26,13 +29,19 @@ import {
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-const SUPPORT_EMAIL = "asif1465majid@gmail.com";
+type SettingsCategoryKey = "account" | "healthData" | "notifications" | "support" | "advanced";
 
 export default function Settings() {
   const router = useRouter();
   const { isDarkMode, toggleDarkMode, colors } = useTheme();
-  const [goalDisplayMode, setGoalDisplayMode] = useState<GoalDisplayMode>("simple");
-  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [goalDisplayMode, setGoalDisplayMode] = useState<GoalDisplayMode>("exact");
+  const [expandedCategories, setExpandedCategories] = useState<Record<SettingsCategoryKey, boolean>>({
+    account: true,
+    healthData: false,
+    notifications: false,
+    support: false,
+    advanced: false,
+  });
   const legalSettingMap = {
     "Terms of Service": legalDocuments.terms,
     "Privacy Policy": legalDocuments.privacy,
@@ -40,18 +49,25 @@ export default function Settings() {
   } as const;
 
   useEffect(() => {
-    loadGoalDisplayMode().then(setGoalDisplayMode).catch(() => setGoalDisplayMode("simple"));
+    loadGoalDisplayMode().then(setGoalDisplayMode).catch(() => setGoalDisplayMode("exact"));
   }, []);
 
-  const handleGoalDisplayToggle = async (showAdvanced: boolean) => {
-    const nextMode: GoalDisplayMode = showAdvanced ? "advanced" : "simple";
+  const handleGoalDisplayToggle = async (showRanges: boolean) => {
+    const nextMode: GoalDisplayMode = showRanges ? "ranges" : "exact";
     setGoalDisplayMode(nextMode);
     try {
       await saveGoalDisplayMode(nextMode);
     } catch {
-      setGoalDisplayMode(showAdvanced ? "simple" : "advanced");
+      setGoalDisplayMode(showRanges ? "exact" : "ranges");
       Alert.alert("Error", "Could not save target display preference. Please try again.");
     }
+  };
+
+  const toggleCategory = (category: SettingsCategoryKey) => {
+    setExpandedCategories((current) => ({
+      ...current,
+      [category]: !current[category],
+    }));
   };
 
   const handleSettingPress = (setting: string) => {
@@ -81,6 +97,14 @@ export default function Settings() {
       case "Premium":
         router.push("/premium");
         break;
+
+      case "Subscription / Premium":
+        router.push("/premium");
+        break;
+
+      case "Account Management":
+        router.push("/change-password");
+        break;
       
       case "Workout Preferences":
         router.push("/(exercises)/workout");
@@ -90,12 +114,50 @@ export default function Settings() {
         router.push("/(main)/(steps)" as any);
         break;
 
+      case "Permissions":
+        router.push("/(main)/(settings)/permissions" as any);
+        break;
+
+      case "Health Sync":
+        router.push("/(main)/(settings)/permissions" as any);
+        break;
+
+      case "Data Import/Export":
+        router.push("/(main)/(settings)/backup-center" as any);
+        break;
+
+      case "Reminder Settings":
+      case "Push Notifications":
+      case "Email Notifications":
+        router.push("/(main)/(settings)/notification-settings" as any);
+        break;
+
+      case "Backup Center":
+        router.push("/(main)/(settings)/backup-center" as any);
+        break;
+
+      case "Local Sync":
+        router.push("/(main)/(settings)/local-sync-guide" as any);
+        break;
+
+      case "QR Transfer":
+        router.push("/(main)/(qr-transfer)" as any);
+        break;
+
+      case "Developer / Diagnostic Options":
+        Alert.alert(
+          "Developer / Diagnostic Options",
+          "Diagnostic tools are available when a debug build exposes them. Core backup, sync, transfer, and privacy tools are listed above.",
+          [{ text: "OK" }]
+        );
+        break;
+
       case "Mindfulness":
         router.push("/(main)/(mindfulness)" as any);
         break;
 
       case "Help Center":
-        Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=FitFaat%20Help%20Center`);
+        Linking.openURL(`mailto:${FITFAAT_SUPPORT_EMAIL}?subject=FitFaat%20Help%20Center`);
         break;
       
       case "Contact Support":
@@ -103,10 +165,18 @@ export default function Settings() {
           "Contact Support",
           "Get help from our support team.",
           [
-            { text: "Email Support", onPress: () => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=FitFaat%20Support`) },
+            { text: "Email Support", onPress: () => Linking.openURL(`mailto:${FITFAAT_SUPPORT_EMAIL}?subject=FitFaat%20Support`) },
             { text: "Cancel", style: "cancel" }
           ]
         );
+        break;
+
+      case "Report a Problem":
+        openReportProblemOptions("Settings");
+        break;
+
+      case "Feedback":
+        openReportProblemOptions("Settings feedback");
         break;
       
       case "About":
@@ -169,55 +239,6 @@ export default function Settings() {
     );
   };
 
-  const handleDeleteAccount = () => {
-    if (isDeletingAccount) return;
-
-    Alert.alert(
-      "Delete Account",
-      "This action cannot be undone. All your data will be permanently deleted. Are you sure?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Delete Account", 
-          style: "destructive",
-          onPress: () => {
-            Alert.alert(
-              "Final Confirmation",
-              "This will permanently delete your account and all associated data.",
-              [
-                { text: "Cancel", style: "cancel" },
-                { 
-                  text: "Delete Forever", 
-                  style: "destructive",
-                  onPress: async () => {
-                    try {
-                      setIsDeletingAccount(true);
-                      await authApi.deleteAccount();
-                      await tokenStorage.clearAll();
-                      await AsyncStorage.removeItem('weeklyTrackingId');
-                      Alert.alert(
-                        "Account Deleted",
-                        "Your account has been permanently deleted.",
-                        [{ text: "OK", onPress: () => router.replace('/(auth)/email-login') }]
-                      );
-                    } catch (error: any) {
-                      Alert.alert(
-                        "Error",
-                        error?.message || error?.response?.data?.message || "Failed to delete account. Please try again."
-                      );
-                    } finally {
-                      setIsDeletingAccount(false);
-                    }
-                  }
-                }
-              ]
-            );
-          }
-        }
-      ]
-    );
-  };
-
   const SettingItem = ({ 
     icon, 
     title, 
@@ -251,6 +272,49 @@ export default function Settings() {
     </TouchableOpacity>
   );
 
+  const CategorySection = ({
+    id,
+    icon,
+    title,
+    subtitle,
+    children,
+  }: {
+    id: SettingsCategoryKey;
+    icon: string;
+    title: string;
+    subtitle: string;
+    children: React.ReactNode;
+  }) => {
+    const expanded = expandedCategories[id];
+
+    return (
+      <View style={styles.section}>
+        <TouchableOpacity
+          style={[styles.categoryHeader, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder || colors.border }]}
+          onPress={() => toggleCategory(id)}
+          activeOpacity={0.82}
+          accessibilityRole="button"
+          accessibilityLabel={`${expanded ? "Collapse" : "Expand"} ${title}`}
+        >
+          <View style={[styles.categoryIcon, { backgroundColor: colors.primarySoft }]}>
+            <Ionicons name={icon as any} size={24} color={colors.primary} />
+          </View>
+          <View style={styles.categoryText}>
+            <Text style={[styles.categoryTitle, { color: colors.textPrimary }]}>{title}</Text>
+            <Text style={[styles.categorySubtitle, { color: colors.textSecondary }]}>{subtitle}</Text>
+          </View>
+          <Ionicons
+            name={expanded ? "chevron-up" : "chevron-down"}
+            size={20}
+            color={colors.textSecondary}
+          />
+        </TouchableOpacity>
+
+        {expanded ? <View style={styles.categoryBody}>{children}</View> : null}
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.screenColor }]} edges={['top']}>
       <StatusBar
@@ -270,155 +334,155 @@ export default function Settings() {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
           >
-          {/* Account Section */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Account</Text>
+          <CategorySection
+            id="account"
+            icon="person-circle-outline"
+            title="Account"
+            subtitle="Profile, subscription, and account access"
+          >
             <SettingItem
               icon="person-outline"
-              title="Profile Information"
-              subtitle="Manage your personal details"
+              title="Profile"
+              subtitle="Personal details and health profile"
               onPress={() => handleSettingPress("Profile Information")}
             />
             <SettingItem
               icon="camera-outline"
-              title="Edit Profile Picture"
-              subtitle="Change your profile photo"
+              title="Profile Photo"
+              subtitle="Change your profile image"
               onPress={() => handleSettingPress("Edit Profile Picture")}
             />
             <SettingItem
+              icon="star-outline"
+              title="Subscription / Premium"
+              subtitle="Plan status and paid benefits"
+              onPress={() => handleSettingPress("Subscription / Premium")}
+            />
+            <SettingItem
               icon="lock-closed-outline"
-              title="Change Password"
-              subtitle="Update your account password"
-              onPress={() => handleSettingPress("Change Password")}
+              title="Account Management"
+              subtitle="Password and sign-in security"
+              onPress={() => handleSettingPress("Account Management")}
             />
             <SettingItem
               icon="card-outline"
               title="Payment Methods"
-              subtitle="Manage your payment options"
+              subtitle="Saved payment options"
               onPress={() => handleSettingPress("Payment Methods")}
             />
             <SettingItem
-              icon="star-outline"
-              title="Premium"
-              subtitle="Upgrade to unlock premium features"
-              onPress={() => handleSettingPress("Premium")}
-            />
-          </View>
-
-          {/* Professional Access Section */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Professional Access</Text>
-            <SettingItem
               icon="medkit-outline"
-              title="Join as Doctor"
+              title="Doctor Access"
               subtitle="Register or manage your doctor profile"
-              onPress={() => router.push("/(main)/(doctor-portal)")}
+              onPress={() => router.push("/(main)/(doctor-portal)" as any)}
             />
-          </View>
+          </CategorySection>
 
-          {/* Preferences Section */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Preferences</Text>
+          <CategorySection
+            id="healthData"
+            icon="pulse-outline"
+            title="Health Data"
+            subtitle="Sync, import/export, permissions, and targets"
+          >
             <SettingItem
-              icon="notifications-outline"
-              title="Notifications"
-              subtitle="Manage notification preferences"
-              onPress={() => router.push("/notification-settings")}
+              icon="sync-outline"
+              title="Health Sync"
+              subtitle="Connected health and step access"
+              onPress={() => handleSettingPress("Health Sync")}
             />
             <SettingItem
-              icon="moon-outline"
-              title="Dark Mode"
-              subtitle="Switch between light and dark themes"
-              rightComponent={
-                <Switch
-                  value={isDarkMode}
-                  onValueChange={toggleDarkMode}
-                  trackColor={{ false: colors.textSecondary + '40', true: colors.primary + '40' }}
-                  thumbColor={isDarkMode ? colors.primary : colors.textSecondary}
-                />
-              }
-              showArrow={false}
+              icon="swap-vertical-outline"
+              title="Data Import/Export"
+              subtitle="Backup files, restore preview, and QR transfer tools"
+              onPress={() => handleSettingPress("Data Import/Export")}
             />
             <SettingItem
-              icon="options-outline"
-              title="Advanced Target Ranges"
-              subtitle={
-                goalDisplayMode === "advanced"
-                  ? "Show calories and hydration as estimated ranges"
-                  : "Show calories and hydration as one simple number"
-              }
-              rightComponent={
-                <Switch
-                  value={goalDisplayMode === "advanced"}
-                  onValueChange={handleGoalDisplayToggle}
-                  trackColor={{ false: colors.textSecondary + '40', true: colors.primary + '40' }}
-                  thumbColor={goalDisplayMode === "advanced" ? colors.primary : colors.textSecondary}
-                />
-              }
-              showArrow={false}
-            />
-          </View>
-
-          {/* Local Sync Section */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Local Sync</Text>
-            <SettingItem
-              icon="archive-outline"
-              title="Backup Center"
-              subtitle="Export, preview, test, and restore local FitFaat backups"
-              onPress={() => router.push("/(main)/(settings)/backup-center" as any)}
-            />
-            <SettingItem
-              icon="help-circle-outline"
-              title="How To Backup"
-              subtitle="Export, test, move, preview, and restore backup files"
-              onPress={() => router.push("/(main)/(settings)/local-sync-guide" as any)}
-            />
-          </View>
-
-          {/* Health & Fitness Section */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Health & Fitness</Text>
-            <SettingItem
-              icon="fitness-outline"
-              title="Workout Preferences"
-              subtitle="Customize your workout experience"
-              onPress={() => handleSettingPress("Workout Preferences")}
-            />
-            <SettingItem
-              icon="basket-outline"
-              title="Meal Planner"
-              subtitle="Premium meal planning and grocery lists"
-              onPress={() => router.push("/(main)/(meal-planner)" as any)}
+              icon="shield-checkmark-outline"
+              title="Permissions"
+              subtitle="Camera, mic, photos, notifications, and steps"
+              onPress={() => handleSettingPress("Permissions")}
             />
             <SettingItem
               icon="footsteps-outline"
               title="Step Counter"
-              subtitle="Basic daily steps; Premium unlocks advanced step insights"
+              subtitle="Live steps, goals, calories, and weekly trends"
               onPress={() => handleSettingPress("Step Counter")}
             />
-              <SettingItem
-                icon="leaf-outline"
-                title="Mindfulness"
-                subtitle="Basic breathing is free; Premium unlocks the full library"
-                onPress={() => handleSettingPress("Mindfulness")}
-              />
-          </View>
+            <SettingItem
+              icon="options-outline"
+              title="Target Ranges"
+              subtitle={
+                goalDisplayMode === "ranges"
+                  ? "Showing healthy calorie and hydration ranges"
+                  : "Showing exact calorie and hydration targets"
+              }
+              rightComponent={
+                <Switch
+                  value={goalDisplayMode === "ranges"}
+                  onValueChange={handleGoalDisplayToggle}
+                  trackColor={{ false: colors.textSecondary + '40', true: colors.primary + '40' }}
+                  thumbColor={goalDisplayMode === "ranges" ? colors.primary : colors.textSecondary}
+                />
+              }
+              showArrow={false}
+            />
+          </CategorySection>
 
-          {/* Support Section */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Support</Text>
+          <CategorySection
+            id="notifications"
+            icon="notifications-outline"
+            title="Notifications"
+            subtitle="Reminders, push notifications, and email"
+          >
+            <SettingItem
+              icon="alarm-outline"
+              title="Reminder Settings"
+              subtitle="Daily health and habit reminders"
+              onPress={() => handleSettingPress("Reminder Settings")}
+            />
+            <SettingItem
+              icon="phone-portrait-outline"
+              title="Push Notifications"
+              subtitle="Device notification preferences"
+              onPress={() => handleSettingPress("Push Notifications")}
+            />
+            <SettingItem
+              icon="mail-outline"
+              title="Email Notifications"
+              subtitle="Email updates and account messages"
+              onPress={() => handleSettingPress("Email Notifications")}
+            />
+          </CategorySection>
+
+          <CategorySection
+            id="support"
+            icon="help-circle-outline"
+            title="Support"
+            subtitle="Help, contact, feedback, and app information"
+          >
             <SettingItem
               icon="help-circle-outline"
               title="Help Center"
-              subtitle={SUPPORT_EMAIL}
+              subtitle={FITFAAT_SUPPORT_EMAIL}
               onPress={() => handleSettingPress("Help Center")}
             />
             <SettingItem
               icon="mail-outline"
               title="Contact Support"
-              subtitle={SUPPORT_EMAIL}
+              subtitle={FITFAAT_SUPPORT_EMAIL}
               onPress={() => handleSettingPress("Contact Support")}
+            />
+            <SettingItem
+              icon="chatbubble-ellipses-outline"
+              title="Feedback"
+              subtitle={`WhatsApp ${FITFAAT_SUPPORT_WHATSAPP_DISPLAY} or ${FITFAAT_SUPPORT_EMAIL}`}
+              onPress={() => handleSettingPress("Feedback")}
+            />
+            <SettingItem
+              icon="bug-outline"
+              title="Report a Problem"
+              subtitle="Send a bug report with support context"
+              onPress={() => handleSettingPress("Report a Problem")}
             />
             <SettingItem
               icon="information-circle-outline"
@@ -426,11 +490,6 @@ export default function Settings() {
               subtitle="App version 1.0.0"
               onPress={() => handleSettingPress("About")}
             />
-          </View>
-
-          {/* Legal Section */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Legal</Text>
             <SettingItem
               icon="document-text-outline"
               title="Terms of Service"
@@ -449,7 +508,53 @@ export default function Settings() {
               subtitle="Open source licenses"
               onPress={() => handleSettingPress("Licenses")}
             />
-          </View>
+          </CategorySection>
+
+          <CategorySection
+            id="advanced"
+            icon="settings-outline"
+            title="Advanced"
+            subtitle="Backup, transfer, local sync, and diagnostics"
+          >
+            <SettingItem
+              icon="moon-outline"
+              title="Dark Mode"
+              subtitle="Switch between light and dark themes"
+              rightComponent={
+                <Switch
+                  value={isDarkMode}
+                  onValueChange={toggleDarkMode}
+                  trackColor={{ false: colors.textSecondary + '40', true: colors.primary + '40' }}
+                  thumbColor={isDarkMode ? colors.primary : colors.textSecondary}
+                />
+              }
+              showArrow={false}
+            />
+            <SettingItem
+              icon="archive-outline"
+              title="Backup Center"
+              subtitle="Export, preview, test, restore, and retry checks"
+              onPress={() => handleSettingPress("Backup Center")}
+            />
+            <SettingItem
+              icon="help-circle-outline"
+              title="Local Sync"
+              subtitle="How to move and restore backup files"
+              onPress={() => handleSettingPress("Local Sync")}
+            />
+            <SettingItem
+              icon="qr-code-outline"
+              title="QR Transfer"
+              subtitle="Move selected FitFaat data with a QR code"
+              onPress={() => handleSettingPress("QR Transfer")}
+            />
+            <SettingItem
+              icon="code-slash-outline"
+              title="Developer / Diagnostic Options"
+              subtitle="Troubleshooting tools for debug builds"
+              onPress={() => handleSettingPress("Developer / Diagnostic Options")}
+            />
+          </CategorySection>
 
 
           {/* Logout Section */}
@@ -457,16 +562,6 @@ export default function Settings() {
             <TouchableOpacity style={[styles.logoutButton, { backgroundColor: colors.cardBackground, borderColor: colors.error + '20' }]} onPress={handleSignOut}>
               <Ionicons name="log-out-outline" size={24} color={colors.error} />
               <Text style={[styles.logoutText, { color: colors.error }]}>Sign Out</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Delete Account Section */}
-          <View style={styles.section}>
-            <TouchableOpacity style={[styles.deleteAccountButton, { backgroundColor: colors.cardBackground, borderColor: colors.error + '40' }]} onPress={handleDeleteAccount}>
-              <Ionicons name="trash-outline" size={24} color={colors.error} />
-              <Text style={[styles.deleteAccountText, { color: colors.error }]}>
-                {isDeletingAccount ? "Deleting Account..." : "Delete Account"}
-              </Text>
             </TouchableOpacity>
           </View>
 
@@ -500,6 +595,39 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: hp(1.5),
     marginLeft: wp(2),
+  },
+  categoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: hp(1.55),
+    paddingHorizontal: wp(4),
+    borderRadius: hp(1.7),
+    borderWidth: 1,
+  },
+  categoryIcon: {
+    width: hp(5),
+    height: hp(5),
+    borderRadius: hp(2.5),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: wp(3.5),
+  },
+  categoryText: {
+    flex: 1,
+    paddingRight: wp(2),
+  },
+  categoryTitle: {
+    fontSize: hp(1.95),
+    fontWeight: '800',
+    marginBottom: hp(0.25),
+  },
+  categorySubtitle: {
+    fontSize: hp(1.35),
+    fontWeight: '600',
+    lineHeight: hp(1.9),
+  },
+  categoryBody: {
+    marginTop: hp(0.85),
   },
   settingItem: {
     flexDirection: 'row',
@@ -559,26 +687,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   logoutText: {
-    fontSize: hp(1.8),
-    fontWeight: '600',
-    marginLeft: wp(2),
-  },
-  deleteAccountButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: hp(2),
-    paddingHorizontal: wp(4),
-    marginBottom: hp(0.5),
-    borderRadius: hp(1.5),
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-    borderWidth: 1,
-  },
-  deleteAccountText: {
     fontSize: hp(1.8),
     fontWeight: '600',
     marginLeft: wp(2),

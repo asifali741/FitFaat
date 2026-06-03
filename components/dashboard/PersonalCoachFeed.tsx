@@ -16,7 +16,6 @@ import {
   getSingleMetricProgress,
 } from '@/utils/dashboardProgress';
 import { getExerciseCaloriesBurned } from '@/utils/localExerciseProgress';
-import { FREE_PLAN_LIMITS } from '@/utils/featureAccess';
 import type { WeeklyNutritionReport } from '@/utils/nutritionInsights';
 
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -331,8 +330,8 @@ const buildWeightTrendCalibrationCard = (
         `Your daily calorie target has been tuned by ${adjustment > 0 ? '+' : ''}${adjustment} kcal from the weekly trend.`,
       icon: 'scale-outline',
       color: '#8B5CF6',
-      actionLabel: 'Open profile',
-      action: 'weight',
+      actionLabel: 'Log meal',
+      action: 'meal',
       meta: `${confidence}% confidence`,
     };
   }
@@ -341,11 +340,11 @@ const buildWeightTrendCalibrationCard = (
     return {
       id: 'weekly-weight-trend-learning',
       title: 'Weight trend is learning',
-      body: 'Log weight consistently and FitFaat will only tune calories when the weekly signal is reliable.',
+      body: 'Keep daily meals consistent so FitFaat has a cleaner weekly signal for calorie targets.',
       icon: 'analytics-outline',
       color: '#8B5CF6',
-      actionLabel: 'Add weight',
-      action: 'weight',
+      actionLabel: 'Log meal',
+      action: 'meal',
       meta: `${Math.max(0, today.weightTrendConfidence || 0)}% signal`,
     };
   }
@@ -494,8 +493,8 @@ export function PersonalCoachFeed({
     const workoutTarget = isPremium && today ? getBurnedCaloriesTarget(today) : 0;
     const workoutCalories = isPremium && today ? getExerciseCaloriesBurned(today) : 0;
     const rawSteps = today ? getDaySteps(today) : 0;
-    const displayedSteps = isPremium ? rawSteps : Math.min(rawSteps, FREE_PLAN_LIMITS.dailyStepCounterPreview);
-    const stepGoal = isPremium && today ? getDayStepGoal(today) : FREE_PLAN_LIMITS.dailyStepCounterPreview;
+    const displayedSteps = rawSteps;
+    const stepGoal = today ? getDayStepGoal(today) : 0;
     const stepsProgress = today ? getSingleMetricProgress(displayedSteps, stepGoal) : 0;
     const upcomingAppointments = getUpcomingAppointmentCount(appointments);
     const latestExercise = isPremium ? getLatestExercise(sortedDays) : undefined;

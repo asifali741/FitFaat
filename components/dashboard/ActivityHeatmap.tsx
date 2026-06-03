@@ -23,6 +23,17 @@ import {
   getWalkingCaloriesBurned,
   getWalkingCaloriesTarget,
 } from "@/utils/localWalkingProgress";
+import {
+  getGoalExperience,
+  getGoalProgressStatusLabel,
+} from "@/utils/goalExperience";
+import { buildGoalProgressInterpretation } from "@/utils/goalAdaptivePlan";
+import {
+  loadGoalSpineKey,
+  normalizeGoalSpineKey,
+  type GoalSpineDay,
+  type GoalSpineKey,
+} from "@/utils/goalSpine";
 
 const ACTIVITY_HEATMAP_STORAGE_KEY = "fitfaat_activity_heatmap_snapshots";
 const MAX_HISTORY_DAYS = 190;
@@ -61,11 +72,26 @@ type ActivitySnapshot = {
 
 type ActivityHeatmapProps = {
   days: HeatmapDay[];
+  goal?: GoalSpineKey | string | number | null;
   includeExercise?: boolean;
   enableAdvancedFilters?: boolean;
   colors: any;
   embedded?: boolean;
 };
+
+const snapshotToGoalDay = (snapshot: ActivitySnapshot): GoalSpineDay => ({
+  dayNo: snapshot.dayNo,
+  date: snapshot.dateKey,
+  status: "finished",
+  achievedCalories: snapshot.achievedCalories,
+  targetCalories: snapshot.targetCalories,
+  achievedHydration: snapshot.achievedHydration,
+  targetHydration: snapshot.targetHydration,
+  exerciseCaloriesBurned: snapshot.exerciseCalories,
+  walkingSteps: snapshot.walkingCalories > 0 ? 5000 : 0,
+  targetSteps: snapshot.walkingTarget > 0 ? 5000 : 0,
+  meals: snapshot.achievedCalories > 0 ? [{}] : [],
+});
 
 const getDateKey = (value?: string | Date | null) => {
   const date = value ? new Date(value) : new Date();
@@ -240,16 +266,20 @@ const getMonthLabels = (weekGrid: ReturnType<typeof buildWeekGrid>) => {
 
 export function ActivityHeatmap({
   days,
+  goal,
   includeExercise = false,
-  enableAdvancedFilters = includeExercise,
+  enableAdvancedFilters = false,
   colors,
   embedded = false,
 }: ActivityHeatmapProps) {
   const [activityHistory, setActivityHistory] = useState<ActivitySnapshot[]>([]);
   const [rangeWeeks, setRangeWeeks] = useState<12 | 26>(12);
   const [selectedSnapshot, setSelectedSnapshot] = useState<ActivitySnapshot | null>(null);
+  const [localGoal, setLocalGoal] = useState<GoalSpineKey>("unset");
 
   const styles = useMemo(() => getStyles(colors, embedded), [colors, embedded]);
+  const resolvedGoal = normalizeGoalSpineKey(goal ?? localGoal);
+  const goalExperience = getGoalExperience(resolvedGoal);
   const daysSignature = useMemo(
     () =>
       days
@@ -274,6 +304,17 @@ export function ActivityHeatmap({
       setRangeWeeks(12);
     }
   }, [enableAdvancedFilters, rangeWeeks]);
+
+  useEffect(() => {
+    if (goal !== undefined && goal !== null) return;
+
+    loadGoalSpineKey()
+      .then(setLocalGoal)
+      .catch((error) => {
+        console.log("[ActivityHeatmap] Unable to load goal context:", error);
+        setLocalGoal("unset");
+      });
+  }, [goal]);
 
   useEffect(() => {
     let isActive = true;
@@ -325,6 +366,45 @@ export function ActivityHeatmap({
           currentRangeSnapshots.length
       )
     : 0;
+  const heatmapGoalStatus = getGoalProgressStatusLabel({
+    goal: resolvedGoal,
+    progressPercent: averageProgress,
+    trackedDays: activeDays,
+  });
+  const selectedGoalStatus = getGoalProgressStatusLabel({
+    goal: resolvedGoal,
+    progressPercent: selectedSnapshot?.progress || 0,
+    trackedDays: selectedSnapshot?.progress ? 1 : 0,
+  });
+  const interpretationDays = useMemo(
+    () => currentRangeSnapshots.map(snapshotToGoalDay),
+    [currentRangeSnapshots]
+  );
+  const heatmapInterpretation = useMemo(
+    () =>
+      buildGoalProgressInterpretation({
+        goal: resolvedGoal,
+        days: interpretationDays,
+        isPremium: includeExercise,
+      }),
+    [includeExercise, interpretationDays, resolvedGoal]
+  );
+  const selectedGoalDay = useMemo(
+    () => (selectedSnapshot ? snapshotToGoalDay(selectedSnapshot) : null),
+    [selectedSnapshot]
+  );
+  const selectedInterpretation = useMemo(
+    () =>
+      selectedGoalDay
+        ? buildGoalProgressInterpretation({
+            goal: resolvedGoal,
+            days: [selectedGoalDay],
+            today: selectedGoalDay,
+            isPremium: includeExercise,
+          })
+        : null,
+    [includeExercise, resolvedGoal, selectedGoalDay]
+  );
 
   const renderSummaryStat = (label: string, value: string, icon: keyof typeof Ionicons.glyphMap, color: string) => (
     <View style={styles.statItem}>
@@ -338,9 +418,15 @@ export function ActivityHeatmap({
     <View style={styles.section}>
       <View style={styles.card}>
         <View style={styles.header}>
-          <View>
+          <View style={styles.headerCopy}>
             <Text style={styles.eyebrow}>Consistency</Text>
             <Text style={styles.title}>Activity Heatmap</Text>
+            <Text style={[styles.goalStatusText, { color: goalExperience.color }]}>
+              {heatmapGoalStatus}
+            </Text>
+            <Text style={styles.goalInterpretationText} numberOfLines={2}>
+              Helping: {heatmapInterpretation.helping.join(", ")}. Blocking: {heatmapInterpretation.blocking.join(", ")}.
+            </Text>
           </View>
           {enableAdvancedFilters ? (
             <View style={styles.rangeSwitch}>
@@ -490,14 +576,19 @@ export function ActivityHeatmap({
                 ]}
               />
               <View style={styles.sheetProgressCopy}>
-                <Text style={styles.sheetProgressValue}>{selectedSnapshot?.progress || 0}% goals met</Text>
+                <Text style={styles.sheetProgressValue}>{selectedGoalStatus}</Text>
                 <Text style={styles.sheetProgressHint}>
                   {selectedSnapshot?.progress
                     ? includeExercise
-                      ? "This cell reflects nutrition consistency with workout and walking signals shown separately."
-                      : "This cell reflects calorie and hydration consistency."
+                      ? `This cell connects ${goalExperience.label} progress with workout and walking signals shown separately.`
+                      : `This cell reflects calorie and hydration consistency for ${goalExperience.label}.`
                     : "No logged activity was found for this day."}
                 </Text>
+                {selectedInterpretation ? (
+                  <Text style={[styles.sheetProgressNext, { color: goalExperience.color }]} numberOfLines={2}>
+                    Next: {selectedInterpretation.nextBestStep}
+                  </Text>
+                ) : null}
               </View>
             </View>
 
@@ -571,6 +662,10 @@ const getStyles = (colors: any, embedded: boolean) => StyleSheet.create({
     justifyContent: "space-between",
     gap: wp(3),
   },
+  headerCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
   eyebrow: {
     color: colors.textSecondary,
     fontSize: Math.min(hp(1.18), wp(2.8)),
@@ -582,6 +677,19 @@ const getStyles = (colors: any, embedded: boolean) => StyleSheet.create({
     fontSize: Math.min(hp(2.15), wp(4.9)),
     fontWeight: "900",
     marginTop: hp(0.2),
+  },
+  goalStatusText: {
+    fontSize: Math.min(hp(1.12), wp(2.65)),
+    lineHeight: hp(1.55),
+    fontWeight: "900",
+    marginTop: hp(0.25),
+  },
+  goalInterpretationText: {
+    color: colors.textSecondary,
+    fontSize: Math.min(hp(1.02), wp(2.42)),
+    lineHeight: hp(1.45),
+    fontWeight: "700",
+    marginTop: hp(0.25),
   },
   rangeSwitch: {
     flexDirection: "row",
@@ -762,6 +870,12 @@ const getStyles = (colors: any, embedded: boolean) => StyleSheet.create({
     fontWeight: "700",
     lineHeight: hp(1.8),
     marginTop: hp(0.3),
+  },
+  sheetProgressNext: {
+    fontSize: Math.min(hp(1.12), wp(2.65)),
+    fontWeight: "800",
+    lineHeight: hp(1.55),
+    marginTop: hp(0.45),
   },
   sheetMetricGrid: {
     flexDirection: "row",

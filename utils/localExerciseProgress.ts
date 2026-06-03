@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { type AdaptiveGoalMetrics, loadAdaptiveGoalMetrics } from "@/utils/adaptiveGoals";
+import { queueAccountScopedStorageCloudSync } from "@/utils/auth/accountScopedStorageSyncQueue";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
 import {
   getDashboardUserIdentity,
@@ -9,7 +10,7 @@ import {
 } from "@/utils/dashboardStorage";
 import { getWalkingCaloriesBurned } from "@/utils/localWalkingProgress";
 
-const LOCAL_EXERCISE_PROGRESS_KEY = "fitfaat_local_exercise_progress";
+export const LOCAL_EXERCISE_PROGRESS_KEY = "fitfaat_local_exercise_progress";
 
 type DayLike = {
   _id?: string;
@@ -165,6 +166,7 @@ const readProgressStore = async (): Promise<ExerciseProgressStore> => {
 
 const saveProgressStore = async (store: ExerciseProgressStore) => {
   await AsyncStorage.setItem(LOCAL_EXERCISE_PROGRESS_KEY, JSON.stringify(store));
+  queueAccountScopedStorageCloudSync("exercise-progress");
 };
 
 const getExerciseProgressScope = async (): Promise<ExerciseProgressScope> => {

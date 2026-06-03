@@ -7,6 +7,12 @@ import {
 import { useTheme } from '@/contexts/ThemeContext';
 import { loadAchievementLocalStats } from '@/utils/achievementStorage';
 import { getStoredDashboardCache } from '@/utils/dashboardStorage';
+import {
+  getGoalExperience,
+  getGoalProgressStatusLabel,
+} from '@/utils/goalExperience';
+import { buildGoalProgressInterpretation } from '@/utils/goalAdaptivePlan';
+import { loadGoalSpineKey, type GoalSpineKey } from '@/utils/goalSpine';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -27,6 +33,7 @@ export default function BadgesScreen() {
   const styles = getStyles(colors);
   const [badges, setBadges] = useState<AchievementBadge[]>([]);
   const [loading, setLoading] = useState(true);
+  const [goalKey, setGoalKey] = useState<GoalSpineKey>('unset');
 
   useEffect(() => {
     let mounted = true;
@@ -34,12 +41,16 @@ export default function BadgesScreen() {
     const loadBadges = async () => {
       const cachedDashboard = await getStoredDashboardCache<Record<string, AchievementDay>>();
       const progressData = cachedDashboard?.data || null;
-      const localStats = await loadAchievementLocalStats();
+      const [localStats, nextGoal] = await Promise.all([
+        loadAchievementLocalStats(),
+        loadGoalSpineKey().catch(() => 'unset' as GoalSpineKey),
+      ]);
       const calculatedBadges = calculateAchievementBadges(progressData, localStats);
 
       if (!mounted) return;
 
       setBadges(calculatedBadges);
+      setGoalKey(nextGoal);
       setLoading(false);
     };
 
@@ -65,6 +76,46 @@ export default function BadgesScreen() {
     [badges]
   );
   const unlockedCount = badges.filter((badge) => badge.unlocked).length;
+  const goalExperience = getGoalExperience(goalKey);
+  const badgeGoalStatus = getGoalProgressStatusLabel({
+    goal: goalKey,
+    progressPercent: badges.length ? (unlockedCount / badges.length) * 100 : 0,
+    trackedDays: unlockedCount,
+  });
+  const badgeSignalDays = useMemo(
+    () =>
+      badges.map((badge, index) => {
+        const label = `${badge.title} ${badge.description}`.toLowerCase();
+        const progress = badge.unlocked ? 1 : badge.progress;
+        return {
+          dayNo: index + 1,
+          status: progress > 0 ? 'finished' : 'active',
+          achievedCalories: progress > 0 ? Math.round(1000 * progress) : 0,
+          targetCalories: 1000,
+          targetCaloriesMin: 850,
+          targetCaloriesMax: 1100,
+          achievedHydration: progress > 0 ? 1.5 : 0,
+          targetHydration: 2,
+          walkingSteps: label.includes('walk') || label.includes('step') ? Math.round(6000 * progress) : 0,
+          targetSteps: 6000,
+          exerciseCaloriesBurned:
+            label.includes('workout') || label.includes('strength') || label.includes('streak')
+              ? Math.round(220 * progress)
+              : 0,
+          meals: progress > 0 ? [{ name: badge.title }] : [],
+        };
+      }),
+    [badges]
+  );
+  const badgeInterpretation = useMemo(
+    () =>
+      buildGoalProgressInterpretation({
+        goal: goalKey,
+        days: badgeSignalDays,
+        isPremium: true,
+      }),
+    [badgeSignalDays, goalKey]
+  );
 
   const renderBadge = (badge: AchievementBadge) => {
     const badgeColor = badge.unlocked ? badge.color : badge.lockedColor;
@@ -160,7 +211,10 @@ export default function BadgesScreen() {
                 Your Badge Collection
               </Text>
               <Text style={[styles.summarySubtitle, { color: colors.textSecondary }]}>
-                Progress updates from your local logs and weekly dashboard data.
+                {badgeGoalStatus}. Milestones show how your logs support {goalExperience.label}.
+              </Text>
+              <Text style={[styles.summaryInsight, { color: goalExperience.color }]} numberOfLines={2}>
+                Helping: {badgeInterpretation.helping.join(', ')}. Blocking: {badgeInterpretation.blocking.join(', ')}.
               </Text>
             </View>
             <View style={[styles.summaryCount, { backgroundColor: `${colors.primary}14` }]}>
@@ -226,6 +280,13 @@ const getStyles = (colors: any) =>
       fontSize: Math.min(hp(1.35), wp(3.2)),
       lineHeight: Math.min(hp(2), wp(4.6)),
       fontWeight: '600',
+    },
+    summaryInsight: {
+      marginTop: hp(0.45),
+      maxWidth: wp(56),
+      fontSize: Math.min(hp(1.1), wp(2.6)),
+      lineHeight: hp(1.55),
+      fontWeight: '800',
     },
     summaryCount: {
       minWidth: wp(22),

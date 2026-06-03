@@ -26,33 +26,44 @@ export function FeatureLimitBanner({
 
   if (!access) return null;
   if (access.accessSource === "premium" && !showPremiumActive) return null;
-  if (access.accessSource === "free") return null;
+  if (access.accessSource === "free" && access.planLabel !== "Free preview") return null;
 
   const isPremium = access.accessSource === "premium";
   const isLocked = access.accessSource === "locked";
+  const isFreePreview = access.accessSource === "free" && access.planLabel === "Free preview";
   const title = isPremium
     ? `${access.label} unlimited`
-    : isLocked
+    : isFreePreview
+      ? `${access.label} preview`
+      : isLocked
       ? `${access.label} is Premium`
       : `${access.label} access`;
   const subtitle = isPremium
     ? "Your Premium Membership is active."
-    : isLocked
+    : isFreePreview
+      ? access.planDescription
+      : isLocked
       ? access.lockedReason || "Premium adds this feature when you're ready."
       : access.statusLabel;
   const badge = isPremium
     ? "Unlimited"
-    : isLocked
+    : isFreePreview
+      ? "Free Preview"
+      : isLocked
       ? "Locked"
       : access.statusLabel;
   const icon = isPremium
     ? "diamond-outline"
-    : isLocked
+    : isFreePreview
+      ? "eye-outline"
+      : isLocked
       ? "lock-closed-outline"
       : "sparkles-outline";
   const accent = isPremium
     ? colors.success || colors.primary
-    : isLocked
+    : isFreePreview
+      ? colors.primary
+      : isLocked
       ? colors.warning || "#F59E0B"
       : colors.primary;
 

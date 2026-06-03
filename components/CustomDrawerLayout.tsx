@@ -91,6 +91,7 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
   const lastProfileImageEventAt = useRef(0);
   const profileImageUserKeyRef = useRef<string | null>(null);
   const displayImageUrl = profileImageUrl || gmailImageUrl;
+  const router = useRouter();
   
   useEffect(() => {
     fetchUserData();
@@ -309,7 +310,11 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
     return currentRoute === '(exercises)/workout' || currentRoute.startsWith('(exercises)');
   };
 
-  const isChartsActive = () => pathname.includes('/charts');
+  const isAnalyticsActive = () => pathname.includes('/command-center');
+  const openAnalytics = () => {
+    router.push('/(main)/(dashboard)/command-center' as any);
+    (navigation as any).closeDrawer?.();
+  };
 
   const styles = getStyles(colors, insets.bottom);
   const drawerLabelStyle = {
@@ -369,7 +374,13 @@ export function DrawerSceneWrapper(props: DrawerSceneWrapperProps) {
           label="Dashboard"
           onPress={() => navigation.navigate('(dashboard)')}
           labelStyle={drawerLabelStyle}
-          style={drawerItemStyle(isRouteActive('(dashboard)') && !isChartsActive())}
+          style={drawerItemStyle(isRouteActive('(dashboard)') && !isAnalyticsActive())}
+        />
+        <DrawerItem
+          label="Analytics"
+          onPress={openAnalytics}
+          labelStyle={drawerLabelStyle}
+          style={drawerItemStyle(isAnalyticsActive())}
         />
         <DrawerItem
           label="HeaLora"

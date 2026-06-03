@@ -64,7 +64,6 @@ export default function ChangePassword() {
   useEffect(() => {
     // Set Android navigation bar to white
     if (Platform.OS === 'android') {
-      NavigationBar.setBackgroundColorAsync('#FFFFFF').catch(() => {});
       NavigationBar.setButtonStyleAsync('dark').catch(() => {});
       NavigationBar.setStyle('light');
     }

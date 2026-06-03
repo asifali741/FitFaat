@@ -1,17 +1,14 @@
 import AppHeader from "@/components/AppHeader";
 import {
-  DashboardCommandCenter,
-  DashboardWeeklyHealthReport,
   QuickAddBottomSheet,
-  ReadinessScoreCard,
   type DashboardMoodValue,
   type QuickAddAction,
 } from "@/components/dashboard/DashboardCommandCenter";
-import { PersonalCoachFeed } from "@/components/dashboard/PersonalCoachFeed";
+import { DashboardSevenDayJourney } from "@/components/dashboard/DashboardSevenDayJourney";
+import { StepCounterCard } from "@/components/dashboard/StepCounterCard";
 import NewsModalPopup from "@/components/NewsModalPopup";
 import PatientDietPlanViewer from "@/components/PatientDietPlanViewer";
 import { StreakDisplay } from "@/components/StreakDisplay";
-import { useAppointments } from "@/contexts/AppointmentContext";
 import { useLiveWalkingProgress } from "@/hooks/useLiveWalkingProgress";
 import { useNews } from "@/contexts/NewsContext";
 import { useNotifications } from "@/contexts/NotificationContext";
@@ -20,10 +17,9 @@ import {
   applyAdaptiveGoalsToJsonResponse,
   applyWeeklyWeightTrendCalibrationToCalories,
   calculateMifflinStJeorBaseGoals,
-  loadAdaptiveGoalCarryForward,
   loadAdaptiveGoalMetrics,
   loadWeeklyWeightTrendCalibration,
-  saveAdaptiveGoalCarryForward,
+  runAdaptiveGoalFreshTargetQaCases,
 } from "@/utils/adaptiveGoals";
 import { dailyLogsApi } from "@/utils/dailyLogsApi";
 import {
@@ -31,34 +27,39 @@ import {
   mergeExerciseProgressIntoJsonResponse,
 } from "@/utils/localExerciseProgress";
 import {
-  getWalkingCaloriesBurned,
   mergeWalkingProgressIntoJsonResponse,
 } from "@/utils/localWalkingProgress";
 import {
+  getCalorieTargetProgress,
+  getHydrationTargetProgress,
   loadGoalDisplayMode,
+  runGoalTargetDisplayQaCases,
   type GoalDisplayMode,
 } from "@/utils/goalTargetDisplay";
 import {
-  loadHabitPreferences,
-  markHabitMissionComplete,
-  markMiniLessonSeen,
-  saveHabitPreferences,
-  refreshHabitMission,
-  scheduleHabitMissionReminder,
-  type HabitPreferences,
-  type HabitMission,
-} from "@/utils/habitMissions";
+  loadGoalSpineKey,
+  runGoalSpineQaCases,
+  type GoalSpineKey,
+} from "@/utils/goalSpine";
 import {
-  buildWeeklyNutritionReport,
-  buildWeeklyNutritionReportFromStorage,
-  saveNutritionReportSnapshot,
-  type WeeklyNutritionReport,
-} from "@/utils/nutritionInsights";
+  getGoalPremiumFeatureCopy,
+  runGoalExperienceQaCases,
+} from "@/utils/goalExperience";
+import { runGoalAdaptivePlanQaCases } from "@/utils/goalAdaptivePlan";
 import { getIsPremiumUser } from "@/utils/premiumAccess";
-import { authApi } from "@/utils/auth/authApi";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
-import { cachedRequestJson, isRequestAbortError } from "@/utils/apiHelper";
-import { getBackendBaseUrl } from "@/utils/config";
+import { isRequestAbortError } from "@/utils/apiHelper";
+import {
+  evaluateDashboardCycleGuard,
+  getActiveDayDuration,
+  getDashboardLocalDateKey,
+  runDashboardCycleGuardQaCases,
+  shouldUseStaleDashboardCacheFallback,
+} from "@/utils/dashboardCycleGuard";
+import {
+  mergeDailyProgressMap,
+  runDailyProgressSyncQaCases,
+} from "@/utils/dailyProgressSync";
 import {
   getDashboardUserIdentity,
   getStoredDashboardCache,
@@ -67,68 +68,61 @@ import {
 } from "@/utils/dashboardStorage";
 import { applyPendingDashboardMutations } from "@/utils/dashboardPendingMutations";
 import { syncLatestHealthData } from "@/utils/healthDataSync";
-import { scheduleAdaptiveNutritionNotifications, type NutritionGoalSummary } from "@/utils/nutritionProfile";
+import {
+  buildNutritionProfile,
+  scheduleAdaptiveNutritionNotifications,
+  type NutritionGoalSummary,
+} from "@/utils/nutritionProfile";
+import {
+  DASHBOARD_DEFAULT_MEAL_HOURS,
+  DASHBOARD_DEFAULT_WATER_HOURS,
+  getDashboardJourneyOrder,
+  normalizeDashboardHours,
+  parseDashboardOpenedStepSnapshot,
+  serializeDashboardOpenedStepSnapshot,
+  type DashboardJourneySection,
+  type DashboardTimingHours,
+} from "@/utils/dashboardJourneyOrder";
+import { runPremiumClarityQaCases } from "@/utils/featureAccess";
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, AppState, InteractionManager, Modal, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Days } from "./_Day";
+import {
+  computeStreakFromDays,
+  getDashboardTargetDay,
+  getDashboardWeekHydrationValue as getHydrationValue,
+  parseDashboardDate,
+  sortByDayDate,
+  startOfLocalDay,
+} from "./dashboardWeek";
 import { Day, jsonResponse } from "./types";
 
-const getSecondsUntilEndOfLocalDay = () => {
-  const now = new Date();
-  const endOfDay = new Date();
-  endOfDay.setHours(23, 59, 59, 999);
+const getDashboardDateKey = getDashboardLocalDateKey;
+const ONBOARDING_FIRST_LOG_NUDGE_KEY = 'fitfaat_onboarding_first_log_nudge';
+const DASHBOARD_LAST_OPENED_STEPS_KEY = 'fitfaat_dashboard_last_opened_steps';
+const DASHBOARD_PRIMARY_QUICK_ACTIONS: QuickAddAction[] = [
+  'meal',
+  'mealPlanner',
+  'water',
+  'steps',
+  'mindfulness',
+  'note',
+  'settings',
+];
 
-  return Math.max(0, Math.floor((endOfDay.getTime() - now.getTime()) / 1000));
-};
+const getCurrentDashboardDateKey = () => {
+  const dateKey = getDashboardDateKey();
+  if (dateKey) return dateKey;
 
-const getDashboardDateKey = (value?: string | Date | null) => {
-  if (!value) {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
-
-  if (value instanceof Date) {
-    if (Number.isNaN(value.getTime())) return null;
-    const year = value.getFullYear();
-    const month = String(value.getMonth() + 1).padStart(2, '0');
-    const day = String(value.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
-
-  const isoMatch = String(value).match(/^(\d{4}-\d{2}-\d{2})/);
-  if (isoMatch) return isoMatch[1];
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return null;
-  const year = parsed.getFullYear();
-  const month = String(parsed.getMonth() + 1).padStart(2, '0');
-  const day = String(parsed.getDate()).padStart(2, '0');
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
-};
-
-const isCurrentDashboardDate = (date?: string | Date | null) => {
-  const dayKey = getDashboardDateKey(date);
-  return !dayKey || dayKey === getDashboardDateKey();
-};
-
-const getActiveDayDuration = (dailyLog: any) => {
-  const duration = Number(
-    dailyLog?.duration ?? dailyLog?.timeLeftSeconds ?? dailyLog?.secondsRemaining
-  );
-
-  if (Number.isFinite(duration) && duration > 0) {
-    return Math.floor(duration);
-  }
-
-  return isCurrentDashboardDate(dailyLog?.date) ? getSecondsUntilEndOfLocalDay() : 0;
 };
 
 // Convert WeeklyTracking data to jsonResponse format
@@ -141,8 +135,18 @@ const convertToJsonResponse = (weeklyTracking: any): jsonResponse => {
       _id: dailyLog._id, // Include MongoDB daily log ID
       dayNo: dailyLog.dayNumber,
       date: dailyLog.date,
+      dateKey: getDashboardDateKey(dailyLog.date),
+      updatedAt: dailyLog.updatedAt || dailyLog.savedAt || dailyLog.createdAt,
+      savedAt: dailyLog.savedAt,
+      createdAt: dailyLog.createdAt,
       achievedCalories: dailyLog.achievedCalories,
       achieviedHydration: dailyLog.achievedHydration,
+      achievedHydration: dailyLog.achievedHydration ?? dailyLog.achieviedHydration,
+      calorieIntake: dailyLog.calorieIntake ?? dailyLog.caloriesIntake ?? dailyLog.achievedCalories,
+      caloriesIntake: dailyLog.caloriesIntake ?? dailyLog.calorieIntake ?? dailyLog.achievedCalories,
+      hydrationIntake: dailyLog.hydrationIntake ?? dailyLog.achievedHydration ?? dailyLog.achieviedHydration,
+      meals: Array.isArray(dailyLog.meals) ? dailyLog.meals : [],
+      waterIntake: Array.isArray(dailyLog.waterIntake) ? dailyLog.waterIntake : [],
       baseTargetCalories: dailyLog.baseTargetCalories || dailyLog.defaultTargetCalories || dailyLog.targetCalories,
       baseTargetHydration: dailyLog.baseTargetHydration || dailyLog.defaultTargetHydration || dailyLog.targetHydration,
       targetCalories: dailyLog.targetCalories,
@@ -188,7 +192,8 @@ const convertToJsonResponse = (weeklyTracking: any): jsonResponse => {
       burnedCaloriesTarget: dailyLog.burnedCaloriesTarget,
       workoutCaloriesTarget: dailyLog.workoutCaloriesTarget,
       dailyBurnedCaloriesTarget: dailyLog.dailyBurnedCaloriesTarget,
-      remarks: dailyLog.remarks || null,
+      remarks: dailyLog.remarks || dailyLog.notes || null,
+      notes: dailyLog.notes,
       duration: dailyLog.status === 'active' ? getActiveDayDuration(dailyLog) : 0,
       status: dailyLog.status as "locked" | "active" | "finished",
     };
@@ -197,12 +202,20 @@ const convertToJsonResponse = (weeklyTracking: any): jsonResponse => {
   return data as jsonResponse;
 };
 
-type StoredDashboardData = { data: jsonResponse; timestamp: Date };
+type StoredDashboardData = {
+  data: jsonResponse;
+  timestamp: Date;
+  weeklyTrackingId?: string | null;
+};
 
 const normalizeStoredDashboardData = (value: unknown): StoredDashboardData | null => {
   if (!value || typeof value !== 'object') return null;
 
-  const record = value as { data?: unknown; timestamp?: unknown };
+  const record = value as {
+    data?: unknown;
+    timestamp?: unknown;
+    weeklyTrackingId?: unknown;
+  };
   if (!record.data || typeof record.data !== 'object' || Array.isArray(record.data)) {
     return null;
   }
@@ -217,6 +230,7 @@ const normalizeStoredDashboardData = (value: unknown): StoredDashboardData | nul
   return {
     data: record.data as jsonResponse,
     timestamp: Number.isNaN(timestamp.getTime()) ? new Date() : timestamp,
+    weeklyTrackingId: record.weeklyTrackingId ? String(record.weeklyTrackingId) : null,
   };
 };
 
@@ -231,111 +245,14 @@ const checkLocalStorage = async () => {
   }
 };
 
-const parseDashboardDate = (date?: string) => {
-  if (!date) return null;
-  const parsed = new Date(date);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-};
-
-const startOfLocalDay = (date: Date) => {
-  const nextDate = new Date(date);
-  nextDate.setHours(0, 0, 0, 0);
-  return nextDate;
-};
-
-const getHydrationValue = (day: Day) =>
-  Number(day.achieviedHydration ?? (day as any).achievedHydration ?? 0);
-
-const hasDayProgress = (day: Day, includeExercise = false) =>
-  Number(day.achievedCalories || 0) > 0 ||
-  getHydrationValue(day) > 0 ||
-  (includeExercise &&
-    (getExerciseCaloriesBurned(day) > 0 || getWalkingCaloriesBurned(day) > 0));
-
-const isStreakProgressDay = (day: Day, includeExercise = false) =>
-  day.status === 'finished' || (day.status === 'active' && hasDayProgress(day, includeExercise));
-
-const sortByDayDate = (a: Day, b: Day) => {
-  const aDate = parseDashboardDate(a.date);
-  const bDate = parseDashboardDate(b.date);
-  if (aDate && bDate) return aDate.getTime() - bDate.getTime();
-  return a.dayNo - b.dayNo;
-};
-
-const getDashboardTargetDay = (days: Day[]) => {
-  const todayKey = getDashboardDateKey();
-  return (
-    days.find((day) => day.status === 'active') ||
-    days.find((day) => getDashboardDateKey(day.date) === todayKey) ||
-    days.find((day) => day.status !== 'locked') ||
-    days[0] ||
-    null
-  );
-};
-
-/**
- * Compute streak data dynamically from the local day data.
- * Counts from the latest unlocked day so future locked days do not reset progress.
- */
-const computeStreakFromDays = (data: jsonResponse, includeExercise = false) => {
-  const allDaysSorted = Object.values(data).sort(sortByDayDate);
-  const unlockedDaysSorted = allDaysSorted.filter((day) => day.status !== 'locked');
-  
-  let currentStreak = 0;
-  for (let i = unlockedDaysSorted.length - 1; i >= 0; i--) {
-    const day = unlockedDaysSorted[i];
-    if (isStreakProgressDay(day, includeExercise)) {
-      currentStreak++;
-    } else {
-      break;
-    }
-  }
-
-  let longestStreak = 0;
-  let tempStreak = 0;
-  for (const day of allDaysSorted) {
-    if (isStreakProgressDay(day, includeExercise)) {
-      tempStreak++;
-      longestStreak = Math.max(longestStreak, tempStreak);
-    } else {
-      tempStreak = 0;
-    }
-  }
-
-  longestStreak = Math.max(longestStreak, currentStreak);
-
-  const weeklyGoal = 7;
-  const streakPercentage = Math.round((currentStreak / weeklyGoal) * 100);
-
-  // Generate message
-  let message = '';
-  if (currentStreak === 0) {
-    message = 'Start with one meal or water log today. A streak begins with a real check-in.';
-  } else if (currentStreak === 1) {
-    message = "One day saved. Repeat the easiest useful log today.";
-  } else if (currentStreak < weeklyGoal) {
-    const daysLeft = weeklyGoal - currentStreak;
-    message = `${currentStreak} days active. ${daysLeft} more to complete the weekly rhythm.`;
-  } else {
-    message = 'Weekly rhythm complete. Keep the next log simple so it stays repeatable.';
-  }
-
-  return {
-    streakCount: currentStreak,
-    longestStreak,
-    message,
-    streakPercentage,
-    weeklyGoalDays: weeklyGoal,
-    shouldSendReminder: currentStreak === 0,
-  };
-};
-
 const toGoalSummary = (day: Day): NutritionGoalSummary => ({
   dayLogId: day._id,
   dayNo: day.dayNo,
   date: day.date,
   achievedCalories: day.achievedCalories,
   targetCalories: day.targetCalories,
+  targetCaloriesMin: day.targetCaloriesMin,
+  targetCaloriesMax: day.targetCaloriesMax,
   achievedHydration: day.achieviedHydration,
   targetHydration: day.targetHydration,
   calorieGoalDirection: day.calorieGoalDirection,
@@ -388,8 +305,10 @@ type EndOfDayRecap = {
   workoutDone: boolean;
   achievedCalories: number;
   targetCalories: number;
+  calorieTargetLabel: string;
   achievedHydration: number;
   targetHydration: number;
+  hydrationTargetLabel: string;
   workoutCalories: number;
   bestAction: string;
 };
@@ -397,23 +316,69 @@ type EndOfDayRecap = {
 const END_OF_DAY_RECAP_STORAGE_PREFIX = 'fitfaat_end_day_recap_seen';
 const DASHBOARD_FOCUS_REFRESH_TTL_MS = 90 * 1000;
 const DASHBOARD_BACKGROUND_REFRESH_TTL_MS = 2 * 60 * 1000;
+const DASHBOARD_APP_FOREGROUND_REFRESH_TTL_MS = 30 * 1000;
 const HEALTH_SYNC_BACKGROUND_TTL_MS = 5 * 60 * 1000;
+const DASHBOARD_UNLOCK_TIMER_BUFFER_MS = 250;
+const DASHBOARD_UNLOCK_RETRY_MS = 1500;
+const DASHBOARD_UNLOCK_MAX_RETRIES = 2;
 
-const buildEndOfDayRecap = (day: Day): EndOfDayRecap => {
+const getDashboardDurationSeconds = (day?: Pick<Day, "date" | "duration"> | null) => {
+  const durationSeconds = Number(day?.duration);
+  const explicitDurationSeconds = Number.isFinite(durationSeconds)
+    ? Math.max(0, Math.floor(durationSeconds))
+    : 0;
+  const localDaySeconds = day
+    ? getActiveDayDuration({ date: day.date, duration: 0 })
+    : 0;
+
+  if (explicitDurationSeconds > 0 && localDaySeconds > 0) {
+    return Math.min(explicitDurationSeconds, localDaySeconds);
+  }
+
+  return explicitDurationSeconds || localDaySeconds;
+};
+
+const getActiveDayUnlockTarget = (data: jsonResponse | null) => {
+  if (!data) return null;
+
+  const activeEntry = (Object.entries(data) as [keyof jsonResponse, Day][])
+    .find(([, day]) => String(day.status || "").toLowerCase() === "active");
+  if (!activeEntry) return null;
+
+  const [dayKey, activeDay] = activeEntry;
+  const durationSeconds = getDashboardDurationSeconds(activeDay);
+  const identity = activeDay._id || activeDay.date || activeDay.dayNo || dayKey;
+
+  return {
+    dayKey: String(dayKey),
+    durationSeconds,
+    signature: `${dayKey}:${identity}:${durationSeconds}`,
+  };
+};
+
+const buildEndOfDayRecap = (day: Day, goalDisplayMode: GoalDisplayMode): EndOfDayRecap => {
   const achievedCalories = Number(day.achievedCalories || 0);
   const targetCalories = Number(day.targetCalories || 0);
   const achievedHydration = getHydrationValue(day);
   const targetHydration = Number(day.targetHydration || 0);
   const workoutCalories = getExerciseCaloriesBurned(day);
-  const caloriesHit = targetCalories > 0 && achievedCalories >= targetCalories;
-  const hydrationHit = targetHydration > 0 && achievedHydration >= targetHydration;
+  const calorieProgress = getCalorieTargetProgress(day, goalDisplayMode);
+  const hydrationProgress = getHydrationTargetProgress(day, goalDisplayMode);
+  const caloriesHit = goalDisplayMode === 'ranges'
+    ? calorieProgress.isComplete
+    : targetCalories > 0 && achievedCalories >= targetCalories;
+  const hydrationHit = goalDisplayMode === 'ranges'
+    ? hydrationProgress.isComplete
+    : targetHydration > 0 && achievedHydration >= targetHydration;
   const workoutDone = workoutCalories > 0 || Number((day as any).exerciseDurationSeconds || 0) > 0;
 
   let bestAction = 'You checked in and kept momentum';
   if (caloriesHit && hydrationHit && workoutDone) {
     bestAction = 'Perfect day with nutrition, water, and workout complete';
   } else if (caloriesHit && hydrationHit) {
-    bestAction = 'Balanced calories and hydration';
+    bestAction = goalDisplayMode === 'ranges'
+      ? 'Stayed within a healthy food and water range'
+      : 'Balanced calories and hydration';
   } else if (workoutDone) {
     bestAction = 'Workout completed';
   } else if (hydrationHit) {
@@ -434,18 +399,20 @@ const buildEndOfDayRecap = (day: Day): EndOfDayRecap => {
     workoutDone,
     achievedCalories,
     targetCalories,
+    calorieTargetLabel: goalDisplayMode === 'ranges'
+      ? `${calorieProgress.range.min.toLocaleString()}-${calorieProgress.range.max.toLocaleString()}`
+      : targetCalories.toLocaleString(),
     achievedHydration,
     targetHydration,
+    hydrationTargetLabel: goalDisplayMode === 'ranges'
+      ? `${hydrationProgress.range.min.toFixed(1)}-${hydrationProgress.range.max.toFixed(1)}`
+      : targetHydration.toFixed(1),
     workoutCalories,
     bestAction,
   };
 };
 
 type DashboardActionHandlers = {
-  saveAdaptiveGoalCarryForwardFromCurrentData: (
-    ownerUserId?: string | null,
-    weeklyTrackingId?: string | null
-  ) => Promise<void>;
   refreshDashboardInBackground: (premiumActive: boolean) => void;
   checkAndCreateNewCycle: (premiumOverride?: boolean) => Promise<boolean>;
   loadJson: (storedData: StoredDashboardData, premiumOverride?: boolean) => Promise<void>;
@@ -458,40 +425,207 @@ export default function DayPlan () {
   const router = useRouter();
   const { colors } = useTheme();
   const { news, unreadCount, markNewsAsRead } = useNews();
-  const { appointments: localAppointments } = useAppointments();
   const { scheduleFitFaatNotification, cancelScheduledNotification } = useNotifications();
   const [JsonResponse, setJsonResponse] = useState<null|jsonResponse>(null);
   const [showNewsModal, setShowNewsModal] = useState(false);
   const [showDietPlanViewer, setShowDietPlanViewer] = useState(false);
   const [showQuickAddSheet, setShowQuickAddSheet] = useState(false);
-  const [commandCenterAppointments, setCommandCenterAppointments] = useState<any[]>([]);
-  const [chatAlertCount, setChatAlertCount] = useState(0);
   const [selectedMood, setSelectedMood] = useState<DashboardMoodValue | null>(null);
   const [isPremium, setIsPremium] = useState(false);
-  const [goalDisplayMode, setGoalDisplayMode] = useState<GoalDisplayMode>("simple");
+  const [goalDisplayMode, setGoalDisplayMode] = useState<GoalDisplayMode>("exact");
+  const [fitnessGoal, setFitnessGoal] = useState<GoalSpineKey>("unset");
   const [endOfDayRecap, setEndOfDayRecap] = useState<EndOfDayRecap | null>(null);
-  const [nutritionReport, setNutritionReport] = useState<WeeklyNutritionReport | null>(null);
-  const [habitMission, setHabitMission] = useState<HabitMission | null>(null);
-  const [habitStreakCount, setHabitStreakCount] = useState(0);
-  const [habitPreferences, setHabitPreferences] = useState<HabitPreferences | null>(null);
   const [dashboardLoadError, setDashboardLoadError] = useState<string | null>(null);
   const [dashboardRetryKey, setDashboardRetryKey] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [dashboardTimingHours, setDashboardTimingHours] = useState<DashboardTimingHours>({
+    mealHours: DASHBOARD_DEFAULT_MEAL_HOURS,
+    waterHours: DASHBOARD_DEFAULT_WATER_HOURS,
+  });
+  const [dashboardTimeTick, setDashboardTimeTick] = useState(() => Date.now());
+  const [dashboardOpenedStepSnapshot, setDashboardOpenedStepSnapshot] = useState<number | null>(null);
   const hasCheckedForNewCycle = useRef(false);
+  const cycleCheckInFlight = useRef(false);
   const adaptiveNutritionSignature = useRef<string | null>(null);
   const hasCompletedInitialLoad = useRef(false);
   const healthSyncInFlight = useRef(false);
   const lastHealthSyncAt = useRef(0);
   const lastFocusRefreshAt = useRef(0);
   const lastBackgroundRefreshAt = useRef(0);
+  const lastAppForegroundRefreshAt = useRef(0);
+  const activeDayUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeDayUnlockRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeDayUnlockInFlightRef = useRef(false);
+  const activeDayUnlockExpiresAtRef = useRef<number | null>(null);
   const liveWalkingProgress = useLiveWalkingProgress();
+  const latestDashboardStepsRef = useRef(0);
   const dashboardActions = useRef<DashboardActionHandlers>({
-    saveAdaptiveGoalCarryForwardFromCurrentData: async () => undefined,
     refreshDashboardInBackground: () => undefined,
     checkAndCreateNewCycle: async () => false,
     loadJson: async () => undefined,
     callApi: async () => false,
   });
   const moodStorageKey = `dashboardMood:${getDashboardDateKey()}`;
+
+  const loadDashboardPreferences = useCallback(async () => {
+    const [displayMode, goalKey] = await Promise.all([
+      loadGoalDisplayMode().catch(() => "exact" as GoalDisplayMode),
+      loadGoalSpineKey().catch(() => "unset" as GoalSpineKey),
+    ]);
+
+    setGoalDisplayMode(displayMode);
+    setFitnessGoal(goalKey);
+  }, []);
+
+  useEffect(() => {
+    latestDashboardStepsRef.current = Math.max(0, Math.round(liveWalkingProgress.steps || 0));
+  }, [liveWalkingProgress.steps]);
+
+  useEffect(() => {
+    let active = true;
+    const task = InteractionManager.runAfterInteractions(() => {
+      buildNutritionProfile()
+        .then((profile) => {
+          if (!active) return;
+
+          setDashboardTimingHours({
+            mealHours: normalizeDashboardHours(profile.regularMealHours, DASHBOARD_DEFAULT_MEAL_HOURS),
+            waterHours: normalizeDashboardHours(profile.hydrationHours, DASHBOARD_DEFAULT_WATER_HOURS),
+          });
+        })
+        .catch((error) => {
+          console.log('[Dashboard] Nutrition timing profile unavailable:', error);
+        });
+    });
+
+    return () => {
+      active = false;
+      task.cancel();
+    };
+  }, []);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setDashboardTimeTick(Date.now());
+    }, 60 * 1000);
+
+    return () => clearInterval(intervalId);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+
+      AsyncStorage.getItem(DASHBOARD_LAST_OPENED_STEPS_KEY)
+        .then((storedValue) => {
+          if (!active) return;
+          const fallbackSteps = latestDashboardStepsRef.current;
+          setDashboardOpenedStepSnapshot(
+            parseDashboardOpenedStepSnapshot({
+              storedValue,
+              currentSteps: fallbackSteps,
+              currentDateKey: getCurrentDashboardDateKey(),
+            })
+          );
+        })
+        .catch((error) => {
+          console.log('[Dashboard] Last opened step snapshot unavailable:', error);
+          if (active) {
+            setDashboardOpenedStepSnapshot(latestDashboardStepsRef.current);
+          }
+        });
+
+      return () => {
+        active = false;
+        AsyncStorage.setItem(
+          DASHBOARD_LAST_OPENED_STEPS_KEY,
+          serializeDashboardOpenedStepSnapshot({
+            steps: latestDashboardStepsRef.current,
+            dateKey: getCurrentDashboardDateKey(),
+          })
+        ).catch((error) => {
+          console.log('[Dashboard] Unable to save last opened step snapshot:', error);
+        });
+      };
+    }, [])
+  );
+
+  useEffect(() => {
+    let active = true;
+
+    AsyncStorage.getItem(ONBOARDING_FIRST_LOG_NUDGE_KEY)
+      .then(async (value) => {
+        if (!active || value !== '1') return;
+        await AsyncStorage.removeItem(ONBOARDING_FIRST_LOG_NUDGE_KEY);
+        if (!active) return;
+
+        Alert.alert(
+          'Setup complete',
+          'Start with water or your first meal so FitFaat can explain today from real logs.',
+          [
+            { text: 'Later', style: 'cancel' },
+            { text: 'Quick Add', onPress: () => setShowQuickAddSheet(true) },
+          ]
+        );
+      })
+      .catch((error) => {
+        console.log('[Dashboard] Onboarding nudge unavailable:', error);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof __DEV__ === "undefined" || !__DEV__) return;
+
+    const task = InteractionManager.runAfterInteractions(() => {
+      const failedCases = runDashboardCycleGuardQaCases().filter((result) => !result.passed);
+      if (failedCases.length) {
+        console.warn("[DashboardCycleGuard] QA cases failed", failedCases);
+      }
+
+      const failedPremiumCases = runPremiumClarityQaCases().filter((result) => !result.passed);
+      if (failedPremiumCases.length) {
+        console.warn("[PremiumClarity] QA cases failed", failedPremiumCases);
+      }
+
+      const failedDailySyncCases = runDailyProgressSyncQaCases().filter((result) => !result.passed);
+      if (failedDailySyncCases.length) {
+        console.warn("[DailyProgressSync] QA cases failed", failedDailySyncCases);
+      }
+
+      const failedFreshTargetCases = runAdaptiveGoalFreshTargetQaCases().filter((result) => !result.passed);
+      if (failedFreshTargetCases.length) {
+        console.warn("[AdaptiveGoals] Fresh target QA cases failed", failedFreshTargetCases);
+      }
+
+      const failedGoalTargetCases = runGoalTargetDisplayQaCases().filter((result) => !result.passed);
+      if (failedGoalTargetCases.length) {
+        console.warn("[GoalTargetDisplay] QA cases failed", failedGoalTargetCases);
+      }
+
+      const failedGoalSpineCases = runGoalSpineQaCases().filter((result) => !result.passed);
+      if (failedGoalSpineCases.length) {
+        console.warn("[GoalSpine] QA cases failed", failedGoalSpineCases);
+      }
+
+      const failedGoalExperienceCases = runGoalExperienceQaCases().filter((result) => !result.passed);
+      if (failedGoalExperienceCases.length) {
+        console.warn("[GoalExperience] QA cases failed", failedGoalExperienceCases);
+      }
+
+      const failedGoalAdaptivePlanCases = runGoalAdaptivePlanQaCases().filter((result) => !result.passed);
+      if (failedGoalAdaptivePlanCases.length) {
+        console.warn("[GoalAdaptivePlan] QA cases failed", failedGoalAdaptivePlanCases);
+      }
+    });
+
+    return () => {
+      task.cancel();
+    };
+  }, []);
 
   const runHealthSyncInBackground = useCallback((force = false) => {
     if (healthSyncInFlight.current) return;
@@ -509,20 +643,6 @@ export default function DayPlan () {
       });
   }, []);
 
-  const saveAdaptiveGoalCarryForwardFromCurrentData = async (
-    ownerUserId?: string | null,
-    weeklyTrackingId?: string | null
-  ) => {
-    const latestUser = ownerUserId ? null : await tokenStorage.getUser();
-    const latestWeeklyTrackingId = weeklyTrackingId ?? await getStoredWeeklyTrackingId(latestUser);
-    const currentData = JsonResponse || (await checkLocalStorage())?.data;
-
-    await saveAdaptiveGoalCarryForward(currentData, {
-      userId: ownerUserId || latestUser?.id,
-      weeklyTrackingId: latestWeeklyTrackingId,
-    });
-  };
-
   const refreshDashboardInBackground = (premiumActive: boolean) => {
     const now = Date.now();
     if (now - lastBackgroundRefreshAt.current < DASHBOARD_BACKGROUND_REFRESH_TTL_MS) {
@@ -536,56 +656,6 @@ export default function DayPlan () {
       }
     });
   };
-
-  const loadCommandCenterSignals = useCallback(async () => {
-    try {
-      const response = await authApi.getUserAppointments();
-      setCommandCenterAppointments(response.appointments || []);
-    } catch (error) {
-      console.log('[DashboardCommandCenter] Appointment preview unavailable:', error);
-    }
-
-    try {
-      const token = await tokenStorage.getToken();
-      if (!token) {
-        setChatAlertCount(0);
-        return;
-      }
-
-      const user = await tokenStorage.getUser();
-      const cacheUserKey = user?._id || user?.id || user?.userId || 'current';
-      const data = await cachedRequestJson<any>(
-        `dashboard:unread-by-appointment:${cacheUserKey}`,
-        `${getBackendBaseUrl()}/api/chat/unread-by-appointment`,
-        {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        },
-        {
-          timeoutMs: 6500,
-          retries: 1,
-          retryDelayMs: 500,
-          cacheTtlMs: 30 * 1000,
-          maxStaleMs: 10 * 60 * 1000,
-          allowStaleOnError: true,
-          maxWaitForFreshMs: 1500,
-          refreshCacheInBackground: true,
-        }
-      );
-      const unreadMap = data?.unreadByAppointment || {};
-      const totalUnread = Object.values(unreadMap).reduce(
-        (sum: number, value: any) => sum + Math.max(0, Number(value || 0)),
-        0
-      );
-      setChatAlertCount(totalUnread);
-    } catch (error) {
-      console.log('[DashboardCommandCenter] Chat alert preview unavailable:', error);
-      setChatAlertCount(0);
-    }
-  }, []);
 
   useEffect(() => {
     const loadMood = async () => {
@@ -606,8 +676,7 @@ export default function DayPlan () {
     };
 
     loadMood();
-    loadCommandCenterSignals();
-  }, [loadCommandCenterSignals, moodStorageKey]);
+  }, [moodStorageKey]);
 
   const handleMoodSelect = async (mood: DashboardMoodValue) => {
     setSelectedMood(mood);
@@ -623,7 +692,13 @@ export default function DayPlan () {
 
   // Local day data already contains the streak source of truth for this screen.
   const streak = computedStreak;
-  const streakLoading = false;
+  const activeDayUnlockTarget = useMemo(
+    () => getActiveDayUnlockTarget(JsonResponse),
+    [JsonResponse]
+  );
+  const activeDayUnlockDayKey = activeDayUnlockTarget?.dayKey;
+  const activeDayUnlockDurationSeconds = activeDayUnlockTarget?.durationSeconds;
+  const activeDayUnlockSignature = activeDayUnlockTarget?.signature;
 
   //Get Data from API or Local Storage
   useEffect( () => { 
@@ -633,39 +708,21 @@ export default function DayPlan () {
       try {
         setDashboardLoadError(null);
         runHealthSyncInBackground();
+        loadDashboardPreferences();
 
-        const [user, premiumActive, stored] = await Promise.all([
-          tokenStorage.getUser(),
+        const [premiumActive, stored] = await Promise.all([
           getIsPremiumUser(),
           checkLocalStorage(),
         ]);
-        const storedWeeklyId = await getStoredWeeklyTrackingId(user);
-
         if (!isActive) return;
 
         setIsPremium(premiumActive);
 
-        const userWeeklyId = user?.weeklyTrackingId;
-
-        // If weeklyTrackingIds don't match or user doesn't have one, fetch fresh from backend
-        if (!storedWeeklyId || !userWeeklyId || storedWeeklyId !== userWeeklyId) {
-          await dashboardActions.current.saveAdaptiveGoalCarryForwardFromCurrentData(user?.id, storedWeeklyId);
-          const loadedFreshData = await dashboardActions.current.callApi(premiumActive);
-          if (!loadedFreshData) {
-            const refreshedStored = await checkLocalStorage();
-            if (refreshedStored && refreshedStored.data) {
-              await dashboardActions.current.loadJson(refreshedStored, premiumActive);
-              return;
-            }
-            throw new Error('Dashboard data is unavailable right now.');
-          }
-          return;
-        }
-
-        if(stored && stored.data)
-        {
+        if (stored?.data) {
           await dashboardActions.current.loadJson(stored, premiumActive);
-          dashboardActions.current.refreshDashboardInBackground(premiumActive);
+          if (isActive) {
+            dashboardActions.current.refreshDashboardInBackground(premiumActive);
+          }
           return;
         }
 
@@ -683,7 +740,7 @@ export default function DayPlan () {
     return () => {
       isActive = false;
     };
-  },[dashboardRetryKey, runHealthSyncInBackground]);
+  },[dashboardRetryKey, loadDashboardPreferences, runHealthSyncInBackground]);
 
   useEffect(() => {
     if (!liveWalkingProgress.hasLoaded) return;
@@ -752,13 +809,34 @@ export default function DayPlan () {
       // This effect runs when JsonResponse changes
       // Check if all days are finished, indicating a need to refresh
       if (JsonResponse && !hasCheckedForNewCycle.current) {
-        const allDays = Object.values(JsonResponse);
+        const user = await tokenStorage.getUser();
+        const weeklyTrackingId = await getStoredWeeklyTrackingId(user);
+        const userWeeklyTrackingId =
+          user?.weeklyTrackingId ||
+          user?.currentWeeklyTrackingId ||
+          user?.weeklyTracking?._id ||
+          user?.weeklyTracking?.id ||
+          weeklyTrackingId;
+        const guardDecision = evaluateDashboardCycleGuard({
+          data: JsonResponse,
+          cacheTimestamp: new Date(),
+          storedWeeklyTrackingId: weeklyTrackingId,
+          userWeeklyTrackingId,
+        });
+
+        if (guardDecision.action === "check-cycle" && guardDecision.reason === "all-days-finished") {
+          console.log("[DashboardCycleGuard] All days finished, checking for a fresh weekly cycle.");
+          hasCheckedForNewCycle.current = true;
+          setTimeout(async () => {
+            await dashboardActions.current.checkAndCreateNewCycle();
+          }, 1000);
+        }
+        const allDays = Object.values(JsonResponse || {});
         const allFinished = allDays.every(day => day.status === 'finished');
         
-        if (allFinished) {
+        if (allFinished && !hasCheckedForNewCycle.current && guardDecision.action !== "check-cycle") {
           console.log('🔄 All days finished, checking for new cycle...');
           hasCheckedForNewCycle.current = true; // Prevent infinite loop
-          await dashboardActions.current.saveAdaptiveGoalCarryForwardFromCurrentData();
           // Wait a moment then check/create new cycle
           setTimeout(async () => {
             await dashboardActions.current.checkAndCreateNewCycle();
@@ -801,7 +879,7 @@ export default function DayPlan () {
 
       if (!finishedDay) return;
 
-      const recap = buildEndOfDayRecap(finishedDay);
+      const recap = buildEndOfDayRecap(finishedDay, goalDisplayMode);
       try {
         const alreadySeen = await AsyncStorage.getItem(recap.key);
         if (!alreadySeen) {
@@ -813,10 +891,16 @@ export default function DayPlan () {
     };
 
     loadLatestRecap();
-  }, [JsonResponse, endOfDayRecap]);
+  }, [JsonResponse, endOfDayRecap, goalDisplayMode]);
 
   // Check and create new cycle if needed
   const checkAndCreateNewCycle = async (premiumOverride = isPremium) => {
+    if (cycleCheckInFlight.current) {
+      return false;
+    }
+
+    cycleCheckInFlight.current = true;
+
     try {
       console.log("Checking if new cycle needed...");
       // Get user info
@@ -827,7 +911,6 @@ export default function DayPlan () {
       }
 
       const weeklyTrackingId = await getStoredWeeklyTrackingId(user);
-      await saveAdaptiveGoalCarryForwardFromCurrentData(user.id, weeklyTrackingId);
       const adaptiveMetrics = await loadAdaptiveGoalMetrics(user);
       const adaptivePlan = premiumOverride ? "premium" : "free";
       const baseGoals = calculateMifflinStJeorBaseGoals(adaptiveMetrics, {
@@ -863,13 +946,14 @@ export default function DayPlan () {
       console.log('Cycle check result:', result.message, 'New cycle created:', result.newCycleCreated);
 
       // Convert to jsonResponse format
-      const carryForward = await loadAdaptiveGoalCarryForward({
-        userId: user.id,
-        currentWeeklyTrackingId: result.newWeeklyTrackingId || weeklyTrackingId,
-      });
       const activeWeeklyTrackingId = result.newWeeklyTrackingId || weeklyTrackingId;
       const dashboardUserId = getDashboardUserIdentity(user) || user.id;
-      let data = convertToJsonResponse(result.data);
+      const storedBeforeFreshMerge = await checkLocalStorage();
+      let data = mergeDailyProgressMap(
+        storedBeforeFreshMerge?.data,
+        convertToJsonResponse(result.data),
+        { preferIncomingWhenUnclear: true }
+      ) as jsonResponse;
       data = await mergeExerciseProgressIntoJsonResponse(data);
       data = await mergeWalkingProgressIntoJsonResponse(data);
       data = await applyPendingDashboardMutations(data, {
@@ -877,7 +961,7 @@ export default function DayPlan () {
         weeklyTrackingId: activeWeeklyTrackingId,
         source: "server",
       });
-      data = applyAdaptiveGoalsToJsonResponse(data, adaptiveMetrics, carryForward, {
+      data = applyAdaptiveGoalsToJsonResponse(data, adaptiveMetrics, {
         plan: adaptivePlan,
         weightTrendCalibration,
       });
@@ -907,22 +991,31 @@ export default function DayPlan () {
         console.log('[Dashboard] Unable to refresh cycle:', error);
       }
       return false;
+    } finally {
+      cycleCheckInFlight.current = false;
     }
   };
 
   const loadJson = async (
-    {data, timestamp} : StoredDashboardData,
+    {data, timestamp, weeklyTrackingId: storedWeeklyTrackingId} : StoredDashboardData,
     premiumOverride = isPremium
   ) =>{
     const user = await tokenStorage.getUser();
     const weeklyTrackingId = await getStoredWeeklyTrackingId(user);
-    const carryForward = await loadAdaptiveGoalCarryForward({
-      userId: user?.id,
-      currentWeeklyTrackingId: weeklyTrackingId,
-    });
+    const userWeeklyTrackingId =
+      user?.weeklyTrackingId ||
+      user?.currentWeeklyTrackingId ||
+      user?.weeklyTracking?._id ||
+      user?.weeklyTracking?.id ||
+      weeklyTrackingId;
     const adaptiveMetrics = await loadAdaptiveGoalMetrics(user);
     data = await mergeExerciseProgressIntoJsonResponse(data);
     data = await mergeWalkingProgressIntoJsonResponse(data);
+    data = await applyPendingDashboardMutations(data, {
+      userId: getDashboardUserIdentity(user) || user?.id,
+      weeklyTrackingId,
+      source: "local",
+    });
     const adaptivePlan = premiumOverride ? "premium" : "free";
     const weightTrendCalibration = await loadWeeklyWeightTrendCalibration(
       adaptiveMetrics,
@@ -933,65 +1026,127 @@ export default function DayPlan () {
         plan: adaptivePlan,
       }
     );
-    data = applyAdaptiveGoalsToJsonResponse(data, adaptiveMetrics, carryForward, {
+    data = applyAdaptiveGoalsToJsonResponse(data, adaptiveMetrics, {
       plan: adaptivePlan,
       weightTrendCalibration,
     });
-    let entry : keyof jsonResponse
-    let foundActive = false;
-    for (const key in data)
-    {
-      entry = key as keyof jsonResponse
-      if(data[entry].status === 'active')
-      {
-        foundActive = true;
-        const cachedDuration = Number(data[entry].duration);
-        //                   current time - timestamp of localStorage    in seconds
-        const timeElapsed = (Date.now() - timestamp.getTime()) / 1000;
-        //                activeDay.duration - timepassed since creation
-        const timeLeft = Number.isFinite(cachedDuration) && cachedDuration > 0
-          ? cachedDuration - timeElapsed
-          : isCurrentDashboardDate(data[entry].date)
-            ? getSecondsUntilEndOfLocalDay()
-            : 0;
-        if(timeLeft>0)
-        {
-          //yes local stored is valid and i am updating data variable with its remaining time and break
-          data[entry].duration = timeLeft;
-          setJsonResponse(data);
-          await setStoredDashboardCache({ data, timestamp: new Date() }, user, weeklyTrackingId);
-          break;
-        }
-        else{
-          //no local stored data expired, check/create cycle
-          await checkAndCreateNewCycle(premiumOverride)
-          break;
-        }
+
+    const guardDecision = evaluateDashboardCycleGuard({
+      data,
+      cacheTimestamp: timestamp,
+      storedWeeklyTrackingId: storedWeeklyTrackingId || weeklyTrackingId,
+      userWeeklyTrackingId,
+    });
+
+    if (guardDecision.action === "check-cycle") {
+      console.log("[DashboardCycleGuard] check-cycle needed:", guardDecision.reason);
+      const loadedFreshData = await checkAndCreateNewCycle(premiumOverride);
+      if (loadedFreshData) return;
+
+      if (!shouldUseStaleDashboardCacheFallback(guardDecision)) {
+        return;
       }
+
+      console.log("[DashboardCycleGuard] Using stale dashboard cache after failed cycle check.");
+    } else if (guardDecision.activeDayKey && data[guardDecision.activeDayKey as keyof jsonResponse]) {
+      const activeDayKey = guardDecision.activeDayKey as keyof jsonResponse;
+      data = {
+        ...data,
+        [activeDayKey]: {
+          ...data[activeDayKey],
+          duration: guardDecision.activeDayDuration,
+        },
+      };
     }
-    // If no active day found (all finished), check and create new cycle
-    if (!foundActive) {
-      console.log('No active day found in local storage, checking for new cycle...');
-      await saveAdaptiveGoalCarryForwardFromCurrentData();
-      await checkAndCreateNewCycle(premiumOverride);
-    }
+
+    setJsonResponse(data);
   }
   const callApi = async (premiumOverride = isPremium) => {
     // Delegate to the new checkAndCreateNewCycle function
     return await checkAndCreateNewCycle(premiumOverride);
   };
   dashboardActions.current = {
-    saveAdaptiveGoalCarryForwardFromCurrentData,
     refreshDashboardInBackground,
     checkAndCreateNewCycle,
     loadJson,
     callApi,
   };
 
+  const triggerActiveDayUnlockRefresh = useCallback(
+    async (reason: string, retryCount = 0) => {
+      if (activeDayUnlockInFlightRef.current) return;
+
+      activeDayUnlockInFlightRef.current = true;
+
+      try {
+        console.log(`[DashboardCycleGuard] Active day unlock refresh triggered: ${reason}`);
+        const premiumActive = await getIsPremiumUser().catch(() => isPremium);
+        setIsPremium(premiumActive);
+
+        const loadedFreshData = await dashboardActions.current.checkAndCreateNewCycle(premiumActive);
+        if (!loadedFreshData && retryCount < DASHBOARD_UNLOCK_MAX_RETRIES) {
+          if (activeDayUnlockRetryTimerRef.current) {
+            clearTimeout(activeDayUnlockRetryTimerRef.current);
+          }
+          activeDayUnlockRetryTimerRef.current = setTimeout(() => {
+            triggerActiveDayUnlockRefresh(reason, retryCount + 1);
+          }, DASHBOARD_UNLOCK_RETRY_MS);
+        }
+      } finally {
+        activeDayUnlockInFlightRef.current = false;
+      }
+    },
+    [isPremium]
+  );
+
+  useEffect(() => {
+    if (activeDayUnlockTimerRef.current) {
+      clearTimeout(activeDayUnlockTimerRef.current);
+      activeDayUnlockTimerRef.current = null;
+    }
+    if (activeDayUnlockRetryTimerRef.current) {
+      clearTimeout(activeDayUnlockRetryTimerRef.current);
+      activeDayUnlockRetryTimerRef.current = null;
+    }
+
+    if (!activeDayUnlockDayKey || activeDayUnlockDurationSeconds === undefined) {
+      activeDayUnlockExpiresAtRef.current = null;
+      return;
+    }
+
+    const timeoutMs =
+      activeDayUnlockDurationSeconds > 0
+        ? activeDayUnlockDurationSeconds * 1000 + DASHBOARD_UNLOCK_TIMER_BUFFER_MS
+        : 0;
+    activeDayUnlockExpiresAtRef.current = Date.now() + timeoutMs;
+
+    activeDayUnlockTimerRef.current = setTimeout(() => {
+      triggerActiveDayUnlockRefresh(
+        `timer-expired:${activeDayUnlockDayKey}:${activeDayUnlockDurationSeconds}s`
+      );
+    }, timeoutMs);
+
+    return () => {
+      if (activeDayUnlockTimerRef.current) {
+        clearTimeout(activeDayUnlockTimerRef.current);
+        activeDayUnlockTimerRef.current = null;
+      }
+      if (activeDayUnlockRetryTimerRef.current) {
+        clearTimeout(activeDayUnlockRetryTimerRef.current);
+        activeDayUnlockRetryTimerRef.current = null;
+      }
+      activeDayUnlockExpiresAtRef.current = null;
+    };
+  }, [
+    activeDayUnlockDayKey,
+    activeDayUnlockDurationSeconds,
+    activeDayUnlockSignature,
+    triggerActiveDayUnlockRefresh,
+  ]);
+
   useFocusEffect(
     useCallback(() => {
-      loadCommandCenterSignals();
-      loadGoalDisplayMode().then(setGoalDisplayMode).catch(() => setGoalDisplayMode("simple"));
+      loadDashboardPreferences();
       runHealthSyncInBackground();
 
       if (!hasCompletedInitialLoad.current) {
@@ -1000,7 +1155,10 @@ export default function DayPlan () {
       }
 
       const now = Date.now();
-      if (now - lastFocusRefreshAt.current < DASHBOARD_FOCUS_REFRESH_TTL_MS) {
+      const unlockExpired =
+        activeDayUnlockExpiresAtRef.current !== null &&
+        now >= activeDayUnlockExpiresAtRef.current;
+      if (!unlockExpired && now - lastFocusRefreshAt.current < DASHBOARD_FOCUS_REFRESH_TTL_MS) {
         return;
       }
       lastFocusRefreshAt.current = now;
@@ -1008,6 +1166,11 @@ export default function DayPlan () {
       let isActive = true;
 
       const refreshFromCacheOrApi = async () => {
+        if (unlockExpired) {
+          await triggerActiveDayUnlockRefresh("focus-after-active-day-expired");
+          return;
+        }
+
         const [premiumActive, stored] = await Promise.all([
           getIsPremiumUser(),
           checkLocalStorage(),
@@ -1016,7 +1179,7 @@ export default function DayPlan () {
 
         setIsPremium(premiumActive);
 
-        if (stored && stored.data) {
+        if (stored?.data) {
           await dashboardActions.current.loadJson(stored, premiumActive);
           if (isActive) {
             dashboardActions.current.refreshDashboardInBackground(premiumActive);
@@ -1032,145 +1195,124 @@ export default function DayPlan () {
       return () => {
         isActive = false;
       };
-    }, [loadCommandCenterSignals, runHealthSyncInBackground])
+    }, [loadDashboardPreferences, runHealthSyncInBackground, triggerActiveDayUnlockRefresh])
   );
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState !== "active") return;
+
+      const now = Date.now();
+      const unlockExpired =
+        activeDayUnlockExpiresAtRef.current !== null &&
+        now >= activeDayUnlockExpiresAtRef.current;
+      if (!unlockExpired && now - lastAppForegroundRefreshAt.current < DASHBOARD_APP_FOREGROUND_REFRESH_TTL_MS) {
+        return;
+      }
+      lastAppForegroundRefreshAt.current = now;
+
+      const refreshAfterResume = async () => {
+        try {
+          if (unlockExpired) {
+            await triggerActiveDayUnlockRefresh("app-resumed-after-active-day-expired");
+            return;
+          }
+
+          runHealthSyncInBackground();
+
+          const [premiumActive, stored] = await Promise.all([
+            getIsPremiumUser(),
+            checkLocalStorage(),
+          ]);
+
+          if (!isMounted) return;
+
+          setIsPremium(premiumActive);
+
+          await loadDashboardPreferences();
+
+          if (!isMounted) return;
+
+          if (stored?.data) {
+            await dashboardActions.current.loadJson(stored, premiumActive);
+            if (isMounted) {
+              dashboardActions.current.refreshDashboardInBackground(premiumActive);
+            }
+            return;
+          }
+
+          await dashboardActions.current.callApi(premiumActive);
+        } catch (error) {
+          if (!isRequestAbortError(error)) {
+            console.log("[Dashboard] App resume refresh unavailable:", error);
+          }
+        }
+      };
+
+      refreshAfterResume();
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.remove();
+    };
+  }, [loadDashboardPreferences, runHealthSyncInBackground, triggerActiveDayUnlockRefresh]);
+
+  const handleDashboardRefresh = useCallback(async () => {
+    if (isRefreshing) return;
+
+    setIsRefreshing(true);
+    setDashboardLoadError(null);
+    runHealthSyncInBackground(true);
+
+    try {
+      const premiumActive = await getIsPremiumUser();
+      setIsPremium(premiumActive);
+
+      await loadDashboardPreferences();
+
+      const loadedFreshData = await dashboardActions.current.callApi(premiumActive);
+      if (!loadedFreshData) {
+        const stored = await checkLocalStorage();
+        if (stored?.data) {
+          await dashboardActions.current.loadJson(stored, premiumActive);
+          return;
+        }
+
+        throw new Error("Dashboard data is unavailable right now.");
+      }
+    } catch (error: any) {
+      const message = error?.message || "Unable to refresh dashboard data.";
+      console.log("[Dashboard] Pull-to-refresh failed:", error);
+      if (!JsonResponse) {
+        setDashboardLoadError(message);
+      } else {
+        Alert.alert("Refresh Failed", message);
+      }
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [JsonResponse, isRefreshing, loadDashboardPreferences, runHealthSyncInBackground]);
 
   const daysArray: Day[] = useMemo(
     () => (JsonResponse ? Object.values(JsonResponse) : []),
     [JsonResponse]
   );
-
-  const dashboardAppointments = useMemo(() => {
-    const appointmentMap = new Map<string, any>();
-    [...commandCenterAppointments, ...localAppointments].forEach((appointment: any) => {
-      const key = appointment?._id || appointment?.id || `${appointment?.date || ''}-${appointment?.time || ''}`;
-      if (key) {
-        appointmentMap.set(String(key), appointment);
-      }
-    });
-    return Array.from(appointmentMap.values());
-  }, [commandCenterAppointments, localAppointments]);
-
-  useEffect(() => {
-    loadHabitPreferences()
-      .then(setHabitPreferences)
-      .catch((error) => {
-        console.log('[BehaviorCoach] Unable to load habit preferences:', error);
-      });
-  }, []);
-
-  useEffect(() => {
-    let isActive = true;
-
-    if (!JsonResponse || !daysArray.length) {
-      setNutritionReport(null);
-      setHabitMission(null);
-      setHabitStreakCount(0);
-      return () => {
-        isActive = false;
-      };
-    }
-
-    const fallbackReport = buildWeeklyNutritionReport(daysArray);
-    setNutritionReport(fallbackReport);
-
-    const refreshLocalInsights = async () => {
-      let report = fallbackReport;
-
-      try {
-        report = await buildWeeklyNutritionReportFromStorage(daysArray);
-      } catch (error) {
-        console.log('[NutritionReport] Unable to load nutrition profile entries:', error);
-      }
-
-      if (!isActive) return;
-
-      setNutritionReport(report);
-
-      saveNutritionReportSnapshot(report).catch((error) => {
-        console.log('[NutritionReport] Unable to save local report snapshot:', error);
-      });
-
-      if (!isPremium) {
-        setHabitMission(null);
-        setHabitStreakCount(0);
-        return;
-      }
-
-      refreshHabitMission(report, selectedMood)
-        .then(({ mission, streakCount }) => {
-          if (!isActive) return;
-          setHabitMission(mission);
-          setHabitStreakCount(streakCount);
-          markMiniLessonSeen(mission.lessonId).catch((error) => {
-            console.log('[BehaviorCoach] Unable to save lesson state:', error);
-          });
-        })
-        .catch((error) => {
-          console.log('[BehaviorCoach] Unable to refresh local mission:', error);
-        });
-    };
-
-    refreshLocalInsights();
-
-    return () => {
-      isActive = false;
-    };
-  }, [JsonResponse, daysArray, isPremium, selectedMood]);
-
-  useEffect(() => {
-    if (!habitMission) return;
-
-    scheduleHabitMissionReminder({
-      mission: habitMission,
-      schedule: scheduleFitFaatNotification,
-      cancel: cancelScheduledNotification,
-    }).catch((error) => {
-      console.log('[BehaviorCoach] Unable to schedule local mission reminder:', error);
-    });
-  }, [habitMission, scheduleFitFaatNotification, cancelScheduledNotification]);
-
-  const handleCompleteHabitMission = useCallback(async () => {
-    if (!habitMission) return;
-
-    try {
-      const result = await markHabitMissionComplete(habitMission.id);
-      if (result.mission) {
-        setHabitMission(result.mission);
-      }
-      setHabitStreakCount(result.streakCount);
-      Alert.alert('Mission complete', 'Your habit streak has been updated.');
-    } catch (error) {
-      console.log('[BehaviorCoach] Unable to complete mission:', error);
-      Alert.alert('Could not save mission', 'Please try again.');
-    }
-  }, [habitMission]);
-
-  const handleToggleHabitReminders = useCallback(async () => {
-    try {
-      const currentPreferences = habitPreferences || await loadHabitPreferences();
-      const nextPreferences = await saveHabitPreferences({
-        remindersEnabled: !currentPreferences.remindersEnabled,
-      });
-      setHabitPreferences(nextPreferences);
-
-      if (habitMission) {
-        await scheduleHabitMissionReminder({
-          mission: habitMission,
-          schedule: scheduleFitFaatNotification,
-          cancel: cancelScheduledNotification,
-        });
-      }
-    } catch (error) {
-      console.log('[BehaviorCoach] Unable to update reminder preference:', error);
-      Alert.alert('Could not update reminder', 'Please try again.');
-    }
-  }, [
-    cancelScheduledNotification,
-    habitMission,
-    habitPreferences,
-    scheduleFitFaatNotification,
-  ]);
+  const currentDashboardSteps = Math.max(0, Math.round(liveWalkingProgress.steps || 0));
+  const stepsSinceLastDashboardOpen = dashboardOpenedStepSnapshot === null
+    ? 0
+    : Math.max(0, currentDashboardSteps - dashboardOpenedStepSnapshot);
+  const dashboardJourneyOrder = useMemo(
+    () =>
+      getDashboardJourneyOrder({
+        currentTime: dashboardTimeTick,
+        timingHours: dashboardTimingHours,
+        stepsSinceLastOpen: stepsSinceLastDashboardOpen,
+      }),
+    [dashboardTimeTick, dashboardTimingHours, stepsSinceLastDashboardOpen]
+  );
 
   //function called by child component to navigate to detailed day view
   const navigateToDayDetails = (dayNo: number, quickMode?: 'meal' | 'hydration') : void => {
@@ -1192,6 +1334,15 @@ export default function DayPlan () {
                 } // pass as object
               })
   }
+  const openJourneyDayDetails = (day: Day): void => {
+    router.push({
+      pathname: "/(main)/(dashboard)/DetailsDay",
+      params: {
+        selectedDay: JSON.stringify(day),
+      },
+    });
+  };
+
   //Mapping JsonResponse to Day Components
   if(!JsonResponse)
   {
@@ -1229,7 +1380,7 @@ export default function DayPlan () {
               <ActivityIndicator size="large" color={colors.primary} />
               <Text style={[styles.loadingTitle, { color: colors.textPrimary }]}>Loading your dashboard</Text>
               <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-                FitFaat is preparing today's meals, water, coach, and report data.
+                FitFaat is preparing today's meals, water, steps, and report data.
               </Text>
             </View>
           )}
@@ -1268,6 +1419,11 @@ export default function DayPlan () {
       return;
     }
 
+    if (action === 'settings') {
+      router.push('/(main)/(settings)' as any);
+      return;
+    }
+
     if (action === 'mealPlanner') {
       router.push('/(main)/(meal-planner)' as any);
       return;
@@ -1285,7 +1441,17 @@ export default function DayPlan () {
 
     if (action === 'workout') {
       if (!isPremium) {
-        router.push('/(main)/(settings)/premium');
+        Alert.alert(
+          'Workout supports your goal',
+          getGoalPremiumFeatureCopy(fitnessGoal, 'workoutModule'),
+          [
+            { text: 'Not now', style: 'cancel' },
+            {
+              text: 'View Premium',
+              onPress: () => router.push('/(main)/(settings)/premium'),
+            },
+          ]
+        );
         return;
       }
 
@@ -1303,9 +1469,6 @@ export default function DayPlan () {
       return;
     }
 
-    if (action === 'weight') {
-      router.push('/(main)/profile');
-    }
   };
 
   const closeEndOfDayRecap = async () => {
@@ -1319,7 +1482,46 @@ export default function DayPlan () {
     setEndOfDayRecap(null);
   };
 
+  const displayStreak = streak || {
+    streakCount: 0,
+    longestStreak: 0,
+    message: "Log one meal, water, or step session to start this week's rhythm.",
+    streakPercentage: 0,
+    shouldSendReminder: false,
+  };
+
   const floatingButtonIconSize = Math.min(hp(2.2), wp(4.8));
+
+  const renderDashboardJourneySection = (section: DashboardJourneySection) => {
+    if (section === 'days') {
+      return (
+        <DashboardSevenDayJourney
+          key="days"
+          days={daysArray}
+          goalDisplayMode={goalDisplayMode}
+          isPremium={isPremium}
+          colors={colors}
+          onOpenDay={(day) => openJourneyDayDetails(day as Day)}
+        />
+      );
+    }
+
+    if (section === 'streak') {
+      return (
+        <StreakDisplay
+          key="streak"
+          streakCount={displayStreak.streakCount}
+          longestStreak={displayStreak.longestStreak}
+          message={displayStreak.message}
+          streakPercentage={displayStreak.streakPercentage}
+          shouldSendReminder={displayStreak.shouldSendReminder}
+          loading={false}
+        />
+      );
+    }
+
+    return <StepCounterCard key="steps" colors={colors} />;
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.screenColor }]} edges={['top']}>
@@ -1330,6 +1532,8 @@ export default function DayPlan () {
         showNotificationBell={true}
         notificationCount={unreadCount}
         onNotificationPress={handleNotificationPress}
+        compactTitleSpacing
+        titleMinimumFontScale={0.72}
       />
 
       {/* News Modal Popup */}
@@ -1351,6 +1555,8 @@ export default function DayPlan () {
         colors={colors}
         selectedMood={selectedMood}
         isPremium={isPremium}
+        actions={DASHBOARD_PRIMARY_QUICK_ACTIONS}
+        showMoodAction={false}
         onClose={() => setShowQuickAddSheet(false)}
         onSelectMood={handleMoodSelect}
         onAction={handleQuickAddAction}
@@ -1383,7 +1589,7 @@ export default function DayPlan () {
                   {endOfDayRecap?.achievedCalories || 0}
                 </Text>
                 <Text style={[styles.recapStatLabel, { color: colors.textSecondary }]}>
-                  / {endOfDayRecap?.targetCalories || 0} cal
+                  / {endOfDayRecap?.calorieTargetLabel || endOfDayRecap?.targetCalories || 0} cal
                 </Text>
               </View>
 
@@ -1397,7 +1603,7 @@ export default function DayPlan () {
                   {(endOfDayRecap?.achievedHydration || 0).toFixed(1)}L
                 </Text>
                 <Text style={[styles.recapStatLabel, { color: colors.textSecondary }]}>
-                  / {endOfDayRecap?.targetHydration || 0}L
+                  / {endOfDayRecap?.hydrationTargetLabel || endOfDayRecap?.targetHydration || 0}L
                 </Text>
               </View>
 
@@ -1440,82 +1646,17 @@ export default function DayPlan () {
           showsVerticalScrollIndicator={false} 
           showsHorizontalScrollIndicator={false}
           scrollEventThrottle={16}
-        >
-          <DashboardCommandCenter
-            days={daysArray}
-            appointments={dashboardAppointments}
-            chatAlertCount={chatAlertCount}
-            streak={streak}
-            isPremium={isPremium}
-            colors={colors}
-            selectedMood={selectedMood}
-            onOpenQuickAdd={() => setShowQuickAddSheet(true)}
-            onQuickAddAction={handleQuickAddAction}
-            goalDisplayMode={goalDisplayMode}
-            showReadiness={false}
-            showWeeklyReport={false}
-            nutritionReport={nutritionReport}
-            habitMission={habitMission}
-            habitStreakCount={habitStreakCount}
-            habitPreferences={habitPreferences}
-            onCompleteHabitMission={handleCompleteHabitMission}
-            onToggleHabitReminders={handleToggleHabitReminders}
-          />
-
-          {/* Streak Display Component */}
-          {streak && (
-            <StreakDisplay
-              streakCount={streak.streakCount}
-              longestStreak={streak.longestStreak}
-              message={streak.message}
-              streakPercentage={streak.streakPercentage}
-              shouldSendReminder={streak.shouldSendReminder}
-              loading={streakLoading}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleDashboardRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+              progressBackgroundColor={colors.cardBackground}
             />
-          )}
-
-          {
-            //calling 7 <Day> components with jsonResponse useState data
-            daysArray.map((dayData, index) => (
-              <Days
-                key={index}
-                props={dayData}
-                onDayPress={navigateToDayDetails}
-                showExerciseProgress={isPremium}
-                goalDisplayMode={goalDisplayMode}
-              />
-            ))
           }
-
-          <PersonalCoachFeed
-            days={daysArray}
-            appointments={dashboardAppointments}
-            streak={streak}
-            selectedMood={selectedMood}
-            isPremium={isPremium}
-            colors={colors}
-            onAction={handleQuickAddAction}
-            nutritionReport={nutritionReport}
-            habitMission={habitMission}
-            habitStreakCount={habitStreakCount}
-          />
-
-          <View style={styles.readinessSection}>
-            <ReadinessScoreCard
-              days={daysArray}
-              isPremium={isPremium}
-              colors={colors}
-              selectedMood={selectedMood}
-            />
-          </View>
-
-          <DashboardWeeklyHealthReport
-            days={daysArray}
-            appointments={dashboardAppointments}
-            isPremium={isPremium}
-            colors={colors}
-            nutritionReport={nutritionReport}
-          />
+        >
+          {dashboardJourneyOrder.map(renderDashboardJourneySection)}
           <View style={styles.dietButtonClearance} />
         </ScrollView>
 
@@ -1525,21 +1666,6 @@ export default function DayPlan () {
           activeOpacity={0.85}
         >
           <Ionicons name="add" size={Math.min(hp(3.2), wp(7))} color={colors.textOnPrimary} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.floatingButtonLeft, { backgroundColor: colors.secondary, shadowColor: colors.secondary }]}
-          onPress={() => router.push('/(main)/(dashboard)/charts')}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="bar-chart" size={floatingButtonIconSize} color={colors.textOnPrimary} />
-          <Text
-            style={[styles.floatingButtonText, { color: colors.textOnPrimary }]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-          >
-            VIEW CHARTS
-          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity

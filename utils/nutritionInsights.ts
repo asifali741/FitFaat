@@ -147,11 +147,11 @@ const getMealNumber = (meal: any, keys: string[]) => {
 
 const getMealTime = (meal: any, fallbackDate?: string) => {
   const raw =
-    meal?.createdAt ||
     meal?.loggedAt ||
     meal?.timestamp ||
     meal?.mealTime ||
     meal?.time ||
+    meal?.createdAt ||
     meal?.date ||
     fallbackDate;
   const date = raw ? new Date(raw) : null;

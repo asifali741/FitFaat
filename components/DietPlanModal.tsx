@@ -140,7 +140,6 @@ const DietPlanModal: React.FC<DietPlanModalProps> = ({
     if (Platform.OS === 'android') {
       StatusBar.setBackgroundColor(systemBarColor);
       StatusBar.setTranslucent(false);
-      NavigationBar.setBackgroundColorAsync(systemBarColor).catch(() => {});
       NavigationBar.setButtonStyleAsync('dark').catch(() => {});
       NavigationBar.setStyle('light');
     }

@@ -187,17 +187,11 @@ export default function ExerciseDetails() {
       return;
     }
 
-    NavigationBar.setPositionAsync("absolute").catch(() => {});
-    NavigationBar.setBackgroundColorAsync("#00000000").catch(() => {});
-    NavigationBar.setBorderColorAsync("#00000000").catch(() => {});
     NavigationBar.setButtonStyleAsync(isDarkMode ? "light" : "dark").catch(() => {});
     NavigationBar.setStyle(isDarkMode ? "dark" : "light");
     NavigationBar.setVisibilityAsync("visible").catch(() => {});
 
     return () => {
-      NavigationBar.setPositionAsync("relative").catch(() => {});
-      NavigationBar.setBackgroundColorAsync(isDarkMode ? colors.screenColor : "#FFFFFF").catch(() => {});
-      NavigationBar.setBorderColorAsync(isDarkMode ? colors.screenColor : "#FFFFFF").catch(() => {});
       NavigationBar.setButtonStyleAsync(isDarkMode ? "light" : "dark").catch(() => {});
       NavigationBar.setStyle(isDarkMode ? "dark" : "light");
     };

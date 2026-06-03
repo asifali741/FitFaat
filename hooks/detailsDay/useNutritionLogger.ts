@@ -9,6 +9,7 @@ import { removeStoredDashboardCache } from "@/utils/dashboardStorage";
 import {
   logMealDraftsToDailyLog,
   logNutritionEntryToDailyLog,
+  type ConfirmedNutritionMutation,
 } from "@/utils/nutritionLogger";
 import {
   recordNutritionProfileEntry,
@@ -27,6 +28,10 @@ type ConfirmedMutationInput = {
   entry?: any;
   calories?: number;
   hydrationAmount?: number;
+  loggedAt?: string;
+  recordedAt?: string;
+  mealName?: string;
+  proteinGrams?: number;
   nextDayData: any;
 };
 
@@ -66,9 +71,22 @@ export function useNutritionLogger({
       entry,
       calories,
       hydrationAmount,
+      loggedAt,
+      recordedAt,
       nextDayData,
     }: ConfirmedMutationInput) => {
       try {
+        const mutationLoggedAt =
+          loggedAt ||
+          entry?.loggedAt ||
+          entry?.timestamp ||
+          entry?.createdAt ||
+          new Date().toISOString();
+        const mutationRecordedAt =
+          recordedAt ||
+          entry?.recordedAt ||
+          entry?.savedAt ||
+          new Date().toISOString();
         await recordDashboardPendingMutation({
           type,
           dayLogId,
@@ -76,6 +94,9 @@ export function useNutritionLogger({
           entry,
           calories,
           hydrationAmount,
+          loggedAt: mutationLoggedAt,
+          occurredAt: mutationRecordedAt,
+          confirmedAt: mutationRecordedAt,
           achievedCaloriesAfter: nextDayData?.achievedCalories,
           achievedHydrationAfter:
             nextDayData?.achieviedHydration ?? nextDayData?.achievedHydration,
@@ -95,6 +116,7 @@ export function useNutritionLogger({
       loggedProteinGrams,
       loggedMealCount,
       loggedWaterLiters,
+      confirmedMutations,
     }: {
       dayLogId: string;
       updatedDayData: any;
@@ -102,22 +124,118 @@ export function useNutritionLogger({
       loggedProteinGrams: number;
       loggedMealCount: number;
       loggedWaterLiters: number;
+      confirmedMutations: ConfirmedNutritionMutation[];
     }) => {
       try {
-        await recordNutritionProfileEntry({
-          dayLogId,
-          dayNo: updatedDayData.dayNo,
-          dayDate: updatedDayData.date,
-          timestamp: new Date().toISOString(),
-          calories: loggedCalories,
-          proteinGrams: loggedProteinGrams,
-          mealCount: loggedMealCount,
-          waterLiters: loggedWaterLiters,
-          targetCalories: updatedDayData.targetCalories,
-          achievedCaloriesAfter: updatedDayData.achievedCalories,
-          targetHydration: updatedDayData.targetHydration,
-          achievedHydrationAfter: updatedDayData.achieviedHydration,
-        });
+        const profileWrites = confirmedMutations
+          .filter((mutation) => mutation.type === "meal" && Number(mutation.calories || 0) > 0)
+          .map((mutation) => {
+            const loggedAt =
+              mutation.loggedAt ||
+              mutation.entry?.loggedAt ||
+              mutation.entry?.timestamp ||
+              mutation.entry?.createdAt ||
+              new Date().toISOString();
+            const proteinGrams = Math.max(
+              0,
+              Math.round(
+                Number(
+                  mutation.proteinGrams ??
+                    mutation.entry?.proteinGrams ??
+                    mutation.entry?.protein ??
+                    mutation.entry?.protein_g ??
+                    0
+                )
+              )
+            );
+
+            return recordNutritionProfileEntry({
+              dayLogId,
+              dayNo: updatedDayData.dayNo,
+              dayDate: updatedDayData.date,
+              timestamp: loggedAt,
+              loggedAt,
+              recordedAt: mutation.recordedAt || mutation.entry?.recordedAt,
+              eventType: "meal",
+              source: "meal-log",
+              mealName:
+                mutation.mealName ||
+                mutation.entry?.foodName ||
+                mutation.entry?.food_name ||
+                mutation.entry?.name ||
+                "Meal",
+              calories: Number(mutation.calories || mutation.entry?.calories || 0),
+              proteinGrams,
+              mealCount: 1,
+              waterLiters: 0,
+              targetCalories: updatedDayData.targetCalories,
+              targetCaloriesMin: updatedDayData.targetCaloriesMin,
+              targetCaloriesMax: updatedDayData.targetCaloriesMax,
+              achievedCaloriesAfter: updatedDayData.achievedCalories,
+              targetHydration: updatedDayData.targetHydration,
+              achievedHydrationAfter: updatedDayData.achieviedHydration,
+            });
+          });
+
+        const hydrationMutation = [...confirmedMutations]
+          .reverse()
+          .find((mutation) => mutation.type === "hydration");
+        if (loggedWaterLiters > 0) {
+          const loggedAt =
+            hydrationMutation?.loggedAt ||
+            hydrationMutation?.entry?.loggedAt ||
+            hydrationMutation?.entry?.timestamp ||
+            hydrationMutation?.entry?.createdAt ||
+            new Date().toISOString();
+          profileWrites.push(
+            recordNutritionProfileEntry({
+              dayLogId,
+              dayNo: updatedDayData.dayNo,
+              dayDate: updatedDayData.date,
+              timestamp: loggedAt,
+              loggedAt,
+              eventType: "hydration",
+              source: "hydration-log",
+              calories: 0,
+              proteinGrams: 0,
+              mealCount: 0,
+              waterLiters: loggedWaterLiters,
+              targetCalories: updatedDayData.targetCalories,
+              targetCaloriesMin: updatedDayData.targetCaloriesMin,
+              targetCaloriesMax: updatedDayData.targetCaloriesMax,
+              achievedCaloriesAfter: updatedDayData.achievedCalories,
+              targetHydration: updatedDayData.targetHydration,
+              achievedHydrationAfter: updatedDayData.achieviedHydration,
+            })
+          );
+        }
+
+        if (!profileWrites.length && (loggedCalories > 0 || loggedWaterLiters > 0 || loggedProteinGrams > 0)) {
+          const loggedAt = new Date().toISOString();
+          profileWrites.push(
+            recordNutritionProfileEntry({
+              dayLogId,
+              dayNo: updatedDayData.dayNo,
+              dayDate: updatedDayData.date,
+              timestamp: loggedAt,
+              loggedAt,
+              eventType: loggedCalories > 0 ? "meal" : "hydration",
+              source: "legacy-aggregate",
+              calories: loggedCalories,
+              proteinGrams: loggedProteinGrams,
+              mealCount: loggedMealCount,
+              waterLiters: loggedWaterLiters,
+              targetCalories: updatedDayData.targetCalories,
+              targetCaloriesMin: updatedDayData.targetCaloriesMin,
+              targetCaloriesMax: updatedDayData.targetCaloriesMax,
+              achievedCaloriesAfter: updatedDayData.achievedCalories,
+              targetHydration: updatedDayData.targetHydration,
+              achievedHydrationAfter: updatedDayData.achieviedHydration,
+            })
+          );
+        }
+
+        await Promise.all(profileWrites);
 
         await scheduleAdaptiveNutritionNotifications({
           summary: {
@@ -126,6 +244,8 @@ export function useNutritionLogger({
             date: updatedDayData.date,
             achievedCalories: updatedDayData.achievedCalories,
             targetCalories: updatedDayData.targetCalories,
+            targetCaloriesMin: updatedDayData.targetCaloriesMin,
+            targetCaloriesMax: updatedDayData.targetCaloriesMax,
             achievedHydration: updatedDayData.achieviedHydration,
             targetHydration: updatedDayData.targetHydration,
             calorieGoalDirection: updatedDayData.calorieGoalDirection,
@@ -190,6 +310,7 @@ export function useNutritionLogger({
           loggedProteinGrams,
           loggedMealCount: logResult.loggedMealCount,
           loggedWaterLiters: 0,
+          confirmedMutations: logResult.confirmedMutations,
         });
 
         resetMealForm();
@@ -214,7 +335,7 @@ export function useNutritionLogger({
         );
       } catch (error) {
         console.error("Error logging meal drafts:", error);
-        Alert.alert("Error", "Failed to log meal template. Please check your connection.");
+        Alert.alert("Error", "Failed to log meal. Please check your connection.");
       } finally {
         setIsLoading(false);
       }
@@ -242,6 +363,7 @@ export function useNutritionLogger({
       drinkQuantity,
       mealQuantity,
       descriptionInput,
+      eatenAt,
     }: {
       calorieInput: string;
       waterInput: string;
@@ -250,6 +372,7 @@ export function useNutritionLogger({
       drinkQuantity: string;
       mealQuantity: string;
       descriptionInput: string;
+      eatenAt?: string;
     }) => {
       setIsLoading(true);
       try {
@@ -272,6 +395,7 @@ export function useNutritionLogger({
               carbs: Math.round((selectedFoodItem?.carbs_g || selectedFoodItem?.carbohydrates_g || 0) * Math.max(0.25, toMealNumber(mealQuantity, 1))),
               fats: Math.round((selectedFoodItem?.fat_g || 0) * Math.max(0.25, toMealNumber(mealQuantity, 1))),
               description: descriptionInput,
+              eatenAt,
             }
           : null;
         const drinkTotals = selectedDrink ? getDrinkNutritionTotals(selectedDrink, drinkQuantity) : null;
@@ -335,6 +459,7 @@ export function useNutritionLogger({
             loggedProteinGrams,
             loggedMealCount,
             loggedWaterLiters,
+            confirmedMutations: nutritionResult.confirmedMutations,
           });
 
           await sendFitFaatNotification(

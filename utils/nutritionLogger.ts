@@ -9,6 +9,7 @@ export type NutritionMealDraft = {
   carbs?: number;
   fats?: number;
   description?: string;
+  eatenAt?: string;
 };
 
 export type ConfirmedNutritionMutation = {
@@ -16,6 +17,10 @@ export type ConfirmedNutritionMutation = {
   entry?: any;
   calories?: number;
   hydrationAmount?: number;
+  loggedAt?: string;
+  recordedAt?: string;
+  mealName?: string;
+  proteinGrams?: number;
 };
 
 export type NutritionLogResult = {
@@ -50,6 +55,42 @@ const getHydrationFromWaterResponse = (waterResponse: any) => {
   return Number.isFinite(responseHydration) ? responseHydration : null;
 };
 
+const normalizeMealResponse = (
+  mealResponse: any,
+  draft: NutritionMealDraft,
+  loggedAt: string,
+  recordedAt: string
+) => ({
+  ...(mealResponse || {}),
+  foodName:
+    mealResponse?.foodName ||
+    mealResponse?.food_name ||
+    mealResponse?.name ||
+    draft.foodName,
+  calories: toNumber(mealResponse?.calories, draft.calories),
+  protein:
+    toNumber(
+      mealResponse?.protein ??
+        mealResponse?.protein_g ??
+        mealResponse?.proteinGrams,
+      draft.protein || 0
+    ) || undefined,
+  carbs:
+    toNumber(
+      mealResponse?.carbs ??
+        mealResponse?.carbs_g ??
+        mealResponse?.carbohydrates_g,
+      draft.carbs || 0
+    ) || undefined,
+  fats:
+    toNumber(mealResponse?.fats ?? mealResponse?.fat_g, draft.fats || 0) ||
+    undefined,
+  loggedAt: mealResponse?.loggedAt || mealResponse?.timestamp || loggedAt,
+  timestamp: mealResponse?.timestamp || mealResponse?.loggedAt || loggedAt,
+  createdAt: mealResponse?.createdAt || mealResponse?.loggedAt || loggedAt,
+  recordedAt: mealResponse?.recordedAt || mealResponse?.savedAt || recordedAt,
+});
+
 export const logMealDraftsToDailyLog = async (
   dayLogId: string,
   dayData: any,
@@ -65,6 +106,8 @@ export const logMealDraftsToDailyLog = async (
 
   for (const draft of drafts) {
     let mealResponse: any = null;
+    const recordedAt = new Date().toISOString();
+    const loggedAt = draft.eatenAt || recordedAt;
     try {
       mealResponse = await dailyLogsApi.addMeal(
         dayLogId,
@@ -75,7 +118,8 @@ export const logMealDraftsToDailyLog = async (
         draft.protein,
         draft.carbs,
         draft.fats,
-        draft.description || ""
+        draft.description || "",
+        loggedAt
       );
     } catch (error) {
       firstMealError = firstMealError || error;
@@ -90,11 +134,16 @@ export const logMealDraftsToDailyLog = async (
 
     loggedCalories += draft.calories;
     loggedProteinGrams += Math.max(0, Math.round(draft.protein || 0));
-    mealResponses.push(mealResponse);
+    const normalizedMealResponse = normalizeMealResponse(mealResponse, draft, loggedAt, recordedAt);
+    mealResponses.push(normalizedMealResponse);
     confirmedMutations.push({
       type: "meal",
-      entry: mealResponse,
+      entry: normalizedMealResponse,
       calories: draft.calories,
+      loggedAt,
+      recordedAt,
+      mealName: draft.foodName,
+      proteinGrams: Math.max(0, Math.round(draft.protein || 0)),
     });
   }
 
@@ -152,6 +201,8 @@ export const logNutritionEntryToDailyLog = async ({
 
   if (meal && meal.calories > 0) {
     let mealResponse: any = null;
+    const recordedAt = new Date().toISOString();
+    const loggedAt = meal.eatenAt || recordedAt;
     try {
       mealResponse = await dailyLogsApi.addMeal(
         dayLogId,
@@ -162,28 +213,36 @@ export const logNutritionEntryToDailyLog = async ({
         meal.protein,
         meal.carbs,
         meal.fats,
-        meal.description || ""
+        meal.description || "",
+        loggedAt
       );
     } catch (error) {
       firstError = firstError || error;
     }
 
     if (mealResponse) {
+      const normalizedMealResponse = normalizeMealResponse(mealResponse, meal, loggedAt, recordedAt);
       hasMeal = true;
       loggedCalories += meal.calories;
       loggedProteinGrams += Math.max(0, Math.round(meal.protein || 0));
       loggedMealCount += 1;
-      mealResponses.push(mealResponse);
+      mealResponses.push(normalizedMealResponse);
       successMessages.push(`${meal.calories} calories logged`);
       updatedDayData = {
         ...updatedDayData,
         achievedCalories: Number(updatedDayData.achievedCalories || 0) + meal.calories,
-        meals: updatedDayData.meals ? [...updatedDayData.meals, mealResponse] : [mealResponse],
+        meals: updatedDayData.meals
+          ? [...updatedDayData.meals, normalizedMealResponse]
+          : [normalizedMealResponse],
       };
       confirmedMutations.push({
         type: "meal",
-        entry: mealResponse,
+        entry: normalizedMealResponse,
         calories: meal.calories,
+        loggedAt,
+        recordedAt,
+        mealName: meal.foodName,
+        proteinGrams: Math.max(0, Math.round(meal.protein || 0)),
       });
     } else {
       successMessages.push("Meal could not be logged");
@@ -193,6 +252,7 @@ export const logNutritionEntryToDailyLog = async ({
   const hydrationAmount = Math.max(0, toNumber(waterAmount));
   if (hydrationAmount > 0) {
     let waterResponse: any = null;
+    const waterLoggedAt = new Date().toISOString();
     try {
       waterResponse = await dailyLogsApi.addWater(dayLogId, hydrationAmount);
     } catch (error) {
@@ -206,22 +266,42 @@ export const logNutritionEntryToDailyLog = async ({
 
       const responseHydration = getHydrationFromWaterResponse(waterResponse);
       const nextHydration = responseHydration ?? getHydrationValue(updatedDayData) + hydrationAmount;
+      const latestWaterEntry = Array.isArray(waterResponse.waterIntake)
+        ? waterResponse.waterIntake[waterResponse.waterIntake.length - 1]
+        : waterResponse;
+      const normalizedWaterEntry = {
+        ...(latestWaterEntry || {}),
+        amount: toNumber(latestWaterEntry?.amount, hydrationAmount),
+        loggedAt: latestWaterEntry?.loggedAt || latestWaterEntry?.timestamp || waterLoggedAt,
+        timestamp: latestWaterEntry?.timestamp || latestWaterEntry?.loggedAt || waterLoggedAt,
+        createdAt: latestWaterEntry?.createdAt || waterLoggedAt,
+      };
+      const nextWaterIntake = Array.isArray(waterResponse.waterIntake)
+        ? [
+            ...waterResponse.waterIntake.slice(0, -1),
+            normalizedWaterEntry,
+          ]
+        : [
+            ...(Array.isArray(updatedDayData.waterIntake) ? updatedDayData.waterIntake : []),
+            normalizedWaterEntry,
+          ];
       updatedDayData = {
         ...updatedDayData,
         achieviedHydration: nextHydration,
         achievedHydration: nextHydration,
-        waterIntake: waterResponse.waterIntake || updatedDayData.waterIntake,
+        waterIntake: nextWaterIntake,
       };
       confirmedMutations.push({
         type: "hydration",
-        entry: Array.isArray(waterResponse.waterIntake)
-          ? waterResponse.waterIntake[waterResponse.waterIntake.length - 1]
-          : waterResponse,
+        entry: normalizedWaterEntry,
         hydrationAmount,
+        loggedAt: waterLoggedAt,
       });
 
       if (drinkMeal && drinkMeal.calories > 0) {
         let drinkMealResponse: any = null;
+        const drinkRecordedAt = new Date().toISOString();
+        const drinkLoggedAt = drinkMeal.eatenAt || drinkRecordedAt;
         try {
           drinkMealResponse = await dailyLogsApi.addMeal(
             dayLogId,
@@ -232,28 +312,39 @@ export const logNutritionEntryToDailyLog = async ({
             drinkMeal.protein,
             drinkMeal.carbs,
             drinkMeal.fats,
-            drinkMeal.description || "Logged from hydration"
+            drinkMeal.description || "Logged from hydration",
+            drinkLoggedAt
           );
         } catch (error) {
           console.log("[NutritionLogger] Drink calories were not logged:", error);
         }
 
         if (drinkMealResponse) {
+          const normalizedDrinkMealResponse = normalizeMealResponse(
+            drinkMealResponse,
+            drinkMeal,
+            drinkLoggedAt,
+            drinkRecordedAt
+          );
           hasMeal = true;
           loggedCalories += drinkMeal.calories;
           loggedProteinGrams += Math.max(0, Math.round(drinkMeal.protein || 0));
           loggedMealCount += 1;
           successMessages.push(`${drinkMeal.calories} drink calories logged`);
-          mealResponses.push(drinkMealResponse);
+          mealResponses.push(normalizedDrinkMealResponse);
           updatedDayData = {
             ...updatedDayData,
             achievedCalories: Number(updatedDayData.achievedCalories || 0) + drinkMeal.calories,
-            meals: [...(updatedDayData.meals || []), drinkMealResponse],
+            meals: [...(updatedDayData.meals || []), normalizedDrinkMealResponse],
           };
           confirmedMutations.push({
             type: "meal",
-            entry: drinkMealResponse,
+            entry: normalizedDrinkMealResponse,
             calories: drinkMeal.calories,
+            loggedAt: drinkLoggedAt,
+            recordedAt: drinkRecordedAt,
+            mealName: drinkMeal.foodName,
+            proteinGrams: Math.max(0, Math.round(drinkMeal.protein || 0)),
           });
         } else {
           successMessages.push("Drink calories could not be logged");

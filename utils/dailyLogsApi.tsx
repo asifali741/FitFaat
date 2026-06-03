@@ -1,5 +1,4 @@
 import { tokenStorage } from '@/utils/auth/tokenStorage';
-import { saveAdaptiveGoalCarryForwardFromStorage } from '@/utils/adaptiveGoals';
 import {
   removeStoredDashboardCache,
   setStoredWeeklyTrackingId,
@@ -29,6 +28,12 @@ const READ_REQUEST_CONFIG = {
 const WRITE_REQUEST_CONFIG = {
   timeoutMs: 12000,
   retries: 0,
+};
+
+const FRESH_READ_REQUEST_CONFIG = {
+  timeoutMs: 10000,
+  retries: 1,
+  retryDelayMs: 600,
 };
 
 const dailyLogsCachePrefix = 'daily-logs:';
@@ -66,7 +71,6 @@ export const dailyLogsApi = {
 
       // If a new cycle was created, update AsyncStorage and tokenStorage
       if (data.newCycleCreated && data.newWeeklyTrackingId) {
-        await saveAdaptiveGoalCarryForwardFromStorage({ userId, weeklyTrackingId });
         await setStoredWeeklyTrackingId(data.newWeeklyTrackingId);
         // Clear old cached data
         await removeStoredDashboardCache(undefined, weeklyTrackingId);
@@ -143,6 +147,31 @@ export const dailyLogsApi = {
     }
   },
 
+  // Get weekly progress without using request cache. Use for login, dashboard refresh,
+  // and any path where backend daily logs must be authoritative.
+  getWeeklyProgressFresh: async (weeklyTrackingId: string) => {
+    try {
+      const data = await requestJson<any>(
+        `${API_BASE_URL}/daily-logs/progress/${weeklyTrackingId}`,
+        {
+          method: 'GET',
+          headers: {
+            ...JSON_HEADERS,
+            'Cache-Control': 'no-cache',
+            Pragma: 'no-cache',
+          },
+        },
+        FRESH_READ_REQUEST_CONFIG
+      );
+
+      await clearDailyLogRequestCache();
+      return data.data;
+    } catch (error) {
+      console.error('Error fetching fresh weekly progress:', error);
+      throw error;
+    }
+  },
+
   // Get single day log
   getDailyLog: async (dayId: string) => {
     try {
@@ -163,6 +192,30 @@ export const dailyLogsApi = {
     }
   },
 
+  // Get a single day without using request cache.
+  getDailyLogFresh: async (dayId: string) => {
+    try {
+      const data = await requestJson<any>(
+        `${API_BASE_URL}/daily-logs/${dayId}`,
+        {
+          method: 'GET',
+          headers: {
+            ...JSON_HEADERS,
+            'Cache-Control': 'no-cache',
+            Pragma: 'no-cache',
+          },
+        },
+        FRESH_READ_REQUEST_CONFIG
+      );
+
+      await clearDailyLogRequestCache();
+      return data.data;
+    } catch (error) {
+      console.error('Error fetching fresh daily log:', error);
+      throw error;
+    }
+  },
+
   // Add meal to a day
   addMeal: async (
     dayId: string,
@@ -173,7 +226,8 @@ export const dailyLogsApi = {
     protein?: number,
     carbs?: number,
     fats?: number,
-    notes?: string
+    notes?: string,
+    loggedAt?: string
   ) => {
     try {
       console.log('[addMeal] Adding meal to dayId:', dayId);
@@ -193,6 +247,7 @@ export const dailyLogsApi = {
             carbs,
             fats,
             notes,
+            loggedAt,
           }),
         },
         WRITE_REQUEST_CONFIG
@@ -296,7 +351,6 @@ export const dailyLogsApi = {
         // Update AsyncStorage with new weekly tracking ID
         try {
           const user = await tokenStorage.getUser();
-          await saveAdaptiveGoalCarryForwardFromStorage({ userId: user?.id, weeklyTrackingId });
           await setStoredWeeklyTrackingId(data.data.newWeeklyTrackingId, user);
           console.log('New weekly cycle started! Updated weeklyTrackingId:', data.data.newWeeklyTrackingId);
 

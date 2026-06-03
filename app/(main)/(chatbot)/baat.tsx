@@ -5,7 +5,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import Controls from "@/Control/controls";
 import * as NavigationBar from 'expo-navigation-bar';
 import * as SystemUI from 'expo-system-ui';
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { FlatList, Image, Keyboard, KeyboardAvoidingView, Platform, StatusBar, StyleSheet, Text, View } from "react-native";
 import type { KeyboardEvent } from "react-native";
@@ -32,6 +32,7 @@ const ANDROID_KEYBOARD_EXTRA_LIFT = hp(11);
 
 export default function Baat() {
   const { colors, isDarkMode } = useTheme();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const {
     messages: storedMessages,
@@ -91,6 +92,10 @@ export default function Baat() {
     });
   }, []);
 
+  const openChatHistory = useCallback(() => {
+    router.push("/(main)/(chatbot)/chat-history" as any);
+  }, [router]);
+
   useEffect(() => {
     const handleKeyboardShow = (event: KeyboardEvent) => {
       Keyboard.scheduleLayoutAnimation(event);
@@ -127,13 +132,11 @@ export default function Baat() {
       if (Platform.OS !== 'android') return;
 
       SystemUI.setBackgroundColorAsync('#FFFFFF').catch(() => {});
-      NavigationBar.setBackgroundColorAsync('#FFFFFF').catch(() => {});
       NavigationBar.setButtonStyleAsync('dark').catch(() => {});
       NavigationBar.setStyle('light');
 
       return () => {
         SystemUI.setBackgroundColorAsync('#FFFFFF').catch(() => {});
-        NavigationBar.setBackgroundColorAsync('#FFFFFF').catch(() => {});
         NavigationBar.setButtonStyleAsync('dark').catch(() => {});
         NavigationBar.setStyle('light');
       };
@@ -151,6 +154,13 @@ export default function Baat() {
           <AppHeader
             title="HeaLora Chat"
             showStepIndicator={false}
+            rightActions={[
+              {
+                icon: "time-outline",
+                accessibilityLabel: "Open chat history",
+                onPress: openChatHistory,
+              },
+            ]}
           />
         </View>
 

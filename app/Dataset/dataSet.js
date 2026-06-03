@@ -1774,6 +1774,14 @@ export const pakistaniDishes = [
     "fat_g": 1
   },
   {
+    "food_name": "Dates (Khajoor)",
+    "serving_size": "5 dates",
+    "calories_kcal": 115,
+    "protein_g": 1,
+    "carbs_g": 31,
+    "fat_g": 0.2
+  },
+  {
     "food_name": "Papri Chaat",
     "serving_size": "1 serving",
     "calories_kcal": 300,

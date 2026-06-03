@@ -1,7 +1,23 @@
 import AppHeader from "@/components/AppHeader";
 import { FeatureLimitBanner } from "@/components/common/FeatureLimitBanner";
 import { useTheme } from "@/contexts/ThemeContext";
+import { tokenStorage } from "@/utils/auth/tokenStorage";
+import { getStoredDashboardCache } from "@/utils/dashboardStorage";
 import { getFeatureAccessStatus, type FeatureAccessStatus } from "@/utils/featureAccess";
+import {
+  buildGoalMealPlannerStatus,
+  getGoalExperience,
+} from "@/utils/goalExperience";
+import {
+  buildGoalAdaptiveMealPlan,
+  type GoalMealSuggestion,
+} from "@/utils/goalAdaptivePlan";
+import { loadGoalSpineKey, type GoalSpineKey } from "@/utils/goalSpine";
+import {
+  formatCalorieTarget,
+  loadGoalDisplayMode,
+  type GoalDisplayMode,
+} from "@/utils/goalTargetDisplay";
 import { localSyncEvents } from "@/utils/localSyncEvents";
 import {
   addDaysToDateKey,
@@ -24,7 +40,7 @@ import {
   upsertManualGroceryItem,
 } from "@/utils/localMealPlanner";
 import { Ionicons } from "@expo/vector-icons";
-import { router, useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -103,7 +119,30 @@ const buildManualGroceryList = (groceryState: FitFaatGroceryState): FitFaatGroce
       return left.label.localeCompare(right.label);
     });
 
+const extractPlannerDashboardDays = (value: any): any[] => {
+  const data = value?.data && typeof value.data === "object" && !Array.isArray(value.data)
+    ? value.data
+    : value;
+
+  if (!data || typeof data !== "object") return [];
+  return Array.isArray(data) ? data : Object.values(data);
+};
+
+const getDashboardDateKey = (day: any) => {
+  const value = day?.dateKey || day?.date;
+  if (!value) return "";
+  const parsed = new Date(String(value));
+  if (Number.isNaN(parsed.getTime())) {
+    return String(value).slice(0, 10);
+  }
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const date = String(parsed.getDate()).padStart(2, "0");
+  return `${year}-${month}-${date}`;
+};
+
 export default function MealPlannerScreen() {
+  const router = useRouter();
   const { colors, isDarkMode } = useTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(
@@ -127,10 +166,13 @@ export default function MealPlannerScreen() {
   const [notesInput, setNotesInput] = useState("");
   const [manualGroceryInput, setManualGroceryInput] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [isPremium, setIsPremium] = useState(false);
+  const [hasFullPlannerAccess, setHasFullPlannerAccess] = useState(true);
   const [mealPlannerAccess, setMealPlannerAccess] = useState<FeatureAccessStatus | null>(null);
-  const [isPremiumLoading, setIsPremiumLoading] = useState(true);
+  const [isAccessLoading, setIsAccessLoading] = useState(true);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [goalKey, setGoalKey] = useState<GoalSpineKey>("unset");
+  const [goalDisplayMode, setGoalDisplayMode] = useState<GoalDisplayMode>("ranges");
+  const [selectedTargetDay, setSelectedTargetDay] = useState<any | null>(null);
 
   const loadPlannerData = useCallback(async () => {
     try {
@@ -149,41 +191,53 @@ export default function MealPlannerScreen() {
     }
   }, []);
 
-  const requireMealPlannerPro = useCallback(() => {
-    if (isPremium) return true;
+  const loadGoalPlannerContext = useCallback(async () => {
+    try {
+      const [nextGoal, nextDisplayMode, user] = await Promise.all([
+        loadGoalSpineKey(),
+        loadGoalDisplayMode().catch(() => "ranges" as GoalDisplayMode),
+        tokenStorage.getUser().catch(() => null),
+      ]);
+      const cache = await getStoredDashboardCache(user).catch(() => null);
+      const days = extractPlannerDashboardDays(cache?.data);
+      const targetDay =
+        days.find((day) => getDashboardDateKey(day) === selectedDateKey) ||
+        days.find((day) => String(day?.status || "").toLowerCase() === "active") ||
+        null;
 
-    Alert.alert("Premium Feature", mealPlannerAccess?.lockedReason || "Smart meal plans, macros, notes, and automated grocery lists are Premium features.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Upgrade",
-        onPress: () => router.push("/(main)/(settings)/premium" as any),
-      },
-    ]);
-    return false;
-  }, [isPremium, mealPlannerAccess?.lockedReason]);
+      setGoalKey(nextGoal);
+      setGoalDisplayMode(nextDisplayMode);
+      setSelectedTargetDay(targetDay);
+    } catch (error) {
+      console.log("[MealPlanner] Unable to load goal context:", error);
+      setGoalKey("unset");
+      setSelectedTargetDay(null);
+    }
+  }, [selectedDateKey]);
 
-  const loadPremiumPlannerData = useCallback(async () => {
-    setIsPremiumLoading(true);
+  const loadPlannerAccessData = useCallback(async () => {
+    setIsAccessLoading(true);
 
     try {
       const featureAccess = await getFeatureAccessStatus("mealPlannerPro");
       setMealPlannerAccess(featureAccess);
-      setIsPremium(featureAccess.hasAccess);
+      setHasFullPlannerAccess(featureAccess.hasAccess);
       await loadPlannerData();
     } catch (error) {
-      console.log("[MealPlanner] Failed to check premium state:", error);
+      console.log("[MealPlanner] Failed to check planner access:", error);
       setMealPlannerAccess(null);
-      setIsPremium(false);
+      setHasFullPlannerAccess(true);
       await loadPlannerData();
     } finally {
-      setIsPremiumLoading(false);
+      setIsAccessLoading(false);
     }
   }, [loadPlannerData]);
 
   useFocusEffect(
     useCallback(() => {
-      loadPremiumPlannerData();
-    }, [loadPremiumPlannerData])
+      loadPlannerAccessData();
+      loadGoalPlannerContext();
+    }, [loadGoalPlannerContext, loadPlannerAccessData])
   );
 
   useEffect(() => {
@@ -200,14 +254,8 @@ export default function MealPlannerScreen() {
   }, [loadPlannerData]);
 
   useEffect(() => {
-    if (isPremium || isPremiumLoading) return;
-    setCaloriesInput("");
-    setProteinInput("");
-    setCarbsInput("");
-    setFatsInput("");
-    setIngredientsInput("");
-    setNotesInput("");
-  }, [isPremium, isPremiumLoading]);
+    loadGoalPlannerContext();
+  }, [loadGoalPlannerContext]);
 
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
@@ -248,9 +296,37 @@ export default function MealPlannerScreen() {
     [selectedDateMeals]
   );
 
+  const goalExperience = useMemo(() => getGoalExperience(goalKey), [goalKey]);
+  const selectedTargetLabel = useMemo(
+    () => selectedTargetDay ? formatCalorieTarget(selectedTargetDay, goalDisplayMode, hasFullPlannerAccess ? "premium" : "free") : null,
+    [goalDisplayMode, hasFullPlannerAccess, selectedTargetDay]
+  );
+  const plannerGoalStatus = useMemo(
+    () =>
+      buildGoalMealPlannerStatus({
+        goal: goalKey,
+        plannedCalories: hasFullPlannerAccess ? selectedDateCalories : 0,
+        targetCalories: selectedTargetDay?.targetCalories,
+        targetCaloriesMin: selectedTargetDay?.targetCaloriesMin,
+        targetCaloriesMax: selectedTargetDay?.targetCaloriesMax,
+        targetLabel: selectedTargetLabel,
+      }),
+    [goalKey, hasFullPlannerAccess, selectedDateCalories, selectedTargetDay, selectedTargetLabel]
+  );
+  const adaptiveMealPlan = useMemo(
+    () =>
+      buildGoalAdaptiveMealPlan({
+        goal: goalKey,
+        targetDay: selectedTargetDay,
+        plannedMeals: selectedDateMeals,
+        isPremium: hasFullPlannerAccess,
+      }),
+    [goalKey, hasFullPlannerAccess, selectedDateMeals, selectedTargetDay]
+  );
+
   const groceryItems = useMemo(
-    () => (isPremium ? buildGeneratedGroceryList(meals, groceryState) : buildManualGroceryList(groceryState)),
-    [groceryState, isPremium, meals]
+    () => (hasFullPlannerAccess ? buildGeneratedGroceryList(meals, groceryState) : buildManualGroceryList(groceryState)),
+    [groceryState, hasFullPlannerAccess, meals]
   );
 
   const grocerySummary = useMemo(() => {
@@ -307,12 +383,12 @@ export default function MealPlannerScreen() {
         dateKey: editingMeal?.dateKey || selectedDateKey,
         type: mealType,
         name: mealName,
-        calories: isPremium ? parseNumberInput(caloriesInput) : editingMeal?.calories,
-        protein: isPremium ? parseNumberInput(proteinInput) : editingMeal?.protein,
-        carbs: isPremium ? parseNumberInput(carbsInput) : editingMeal?.carbs,
-        fats: isPremium ? parseNumberInput(fatsInput) : editingMeal?.fats,
-        ingredients: isPremium ? parseIngredients(ingredientsInput) : editingMeal?.ingredients || [],
-        notes: isPremium ? notesInput.trim() || undefined : editingMeal?.notes,
+        calories: hasFullPlannerAccess ? parseNumberInput(caloriesInput) : editingMeal?.calories,
+        protein: hasFullPlannerAccess ? parseNumberInput(proteinInput) : editingMeal?.protein,
+        carbs: hasFullPlannerAccess ? parseNumberInput(carbsInput) : editingMeal?.carbs,
+        fats: hasFullPlannerAccess ? parseNumberInput(fatsInput) : editingMeal?.fats,
+        ingredients: hasFullPlannerAccess ? parseIngredients(ingredientsInput) : editingMeal?.ingredients || [],
+        notes: hasFullPlannerAccess ? notesInput.trim() || undefined : editingMeal?.notes,
       });
       await loadPlannerData();
       setEditorVisible(false);
@@ -321,6 +397,31 @@ export default function MealPlannerScreen() {
       Alert.alert("Save Failed", error?.message || "Could not save this meal.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const saveSuggestedMeal = async (suggestion: GoalMealSuggestion) => {
+    try {
+      await upsertFitFaatMealPlan({
+        dateKey: selectedDateKey,
+        type: suggestion.type,
+        name: suggestion.name,
+        calories: hasFullPlannerAccess ? suggestion.calories : undefined,
+        protein: hasFullPlannerAccess ? suggestion.protein : undefined,
+        carbs: hasFullPlannerAccess ? suggestion.carbs : undefined,
+        fats: hasFullPlannerAccess ? suggestion.fats : undefined,
+        ingredients: hasFullPlannerAccess ? suggestion.ingredients : [],
+        notes: hasFullPlannerAccess ? `${suggestion.notes} ${suggestion.timing}` : undefined,
+      });
+      await loadPlannerData();
+      Alert.alert(
+        "Suggestion saved",
+        hasFullPlannerAccess
+          ? `${suggestion.name} was added with macros and ingredients.`
+          : `${suggestion.name} was added to your meal plan.`
+      );
+    } catch (error: any) {
+      Alert.alert("Could Not Save", error?.message || "Please try again.");
     }
   };
 
@@ -340,8 +441,6 @@ export default function MealPlannerScreen() {
   };
 
   const toggleGroceryItem = async (item: FitFaatGroceryItem) => {
-    if (item.source === "planned" && !requireMealPlannerPro()) return;
-
     const nextChecked = !item.checked;
     setGroceryState((current) => ({
       ...current,
@@ -408,7 +507,7 @@ export default function MealPlannerScreen() {
             </Text>
             <Text style={styles.mealMeta} numberOfLines={1}>
               {typeOption.label}
-              {isPremium && meal.calories ? ` - ${Math.round(meal.calories)} kcal` : ""}
+              {hasFullPlannerAccess && meal.calories ? ` - ${Math.round(meal.calories)} kcal` : ""}
             </Text>
           </View>
           <View style={styles.mealActions}>
@@ -430,12 +529,12 @@ export default function MealPlannerScreen() {
             </TouchableOpacity>
           </View>
         </View>
-        {isPremium && meal.ingredients.length > 0 && (
+        {hasFullPlannerAccess && meal.ingredients.length > 0 && (
           <Text style={styles.ingredientsPreview} numberOfLines={2}>
             {meal.ingredients.join(", ")}
           </Text>
         )}
-        {isPremium && (meal.protein || meal.carbs || meal.fats) && (
+        {hasFullPlannerAccess && (meal.protein || meal.carbs || meal.fats) && (
           <View style={styles.macroRow}>
             <Text style={styles.macroText}>P {meal.protein || 0}g</Text>
             <Text style={styles.macroText}>C {meal.carbs || 0}g</Text>
@@ -474,6 +573,97 @@ export default function MealPlannerScreen() {
         })}
       </ScrollView>
 
+      <View style={[styles.goalGuidanceCard, { borderColor: `${goalExperience.color}42` }]}>
+        <View style={styles.goalGuidanceHeader}>
+          <View style={[styles.goalGuidanceIcon, { backgroundColor: `${goalExperience.color}18` }]}>
+            <Ionicons
+              name={goalExperience.icon as keyof typeof Ionicons.glyphMap}
+              size={Math.min(hp(2.35), wp(5.2))}
+              color={goalExperience.color}
+            />
+          </View>
+          <View style={styles.goalGuidanceCopy}>
+            <Text style={styles.goalGuidanceEyebrow}>Meal plan for {goalExperience.label}</Text>
+            <Text style={styles.goalGuidanceTitle}>{plannerGoalStatus.label}</Text>
+            <Text style={styles.goalGuidanceBody}>{plannerGoalStatus.body}</Text>
+          </View>
+        </View>
+        <View style={styles.goalChipRow}>
+          {goalExperience.meal.chips.map((chip) => (
+            <View key={chip} style={[styles.goalChip, { backgroundColor: `${goalExperience.color}12` }]}>
+              <Text style={[styles.goalChipText, { color: goalExperience.color }]}>{chip}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.adaptivePlanCard}>
+        <View style={styles.adaptivePlanHeader}>
+          <View>
+            <Text style={styles.adaptivePlanEyebrow}>Goal targets</Text>
+            <Text style={styles.adaptivePlanTitle}>{adaptiveMealPlan.title}</Text>
+          </View>
+          <View style={[styles.adaptivePlanBadge, { backgroundColor: `${goalExperience.color}16` }]}>
+            <Text style={[styles.adaptivePlanBadgeText, { color: goalExperience.color }]}>
+              Full planner
+            </Text>
+          </View>
+        </View>
+        <View style={styles.adaptivePlanStats}>
+          <View style={styles.adaptivePlanStat}>
+            <Text style={styles.adaptivePlanStatLabel}>Target</Text>
+            <Text style={styles.adaptivePlanStatValue}>{adaptiveMealPlan.targetRangeLabel}</Text>
+          </View>
+          <View style={styles.adaptivePlanStat}>
+            <Text style={styles.adaptivePlanStatLabel}>Protein</Text>
+            <Text style={styles.adaptivePlanStatValue}>
+              {adaptiveMealPlan.proteinTarget}g
+            </Text>
+          </View>
+        </View>
+        <TouchableOpacity
+          style={styles.adaptiveLearnMoreButton}
+          onPress={() => router.push("/(main)/(goal-review)" as any)}
+          activeOpacity={0.82}
+          accessibilityRole="button"
+          accessibilityLabel="Open goal review to learn why targets changed"
+        >
+          <Ionicons name="information-circle-outline" size={Math.min(hp(1.9), wp(4.2))} color={goalExperience.color} />
+          <Text style={[styles.adaptiveLearnMoreText, { color: goalExperience.color }]}>Why changed?</Text>
+        </TouchableOpacity>
+        {adaptiveMealPlan.suggestions.slice(0, 4).map((suggestion) => (
+          <View key={suggestion.id} style={styles.suggestionCard}>
+            <View style={styles.suggestionHeader}>
+              <View style={styles.suggestionCopy}>
+                <Text style={styles.suggestionType}>{getMealTypeOption(suggestion.type).label}</Text>
+                <Text style={styles.suggestionName}>{suggestion.name}</Text>
+                <Text style={styles.suggestionReason}>{suggestion.reason}</Text>
+              </View>
+              <View style={styles.suggestionMetric}>
+                <Text style={styles.suggestionMetricValue}>
+                  {suggestion.calories}
+                </Text>
+                <Text style={styles.suggestionMetricLabel}>kcal</Text>
+              </View>
+            </View>
+            <View style={styles.suggestionMacroRow}>
+              <Text style={styles.suggestionMacro}>P {suggestion.protein}g</Text>
+              <Text style={styles.suggestionMacro}>C {suggestion.carbs}g</Text>
+              <Text style={styles.suggestionMacro}>F {suggestion.fats}g</Text>
+            </View>
+            <View style={styles.suggestionFooter}>
+              <Text style={styles.suggestionTiming} numberOfLines={2}>{suggestion.timing}</Text>
+              <TouchableOpacity
+                style={[styles.suggestionButton, { backgroundColor: goalExperience.color }]}
+                onPress={() => saveSuggestedMeal(suggestion)}
+              >
+                <Text style={styles.suggestionButtonText}>{suggestion.ctaLabel}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))}
+      </View>
+
       <View style={styles.summaryCard}>
         <View>
           <Text style={styles.summaryEyebrow}>Selected Day</Text>
@@ -484,8 +674,8 @@ export default function MealPlannerScreen() {
           <Text style={styles.summaryLabel}>meals</Text>
         </View>
         <View style={styles.summaryStats}>
-          <Text style={styles.summaryValue}>{isPremium ? Math.round(selectedDateCalories) : "Basic"}</Text>
-          <Text style={styles.summaryLabel}>{isPremium ? "kcal" : "plan"}</Text>
+          <Text style={styles.summaryValue}>{Math.round(selectedDateCalories)}</Text>
+          <Text style={styles.summaryLabel}>kcal</Text>
         </View>
       </View>
 
@@ -516,7 +706,9 @@ export default function MealPlannerScreen() {
                 onPress={() => openNewMeal(typeOption.id)}
               >
                 <Ionicons name="add-circle-outline" size={Math.min(hp(2.5), wp(5.5))} color={colors.primary} />
-                <Text style={styles.emptyMealText}>Add {typeOption.label.toLowerCase()}</Text>
+                <Text style={styles.emptyMealText} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.76}>
+                  {typeOption.id === "snack" ? goalExperience.meal.emptyPlan : `Add ${typeOption.label.toLowerCase()}`}
+                </Text>
               </TouchableOpacity>
             )}
           </View>
@@ -529,8 +721,9 @@ export default function MealPlannerScreen() {
     <>
       <View style={styles.grocerySummaryCard}>
         <View>
-          <Text style={styles.summaryEyebrow}>{isPremium ? "Generated From Plans" : "Manual Grocery List"}</Text>
-          <Text style={styles.summaryTitle}>{isPremium ? "Next 14 Days" : "Included Free"}</Text>
+          <Text style={styles.summaryEyebrow}>Generated From Plans</Text>
+          <Text style={styles.summaryTitle}>{goalExperience.meal.groceryTitle}</Text>
+          <Text style={styles.groceryGoalBody} numberOfLines={2}>{goalExperience.meal.groceryBody}</Text>
         </View>
         <View style={styles.summaryStats}>
           <Text style={styles.summaryValue}>{grocerySummary.remaining}</Text>
@@ -570,9 +763,7 @@ export default function MealPlannerScreen() {
           </View>
           <Text style={styles.emptyTitle}>No grocery items yet</Text>
           <Text style={styles.emptySubtitle}>
-            {isPremium
-              ? "Add ingredients to planned meals and FitFaat will build this list automatically."
-              : "Add grocery items manually. Premium can generate this list from planned meal ingredients."}
+            {`${goalExperience.meal.emptyGrocery} Add ingredients to planned meals and FitFaat will build this list automatically.`}
           </Text>
         </View>
       ) : (
@@ -624,10 +815,10 @@ export default function MealPlannerScreen() {
       />
 
       <View style={styles.content}>
-        {isPremiumLoading ? (
+        {isAccessLoading ? (
           <View style={styles.loadingWrap}>
             <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>Checking Premium access</Text>
+            <Text style={styles.loadingText}>Loading meal planner</Text>
           </View>
         ) : (
           <>
@@ -709,7 +900,7 @@ export default function MealPlannerScreen() {
                   {editingMeal ? "Edit Meal" : "Plan Meal"}
                 </Text>
                 <Text style={styles.editorSubtitle}>
-                  {isPremium ? "Saved locally with macros and grocery automation" : "Basic meal details saved locally"}
+                  {goalExperience.meal.editorPremium}
                 </Text>
               </View>
               <TouchableOpacity style={styles.closeButton} onPress={closeEditor}>
@@ -759,77 +950,66 @@ export default function MealPlannerScreen() {
                 selectionColor={colors.primary}
               />
 
-              {isPremium ? (
-                <>
-                  <View style={styles.nutritionGrid}>
-                    <TextInput
-                      style={styles.nutritionInput}
-                      value={caloriesInput}
-                      onChangeText={setCaloriesInput}
-                      placeholder="Calories"
-                      placeholderTextColor={colors.textSecondary}
-                      keyboardType="numeric"
-                      selectionColor={colors.primary}
-                    />
-                    <TextInput
-                      style={styles.nutritionInput}
-                      value={proteinInput}
-                      onChangeText={setProteinInput}
-                      placeholder="Protein g"
-                      placeholderTextColor={colors.textSecondary}
-                      keyboardType="numeric"
-                      selectionColor={colors.primary}
-                    />
-                    <TextInput
-                      style={styles.nutritionInput}
-                      value={carbsInput}
-                      onChangeText={setCarbsInput}
-                      placeholder="Carbs g"
-                      placeholderTextColor={colors.textSecondary}
-                      keyboardType="numeric"
-                      selectionColor={colors.primary}
-                    />
-                    <TextInput
-                      style={styles.nutritionInput}
-                      value={fatsInput}
-                      onChangeText={setFatsInput}
-                      placeholder="Fats g"
-                      placeholderTextColor={colors.textSecondary}
-                      keyboardType="numeric"
-                      selectionColor={colors.primary}
-                    />
-                  </View>
+              <View style={styles.nutritionGrid}>
+                <TextInput
+                  style={styles.nutritionInput}
+                  value={caloriesInput}
+                  onChangeText={setCaloriesInput}
+                  placeholder="Calories"
+                  placeholderTextColor={colors.textSecondary}
+                  keyboardType="numeric"
+                  selectionColor={colors.primary}
+                />
+                <TextInput
+                  style={styles.nutritionInput}
+                  value={proteinInput}
+                  onChangeText={setProteinInput}
+                  placeholder="Protein g"
+                  placeholderTextColor={colors.textSecondary}
+                  keyboardType="numeric"
+                  selectionColor={colors.primary}
+                />
+                <TextInput
+                  style={styles.nutritionInput}
+                  value={carbsInput}
+                  onChangeText={setCarbsInput}
+                  placeholder="Carbs g"
+                  placeholderTextColor={colors.textSecondary}
+                  keyboardType="numeric"
+                  selectionColor={colors.primary}
+                />
+                <TextInput
+                  style={styles.nutritionInput}
+                  value={fatsInput}
+                  onChangeText={setFatsInput}
+                  placeholder="Fats g"
+                  placeholderTextColor={colors.textSecondary}
+                  keyboardType="numeric"
+                  selectionColor={colors.primary}
+                />
+              </View>
 
-                  <TextInput
-                    style={[styles.editorInput, styles.ingredientsInput]}
-                    value={ingredientsInput}
-                    onChangeText={setIngredientsInput}
-                    placeholder="Ingredients, one per line"
-                    placeholderTextColor={colors.textSecondary}
-                    multiline
-                    textAlignVertical="top"
-                    selectionColor={colors.primary}
-                  />
+              <TextInput
+                style={[styles.editorInput, styles.ingredientsInput]}
+                value={ingredientsInput}
+                onChangeText={setIngredientsInput}
+                placeholder="Ingredients, one per line"
+                placeholderTextColor={colors.textSecondary}
+                multiline
+                textAlignVertical="top"
+                selectionColor={colors.primary}
+              />
 
-                  <TextInput
-                    style={[styles.editorInput, styles.notesInput]}
-                    value={notesInput}
-                    onChangeText={setNotesInput}
-                    placeholder="Notes"
-                    placeholderTextColor={colors.textSecondary}
-                    multiline
-                    textAlignVertical="top"
-                    selectionColor={colors.primary}
-                  />
-                </>
-              ) : (
-                <View style={styles.basicEditorNotice}>
-                  <Ionicons name="lock-closed-outline" size={Math.min(hp(2), wp(4.5))} color={colors.primary} />
-                  <Text style={styles.basicEditorNoticeText}>
-                    Premium unlocks macros, ingredients, notes, and automated grocery generation.
-                  </Text>
-                </View>
-              )}
+              <TextInput
+                style={[styles.editorInput, styles.notesInput]}
+                value={notesInput}
+                onChangeText={setNotesInput}
+                placeholder="Notes"
+                placeholderTextColor={colors.textSecondary}
+                multiline
+                textAlignVertical="top"
+                selectionColor={colors.primary}
+              />
 
               <View style={styles.editorActions}>
                 {editingMeal && (
@@ -963,6 +1143,267 @@ const getStyles = (colors: any, isDarkMode: boolean, bottomInset: number) => Sty
   dateChipMetaActive: {
     color: "rgba(255,255,255,0.78)",
   },
+  goalGuidanceCard: {
+    borderRadius: wp(3.4),
+    borderWidth: 1,
+    backgroundColor: colors.cardBackground,
+    padding: wp(3.4),
+    marginBottom: hp(1.2),
+    gap: hp(1),
+  },
+  goalGuidanceHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: wp(2.5),
+  },
+  goalGuidanceIcon: {
+    width: hp(4.4),
+    height: hp(4.4),
+    borderRadius: hp(2.2),
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  goalGuidanceCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  goalGuidanceEyebrow: {
+    color: colors.textSecondary,
+    fontSize: Math.min(hp(1.08), wp(2.6)),
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  goalGuidanceTitle: {
+    color: colors.textPrimary,
+    fontSize: Math.min(hp(1.75), wp(3.9)),
+    fontWeight: "900",
+    marginTop: hp(0.2),
+  },
+  goalGuidanceBody: {
+    color: colors.textSecondary,
+    fontSize: Math.min(hp(1.28), wp(3.05)),
+    lineHeight: hp(1.85),
+    fontWeight: "700",
+    marginTop: hp(0.25),
+  },
+  goalChipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: wp(1.5),
+  },
+  goalChip: {
+    minHeight: hp(2.7),
+    borderRadius: hp(1.35),
+    paddingHorizontal: wp(2),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  goalChipText: {
+    fontSize: Math.min(hp(1), wp(2.4)),
+    fontWeight: "900",
+  },
+  adaptivePlanCard: {
+    borderRadius: wp(3.4),
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    backgroundColor: colors.cardBackground,
+    padding: wp(3.4),
+    marginBottom: hp(1.2),
+    gap: hp(1),
+  },
+  adaptivePlanHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: wp(2),
+  },
+  adaptivePlanEyebrow: {
+    color: colors.textSecondary,
+    fontSize: Math.min(hp(1.02), wp(2.45)),
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  adaptivePlanTitle: {
+    color: colors.textPrimary,
+    fontSize: Math.min(hp(1.82), wp(4.05)),
+    fontWeight: "900",
+    marginTop: hp(0.18),
+  },
+  adaptivePlanBadge: {
+    minHeight: hp(2.8),
+    borderRadius: hp(1.4),
+    paddingHorizontal: wp(2.2),
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  adaptivePlanBadgeText: {
+    fontSize: Math.min(hp(1), wp(2.4)),
+    fontWeight: "900",
+  },
+  adaptivePlanBody: {
+    color: colors.textSecondary,
+    fontSize: Math.min(hp(1.22), wp(2.9)),
+    lineHeight: hp(1.78),
+    fontWeight: "800",
+  },
+  adaptivePlanStats: {
+    flexDirection: "row",
+    gap: wp(2),
+  },
+  adaptivePlanStat: {
+    flex: 1,
+    minHeight: hp(5.4),
+    borderRadius: wp(2.5),
+    backgroundColor: colors.screenColor,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    paddingHorizontal: wp(2.5),
+    paddingVertical: hp(0.7),
+    justifyContent: "center",
+  },
+  adaptivePlanStatLabel: {
+    color: colors.textSecondary,
+    fontSize: Math.min(hp(0.95), wp(2.3)),
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  adaptivePlanStatValue: {
+    color: colors.textPrimary,
+    fontSize: Math.min(hp(1.28), wp(3.05)),
+    fontWeight: "900",
+    marginTop: hp(0.12),
+  },
+  adaptiveLearnMoreButton: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: wp(1.1),
+    minHeight: hp(3.4),
+    paddingHorizontal: wp(2.4),
+    borderRadius: wp(2),
+    backgroundColor: colors.screenColor,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  adaptiveLearnMoreText: {
+    fontSize: Math.min(hp(1.08), wp(2.6)),
+    fontWeight: "900",
+  },
+  adaptiveSnackTiming: {
+    color: colors.primary,
+    fontSize: Math.min(hp(1.08), wp(2.6)),
+    lineHeight: hp(1.55),
+    fontWeight: "900",
+  },
+  suggestionCard: {
+    borderRadius: wp(3),
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    backgroundColor: colors.screenColor,
+    padding: wp(3),
+    gap: hp(0.75),
+  },
+  suggestionHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: wp(2),
+  },
+  suggestionCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  suggestionType: {
+    color: colors.textSecondary,
+    fontSize: Math.min(hp(0.98), wp(2.35)),
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  suggestionName: {
+    color: colors.textPrimary,
+    fontSize: Math.min(hp(1.55), wp(3.55)),
+    fontWeight: "900",
+    marginTop: hp(0.14),
+  },
+  suggestionReason: {
+    color: colors.textSecondary,
+    fontSize: Math.min(hp(1.08), wp(2.6)),
+    lineHeight: hp(1.55),
+    fontWeight: "700",
+    marginTop: hp(0.22),
+  },
+  suggestionMetric: {
+    minWidth: wp(15),
+    alignItems: "center",
+  },
+  suggestionMetricValue: {
+    color: colors.primary,
+    fontSize: Math.min(hp(1.65), wp(3.8)),
+    fontWeight: "900",
+  },
+  suggestionMetricLabel: {
+    color: colors.textSecondary,
+    fontSize: Math.min(hp(0.95), wp(2.3)),
+    fontWeight: "800",
+  },
+  suggestionMacroRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: wp(1.5),
+  },
+  suggestionMacro: {
+    color: colors.primary,
+    backgroundColor: colors.primarySoft,
+    borderRadius: hp(1.2),
+    paddingHorizontal: wp(2),
+    paddingVertical: hp(0.35),
+    fontSize: Math.min(hp(1), wp(2.4)),
+    fontWeight: "900",
+  },
+  suggestionFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: wp(2),
+  },
+  suggestionTiming: {
+    flex: 1,
+    color: colors.textSecondary,
+    fontSize: Math.min(hp(1.02), wp(2.45)),
+    lineHeight: hp(1.45),
+    fontWeight: "700",
+  },
+  suggestionButton: {
+    minHeight: hp(3.6),
+    borderRadius: hp(1.2),
+    paddingHorizontal: wp(2.6),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  suggestionButtonText: {
+    color: "#FFFFFF",
+    fontSize: Math.min(hp(1.05), wp(2.55)),
+    fontWeight: "900",
+  },
+  swapPreviewBox: {
+    borderRadius: wp(2.6),
+    backgroundColor: colors.primarySoft,
+    paddingHorizontal: wp(2.6),
+    paddingVertical: hp(0.9),
+    gap: hp(0.35),
+  },
+  swapPreviewTitle: {
+    color: colors.primary,
+    fontSize: Math.min(hp(1.08), wp(2.6)),
+    fontWeight: "900",
+  },
+  swapPreviewText: {
+    color: colors.textSecondary,
+    fontSize: Math.min(hp(1), wp(2.4)),
+    lineHeight: hp(1.42),
+    fontWeight: "800",
+  },
   summaryCard: {
     minHeight: hp(10),
     borderRadius: wp(4),
@@ -1057,12 +1498,19 @@ const getStyles = (colors: any, isDarkMode: boolean, bottomInset: number) => Sty
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    marginHorizontal: wp(0.4),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(0.9),
     gap: wp(1.8),
   },
   emptyMealText: {
+    flexShrink: 1,
+    minWidth: 0,
     color: colors.primary,
     fontSize: Math.min(hp(1.75), wp(3.8)),
+    lineHeight: Math.min(hp(2.25), wp(4.8)),
     fontWeight: "900",
+    textAlign: "center",
   },
   mealCard: {
     borderRadius: wp(3.2),
@@ -1219,6 +1667,14 @@ const getStyles = (colors: any, isDarkMode: boolean, bottomInset: number) => Sty
     fontSize: Math.min(hp(1.35), wp(3.1)),
     fontWeight: "700",
     marginTop: hp(0.2),
+  },
+  groceryGoalBody: {
+    color: colors.textSecondary,
+    maxWidth: wp(48),
+    fontSize: Math.min(hp(1.1), wp(2.65)),
+    lineHeight: hp(1.55),
+    fontWeight: "700",
+    marginTop: hp(0.25),
   },
   emptyState: {
     alignItems: "center",

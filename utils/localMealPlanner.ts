@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { queueAccountScopedStorageCloudSync } from './auth/accountScopedStorageSyncQueue';
 
 export const FITFAAT_MEAL_PLANS_STORAGE_KEY = 'fitfaat_meal_plans';
 export const FITFAAT_GROCERY_LISTS_STORAGE_KEY = 'fitfaat_grocery_lists';
@@ -195,6 +196,7 @@ export const saveFitFaatMealPlans = async (meals: FitFaatPlannedMeal[]) => {
     FITFAAT_MEAL_PLANS_STORAGE_KEY,
     JSON.stringify(sortPlannedMeals(normalizedMeals))
   );
+  queueAccountScopedStorageCloudSync('meal-plans');
 };
 
 export const upsertFitFaatMealPlan = async (input: FitFaatPlannedMealInput) => {
@@ -244,6 +246,7 @@ export const saveFitFaatGroceryState = async (state: FitFaatGroceryState) => {
     FITFAAT_GROCERY_LISTS_STORAGE_KEY,
     JSON.stringify(normalizeGroceryState(state))
   );
+  queueAccountScopedStorageCloudSync('grocery-list');
 };
 
 export const upsertManualGroceryItem = async (name: string) => {

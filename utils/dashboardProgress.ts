@@ -1,11 +1,18 @@
 import { getExerciseCaloriesBurned } from "@/utils/localExerciseProgress";
-import { FREE_PLAN_LIMITS } from "@/utils/featureAccess";
 import {
+  DEFAULT_STEP_GOAL,
   estimateWalkingCalories,
   getWalkingCaloriesBurned,
   getWalkingCaloriesTarget,
   shouldIncludeWalkingProgress,
 } from "@/utils/localWalkingProgress";
+import {
+  getCalorieTargetProgress,
+  getHydrationTargetProgress,
+  getRangeAwareCalorieScorePercent,
+  normalizeGoalDisplayMode,
+  type GoalDisplayMode,
+} from "@/utils/goalTargetDisplay";
 
 const DEFAULT_WORKOUT_CALORIE_TARGET = 250;
 const WORKOUT_TARGET_FRACTION_OF_FOOD = 0.12;
@@ -106,7 +113,7 @@ export const getProgressValue = (value: unknown) => {
 };
 
 export const HEALTH_SCORE_DISCLAIMER =
-  "FitFaat scores are guidance from your logs and device signals, not a diagnosis or medical advice.";
+  "FitFaat scores are guidance from your logs and device signals, not medical advice.";
 
 export const DASHBOARD_DATA_SOURCE_LABELS: DashboardDataSourceLabel[] = [
   {
@@ -130,13 +137,205 @@ const getDashboardDataSource = (sourceKey: DashboardDataSourceKey) =>
   DASHBOARD_DATA_SOURCE_LABELS.find((source) => source.key === sourceKey) ||
   DASHBOARD_DATA_SOURCE_LABELS[0];
 
+export const FITFAAT_CALCULATION_INFO_LINES = [
+  "Daily Ring = calories + hydration only.",
+  "Free tracks calories, hydration, and full step goals.",
+  "Premium adds workout history, exports, and unlimited support on top of the free tracking tools.",
+  "Next-day targets use food and water logs only; activity does not add or subtract those targets.",
+] as const;
+
 export const getHealthScorePlanExplanation = (includeExercise = false) =>
   includeExercise
-    ? "Premium uses the Full Health Score: calories, hydration, workout burn, and connected walking/step calories are weighted together."
-    : `Free uses the Basic Score: calories, hydration, and the ${FREE_PLAN_LIMITS.dailyStepCounterPreview}-step preview are weighted together.`;
+    ? "Full Health Score includes calories, hydration, workout when available, and walking."
+    : "Free tracks calories, hydration, and full step goals.";
 
 export const getPremiumScoreChangeExplanation = () =>
-  "Premium can change the Full Health Score because activity becomes part of that model; Goal Achieved stays on the same core day-goal calculation.";
+  "Full Health Score can change when workout or walking signals are included. Next-day targets still use food and water logs only.";
+
+export type DashboardScoreTrustCopy = {
+  shortFraming: string;
+  planFraming: string;
+  reasonLine: string;
+  positiveDriver: string;
+  weakestDriver: string;
+  missingSignals: string;
+  nextAction: string;
+  trustLine: string;
+};
+
+export type DashboardScoreExplanation = Pick<
+  DashboardScoreTrustCopy,
+  "reasonLine" | "positiveDriver" | "weakestDriver" | "missingSignals" | "nextAction" | "trustLine"
+>;
+
+const getScoreMetricReasonLabel = (metric: HealthScoreMetric) => {
+  if (metric.key === "calories") return "calories";
+  if (metric.key === "hydration") return "hydration";
+  if (metric.key === "stepsPreview") return "steps";
+  if (metric.key === "workout") return "workout";
+  return "walking";
+};
+
+const getWeightedScoreMetrics = (score?: DashboardHealthScore | null) =>
+  score?.metrics.filter((metric) => metric.weight > 0 && metric.hasTarget) || [];
+
+const getScoreMetricPercent = (metric?: HealthScoreMetric | null) =>
+  Math.max(0, Math.min(100, Math.round(metric?.rawContribution || 0)));
+
+const getMissingSignalMetrics = (score?: DashboardHealthScore | null) => {
+  if (!score) return [];
+
+  return score.metrics.filter((metric) => {
+    const isActiveMetric = metric.weight > 0 && metric.hasTarget;
+    const isPremiumActivity =
+      score.plan === "premium" && (metric.key === "workout" || metric.key === "walking");
+    return (isActiveMetric || isPremiumActivity) && !metric.hasSignal;
+  });
+};
+
+const hasMissingPremiumActivitySignal = (score?: DashboardHealthScore | null) => {
+  if (!score || score.plan !== "premium") return false;
+
+  return score.metrics.some(
+    (metric) =>
+      (metric.key === "workout" || metric.key === "walking") &&
+      metric.weight <= 0 &&
+      !metric.hasSignal
+  );
+};
+
+const getScoreNextAction = (
+  score?: DashboardHealthScore | null,
+  weakestMetric?: HealthScoreMetric
+) => {
+  if (!score || !score.hasAnySignal) {
+    return "Next action: log water or your first meal so the score can start from real data.";
+  }
+
+  if (!weakestMetric) {
+    if (hasMissingPremiumActivitySignal(score)) {
+      return "Next action: log a workout or allow steps so Premium can learn the full routine.";
+    }
+
+    return "Next action: keep logging the basics so this becomes a weekly pattern, not one good reading.";
+  }
+
+  if (weakestMetric.key === "hydration") {
+    return "Next action: add water first; hydration usually moves the score fastest.";
+  }
+
+  if (weakestMetric.key === "calories") {
+    return "Next action: log the next meal and stay close to your calorie target.";
+  }
+
+  if (weakestMetric.key === "workout") {
+    return "Next action: log a short workout so Premium can count training load.";
+  }
+
+  return "Next action: open Steps or enable motion access so walking can count today.";
+};
+
+const getScoreExplanation = (score?: DashboardHealthScore | null): DashboardScoreExplanation => {
+  if (!score || !score.hasAnySignal) {
+    return {
+      reasonLine: "Why this changed: FitFaat needs a meal, water, or step signal before the score can move.",
+      positiveDriver: "Strongest signal: none yet.",
+      weakestDriver: "Watch: missing logs are holding the score back.",
+      missingSignals: "Missing signals: calories, hydration, and steps are still empty.",
+      nextAction: getScoreNextAction(score),
+      trustLine: HEALTH_SCORE_DISCLAIMER,
+    };
+  }
+
+  const weightedMetrics = getWeightedScoreMetrics(score);
+  const missingMetrics = getMissingSignalMetrics(score);
+  const positiveMetric = [...weightedMetrics]
+    .filter((metric) => metric.hasSignal)
+    .sort((a, b) => b.rawContribution - a.rawContribution)[0];
+  const weakestMetric = [...weightedMetrics]
+    .filter((metric) => !metric.hasSignal || metric.rawContribution < 75)
+    .sort((a, b) => a.rawContribution - b.rawContribution)[0];
+  const strongestCopy = positiveMetric
+    ? `Strongest signal: ${positiveMetric.label} is closest at ${getScoreMetricPercent(positiveMetric)}%.`
+    : "Strongest signal: no active score signal has been logged yet.";
+  const weakestCopy = weakestMetric
+    ? `Watch: ${weakestMetric.label} is at ${getScoreMetricPercent(weakestMetric)}% of its target signal.`
+    : "Watch: no active score metric is behind target.";
+  const missingSignalsCopy = missingMetrics.length
+    ? `Missing signals: ${missingMetrics
+        .map((metric) => getScoreMetricReasonLabel(metric))
+        .filter((label, index, labels) => labels.indexOf(label) === index)
+        .join(", ")}.`
+    : "Missing signals: none from the active score model.";
+  const nextAction = getScoreNextAction(score, weakestMetric);
+
+  if (weakestMetric) {
+    return {
+      reasonLine: `Why this changed: lower because ${getScoreMetricReasonLabel(weakestMetric)} is behind.`,
+      positiveDriver: strongestCopy,
+      weakestDriver: weakestCopy,
+      missingSignals: missingSignalsCopy,
+      nextAction,
+      trustLine: HEALTH_SCORE_DISCLAIMER,
+    };
+  }
+
+  if (hasMissingPremiumActivitySignal(score)) {
+    return {
+      reasonLine: "Why this changed: Premium activity signals affect Full Health Score when workout or walking data is available.",
+      positiveDriver: strongestCopy,
+      weakestDriver: "Watch: workout or walking patterns are not available yet.",
+      missingSignals: missingSignalsCopy,
+      nextAction,
+      trustLine: HEALTH_SCORE_DISCLAIMER,
+    };
+  }
+
+  const allKeyMetricsStrong =
+    weightedMetrics.length > 0 &&
+    weightedMetrics.every((metric) => metric.hasSignal && metric.rawContribution >= 85);
+
+  if (allKeyMetricsStrong) {
+    return {
+      reasonLine:
+        score.plan === "premium"
+          ? "Why this changed: higher because your logged basics and activity are on track."
+          : "Why this changed: higher because your logged basics are on track.",
+      positiveDriver: strongestCopy,
+      weakestDriver: weakestCopy,
+      missingSignals: missingSignalsCopy,
+      nextAction,
+      trustLine: HEALTH_SCORE_DISCLAIMER,
+    };
+  }
+
+  return {
+    reasonLine: "Why this changed: FitFaat is combining the signals you have logged so far.",
+    positiveDriver: strongestCopy,
+    weakestDriver: weakestCopy,
+    missingSignals: missingSignalsCopy,
+    nextAction,
+    trustLine: HEALTH_SCORE_DISCLAIMER,
+  };
+};
+
+export const getDashboardScoreTrustCopy = (
+  score?: DashboardHealthScore | null
+): DashboardScoreTrustCopy => {
+  const isPremium = score?.plan === "premium";
+  const explanation = getScoreExplanation(score);
+
+  return {
+    shortFraming: isPremium ? "Premium understands the full lifestyle" : "Free tracks the basics",
+    planFraming: getHealthScorePlanExplanation(isPremium),
+    reasonLine: explanation.reasonLine,
+    positiveDriver: explanation.positiveDriver,
+    weakestDriver: explanation.weakestDriver,
+    missingSignals: explanation.missingSignals,
+    nextAction: explanation.nextAction,
+    trustLine: explanation.trustLine,
+  };
+};
 
 export const getHealthScoreReliabilityCopy = (score?: DashboardHealthScore | null) => {
   if (!score) return "No score yet. Add a meal, water, or step signal to start.";
@@ -254,25 +453,29 @@ const clampCombinedProgress = (
   return hasIncompleteMetric ? Math.min(99, roundedProgress) : roundedProgress;
 };
 
-const getFreePreviewSteps = (day: any) =>
-  Math.min(
-    FREE_PLAN_LIMITS.dailyStepCounterPreview,
-    getProgressValue(day?.walkingSteps ?? day?.steps ?? day?.stepCount)
+const getFreePlanSteps = (day: any) =>
+  getProgressValue(day?.walkingSteps ?? day?.steps ?? day?.stepCount);
+
+const getFreeStepGoal = (day: any) => {
+  const stepGoal = getProgressValue(
+    day?.walkingStepGoal ?? day?.stepGoal ?? day?.targetSteps ?? day?.dailyStepGoal
   );
+  return stepGoal > 0 ? Math.round(stepGoal) : DEFAULT_STEP_GOAL;
+};
 
 const hasWalkingCalorieMetrics = (day: any) =>
   getProgressValue(day?.walkingCalorieMetrics?.height) > 0 &&
   getProgressValue(day?.walkingCalorieMetrics?.weight) > 0;
 
 export const getFreeStepBurnedCalories = (day: any) => {
-  const previewSteps = getFreePreviewSteps(day);
-  if (previewSteps <= 0) return 0;
+  const steps = getFreePlanSteps(day);
+  if (steps <= 0) return 0;
 
   if (hasWalkingCalorieMetrics(day)) {
-    return estimateWalkingCalories(previewSteps, day?.walkingCalorieMetrics);
+    return estimateWalkingCalories(steps, day?.walkingCalorieMetrics);
   }
 
-  return Math.round((previewSteps / 100) * FREE_STEP_FALLBACK_CALORIES_PER_100_STEPS);
+  return Math.round((steps / 100) * FREE_STEP_FALLBACK_CALORIES_PER_100_STEPS);
 };
 
 const getSeparatedActivityMetrics = (day: any) => {
@@ -387,9 +590,10 @@ const buildHealthScoreMetric = ({
 const SCORE_CACHE_LIMIT = 120;
 const healthScoreCache = new Map<string, DashboardHealthScore>();
 
-const getHealthScoreCacheKey = (day: any, includeExercise: boolean) =>
+const getHealthScoreCacheKey = (day: any, includeExercise: boolean, goalDisplayMode: GoalDisplayMode) =>
   [
     includeExercise ? "premium" : "free",
+    normalizeGoalDisplayMode(goalDisplayMode),
     day?._id,
     day?.dayNo,
     day?.date,
@@ -398,6 +602,10 @@ const getHealthScoreCacheKey = (day: any, includeExercise: boolean) =>
     day?.achieviedHydration ?? day?.achievedHydration,
     day?.targetCalories,
     day?.targetHydration,
+    day?.targetCaloriesMin,
+    day?.targetCaloriesMax,
+    day?.targetHydrationMin,
+    day?.targetHydrationMax,
     day?.walkingSteps ?? day?.steps ?? day?.stepCount,
     day?.walkingStepGoal ?? day?.stepGoal ?? day?.targetSteps ?? day?.dailyStepGoal,
     day?.walkingHasStepSignal ? "walkingSignal" : "",
@@ -561,27 +769,50 @@ export const getDashboardCalorieSummary = (
 
 export const getDashboardHealthScore = (
   day: any,
-  includeExercise = false
-): DashboardHealthScore => getDashboardScoreBreakdown(day, includeExercise);
+  includeExercise = false,
+  goalDisplayMode: GoalDisplayMode = "exact"
+): DashboardHealthScore => getDashboardScoreBreakdown(day, includeExercise, goalDisplayMode);
 
 export const getDashboardScoreBreakdown = (
   day: any,
-  includeExercise = false
+  includeExercise = false,
+  goalDisplayMode: GoalDisplayMode = "exact"
 ): DashboardScoreBreakdown => {
-  const cacheKey = getHealthScoreCacheKey(day, includeExercise);
+  const normalizedGoalDisplayMode = normalizeGoalDisplayMode(goalDisplayMode);
+  const plan: HealthScorePlan = includeExercise ? "premium" : "free";
+  const calorieTargetProgress = getCalorieTargetProgress(day, normalizedGoalDisplayMode, plan);
+  const hydrationTargetProgress = getHydrationTargetProgress(day, normalizedGoalDisplayMode, plan);
+  const calorieScoreTarget = normalizedGoalDisplayMode === "ranges" && calorieTargetProgress.status === "within"
+    ? calorieTargetProgress.range.min
+    : normalizedGoalDisplayMode === "ranges" && calorieTargetProgress.status === "above"
+      ? calorieTargetProgress.range.max
+      : normalizedGoalDisplayMode === "ranges"
+        ? calorieTargetProgress.range.min
+        : day?.targetCalories;
+  const hydrationScoreTarget = normalizedGoalDisplayMode === "ranges" && hydrationTargetProgress.status === "within"
+    ? getHydrationValue(day)
+    : normalizedGoalDisplayMode === "ranges" && hydrationTargetProgress.status === "above"
+      ? hydrationTargetProgress.range.max
+      : normalizedGoalDisplayMode === "ranges"
+        ? hydrationTargetProgress.range.min
+        : day?.targetHydration;
+  const cacheKey = getHealthScoreCacheKey(day, includeExercise, normalizedGoalDisplayMode);
   const cachedScore = healthScoreCache.get(cacheKey);
   if (cachedScore) return cachedScore;
 
-  const plan: HealthScorePlan = includeExercise ? "premium" : "free";
-  const calorieContribution = getCalorieScorePercent(day?.achievedCalories, day?.targetCalories);
-  const hydrationContribution = getMetricContribution(getHydrationValue(day), day?.targetHydration);
+  const calorieContribution = normalizedGoalDisplayMode === "ranges"
+    ? getRangeAwareCalorieScorePercent(day, normalizedGoalDisplayMode, plan)
+    : getCalorieScorePercent(day?.achievedCalories, day?.targetCalories);
+  const hydrationContribution = normalizedGoalDisplayMode === "ranges"
+    ? hydrationTargetProgress.percent
+    : getMetricContribution(getHydrationValue(day), day?.targetHydration);
   const coreMetrics = [
     buildHealthScoreMetric({
       day,
       key: "calories",
       label: "Calories",
       achieved: day?.achievedCalories,
-      target: day?.targetCalories,
+      target: calorieScoreTarget,
       rawContribution: calorieContribution,
       weight: CORE_GOAL_SCORE_WEIGHTS.calories,
       sourceKey: "manualLog",
@@ -591,20 +822,21 @@ export const getDashboardScoreBreakdown = (
       key: "hydration",
       label: "Hydration",
       achieved: getHydrationValue(day),
-      target: day?.targetHydration,
+      target: hydrationScoreTarget,
       rawContribution: hydrationContribution,
       weight: CORE_GOAL_SCORE_WEIGHTS.hydration,
       sourceKey: "manualLog",
     }),
   ];
   const coreGoalScore = clampCombinedProgress(getWeightedProgress(coreMetrics), [
-    { achieved: day?.achievedCalories, target: day?.targetCalories },
-    { achieved: getHydrationValue(day), target: day?.targetHydration },
+    { achieved: day?.achievedCalories, target: calorieScoreTarget },
+    { achieved: getHydrationValue(day), target: hydrationScoreTarget },
   ]);
-  const freePreviewSteps = getFreePreviewSteps(day);
+  const freePlanSteps = getFreePlanSteps(day);
+  const freeStepGoal = getFreeStepGoal(day);
   const freeStepContribution = getMetricContribution(
-    freePreviewSteps,
-    FREE_PLAN_LIMITS.dailyStepCounterPreview
+    freePlanSteps,
+    freeStepGoal
   );
   const freeMetrics = [
     buildHealthScoreMetric({
@@ -612,7 +844,7 @@ export const getDashboardScoreBreakdown = (
       key: "calories",
       label: "Calories",
       achieved: day?.achievedCalories,
-      target: day?.targetCalories,
+      target: calorieScoreTarget,
       rawContribution: calorieContribution,
       weight: FREE_SCORE_WEIGHTS.calories,
       sourceKey: "manualLog",
@@ -622,7 +854,7 @@ export const getDashboardScoreBreakdown = (
       key: "hydration",
       label: "Hydration",
       achieved: getHydrationValue(day),
-      target: day?.targetHydration,
+      target: hydrationScoreTarget,
       rawContribution: hydrationContribution,
       weight: FREE_SCORE_WEIGHTS.hydration,
       sourceKey: "manualLog",
@@ -630,9 +862,9 @@ export const getDashboardScoreBreakdown = (
     buildHealthScoreMetric({
       day,
       key: "stepsPreview",
-      label: `${FREE_PLAN_LIMITS.dailyStepCounterPreview}-step preview`,
-      achieved: freePreviewSteps,
-      target: FREE_PLAN_LIMITS.dailyStepCounterPreview,
+      label: "Steps",
+      achieved: freePlanSteps,
+      target: freeStepGoal,
       rawContribution: freeStepContribution,
       weight: FREE_SCORE_WEIGHTS.stepsPreview,
       sourceKey: "pedometer",
@@ -642,9 +874,9 @@ export const getDashboardScoreBreakdown = (
 
   if (!includeExercise) {
     const score = clampCombinedProgress(freeProgress, [
-      { achieved: day?.achievedCalories, target: day?.targetCalories },
-      { achieved: getHydrationValue(day), target: day?.targetHydration },
-      { achieved: freePreviewSteps, target: FREE_PLAN_LIMITS.dailyStepCounterPreview },
+      { achieved: day?.achievedCalories, target: calorieScoreTarget },
+      { achieved: getHydrationValue(day), target: hydrationScoreTarget },
+      { achieved: freePlanSteps, target: freeStepGoal },
     ]);
     const activeWeight = freeMetrics
       .filter((metric) => metric.hasTarget && metric.weight > 0)
@@ -686,7 +918,7 @@ export const getDashboardScoreBreakdown = (
       key: "calories",
       label: "Calories",
       achieved: day?.achievedCalories,
-      target: day?.targetCalories,
+      target: calorieScoreTarget,
       rawContribution: calorieContribution,
       weight: PREMIUM_SCORE_WEIGHTS.calories,
       sourceKey: "manualLog",
@@ -696,7 +928,7 @@ export const getDashboardScoreBreakdown = (
       key: "hydration",
       label: "Hydration",
       achieved: getHydrationValue(day),
-      target: day?.targetHydration,
+      target: hydrationScoreTarget,
       rawContribution: hydrationContribution,
       weight: PREMIUM_SCORE_WEIGHTS.hydration,
       sourceKey: "manualLog",
@@ -770,11 +1002,18 @@ export const getDashboardScoreBreakdown = (
   });
 };
 
-export const getDashboardCombinedProgress = (day: any, includeExercise = false) =>
-  getDashboardScoreBreakdown(day, includeExercise).healthScore;
+export const getDashboardCombinedProgress = (
+  day: any,
+  includeExercise = false,
+  goalDisplayMode: GoalDisplayMode = "exact"
+) =>
+  getDashboardScoreBreakdown(day, includeExercise, goalDisplayMode).healthScore;
 
-export const getDashboardGoalProgress = (day: any) =>
-  getDashboardScoreBreakdown(day, false).coreGoalScore;
+export const getDashboardGoalProgress = (
+  day: any,
+  goalDisplayMode: GoalDisplayMode = "exact"
+) =>
+  getDashboardScoreBreakdown(day, false, goalDisplayMode).coreGoalScore;
 
 const averageNumbers = (values: number[]) =>
   values.length

@@ -17,6 +17,12 @@ interface AppHeaderProps {
   showNotificationBell?: boolean;
   notificationCount?: number;
   onNotificationPress?: () => void;
+  rightActions?: {
+    icon: keyof typeof Ionicons.glyphMap;
+    accessibilityLabel: string;
+    onPress: () => void;
+    badgeCount?: number;
+  }[];
   titleStyle?: StyleProp<TextStyle>;
   titleMinimumFontScale?: number;
   compactTitleSpacing?: boolean;
@@ -32,6 +38,7 @@ export default function AppHeader({
   showNotificationBell = false,
   notificationCount = 0,
   onNotificationPress,
+  rightActions = [],
   titleStyle,
   titleMinimumFontScale = 0.82,
   compactTitleSpacing = false,
@@ -87,10 +94,27 @@ export default function AppHeader({
     }
   };
 
+  const headerActions = [
+    ...rightActions,
+    ...(showNotificationBell
+      ? [{
+          icon: 'notifications' as keyof typeof Ionicons.glyphMap,
+          accessibilityLabel: 'Open notifications',
+          onPress: handleNotificationPress,
+          badgeCount: notificationCount,
+        }]
+      : []),
+  ];
+  const hasMultipleRightActions = headerActions.length > 1;
+
   return (
     <View style={[styles.container, { backgroundColor: colors.primary }]}>
       <View style={[styles.topBar, compactTitleSpacing && styles.topBarCompact, { backgroundColor: colors.primary }]}>
-        <View style={[styles.sideSlot, compactTitleSpacing && styles.sideSlotCompact]}>
+        <View style={[
+          styles.sideSlot,
+          compactTitleSpacing && styles.sideSlotCompact,
+          hasMultipleRightActions && styles.sideSlotWide,
+        ]}>
           {showBackButton ? (
             <TouchableOpacity
               style={styles.iconButton}
@@ -123,26 +147,34 @@ export default function AppHeader({
           {title}
         </Text>
         
-        <View style={[styles.sideSlot, compactTitleSpacing && styles.sideSlotCompact, styles.rightSlot]}>
-          {showNotificationBell && (
-            <TouchableOpacity 
-              style={styles.iconButton}
-              onPress={handleNotificationPress}
-              accessibilityRole="button"
-              accessibilityLabel="Open notifications"
-            >
-              <Ionicons name="notifications" size={Math.min(hp(3.7), wp(7.8))} color={colors.textOnPrimary} />
-              {notificationCount > 0 && (
-                <View style={[styles.badge, { backgroundColor: '#FF6B6B' }]}>
-                  <Text style={styles.badgeText}>
-                    {notificationCount > 99 ? '99+' : notificationCount}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          )}
-
-          {!showNotificationBell && (
+        <View style={[
+          styles.sideSlot,
+          compactTitleSpacing && styles.sideSlotCompact,
+          hasMultipleRightActions && styles.sideSlotWide,
+          styles.rightSlot,
+        ]}>
+          {headerActions.length ? (
+            <View style={styles.rightActionsRow}>
+              {headerActions.map((action) => (
+                <TouchableOpacity
+                  key={action.accessibilityLabel}
+                  style={styles.iconButton}
+                  onPress={action.onPress}
+                  accessibilityRole="button"
+                  accessibilityLabel={action.accessibilityLabel}
+                >
+                  <Ionicons name={action.icon} size={Math.min(hp(3.45), wp(7.4))} color={colors.textOnPrimary} />
+                  {Number(action.badgeCount || 0) > 0 && (
+                    <View style={[styles.badge, { backgroundColor: '#FF6B6B' }]}>
+                      <Text style={styles.badgeText}>
+                        {Number(action.badgeCount || 0) > 99 ? '99+' : action.badgeCount}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : (
             <View style={styles.spacer} />
           )}
         </View>
@@ -199,8 +231,16 @@ const styles = StyleSheet.create({
   sideSlotCompact: {
     width: wp(11.8),
   },
+  sideSlotWide: {
+    width: wp(24),
+  },
   rightSlot: {
     alignItems: 'flex-end',
+  },
+  rightActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
   },
   iconButton: {
     width: Math.min(hp(5.4), wp(11.8)),

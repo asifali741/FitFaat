@@ -91,7 +91,6 @@ export default function PaymentMethods() {
 
   useEffect(() => {
     if (Platform.OS === 'android') {
-      NavigationBar.setBackgroundColorAsync('#FFFFFF').catch(() => {});
       NavigationBar.setButtonStyleAsync('dark').catch(() => {});
       NavigationBar.setStyle('light');
     }

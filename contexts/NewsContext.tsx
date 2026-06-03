@@ -34,6 +34,7 @@ const NewsContext = createContext<NewsContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'fitfaat_read_news';
 const NEWS_POLL_INTERVAL_MS = 5 * 60 * 1000;
+const NEWS_FOREGROUND_REFRESH_TTL_MS = 60 * 1000;
 const NEWS_READ_CONFIG = {
   timeoutMs: 7000,
   retries: 1,
@@ -55,6 +56,8 @@ export const NewsProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const previousIdsRef = useRef<Set<string>>(new Set());
   const hasLoadedOnceRef = useRef(false);
   const lastErrorLogRef = useRef('');
+  const fetchInFlightRef = useRef<Promise<void> | null>(null);
+  const lastFetchStartedAtRef = useRef(0);
 
   const API_BASE_URL = getBackendBaseUrl();
 
@@ -90,64 +93,85 @@ export const NewsProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log('📖 Marked as read:', newsId);
   }, [readNewsIds]);
 
-  const fetchPublishedNews = useCallback(async () => {
-    try {
-      if (!hasLoadedOnceRef.current) {
-        setLoading(true);
-      }
-      setError(null);
-
-      const apiUrl = `${API_BASE_URL}/api/admin/news/published`;
-
-      const response = await cachedRequestJson<any>(
-        'news:published',
-        apiUrl,
-        { method: 'GET' },
-        NEWS_READ_CONFIG
-      );
-
-      const newsList = response?.data || [];
-
-      const newlyAdded = hasLoadedOnceRef.current
-        ? newsList.filter(
-            (item: NewsItem) => !previousIdsRef.current.has(item._id || item.id || '')
-          )
-        : [];
-
-      // Update tracking
-      const currentIds: Set<string> = new Set(
-        newsList.map((n: NewsItem) => (n._id || n.id || '') as string)
-      );
-      previousIdsRef.current = currentIds;
-      setNews(newsList);
-
-      if (newlyAdded.length > 0) {
-        const latestItem = newlyAdded[0];
-        sendFitFaatNotification(
-          'news',
-          'New Health Update',
-          latestItem.title,
-          { newsId: latestItem._id || latestItem.id }
-        ).catch((notificationError) => {
-          console.error('Error sending news notification:', notificationError);
-        });
-      }
-
-      hasLoadedOnceRef.current = true;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to fetch';
-      setError(message);
-      if (lastErrorLogRef.current !== message) {
-        lastErrorLogRef.current = message;
-        console.warn('[News] Published news unavailable:', message);
-      }
-    } finally {
-      setLoading(false);
+  const fetchPublishedNews = useCallback(async (force = false) => {
+    if (!force && fetchInFlightRef.current) {
+      return fetchInFlightRef.current;
     }
+
+    const now = Date.now();
+    if (
+      !force &&
+      hasLoadedOnceRef.current &&
+      now - lastFetchStartedAtRef.current < NEWS_FOREGROUND_REFRESH_TTL_MS
+    ) {
+      return;
+    }
+
+    lastFetchStartedAtRef.current = now;
+
+    const runFetch = async () => {
+      try {
+        if (!hasLoadedOnceRef.current) {
+          setLoading(true);
+        }
+        setError(null);
+
+        const apiUrl = `${API_BASE_URL}/api/admin/news/published`;
+
+        const response = await cachedRequestJson<any>(
+          'news:published',
+          apiUrl,
+          { method: 'GET' },
+          NEWS_READ_CONFIG
+        );
+
+        const newsList = response?.data || [];
+
+        const newlyAdded = hasLoadedOnceRef.current
+          ? newsList.filter(
+              (item: NewsItem) => !previousIdsRef.current.has(item._id || item.id || '')
+            )
+          : [];
+
+        // Update tracking
+        const currentIds: Set<string> = new Set(
+          newsList.map((n: NewsItem) => (n._id || n.id || '') as string)
+        );
+        previousIdsRef.current = currentIds;
+        setNews(newsList);
+
+        if (newlyAdded.length > 0) {
+          const latestItem = newlyAdded[0];
+          sendFitFaatNotification(
+            'news',
+            'New Health Update',
+            latestItem.title,
+            { newsId: latestItem._id || latestItem.id }
+          ).catch((notificationError) => {
+            console.error('Error sending news notification:', notificationError);
+          });
+        }
+
+        hasLoadedOnceRef.current = true;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to fetch';
+        setError(message);
+        if (lastErrorLogRef.current !== message) {
+          lastErrorLogRef.current = message;
+          console.warn('[News] Published news unavailable:', message);
+        }
+      } finally {
+        setLoading(false);
+        fetchInFlightRef.current = null;
+      }
+    };
+
+    fetchInFlightRef.current = runFetch();
+    return fetchInFlightRef.current;
   }, [API_BASE_URL, sendFitFaatNotification]);
 
   const refreshNews = useCallback(async () => {
-    await fetchPublishedNews();
+    await fetchPublishedNews(true);
   }, [fetchPublishedNews]);
 
   useEffect(() => {

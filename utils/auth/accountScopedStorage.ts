@@ -11,22 +11,22 @@ import {
   readLocalHealthDataSnapshot,
 } from '../healthDataSync';
 import {
-  FITFAAT_GROCERY_LISTS_STORAGE_KEY,
-  FITFAAT_MEAL_PLANS_STORAGE_KEY,
-} from '../localMealPlanner';
-import { FITFAAT_NOTES_STORAGE_KEY } from '../localNotes';
-import {
   DASHBOARD_CACHE_KEY_PREFIX,
   LEGACY_DASHBOARD_CACHE_KEY,
   LEGACY_WEEKLY_TRACKING_ID_KEY,
   WEEKLY_TRACKING_ID_KEY_PREFIX,
 } from '../dashboardStorage';
+import { EMERGENCY_WHATSAPP_STORAGE_PREFIX } from '../emergencyWhatsApp';
+export { queueAccountScopedStorageCloudSync } from './accountScopedStorageSyncQueue';
 
 const TOKEN_KEY = 'fitfaat_auth_token';
 const LEGACY_TOKEN_KEY = 'authToken';
 const USER_KEY = 'fitfaat_user';
 const LEGACY_USER_KEY = 'fitfaat_user_data';
 const LOCAL_ACCOUNT_STORAGE_PREFIX = 'fitfaat_account_local_snapshot:';
+const FITFAAT_MEAL_PLANS_STORAGE_KEY = 'fitfaat_meal_plans';
+const FITFAAT_GROCERY_LISTS_STORAGE_KEY = 'fitfaat_grocery_lists';
+const FITFAAT_NOTES_STORAGE_KEY = 'fitfaat_notes';
 let isCloudAccountStorageUnavailable = false;
 
 const ACCOUNT_BACKEND_CACHE_KEYS = [
@@ -56,9 +56,10 @@ const BACKEND_REFRESH_CACHE_PREFIXES = [
   DASHBOARD_CACHE_KEY_PREFIX,
 ];
 
-const ACCOUNT_LOCAL_BACKUP_EXTRA_KEYS = [
-  LEGACY_WEEKLY_TRACKING_ID_KEY,
-  LEGACY_DASHBOARD_CACHE_KEY,
+const ACCOUNT_LOCAL_BACKUP_EXTRA_KEYS: string[] = [];
+const REMOVED_ACCOUNT_STORAGE_KEYS = [
+  'fitfaat_meal_templates',
+  'fitfaat_adaptive_goal_carry_forward',
 ];
 
 const ACCOUNT_SYNC_KEYS = [
@@ -72,7 +73,6 @@ const ACCOUNT_SYNC_KEYS = [
   'fitfaat_early_logs',
   'fitfaat_unlocked_badges',
   'fitfaat_local_exercise_progress',
-  'fitfaat_adaptive_goal_carry_forward',
   'fitfaat_diet_preference',
   'fitfaat_step_counter_history',
   'fitfaat_step_counter_goal',
@@ -80,7 +80,6 @@ const ACCOUNT_SYNC_KEYS = [
   'fitfaat_goal_display_mode',
   'fitfaat_activity_heatmap_snapshots',
   'fitfaat_breathing_sessions',
-  'fitfaat_meal_templates',
   FITFAAT_MEAL_PLANS_STORAGE_KEY,
   FITFAAT_GROCERY_LISTS_STORAGE_KEY,
   FITFAAT_NOTES_STORAGE_KEY,
@@ -97,17 +96,15 @@ const ACCOUNT_SYNC_KEYS = [
 ];
 
 const ACCOUNT_SYNC_PREFIXES = [
-  WEEKLY_TRACKING_ID_KEY_PREFIX,
-  DASHBOARD_CACHE_KEY_PREFIX,
   'fitfaat_nutrition_profile_entries:',
   'fitfaat_nutrition_profile_notifications:',
+  'fitfaat_nutrition_nudge_responses:',
   'dashboardMood:',
   'fitfaat_end_day_recap_seen:',
+  `${EMERGENCY_WHATSAPP_STORAGE_PREFIX}:`,
 ];
 
-const ACCOUNT_LOCAL_ONLY_PREFIXES = [
-  'fitfaat_progress_photos:',
-];
+const ACCOUNT_LOCAL_ONLY_PREFIXES: string[] = [];
 
 const ACCOUNT_CLEAR_KEYS = [
   ...ACCOUNT_BACKEND_CACHE_KEYS,
@@ -117,6 +114,7 @@ const ACCOUNT_CLEAR_KEYS = [
 const ACCOUNT_CLEAR_PREFIXES = [
   ...ACCOUNT_SYNC_PREFIXES,
   ...ACCOUNT_LOCAL_ONLY_PREFIXES,
+  ...BACKEND_REFRESH_CACHE_PREFIXES,
 ];
 
 export type AccountScopedStorageExportItem = {
@@ -203,6 +201,9 @@ const isBackendDerivedStorageKey = (key: string) =>
   BACKEND_REFRESH_CACHE_KEYS.includes(key) ||
   BACKEND_REFRESH_CACHE_PREFIXES.some((prefix) => key.startsWith(prefix));
 
+const isRemovedAccountStorageKey = (key: string) =>
+  REMOVED_ACCOUNT_STORAGE_KEYS.includes(key);
+
 const getStoredValueUpdatedAt = (value?: string | null) => {
   if (!value) return null;
 
@@ -215,8 +216,7 @@ const getStoredValueUpdatedAt = (value?: string | null) => {
       parsed?.data?.updatedAt ||
       parsed?.data?.timestamp ||
       parsed?.metricsUpdatedAt ||
-      parsed?.weightLogsUpdatedAt ||
-      parsed?.carryForwardUpdatedAt;
+      parsed?.weightLogsUpdatedAt;
 
     return typeof rawUpdatedAt === 'string' || typeof rawUpdatedAt === 'number'
       ? new Date(rawUpdatedAt).toISOString()
@@ -280,15 +280,21 @@ export const restoreAccountScopedStorageItems = async (
   options: { backupAfterRestore?: boolean } = {}
 ) => {
   const normalizedItems = items
-    .filter((item) => item && typeof item.key === 'string' && typeof item.value === 'string')
+    .filter((item) =>
+      item &&
+      typeof item.key === 'string' &&
+      typeof item.value === 'string' &&
+      !isRemovedAccountStorageKey(item.key)
+    )
     .map((item) => ({
       key: item.key,
       value: item.value,
       updatedAt: getIncomingItemUpdatedAt(item) || undefined,
     }));
+  const restorableItems = normalizedItems.filter((item) => !isBackendDerivedStorageKey(item.key));
 
-  const pairs = normalizedItems.map((item) => [item.key, item.value] as [string, string]);
-  const healthItems = normalizedItems
+  const pairs = restorableItems.map((item) => [item.key, item.value] as [string, string]);
+  const healthItems = restorableItems
     .filter((item) => item && typeof item.key === 'string')
     .map((item) => ({
       key: item.key,
@@ -298,7 +304,7 @@ export const restoreAccountScopedStorageItems = async (
   const genericPairs = pairs.filter(([key]) => !isHealthDataSyncStorageKey(key));
 
   if (genericPairs.length) {
-    const genericItems = normalizedItems.filter((item) => !isHealthDataSyncStorageKey(item.key));
+    const genericItems = restorableItems.filter((item) => !isHealthDataSyncStorageKey(item.key));
     const currentPairs = await AsyncStorage.multiGet(genericItems.map((item) => item.key));
     const currentByKey = new Map(currentPairs);
     const pairsToRestore = genericItems

@@ -1,13 +1,12 @@
 import { DrawerSceneWrapper } from "@/components/CustomDrawerLayout";
 import { AppointmentProvider } from "@/contexts/AppointmentContext";
-import { ChatbotStorageProvider } from "@/contexts/ChatbotStorage";
 import { ZegoCallProvider } from "@/contexts/ZegoCallProvider";
 import { NewsProvider } from "@/contexts/NewsContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { authApi } from "@/utils/auth/authApi";
 import { DrawerContentComponentProps } from "@react-navigation/drawer";
 import { BottomTabBar } from "@/components/BottomTabBar";
-import { usePathname, useRouter } from "expo-router";
+import { usePathname, useRouter, useSegments } from "expo-router";
 import { Drawer } from "expo-router/drawer";
 import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
@@ -22,6 +21,7 @@ export default function MainLayout() {
     const { colors } = useTheme();
     const router = useRouter();
     const pathname = usePathname();
+    const segments = useSegments();
     const [isDoctor, setIsDoctor] = useState(false);
     const [doctorName, setDoctorName] = useState("");
     const [loading, setLoading] = useState(true);
@@ -37,10 +37,15 @@ export default function MainLayout() {
             router.replace("/(auth)");
             return;
           }
+
+          if (isActive) {
+            setLoading(false);
+          }
           
           // Check if user is a doctor
           try {
             const doctorStatus = await authApi.getDoctorStatus();
+            if (!isActive) return;
             if (doctorStatus.success && doctorStatus.doctor) {
               setIsDoctor(true);
               const name = doctorStatus.doctor.name || doctorStatus.doctor.fullName || "Doctor";
@@ -50,7 +55,9 @@ export default function MainLayout() {
             }
           } catch (error: any) {
             // User is not a doctor, keep isDoctor as false
-            setIsDoctor(false);
+            if (isActive) {
+              setIsDoctor(false);
+            }
           }
 
         } catch (error) {
@@ -76,17 +83,30 @@ export default function MainLayout() {
     }), [isDoctor]);
 
     const doctorPortalOptions = useMemo(() => ({
-      title: isDoctor && doctorName ? `Dr. ${doctorName} 👨‍⚕️` : "Join as Doctor 👨‍⚕️"
+      title: isDoctor && doctorName ? `Dr. ${doctorName}` : "Join as Doctor"
     }), [isDoctor, doctorName]);
 
     const workoutOptions = useMemo(() => ({
-      title: "Workouts 👑",
+      title: "Workouts",
     }), []);
 
     const hiddenDrawerOptions = useMemo(() => ({
       drawerItemStyle: { height: 0, overflow: 'hidden' as const },
     }), []);
-    const shouldHideBottomTabBar = pathname?.includes("doctor-report");
+    const shouldHideBottomTabBar = useMemo(() => {
+      const segmentsStr = segments.join("/");
+      return Boolean(
+        pathname?.includes("doctor-report") ||
+        pathname?.includes("weekly-insights") ||
+        pathname?.includes("goal-review") ||
+        segmentsStr.includes("doctor-report") ||
+        segmentsStr.includes("(doctor-report)") ||
+        segmentsStr.includes("weekly-insights") ||
+        segmentsStr.includes("(weekly-insights)") ||
+        segmentsStr.includes("goal-review") ||
+        segmentsStr.includes("(goal-review)")
+      );
+    }, [pathname, segments]);
 
     if (loading) {
       return null; // or a loading screen
@@ -94,7 +114,6 @@ export default function MainLayout() {
     return <GestureHandlerRootView style={{ flex: 1 }}>
   <ZegoCallProvider>
   <AppointmentProvider>
-  <ChatbotStorageProvider>
   <NewsProvider>
   <View style={{ flex: 1, backgroundColor: colors.background }}>
     <Drawer
@@ -148,10 +167,12 @@ export default function MainLayout() {
     >
       <Drawer.Screen name="index" options={{ drawerItemStyle: { height: 0 } }} />
       <Drawer.Screen name="(dashboard)" options={{ title: "Dashboard" }} />
-      <Drawer.Screen name="(activity-heatmap)" options={hiddenDrawerOptions} />
+      <Drawer.Screen name="(activity-heatmap)/index" options={hiddenDrawerOptions} />
       <Drawer.Screen name="(steps)" options={hiddenDrawerOptions} />
+      <Drawer.Screen name="(qr-transfer)/index" options={hiddenDrawerOptions} />
       <Drawer.Screen name="(doctor-report)" options={hiddenDrawerOptions} />
       <Drawer.Screen name="(weekly-insights)" options={hiddenDrawerOptions} />
+      <Drawer.Screen name="(goal-review)/index" options={hiddenDrawerOptions} />
       <Drawer.Screen name="(chatbot)" options={{ title: "HeaLora" }} />
       <Drawer.Screen name="(mindfulness)" options={hiddenDrawerOptions} />
       <Drawer.Screen name="(meal-planner)" options={hiddenDrawerOptions} />
@@ -174,7 +195,6 @@ export default function MainLayout() {
     {!isDrawerOpen && !shouldHideBottomTabBar && <BottomTabBar />}
   </View>
   </NewsProvider>
-  </ChatbotStorageProvider>
   </AppointmentProvider>
   </ZegoCallProvider>
 </GestureHandlerRootView>
