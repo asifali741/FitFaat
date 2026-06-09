@@ -12,6 +12,7 @@ import {
   heightPercentageToDP as hp,
   widthPercentageToDP as wp,
 } from 'react-native-responsive-screen';
+import { getBackendUrl } from '../../utils/config';
 
 const EmailSignIn = () => {
   const [isRegistering, setIsRegistering] = useState(false);
@@ -31,8 +32,8 @@ const EmailSignIn = () => {
         return;
       }
 
-      const endpoint = isRegistering ? '/api/auth/register' : '/api/auth/login';
-      const response = await fetch(`http://localhost:5000${endpoint}`, {
+      const endpoint = isRegistering ? '/auth/register' : '/auth/login';
+      const response = await fetch(`${getBackendUrl()}${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

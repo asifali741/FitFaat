@@ -1,6 +1,7 @@
 import { createDataScreenStyles } from "@/components/dataScreenStyles";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useCustomOnboarding } from "@/hooks/useCustomOnboarding";
+import { saveGoalDisplayMode, type GoalDisplayMode } from "@/utils/goalTargetDisplay";
 import { Ionicons } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
 import React, { useEffect, useState } from "react";
@@ -46,6 +47,7 @@ export default function Index() {
   const [weight, setWeight] = useState("");
   const [selectedGender, setSelectedGender] = useState<'male'|'female'|'other'|null>(null); // 'male', 'female', 'other'
   const [selectedGoal, setSelectedGoal] = useState<number|null>(null); // 1, 2, or 3
+  const [targetDisplayMode, setTargetDisplayMode] = useState<GoalDisplayMode>("ranges");
   const [birthDate, setBirthDate] = useState({ day: "", month: "", year: "" });
   const [age, setAge] = useState("");
   
@@ -141,7 +143,7 @@ export default function Index() {
         const fieldList = missingFields.join(', ');
         Alert.alert(
           'Incomplete Form',
-          `Please fill in all fields. Missing: ${fieldList}`,
+          `Add these details so FitFaat can calculate daily calorie and hydration targets: ${fieldList}.`,
           [{ text: 'OK', style: 'default' }]
         );
         return;
@@ -207,6 +209,8 @@ export default function Index() {
       };
       console.log('Form data:', formData);
       
+      await saveGoalDisplayMode(targetDisplayMode);
+
       // Complete the onboarding process with the validated form data
       await completeOnboarding(formData);
     } catch (error: any) {
@@ -237,8 +241,21 @@ export default function Index() {
         {/* Main Form Container */}
         <View style={screenStyles.mainBox}>
           <Text style={screenStyles.personalizedText}>
-            🎯 Create Your Personalized Meal Plan
+            Create your personalized meal plan
           </Text>
+
+          <View style={screenStyles.setupExplainer}>
+            <View style={screenStyles.setupExplainerHeader}>
+              <Ionicons name="pulse-outline" size={hp(2.2)} color={colors.primary} />
+              <Text style={screenStyles.setupExplainerTitle}>Your score starts simple</Text>
+            </View>
+            <Text style={screenStyles.setupExplainerText}>
+              Free includes daily basics plus full steps, charts, meal planning, and mindfulness. Premium adds workouts, adaptive goals, exports, and unlimited coaching.
+            </Text>
+            <Text style={screenStyles.setupExplainerText}>
+              FitFaat uses these details to build calorie and hydration targets. After setup, log water or your first meal so the score has real data.
+            </Text>
+          </View>
 
           {/* Name Field */}
           <View>
@@ -265,6 +282,7 @@ export default function Index() {
                 value={height}
                 onChangeText={handleHeightChange}
               />
+              <Text style={screenStyles.fieldHint}>Use feet format, for example 5.8.</Text>
             </View>
             <View style={{ flex: 1 }}>
               <Text style={screenStyles.subsubHeading}>Weight (kg) *</Text>
@@ -277,6 +295,7 @@ export default function Index() {
                 value={weight}
                 onChangeText={setWeight}
               />
+              <Text style={screenStyles.fieldHint}>Used for calorie, hydration, and activity targets.</Text>
             </View>
           </View>
 
@@ -297,9 +316,19 @@ export default function Index() {
               >
                 <Ionicons 
                   name="male-outline" 
-                  size={hp(3.5)} 
+                  size={hp(3.2)} 
                   color={selectedGender === 'male' ? colors.info : colors.textTertiary} 
                 />
+                <Text
+                  style={[
+                    screenStyles.genderLabel,
+                    { color: selectedGender === 'male' ? colors.info : colors.textTertiary }
+                  ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                >
+                  Male
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[
@@ -314,9 +343,19 @@ export default function Index() {
               >
                 <Ionicons 
                   name="female-outline" 
-                  size={hp(3.5)} 
+                  size={hp(3.2)} 
                   color={selectedGender === 'female' ? colors.error : colors.textTertiary} 
                 />
+                <Text
+                  style={[
+                    screenStyles.genderLabel,
+                    { color: selectedGender === 'female' ? colors.error : colors.textTertiary }
+                  ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                >
+                  Female
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[
@@ -331,9 +370,19 @@ export default function Index() {
               >
                 <Ionicons 
                   name="male-female-outline" 
-                  size={hp(3.5)} 
+                  size={hp(3.2)} 
                   color={selectedGender === 'other' ? colors.primary : colors.textTertiary} 
                 />
+                <Text
+                  style={[
+                    screenStyles.genderLabel,
+                    { color: selectedGender === 'other' ? colors.primary : colors.textTertiary }
+                  ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                >
+                  Mix
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -388,6 +437,7 @@ export default function Index() {
                 }}
               />
             </View>
+            <Text style={screenStyles.fieldHint}>Age is calculated from DOB so targets are safer and more personal.</Text>
           </View>
 
           {/* Age */}
@@ -404,13 +454,14 @@ export default function Index() {
             />
             {age && (
               <Text style={{ fontSize: hp(1.5), color: colors.success, marginTop: hp(0.5), marginLeft: wp(1) }}>
-                ✓ Age calculated: {age} years old
+                Age calculated: {age} years old
               </Text>
             )}
           </View>
 
           {/* Fitness Goal Selection */}
           <Text style={screenStyles.subHeading}>What's Your Goal? *</Text>
+          <Text style={screenStyles.fieldHint}>This sets your first calorie direction; you can still adjust habits later.</Text>
           <View style={screenStyles.mappingCol}>
             {data.map((item) => (
               <TouchableOpacity 
@@ -447,6 +498,66 @@ export default function Index() {
             ))}
           </View>
 
+          <Text style={screenStyles.subHeading}>Target Style</Text>
+          <Text style={screenStyles.fieldHint}>Ranges make daily goals easier to track without pressure from one exact number.</Text>
+          <View style={screenStyles.targetModeGroup}>
+            <TouchableOpacity
+              style={[
+                screenStyles.targetModeOption,
+                targetDisplayMode === 'ranges' && screenStyles.targetModeOptionActive,
+              ]}
+              onPress={() => setTargetDisplayMode('ranges')}
+              activeOpacity={0.85}
+            >
+              <View style={screenStyles.targetModeHeader}>
+                <Ionicons
+                  name="options-outline"
+                  size={hp(2.2)}
+                  color={targetDisplayMode === 'ranges' ? colors.primary : colors.textSecondary}
+                />
+                <Text style={[
+                  screenStyles.targetModeTitle,
+                  targetDisplayMode === 'ranges' && { color: colors.primary },
+                ]}>
+                  Ranges
+                </Text>
+                <View style={screenStyles.targetModePill}>
+                  <Text style={screenStyles.targetModePillText}>Default</Text>
+                </View>
+              </View>
+              <Text style={screenStyles.targetModeBody}>
+                Stay within your healthy range. Consistency matters more than perfection.
+              </Text>
+              <Text style={screenStyles.targetModeExample}>Example: 1,980-2,230 cal instead of only 2,100</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                screenStyles.targetModeOption,
+                targetDisplayMode === 'exact' && screenStyles.targetModeOptionActive,
+              ]}
+              onPress={() => setTargetDisplayMode('exact')}
+              activeOpacity={0.85}
+            >
+              <View style={screenStyles.targetModeHeader}>
+                <Ionicons
+                  name="radio-button-on-outline"
+                  size={hp(2.2)}
+                  color={targetDisplayMode === 'exact' ? colors.primary : colors.textSecondary}
+                />
+                <Text style={[
+                  screenStyles.targetModeTitle,
+                  targetDisplayMode === 'exact' && { color: colors.primary },
+                ]}>
+                  Exact targets
+                </Text>
+              </View>
+              <Text style={screenStyles.targetModeBody}>
+                Keep one precise calorie and hydration number. You can switch anytime.
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           {/* Submit Button */}
           <TouchableOpacity
             style={[
@@ -461,7 +572,7 @@ export default function Index() {
               <>
                 <ActivityIndicator color={colors.textOnPrimary} size="small" />
                 <Text style={{ color: colors.textOnPrimary, fontSize: hp(1.8), marginLeft: wp(2), fontWeight: "600" }}>
-                  Creating Your Plan...
+                  Building daily targets...
                 </Text>
               </>
             ) : (

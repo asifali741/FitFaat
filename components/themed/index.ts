@@ -4,6 +4,7 @@
  */
 
 export { KeyboardAwareContainer } from './KeyboardAwareContainer';
+export { KeyboardAwareModalContent } from './KeyboardAwareModalContent';
 export { ThemedButton } from './ThemedButton';
 export { ThemedCard } from './ThemedCard';
 export { ThemedInput } from './ThemedInput';

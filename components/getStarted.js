@@ -132,6 +132,62 @@ export const createGetStartedStyles = (themeColors = fallbackColors) => {
     marginLeft: wp(2),
   },
 
+  // Plan Preview
+  planPreviewCard: {
+    marginHorizontal: wp(5),
+    marginVertical: hp(1),
+    backgroundColor: colors.cardBackground,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: hp(2.2),
+    shadowColor: colors.shadowLight,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  planPreviewList: {
+    gap: hp(1.1),
+  },
+  planPreviewRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: wp(3),
+    paddingVertical: hp(1),
+    paddingHorizontal: wp(2),
+    backgroundColor: colors.backgroundHeader,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  planPreviewIcon: {
+    width: hp(4.2),
+    height: hp(4.2),
+    borderRadius: hp(2.1),
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primary + "14",
+  },
+  planPreviewCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  planPreviewLabel: {
+    fontFamily: "LoraRegular",
+    fontSize: hp(1.55),
+    fontWeight: "800",
+    color: colors.textPrimary,
+  },
+  planPreviewText: {
+    fontFamily: "LoraRegular",
+    fontSize: hp(1.28),
+    lineHeight: hp(1.85),
+    color: colors.textSecondary,
+    fontWeight: "600",
+    marginTop: hp(0.25),
+  },
+
   // Steps List
   stepsList: {
     gap: hp(1.5),

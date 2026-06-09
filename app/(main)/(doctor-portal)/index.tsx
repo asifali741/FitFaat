@@ -1,14 +1,35 @@
 import AppHeader from "@/components/AppHeader";
+import StatusNoticeBanner from "@/components/common/StatusNoticeBanner";
 import { theme } from "@/constants/theme";
 import { useTheme } from '@/contexts/ThemeContext';
 import { useDoctorRegistration } from "@/hooks/useDoctorRegistration";
+import { authApi } from "@/utils/auth/authApi";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import { Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+const DOCTOR_PORTAL_ANALYTICS_CACHE_KEY = 'doctorPortalAnalyticsAppointments';
+
+const getPatientKey = (appointment: any) => (
+  appointment?.patientId?._id ||
+  appointment?.patientId ||
+  appointment?.userId ||
+  appointment?.userEmail ||
+  appointment?.userName ||
+  appointment?._id
+);
+
+const getDietPlanCount = (appointment: any) => {
+  if (Array.isArray(appointment?.dietPlans)) return appointment.dietPlans.length;
+  if (typeof appointment?.dietPlanCount === 'number') return appointment.dietPlanCount;
+  if (appointment?.dietPlan || appointment?.hasDietPlan) return 1;
+  return 0;
+};
 
 export default function DoctorPortal() {
   const { colors } = useTheme();
@@ -18,31 +39,71 @@ export default function DoctorPortal() {
   const [doctorStatus, setDoctorStatus] = useState<string | null>(null);
   const [doctorName, setDoctorName] = useState<string | null>(null);
   const [isLoadingStatus, setIsLoadingStatus] = useState(false);
+  const [doctorAppointments, setDoctorAppointments] = useState<any[]>([]);
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
+  const [usingCachedAnalytics, setUsingCachedAnalytics] = useState(false);
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchDoctorStatus();
-    }, [])
-  );
+  const fetchDoctorAnalytics = useCallback(async (doctorId: string) => {
+    setAnalyticsError(null);
+    setUsingCachedAnalytics(false);
+    try {
+      const response = await authApi.getDoctorAppointments(doctorId);
+      const appointmentList = response.success ? response.appointments || [] : [];
+      setDoctorAppointments(appointmentList);
+      await AsyncStorage.setItem(DOCTOR_PORTAL_ANALYTICS_CACHE_KEY, JSON.stringify(appointmentList));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to refresh doctor analytics';
+      setAnalyticsError(message);
+      try {
+        const cached = await AsyncStorage.getItem(DOCTOR_PORTAL_ANALYTICS_CACHE_KEY);
+        const parsed = cached ? JSON.parse(cached) : [];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setDoctorAppointments(parsed);
+          setUsingCachedAnalytics(true);
+        } else {
+          setDoctorAppointments([]);
+        }
+      } catch {
+        setDoctorAppointments([]);
+      }
+    }
+  }, []);
 
-  const fetchDoctorStatus = async () => {
+  const fetchDoctorStatus = useCallback(async () => {
     setIsLoadingStatus(true);
     try {
       const response = await getDoctorStatus();
       setDoctorStatus(response.doctor?.status || null);
       setDoctorName(response.doctor?.name || null);
+      const doctorId = response.doctor?.id || response.doctor?._id;
+      if ((response.doctor?.status || null) === 'approved' && doctorId) {
+        await fetchDoctorAnalytics(doctorId);
+      } else {
+        setDoctorAppointments([]);
+        setAnalyticsError(null);
+        setUsingCachedAnalytics(false);
+      }
     } catch (error) {
       // Doctor status not found (first time user)
       setDoctorStatus(null);
       setDoctorName(null);
+      setDoctorAppointments([]);
+      setAnalyticsError(null);
+      setUsingCachedAnalytics(false);
     } finally {
       setIsLoadingStatus(false);
     }
-  };
+  }, [fetchDoctorAnalytics, getDoctorStatus]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchDoctorStatus();
+    }, [fetchDoctorStatus])
+  );
 
   const handleDoctorButtonPress = () => {
     if (doctorStatus === 'approved') {
-      Alert.alert('Already Registered', 'You are already registered as a doctor!');
+      router.push('/(main)/(doctor-portal)/patient-management');
       return;
     }
 
@@ -61,20 +122,56 @@ export default function DoctorPortal() {
     router.push('/(main)/(doctor-portal)/register-form');
   };
 
+  const doctorButtonLabel = (() => {
+    if (isLoadingStatus) return 'Loading...';
+    if (doctorStatus === 'approved') {
+      return doctorName ? `Welcome Dr. ${doctorName}` : 'Doctor Dashboard';
+    }
+    if (doctorStatus === 'pending') return 'Application Pending';
+    if (doctorStatus === 'rejected') return 'Resubmit Application';
+    return 'Join as Doctor';
+  })();
+  const doctorButtonIcon: keyof typeof Ionicons.glyphMap =
+    isLoadingStatus
+      ? 'hourglass-outline'
+      : doctorStatus === 'approved'
+        ? 'checkmark-circle'
+        : doctorStatus === 'pending'
+          ? 'time-outline'
+          : doctorStatus === 'rejected'
+            ? 'refresh-circle'
+            : 'add-circle';
+
+  const analytics = React.useMemo(() => {
+    const patientCount = new Set(doctorAppointments.map(getPatientKey).filter(Boolean)).size;
+    const pending = doctorAppointments.filter((appointment) => appointment.status === 'pending').length;
+    const completed = doctorAppointments.filter((appointment) => appointment.status === 'completed').length;
+    const confirmedOrCompleted = doctorAppointments.filter((appointment) => ['confirmed', 'completed'].includes(appointment.status));
+    const respondedChats = confirmedOrCompleted.filter((appointment) => (
+      appointment.lastMessageText ||
+      appointment.lastMessageAt ||
+      appointment.chatAccessGrantedAt
+    )).length;
+    const chatResponseRate = confirmedOrCompleted.length
+      ? Math.round((respondedChats / confirmedOrCompleted.length) * 100)
+      : 0;
+    const dietPlansCreated = doctorAppointments.reduce((sum, appointment) => sum + getDietPlanCount(appointment), 0);
+
+    return {
+      patientCount,
+      pending,
+      completed,
+      chatResponseRate,
+      dietPlansCreated,
+    };
+  }, [doctorAppointments]);
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* Professional Header with Gradient */}
-      <LinearGradient
-        colors={[colors.primary, colors.accent]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.headerGradient}
-      >
-        <AppHeader 
-          title="Doctor Portal"
-          showStepIndicator={false}
-        />
-      </LinearGradient>
+      <AppHeader
+        title="Doctor Portal"
+        showStepIndicator={false}
+      />
 
       {/* Main Content */}
       <ScrollView 
@@ -94,6 +191,56 @@ export default function DoctorPortal() {
             Join our network of healthcare professionals and help patients achieve their fitness goals
           </Text>
         </View>
+
+        {doctorStatus === 'approved' && (
+          <View style={styles.analyticsSection}>
+            <View style={styles.analyticsHeader}>
+              <View>
+                <Text style={styles.analyticsTitle}>Practice Analytics</Text>
+                <Text style={styles.analyticsSubtitle}>A quick view of your patient workload.</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.analyticsRefresh}
+                onPress={() => fetchDoctorStatus()}
+                disabled={isLoadingStatus}
+              >
+                <Ionicons name="refresh" size={Math.min(hp(2.1), wp(4.8))} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+
+            {analyticsError ? (
+              <StatusNoticeBanner
+                tone={usingCachedAnalytics ? 'cached' : 'offline'}
+                title={usingCachedAnalytics ? 'Showing Cached Analytics' : 'Analytics Unavailable'}
+                message={usingCachedAnalytics
+                  ? 'Latest refresh failed, so this panel is using the last saved appointment data.'
+                  : 'Check your connection and retry to refresh doctor analytics.'}
+                actionLabel="Retry"
+                onAction={fetchDoctorStatus}
+                colors={colors}
+                style={styles.analyticsNotice}
+              />
+            ) : null}
+
+            <View style={styles.analyticsGrid}>
+              {[
+                { label: 'Patients', value: analytics.patientCount, icon: 'people-outline', color: colors.primary },
+                { label: 'Pending', value: analytics.pending, icon: 'hourglass-outline', color: colors.warning || colors.primary },
+                { label: 'Completed', value: analytics.completed, icon: 'checkmark-done-outline', color: colors.success },
+                { label: 'Chat rate', value: `${analytics.chatResponseRate}%`, icon: 'chatbubble-ellipses-outline', color: colors.info || colors.secondary },
+                { label: 'Diet plans', value: analytics.dietPlansCreated, icon: 'nutrition-outline', color: colors.secondary },
+              ].map((item) => (
+                <View key={item.label} style={styles.analyticsCard}>
+                  <View style={[styles.analyticsIcon, { backgroundColor: `${item.color}18` }]}>
+                    <Ionicons name={item.icon as any} size={Math.min(hp(2.4), wp(5.3))} color={item.color} />
+                  </View>
+                  <Text style={styles.analyticsValue}>{item.value}</Text>
+                  <Text style={styles.analyticsLabel}>{item.label}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* Features Grid */}
         <View style={styles.featuresContainer}>
@@ -235,13 +382,18 @@ export default function DoctorPortal() {
               style={styles.gradientButton}
             >
               <Ionicons 
-                name={doctorStatus === 'approved' ? "checkmark-circle" : "add-circle"} 
+                name={doctorButtonIcon} 
                 size={24} 
                 color={colors.surface} 
                 style={styles.buttonIcon}
               />
-              <Text style={styles.gradientButtonText}>
-                {isLoadingStatus ? 'Loading...' : doctorStatus === 'approved' && doctorName ? `Welcome Dr. ${doctorName}` : 'Join as Doctor'}
+              <Text
+                style={styles.gradientButtonText}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.72}
+              >
+                {doctorButtonLabel}
               </Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -256,13 +408,9 @@ const getStyles = (colors: any) => StyleSheet.create({
     flex: 1,
     backgroundColor: colors.screenColor,
   },
-  headerGradient: {
-    paddingBottom: hp(2),
-  },
   content: {
     flex: 1,
     backgroundColor: colors.screenColor,
-    ...theme.shadows.large,
   },
   scrollContent: {
     paddingTop: hp(3),
@@ -271,7 +419,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   welcomeSection: {
     alignItems: "center",
-    marginBottom: hp(5),
+    marginBottom: hp(3),
     marginTop: hp(2),
   },
   logoContainer: {
@@ -290,6 +438,77 @@ const getStyles = (colors: any) => StyleSheet.create({
     width: hp(9),
     height: hp(9),
     resizeMode: 'contain',
+  },
+  analyticsSection: {
+    marginBottom: hp(3),
+    backgroundColor: colors.cardBackground,
+    borderRadius: hp(1.8),
+    borderWidth: 1,
+    borderColor: colors.cardBorder || colors.border,
+    padding: hp(1.6),
+    ...theme.shadows.small,
+  },
+  analyticsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: hp(1.4),
+  },
+  analyticsTitle: {
+    color: colors.textPrimary,
+    fontSize: Math.min(hp(2.1), wp(4.8)),
+    fontWeight: '900',
+  },
+  analyticsSubtitle: {
+    marginTop: hp(0.3),
+    color: colors.textSecondary,
+    fontSize: Math.min(hp(1.3), wp(3)),
+    fontWeight: '700',
+  },
+  analyticsRefresh: {
+    width: hp(4.4),
+    height: hp(4.4),
+    borderRadius: hp(2.2),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primarySoft,
+  },
+  analyticsNotice: {
+    marginBottom: hp(1.2),
+  },
+  analyticsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: wp(2),
+  },
+  analyticsCard: {
+    width: '31.8%',
+    minHeight: hp(11.2),
+    borderRadius: hp(1.4),
+    backgroundColor: colors.screenColor,
+    borderWidth: 1,
+    borderColor: colors.cardBorder || colors.border,
+    padding: hp(1.1),
+    justifyContent: 'center',
+  },
+  analyticsIcon: {
+    width: Math.min(hp(3.8), wp(8.4)),
+    height: Math.min(hp(3.8), wp(8.4)),
+    borderRadius: Math.min(hp(1.9), wp(4.2)),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: hp(0.8),
+  },
+  analyticsValue: {
+    color: colors.textPrimary,
+    fontSize: Math.min(hp(2.1), wp(4.8)),
+    fontWeight: '900',
+  },
+  analyticsLabel: {
+    marginTop: hp(0.25),
+    color: colors.textSecondary,
+    fontSize: Math.min(hp(1.15), wp(2.7)),
+    fontWeight: '800',
   },
   welcomeTitle: {
     fontSize: Math.min(hp(3), wp(7.5)),
@@ -396,6 +615,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     ...theme.shadows.large,
   },
   gradientButton: {
+    minHeight: hp(6.8),
     paddingVertical: hp(2.2),
     paddingHorizontal: wp(8),
     borderRadius: 18,
@@ -406,11 +626,15 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   buttonIcon: {
     marginRight: wp(1),
+    flexShrink: 0,
   },
   gradientButtonText: {
+    flexShrink: 1,
+    minWidth: 0,
     color: colors.surface,
-    fontSize: hp(2.2),
+    fontSize: Math.min(hp(2.2), wp(5)),
     fontWeight: "700",
     letterSpacing: 0.3,
+    textAlign: "center",
   },
 });

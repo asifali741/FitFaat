@@ -1,4 +1,5 @@
 import { tokenStorage } from '@/utils/auth/tokenStorage';
+import { requestJson } from '@/utils/apiHelper';
 import { getBackendBaseUrl } from '@/utils/config';
 import { useEffect, useState } from 'react';
 
@@ -32,17 +33,18 @@ export const useChatAccess = (appointmentId: string) => {
         return;
       }
 
-      const response = await fetch(
+      const data = await requestJson<any>(
         `${BACKEND_URL}/api/chat/appointment/${appointmentId}/access`,
         {
+          method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           }
-        }
+        },
+        { timeoutMs: 7000, retries: 1, retryDelayMs: 500 }
       );
 
-      const data = await response.json();
       console.log('Chat access check response:', data);
 
       if (data.success && data.allowed) {

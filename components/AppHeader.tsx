@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleProp, StyleSheet, Text, TextStyle, TouchableOpacity, View } from 'react-native';
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
 
 interface AppHeaderProps {
@@ -17,6 +17,15 @@ interface AppHeaderProps {
   showNotificationBell?: boolean;
   notificationCount?: number;
   onNotificationPress?: () => void;
+  rightActions?: {
+    icon: keyof typeof Ionicons.glyphMap;
+    accessibilityLabel: string;
+    onPress: () => void;
+    badgeCount?: number;
+  }[];
+  titleStyle?: StyleProp<TextStyle>;
+  titleMinimumFontScale?: number;
+  compactTitleSpacing?: boolean;
 }
 export default function AppHeader({
   title,
@@ -29,6 +38,10 @@ export default function AppHeader({
   showNotificationBell = false,
   notificationCount = 0,
   onNotificationPress,
+  rightActions = [],
+  titleStyle,
+  titleMinimumFontScale = 0.82,
+  compactTitleSpacing = false,
 }: AppHeaderProps) {
   const navigation = useNavigation();
   const router = useRouter();
@@ -81,10 +94,27 @@ export default function AppHeader({
     }
   };
 
+  const headerActions = [
+    ...rightActions,
+    ...(showNotificationBell
+      ? [{
+          icon: 'notifications' as keyof typeof Ionicons.glyphMap,
+          accessibilityLabel: 'Open notifications',
+          onPress: handleNotificationPress,
+          badgeCount: notificationCount,
+        }]
+      : []),
+  ];
+  const hasMultipleRightActions = headerActions.length > 1;
+
   return (
     <View style={[styles.container, { backgroundColor: colors.primary }]}>
-      <View style={[styles.topBar, { backgroundColor: colors.primary }]}>
-        <View style={styles.sideSlot}>
+      <View style={[styles.topBar, compactTitleSpacing && styles.topBarCompact, { backgroundColor: colors.primary }]}>
+        <View style={[
+          styles.sideSlot,
+          compactTitleSpacing && styles.sideSlotCompact,
+          hasMultipleRightActions && styles.sideSlotWide,
+        ]}>
           {showBackButton ? (
             <TouchableOpacity
               style={styles.iconButton}
@@ -109,33 +139,42 @@ export default function AppHeader({
         </View>
         
         <Text
-          style={[styles.title, { color: colors.textOnPrimary }]}
+          style={[styles.title, { color: colors.textOnPrimary }, titleStyle]}
           numberOfLines={1}
           adjustsFontSizeToFit
+          minimumFontScale={titleMinimumFontScale}
         >
           {title}
         </Text>
         
-        <View style={[styles.sideSlot, styles.rightSlot]}>
-          {showNotificationBell && (
-            <TouchableOpacity 
-              style={styles.iconButton}
-              onPress={handleNotificationPress}
-              accessibilityRole="button"
-              accessibilityLabel="Open notifications"
-            >
-              <Ionicons name="notifications" size={Math.min(hp(3.7), wp(7.8))} color={colors.textOnPrimary} />
-              {notificationCount > 0 && (
-                <View style={[styles.badge, { backgroundColor: '#FF6B6B' }]}>
-                  <Text style={styles.badgeText}>
-                    {notificationCount > 99 ? '99+' : notificationCount}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          )}
-
-          {!showNotificationBell && (
+        <View style={[
+          styles.sideSlot,
+          compactTitleSpacing && styles.sideSlotCompact,
+          hasMultipleRightActions && styles.sideSlotWide,
+          styles.rightSlot,
+        ]}>
+          {headerActions.length ? (
+            <View style={styles.rightActionsRow}>
+              {headerActions.map((action) => (
+                <TouchableOpacity
+                  key={action.accessibilityLabel}
+                  style={styles.iconButton}
+                  onPress={action.onPress}
+                  accessibilityRole="button"
+                  accessibilityLabel={action.accessibilityLabel}
+                >
+                  <Ionicons name={action.icon} size={Math.min(hp(3.45), wp(7.4))} color={colors.textOnPrimary} />
+                  {Number(action.badgeCount || 0) > 0 && (
+                    <View style={[styles.badge, { backgroundColor: '#FF6B6B' }]}>
+                      <Text style={styles.badgeText}>
+                        {Number(action.badgeCount || 0) > 99 ? '99+' : action.badgeCount}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : (
             <View style={styles.spacer} />
           )}
         </View>
@@ -173,6 +212,9 @@ const styles = StyleSheet.create({
     minHeight: hp(7.6),
     paddingHorizontal: wp(5),
   },
+  topBarCompact: {
+    paddingHorizontal: wp(3.5),
+  },
   title: {
     fontSize: Math.min(hp(3.1), wp(7.2)),
     fontWeight: '800',
@@ -182,12 +224,23 @@ const styles = StyleSheet.create({
   },
   sideSlot: {
     width: wp(13),
-    minWidth: 44,
+    minWidth: Math.min(hp(5.4), wp(11.8)),
     alignItems: 'flex-start',
     justifyContent: 'center',
   },
+  sideSlotCompact: {
+    width: wp(11.8),
+  },
+  sideSlotWide: {
+    width: wp(24),
+  },
   rightSlot: {
     alignItems: 'flex-end',
+  },
+  rightActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
   },
   iconButton: {
     width: Math.min(hp(5.4), wp(11.8)),

@@ -4,12 +4,11 @@
 
 ### ✅ **Step 1: Verify Zego Credentials**
 
-Ensure your `app.config.js` has valid credentials:
+Ensure your `.env` / EAS environment has valid credentials:
 
 ```js
-ZEGO_APP_ID: process.env.ZEGO_APP_ID || "240147723";
-ZEGO_APP_SIGN: process.env.ZEGO_APP_SIGN ||
-  "a264c74ba1e0eadd06807711c52d608221385f1af0ed26e0a731458a2b93fa10";
+ZEGO_APP_ID=<your ZegoCloud AppID>
+ZEGO_APP_SIGN=<your ZegoCloud AppSign>
 ```
 
 - Visit: https://console.zegocloud.com

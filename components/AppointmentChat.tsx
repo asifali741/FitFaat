@@ -1,23 +1,52 @@
 import BackButton from '@/components/BackButton';
 import DietPlanModal from '@/components/DietPlanModal';
+import DoctorActionPlanModal from '@/components/DoctorActionPlanModal';
+import { AnimatedPressable } from '@/components/common/AnimatedPressable';
 import VideoCallButton from '@/components/VideoCallButton';
 import { theme } from '@/constants/theme';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import {
+  cachedRequestJson,
+  clearRequestJsonCache,
+  requestJson,
+} from '@/utils/apiHelper';
 import { tokenStorage } from '@/utils/auth/tokenStorage';
+import {
+  buildChatAccessGrantedNotificationPayload,
+  CHAT_ACCESS_GRANTED_BODY,
+  CHAT_ACCESS_GRANTED_TITLE,
+} from '@/utils/chatAccessNotifications';
+import {
+  getDashboardGoalProgress,
+  getHydrationValue,
+  getProgressValue,
+} from '@/utils/dashboardProgress';
+import {
+  getStoredDashboardCache,
+  getStoredWeeklyTrackingId,
+} from '@/utils/dashboardStorage';
+import {
+  buildDoctorActionPlanMessage,
+  parseDoctorActionPlanMessage,
+  type DoctorActionPlan,
+} from '@/utils/doctorActionPlan';
+import {
+  formatCalorieTarget,
+  formatHydrationTarget,
+  loadGoalDisplayMode,
+} from '@/utils/goalTargetDisplay';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import Constants from 'expo-constants';
 import * as SystemUI from 'expo-system-ui';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   ScrollView,
   StatusBar,
@@ -34,7 +63,7 @@ import {
 } from 'react-native-responsive-screen';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { io, Socket } from 'socket.io-client';
-import { getBackendBaseUrl } from '@/utils/config';
+import { getBackendBaseUrl, isRealtimeSocketEnabled } from '@/utils/config';
 
 interface ChatMessage {
   _id: string;
@@ -48,10 +77,227 @@ interface ChatMessage {
   createdAt: string;
 }
 
-// Remove /api from BACKEND_URL since routes already include it
-const ENV = Constants.expoConfig?.extra;
+type ChatUserRole = ChatMessage['senderRole'];
+
+interface TypingPayload {
+  appointmentId?: string;
+  isTyping?: boolean;
+  senderId?: string;
+  userId?: string;
+  senderName?: string;
+  userName?: string;
+  name?: string;
+  senderRole?: string;
+  userRole?: string;
+  role?: string;
+}
+
+// Remove /api from BACKEND_URL since routes already include it.
 const BACKEND_URL = getBackendBaseUrl();
-const ANDROID_KEYBOARD_EXTRA_LIFT = hp(11);
+const MAX_ANDROID_NAV_BAR_SPACER = hp(3);
+const ANDROID_KEYBOARD_EXTRA_LIFT = hp(12);
+
+const QUICK_REPLIES = {
+  user: ['I am here', 'Can we start?', 'Thank you', 'Please check my diet plan'],
+  doctor: ['I will review it', 'Please share details', 'Chat access granted', 'Book a follow-up'],
+};
+const DASHBOARD_DAY_KEYS = [
+  'day01',
+  'day02',
+  'day03',
+  'day04',
+  'day05',
+  'day06',
+  'day07',
+] as const;
+const CHAT_READ_CONFIG = {
+  timeoutMs: 7000,
+  retries: 1,
+  retryDelayMs: 500,
+  cacheTtlMs: 30 * 1000,
+  maxStaleMs: 60 * 60 * 1000,
+  allowStaleOnError: true,
+  maxWaitForFreshMs: 1600,
+  refreshCacheInBackground: true,
+};
+
+const trimTrailingZeros = (value: string) => value.replace(/\.?0+$/, '');
+
+const formatProgressInteger = (value: unknown) =>
+  Math.round(getProgressValue(value)).toLocaleString();
+
+const formatHydrationLiters = (value: unknown) =>
+  trimTrailingZeros(getProgressValue(value).toFixed(2));
+
+const getDashboardCachePayload = (cache: any) => {
+  if (!cache || typeof cache !== 'object') return null;
+  return cache.data && typeof cache.data === 'object' ? cache.data : cache;
+};
+
+const getDashboardDaysFromCache = (cache: any) => {
+  const payload = getDashboardCachePayload(cache);
+  if (!payload || typeof payload !== 'object') return [];
+
+  if (Array.isArray(payload)) return payload.filter(Boolean);
+  if (Array.isArray(payload.days)) return payload.days.filter(Boolean);
+  if (Array.isArray(payload.dailyLogs)) return payload.dailyLogs.filter(Boolean);
+  if (Array.isArray(payload.weekDays)) return payload.weekDays.filter(Boolean);
+
+  const keyedDays = DASHBOARD_DAY_KEYS.map((key) => payload[key]).filter(Boolean);
+  if (keyedDays.length) return keyedDays;
+
+  return Object.values(payload).filter(
+    (entry: any) => entry && typeof entry === 'object' && ('dayNo' in entry || 'dayNumber' in entry)
+  );
+};
+
+const getDashboardDaySortValue = (day: any, index: number) => {
+  const dateValue = day?.date ? new Date(day.date).getTime() : Number.NaN;
+  if (Number.isFinite(dateValue)) return dateValue;
+
+  const dayNumber = Number(day?.dayNo ?? day?.dayNumber ?? index + 1);
+  return Number.isFinite(dayNumber) ? dayNumber : index + 1;
+};
+
+const getSortedDashboardDays = (days: any[]) =>
+  days
+    .map((day, index) => ({ day, sortValue: getDashboardDaySortValue(day, index) }))
+    .sort((a, b) => a.sortValue - b.sortValue)
+    .map(({ day }) => day);
+
+const isUnlockedDashboardDay = (day: any) =>
+  String(day?.status || '').toLowerCase() !== 'locked';
+
+const getCurrentDashboardDay = (days: any[]) => {
+  const sortedDays = getSortedDashboardDays(days);
+  const todayKey = new Date().toDateString();
+  const activeDay = sortedDays.find(
+    (day) => String(day?.status || '').toLowerCase() === 'active' || day?.isActive
+  );
+  if (activeDay) return activeDay;
+
+  const todayDay = sortedDays.find((day) => {
+    if (!day?.date) return false;
+    const date = new Date(day.date);
+    return !Number.isNaN(date.getTime()) && date.toDateString() === todayKey;
+  });
+  if (todayDay) return todayDay;
+
+  const unlockedDays = sortedDays.filter(isUnlockedDashboardDay);
+  return unlockedDays.length
+    ? unlockedDays[unlockedDays.length - 1]
+    : sortedDays[sortedDays.length - 1];
+};
+
+const getDashboardDayLabel = (day: any) => {
+  const dayNumber = day?.dayNo ?? day?.dayNumber;
+  const dayLabel = dayNumber ? `Day ${String(dayNumber).padStart(2, '0')}` : 'Current day';
+  if (!day?.date) return dayLabel;
+
+  const date = new Date(day.date);
+  if (Number.isNaN(date.getTime())) return dayLabel;
+
+  const dateLabel = date.toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+  });
+  return `${dayLabel} - ${dateLabel}`;
+};
+
+const hasDashboardLogSignal = (day: any) =>
+  getProgressValue(day?.achievedCalories) > 0 ||
+  getHydrationValue(day) > 0 ||
+  getProgressValue(day?.walkingSteps ?? day?.steps ?? day?.stepCount) > 0;
+
+const averageProgressValues = (values: number[]) => {
+  if (!values.length) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+};
+
+const buildProgressSummaryMessage = async () => {
+  const accountUser = await tokenStorage.getUser();
+  const weeklyTrackingId = await getStoredWeeklyTrackingId(accountUser);
+  const dashboardCache = await getStoredDashboardCache(accountUser, weeklyTrackingId);
+  const dashboardDays = getDashboardDaysFromCache(dashboardCache);
+
+  if (!dashboardDays.length) {
+    throw new Error('Open the Dashboard once so FitFaat can prepare your latest progress summary.');
+  }
+
+  const currentDay = getCurrentDashboardDay(dashboardDays);
+  if (!currentDay) {
+    throw new Error('No dashboard day is ready to share yet.');
+  }
+
+  const displayMode = await loadGoalDisplayMode();
+  const unlockedDays = getSortedDashboardDays(dashboardDays).filter(isUnlockedDashboardDay);
+  const trackedDays = unlockedDays.filter(hasDashboardLogSignal);
+  const averageCalories = averageProgressValues(
+    trackedDays.map((day) => getProgressValue(day?.achievedCalories))
+  );
+  const averageHydration = averageProgressValues(trackedDays.map(getHydrationValue));
+  const averageGoalProgress = averageProgressValues(
+    trackedDays.map((day) => getDashboardGoalProgress(day))
+  );
+  const currentGoalProgress = getDashboardGoalProgress(currentDay);
+
+  return [
+    'FitFaat Progress Summary',
+    '',
+    `Current: ${getDashboardDayLabel(currentDay)}`,
+    `Goal achieved: ${Math.round(currentGoalProgress)}%`,
+    `Calories: ${formatProgressInteger(currentDay?.achievedCalories)} / ${formatCalorieTarget(currentDay, displayMode)} cals`,
+    `Hydration: ${formatHydrationLiters(getHydrationValue(currentDay))} / ${formatHydrationTarget(currentDay, displayMode)} L`,
+    '',
+    'Last 7 days:',
+    `Tracked days: ${trackedDays.length}/${unlockedDays.length || dashboardDays.length}`,
+    `Average calories: ${Math.round(averageCalories).toLocaleString()} cals`,
+    `Average hydration: ${trimTrailingZeros(averageHydration.toFixed(2))} L`,
+    `Average goal achieved: ${Math.round(averageGoalProgress)}%`,
+    '',
+    'Shared from my FitFaat progress.',
+  ].join('\n');
+};
+const getChatDateKey = (value?: string) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toDateString();
+};
+
+const formatChatDateDivider = (value?: string) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  if (date.toDateString() === today.toDateString()) return 'Today';
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+
+  return date.toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: date.getFullYear() === today.getFullYear() ? undefined : 'numeric',
+  });
+};
+
+const normalizeChatUserRole = (role?: string | null): ChatUserRole | null => {
+  return role === 'user' || role === 'doctor' ? role : null;
+};
+
+const getParticipantId = (appointment: any, role: ChatUserRole | null) => {
+  if (!appointment || !role) return '';
+
+  const participant = role === 'doctor' ? appointment.doctorId : appointment.patientId;
+  if (!participant) return '';
+  if (typeof participant === 'string') return participant;
+  if (typeof participant === 'object' && participant._id) return String(participant._id);
+
+  return String(participant);
+};
 
 interface AppointmentChatProps {
   appointmentId: string;
@@ -68,6 +314,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [sharingProgress, setSharingProgress] = useState(false);
   const [chatClosed, setChatClosed] = useState(false);
   const [closedReason, setClosedReason] = useState('');
   const [userRole, setUserRole] = useState<'user' | 'doctor' | null>(null);
@@ -75,18 +322,16 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
   const [accessMessage, setAccessMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [otherUserTyping, setOtherUserTyping] = useState(false);
+  const [typingUserName, setTypingUserName] = useState('');
   const [chatAccessGranted, setChatAccessGranted] = useState(false);
   const [isGrantingAccess, setIsGrantingAccess] = useState(false);
   const [otherUserName, setOtherUserName] = useState('');
-  const [otherUserId, setOtherUserId] = useState<string>(''); // For video calls
-  const [patientName, setPatientName] = useState(''); // For doctor's view
-  const [timeRemaining, setTimeRemaining] = useState('');
+  const [, setTimeRemaining] = useState('');
   const [chatEndTime, setChatEndTime] = useState<Date | null>(null);
-  const [patientStats, setPatientStats] = useState<any>(null);
-  const [showStatsModal, setShowStatsModal] = useState(false);
-  const [loadingStats, setLoadingStats] = useState(false);
   const [showDietPlanModal, setShowDietPlanModal] = useState(false);
+  const [showActionPlanModal, setShowActionPlanModal] = useState(false);
   const [loadingDietPlan, setLoadingDietPlan] = useState(false);
+  const [sendingActionPlan, setSendingActionPlan] = useState(false);
   const [appointmentData, setAppointmentData] = useState<any>(null);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
   const [keyboardLift, setKeyboardLift] = useState(0);
@@ -94,14 +339,28 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
   const socketRef = useRef<Socket | null>(null);
   const flatListRef = useRef<FlatList | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
+  const localTypingRef = useRef(false);
+  const lastLocalTypingEventRef = useRef<{ isTyping: boolean; sentAt: number } | null>(null);
+  const currentUserRoleRef = useRef<ChatUserRole | null>(null);
+  const currentUserIdRef = useRef('');
+  const otherUserNameRef = useRef('');
   const timerIntervalRef = useRef<number | null>(null);
   const isInVideoCall = useRef<boolean>(false);
-  const androidNavigationBarHeight = Platform.OS === 'android' && !isKeyboardVisible ? insets.bottom : 0;
+  const accessGrantNotifiedRef = useRef(false);
+  const isVideoCallActive = useCallback(() => isInVideoCall.current, []);
+  const androidNavigationBarHeight =
+    Platform.OS === 'android' && !isKeyboardVisible
+      ? Math.min(insets.bottom, MAX_ANDROID_NAV_BAR_SPACER)
+      : 0;
   const inputBottomPadding = isKeyboardVisible
     ? hp(0.6)
     : Platform.OS === 'android'
       ? hp(1.4)
       : Math.max(insets.bottom, hp(1.5));
+  const quickReplies = useMemo(
+    () => (userRole === 'doctor' ? QUICK_REPLIES.doctor : QUICK_REPLIES.user),
+    [userRole]
+  );
 
   const scrollToBottom = useCallback((animated = true) => {
     requestAnimationFrame(() => {
@@ -110,6 +369,22 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
       }, Platform.OS === 'ios' ? 80 : 120);
     });
   }, []);
+
+  const emitTypingStatus = useCallback((typing: boolean) => {
+    const senderRole = currentUserRoleRef.current ?? userRole;
+    const senderId = currentUserIdRef.current;
+
+    socketRef.current?.emit('typing', {
+      appointmentId,
+      isTyping: typing,
+      ...(senderRole ? { senderRole } : {}),
+      ...(senderId ? { senderId } : {}),
+    });
+
+    localTypingRef.current = typing;
+    lastLocalTypingEventRef.current = { isTyping: typing, sentAt: Date.now() };
+    setIsTyping(typing);
+  }, [appointmentId, userRole]);
 
   useEffect(() => {
     const handleKeyboardShow = (event: KeyboardEvent) => {
@@ -140,32 +415,6 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
     };
   }, [insets.bottom, scrollToBottom]);
 
-  // Initialize socket and load chat
-  useEffect(() => {
-    initializeChat();
-    
-    return () => {
-      // Only disconnect socket if not in video call
-      // During video call, just leave the room but keep socket connected
-      if (socketRef.current) {
-        if (isInVideoCall.current) {
-          console.log('📞 In video call - leaving room but keeping socket connected');
-          socketRef.current.emit('leave-appointment', { appointmentId });
-        } else {
-          console.log('🔌 Disconnecting socket (component unmount)');
-          socketRef.current.disconnect();
-          socketRef.current = null;
-        }
-      }
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-      }
-    };
-  }, [appointmentId]);
-
   useFocusEffect(
     useCallback(() => {
       if (Platform.OS !== 'android') return;
@@ -175,30 +424,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
       return () => {
         SystemUI.setBackgroundColorAsync(colors.screenColor).catch(() => {});
       };
-    }, [])
-  );
-
-  // CRITICAL: Disconnect socket when screen loses focus (user navigates away)
-  // This prevents the chat socket from receiving messages and marking them as read
-  // when the user is on a different screen (like the chat list)
-  useFocusEffect(
-    useCallback(() => {
-      // Screen is focused - reconnect if needed
-      console.log('👁️ [AppointmentChat] Screen focused');
-      if (!socketRef.current?.connected && !isInVideoCall.current) {
-        console.log('🔄 [AppointmentChat] Reconnecting socket...');
-        initializeChat();
-      }
-      
-      return () => {
-        // Screen lost focus - disconnect socket to prevent marking messages as read
-        console.log('👁️ [AppointmentChat] Screen UNFOCUSED - disconnecting socket');
-        if (socketRef.current && !isInVideoCall.current) {
-          socketRef.current.disconnect();
-          socketRef.current = null;
-        }
-      };
-    }, [appointmentId])
+    }, [colors.screenColor])
   );
 
   // Timer countdown
@@ -232,36 +458,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
     };
   }, [chatEndTime]);
 
-  const fetchPatientStats = async () => {
-    setLoadingStats(true);
-    try {
-      const token = await tokenStorage.getToken();
-      const response = await fetch(
-        `${BACKEND_URL}/api/chat/appointment/${appointmentId}/patient-stats`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      const data = await response.json();
-      if (data.success) {
-        setPatientStats(data.stats);
-        setShowStatsModal(true);
-      } else {
-        Alert.alert('Error', data.message || 'Failed to fetch patient stats');
-      }
-    } catch (error) {
-      console.error('Error fetching patient stats:', error);
-      Alert.alert('Error', 'Failed to load patient statistics');
-    } finally {
-      setLoadingStats(false);
-    }
-  };
-
-  const initializeChat = async () => {
+  const initializeChat = useCallback(async () => {
     // Prevent multiple socket connections
     if (socketRef.current?.connected) {
       console.log('⚠️ [AppointmentChat] Socket already connected, skipping init');
@@ -272,31 +469,23 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
       const token = await tokenStorage.getToken();
       if (!token) {
         Alert.alert('Error', 'Please login first');
-        try { const navigation = (require('@react-navigation/native').useNavigation)(); if (navigation && (navigation as any).canGoBack && (navigation as any).canGoBack()) { (navigation as any).goBack(); return; } } catch(e) {}
         router.back();
         return;
       }
 
       // Check chat access
-      const accessResponse = await fetch(
+      const accessData = await requestJson<any>(
         `${BACKEND_URL}/api/chat/appointment/${appointmentId}/access`,
         {
+          method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           }
-        }
+        },
+        { timeoutMs: 8000, retries: 1, retryDelayMs: 500 }
       );
 
-      console.log('Access response status:', accessResponse.status);
-      
-      if (!accessResponse.ok) {
-        const errorText = await accessResponse.text();
-        console.error('Access check failed:', errorText);
-        throw new Error(`Failed to check access: ${accessResponse.status}`);
-      }
-
-      const accessData = await accessResponse.json();
       console.log('Chat access response:', accessData);
 
       if (!accessData.success || !accessData.allowed) {
@@ -307,6 +496,12 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
       }
 
       setUserRole(accessData.userRole);
+      currentUserRoleRef.current = accessData.userRole;
+      const currentUserId =
+        accessData.userId ||
+        accessData.currentUserId ||
+        getParticipantId(accessData.appointment, accessData.userRole);
+      currentUserIdRef.current = currentUserId ? String(currentUserId) : '';
       setCanSend(accessData.canSend);
       setAccessMessage(accessData.message || '');
       setChatAccessGranted(!!accessData.appointment?.chatAccessGrantedAt);
@@ -335,26 +530,27 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
       }
 
       // Load existing messages
-      const messagesResponse = await fetch(
+      const messagesData = await cachedRequestJson<any>(
+        `chat:messages:${appointmentId}`,
         `${BACKEND_URL}/api/chat/appointment/${appointmentId}/messages`,
         {
+          method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           }
-        }
+        },
+        CHAT_READ_CONFIG
       );
 
-      console.log('Messages response status:', messagesResponse.status);
-      
-      if (messagesResponse.ok) {
-        const messagesData = await messagesResponse.json();
-        console.log('Loaded messages:', messagesData.messages?.length || 0);
-        if (messagesData.success) {
-          setMessages(messagesData.messages || []);
-        }
-      } else {
-        console.error('Failed to load messages:', messagesResponse.status);
+      console.log('Loaded messages:', messagesData.messages?.length || 0);
+      if (messagesData.success) {
+        setMessages(messagesData.messages || []);
+      }
+
+      if (!isRealtimeSocketEnabled()) {
+        setLoading(false);
+        return;
       }
 
       // Initialize Socket.io
@@ -377,16 +573,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
         console.log('✅ Room details - appointmentId:', data.appointmentId, 'userRole:', data.userRole, 'canSend:', data.canSend);
         const otherName = data.otherUserName || (accessData.userRole === 'doctor' ? 'Patient' : 'Doctor');
         setOtherUserName(otherName);
-        
-        // Set other user ID for video calls
-        if (data.otherUserId) {
-          setOtherUserId(data.otherUserId);
-        }
-        
-        // Set patient name if user is doctor
-        if (accessData.userRole === 'doctor') {
-          setPatientName(otherName);
-        }
+        otherUserNameRef.current = otherName;
         
         // Update canSend from socket data (this reflects real-time access status)
         if (data.canSend !== undefined) {
@@ -422,10 +609,10 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
             return prev;
           }
 
-          if (message.senderRole !== accessData.userRole) {
+          if (message.senderRole !== (currentUserRoleRef.current || accessData.userRole)) {
             sendFitFaatNotification(
               'chat',
-              `Message from ${message.senderName || otherUserName || 'FitFaat'}`,
+              `Message from ${message.senderName || otherUserNameRef.current || 'FitFaat'}`,
               message.message,
               {
                 appointmentId,
@@ -442,7 +629,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
           console.log('✅ Adding message to state. New count:', newMessages.length);
           
           // Mark message as delivered if it's from the other user
-          if (message.senderRole !== userRole && socketRef.current) {
+          if (message.senderRole !== (currentUserRoleRef.current || accessData.userRole) && socketRef.current) {
             socketRef.current.emit('message-delivered', { messageId: message._id });
             // Also mark as read immediately since user is viewing the chat
             socketRef.current.emit('mark-all-read', { appointmentId });
@@ -471,15 +658,43 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
         console.log('👁️ All messages marked as read');
         setMessages(prev => 
           prev.map(msg => 
-            msg.senderRole === userRole 
+            msg.senderRole === (currentUserRoleRef.current || accessData.userRole)
               ? { ...msg, status: 'read' }
               : msg
           )
         );
       });
 
-      socket.on('user-typing', (data) => {
-        setOtherUserTyping(data.isTyping);
+      socket.on('user-typing', (data: TypingPayload = {}) => {
+        const typingRole = normalizeChatUserRole(data.senderRole || data.userRole || data.role);
+        const typingUserIdValue = data.senderId || data.userId;
+        const typingUserId = typingUserIdValue ? String(typingUserIdValue) : '';
+        const currentRole = currentUserRoleRef.current || accessData.userRole;
+        const currentUserId = currentUserIdRef.current;
+        const nextTyping = Boolean(data.isTyping);
+        const lastLocalTypingEvent = lastLocalTypingEventRef.current;
+        const looksLikeLocalTypingEcho =
+          nextTyping &&
+          !typingRole &&
+          !typingUserId &&
+          lastLocalTypingEvent?.isTyping === nextTyping &&
+          Date.now() - lastLocalTypingEvent.sentAt < 2500;
+        const typingCameFromCurrentUser =
+          (typingRole && typingRole === currentRole) ||
+          (typingUserId && currentUserId && typingUserId === currentUserId) ||
+          (nextTyping && !typingRole && !typingUserId && localTypingRef.current) ||
+          looksLikeLocalTypingEcho;
+
+        if (typingCameFromCurrentUser) {
+          return;
+        }
+
+        setOtherUserTyping(nextTyping);
+        setTypingUserName(
+          nextTyping
+            ? data.senderName || data.userName || data.name || otherUserNameRef.current || 'They'
+            : ''
+        );
       });
 
       socket.on('access-granted', (data) => {
@@ -492,7 +707,25 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
         
         // Use accessData.userRole instead of state userRole (avoid closure issue)
         if (accessData.userRole === 'user' && data.canSend) {
-          Alert.alert('Access Granted', 'Doctor has granted you chat access! You can now send messages.');
+          if (!accessGrantNotifiedRef.current) {
+            accessGrantNotifiedRef.current = true;
+            const notificationPayload = buildChatAccessGrantedNotificationPayload(
+              appointmentId,
+              accessData.appointment
+            );
+            sendFitFaatNotification(
+              'chat',
+              notificationPayload.title,
+              notificationPayload.body,
+              notificationPayload.data
+            ).catch((error) => {
+              console.error('Failed to show chat access notification:', error);
+            });
+            Alert.alert(
+              CHAT_ACCESS_GRANTED_TITLE,
+              CHAT_ACCESS_GRANTED_BODY
+            );
+          }
         }
         
         console.log('🔓 Updated canSend to:', data.canSend);
@@ -545,7 +778,53 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
       Alert.alert('Error', 'Failed to load chat');
       setLoading(false);
     }
-  };
+  }, [appointmentId, router, sendFitFaatNotification]);
+
+  // Initialize socket and load chat
+  useEffect(() => {
+    initializeChat();
+
+    return () => {
+      const wasInVideoCall = isVideoCallActive();
+      if (socketRef.current) {
+        if (wasInVideoCall) {
+          console.log('📞 In video call - leaving room but keeping socket connected');
+          socketRef.current.emit('leave-appointment', { appointmentId });
+        } else {
+          console.log('🔌 Disconnecting socket (component unmount)');
+          socketRef.current.disconnect();
+          socketRef.current = null;
+        }
+      }
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      localTypingRef.current = false;
+      lastLocalTypingEventRef.current = null;
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, [appointmentId, initializeChat, isVideoCallActive]);
+
+  // Disconnect socket when the screen loses focus so messages are not marked read from the list.
+  useFocusEffect(
+    useCallback(() => {
+      console.log('👁️ [AppointmentChat] Screen focused');
+      if (!socketRef.current?.connected && !isVideoCallActive()) {
+        console.log('🔄 [AppointmentChat] Reconnecting socket...');
+        initializeChat();
+      }
+
+      return () => {
+        console.log('👁️ [AppointmentChat] Screen UNFOCUSED - disconnecting socket');
+        if (socketRef.current && !isVideoCallActive()) {
+          socketRef.current.disconnect();
+          socketRef.current = null;
+        }
+      };
+    }, [initializeChat, isVideoCallActive])
+  );
 
   const grantAccessToUser = async () => {
     if (isGrantingAccess) return;
@@ -553,18 +832,23 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
     setIsGrantingAccess(true);
     try {
       const token = await tokenStorage.getToken();
-      const response = await fetch(
+      const data = await requestJson<any>(
         `${BACKEND_URL}/api/chat/appointment/${appointmentId}/grant-access`,
         {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
-          }
-        }
+          },
+          body: JSON.stringify({
+            notification: buildChatAccessGrantedNotificationPayload(
+              appointmentId,
+              appointmentData
+            ),
+          }),
+        },
+        { timeoutMs: 12000, retries: 0 }
       );
-
-      const data = await response.json();
       
       if (data.success) {
         console.log('Access granted successfully:', data);
@@ -591,19 +875,19 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
     }
   };
 
-  const sendMessage = () => {
-    if (!inputText.trim() || sending || chatClosed || !canSend) {
+  const sendChatText = useCallback(async (textToSend: string, restoreInputOnError = false) => {
+    const messageText = textToSend.trim();
+    if (!messageText || sending || chatClosed || !canSend) {
       console.log('Cannot send message:', { 
-        hasText: !!inputText.trim(), 
+        hasText: !!messageText, 
         sending, 
         chatClosed, 
         canSend 
       });
-      return;
+      return false;
     }
 
     setSending(true);
-    const messageText = inputText.trim();
     setInputText('');
     
     if (socketRef.current && socketRef.current.connected) {
@@ -612,6 +896,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
         appointmentId,
         message: messageText
       });
+      clearRequestJsonCache(`chat:messages:${appointmentId}`).catch(() => {});
 
       sendFitFaatNotification(
         'chat',
@@ -633,15 +918,91 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
-      socketRef.current.emit('typing', { appointmentId, isTyping: false });
-      setIsTyping(false);
+      emitTypingStatus(false);
+      return true;
     } else {
-      console.error('Socket not connected, cannot send message');
-      setInputText(messageText); // Restore message
-      setSending(false);
-      Alert.alert('Connection Error', 'Not connected to chat server. Please try again.');
+      try {
+        const token = await tokenStorage.getToken();
+        const data = await requestJson<any>(
+          `${BACKEND_URL}/api/chat/appointment/${appointmentId}/messages`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ message: messageText }),
+          },
+          { timeoutMs: 12000, retries: 0 }
+        );
+
+        if (!data.success) {
+          throw new Error(data.message || 'Failed to send message');
+        }
+
+        clearRequestJsonCache(`chat:messages:${appointmentId}`).catch(() => {});
+        setMessages((prev) => [...prev, data.message]);
+        sendFitFaatNotification(
+          'chat',
+          'Message Sent',
+          `Your message to ${otherUserName || 'the chat'} was sent.`,
+          {
+            appointmentId,
+            chatId: appointmentId,
+            doctorId: appointmentData?.doctorId,
+            patientId: appointmentData?.patientId,
+          }
+        ).catch((error) => {
+          console.error('Failed to show sent-message notification:', error);
+        });
+
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      } catch (error: any) {
+        console.error('REST message send failed:', error);
+        if (restoreInputOnError) {
+          setInputText(messageText);
+        }
+        Alert.alert('Error', error?.message || 'Failed to send message');
+        return false;
+      } finally {
+        setSending(false);
+      }
     }
-  };
+    return true;
+  }, [
+    appointmentData?.doctorId,
+    appointmentData?.patientId,
+    appointmentId,
+    canSend,
+    chatClosed,
+    emitTypingStatus,
+    otherUserName,
+    sendFitFaatNotification,
+    sending,
+  ]);
+
+  const sendMessage = useCallback(async () => {
+    await sendChatText(inputText, true);
+  }, [inputText, sendChatText]);
+
+  const handleSendActionPlan = useCallback(
+    async (plan: DoctorActionPlan) => {
+      if (sendingActionPlan) return;
+
+      setSendingActionPlan(true);
+      try {
+        const sent = await sendChatText(buildDoctorActionPlanMessage(plan));
+        if (sent) {
+          setShowActionPlanModal(false);
+        }
+      } finally {
+        setSendingActionPlan(false);
+      }
+    },
+    [sendChatText, sendingActionPlan]
+  );
 
   const handleTextChange = (text: string) => {
     setInputText(text);
@@ -649,8 +1010,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
     if (!chatClosed && canSend && socketRef.current) {
       // Send typing indicator
       if (!isTyping) {
-        socketRef.current.emit('typing', { appointmentId, isTyping: true });
-        setIsTyping(true);
+        emitTypingStatus(true);
       }
 
       // Clear existing timeout
@@ -660,16 +1020,77 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
 
       // Set new timeout to stop typing indicator
       typingTimeoutRef.current = setTimeout(() => {
-        if (socketRef.current) {
-          socketRef.current.emit('typing', { appointmentId, isTyping: false });
-        }
-        setIsTyping(false);
+        emitTypingStatus(false);
       }, 1000);
     }
   };
 
-  const renderMessage = ({ item }: { item: ChatMessage }) => {
+  const handleShareProgress = useCallback(async () => {
+    if (sharingProgress || sending || chatClosed || !canSend) return;
+
+    setSharingProgress(true);
+    try {
+      const progressSummary = await buildProgressSummaryMessage();
+      await sendChatText(progressSummary);
+    } catch (error: any) {
+      console.error('Failed to build progress summary:', error);
+      Alert.alert(
+        'Progress Not Ready',
+        error?.message || 'FitFaat could not prepare your progress summary yet.'
+      );
+    } finally {
+      setSharingProgress(false);
+    }
+  }, [canSend, chatClosed, sendChatText, sending, sharingProgress]);
+
+  const handleQuickReplyPress = (reply: string) => {
+    handleTextChange(reply);
+  };
+
+  const renderActionPlanCard = (plan: DoctorActionPlan, isOwnMessage: boolean) => {
+    const textColor = isOwnMessage ? colors.textOnPrimary : colors.textPrimary;
+    const mutedColor = isOwnMessage ? 'rgba(255,255,255,0.78)' : colors.textSecondary;
+
+    const rows = [
+      { icon: 'nutrition-outline' as const, label: 'Diet', value: plan.dietTargets || 'Follow doctor guidance' },
+      { icon: 'water-outline' as const, label: 'Water', value: plan.waterGoal || 'Keep hydration consistent' },
+      { icon: 'ban-outline' as const, label: 'Avoid', value: plan.foodsToAvoid || 'Not specified' },
+      { icon: 'document-text-outline' as const, label: 'Notes', value: plan.notes || 'No extra notes' },
+      { icon: 'calendar-outline' as const, label: 'Next', value: plan.nextAppointment || 'Not scheduled' },
+    ];
+
+    return (
+      <View style={styles.actionPlanCard}>
+        <View style={styles.actionPlanHeader}>
+          <View style={styles.actionPlanIcon}>
+            <Ionicons name="clipboard-outline" size={Math.min(hp(2.4), wp(5.4))} color={colors.primary} />
+          </View>
+          <View style={styles.actionPlanTitleWrap}>
+            <Text style={[styles.actionPlanTitle, { color: textColor }]}>Doctor Action Plan</Text>
+            <Text style={[styles.actionPlanSubtitle, { color: mutedColor }]}>
+              Follow this for {plan.durationDays} days
+            </Text>
+          </View>
+        </View>
+        {rows.map((row) => (
+          <View key={row.label} style={styles.actionPlanRow}>
+            <Ionicons name={row.icon} size={Math.min(hp(1.8), wp(4))} color={mutedColor} />
+            <View style={styles.actionPlanRowCopy}>
+              <Text style={[styles.actionPlanRowLabel, { color: mutedColor }]}>{row.label}</Text>
+              <Text style={[styles.actionPlanRowValue, { color: textColor }]}>{row.value}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  const renderMessage = ({ item, index }: { item: ChatMessage; index: number }) => {
     const isOwnMessage = item.senderRole === userRole;
+    const actionPlan = parseDoctorActionPlanMessage(item.message);
+    const previousMessage = index > 0 ? messages[index - 1] : null;
+    const showDateDivider =
+      !previousMessage || getChatDateKey(previousMessage.createdAt) !== getChatDateKey(item.createdAt);
     
     // Determine message status icon
     const getMessageStatusIcon = () => {
@@ -702,44 +1123,59 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
     };
     
     return (
-      <View style={[
-        styles.messageContainer,
-        isOwnMessage ? styles.ownMessage : styles.otherMessage
-      ]}>
-        {!isOwnMessage && (
-          <View style={styles.otherUserAvatar}>
-            <Ionicons 
-              name={userRole === 'doctor' ? 'person' : 'medical'} 
-              size={Math.min(hp(3), wp(6.4))} 
-              color={colors.primary} 
-            />
+      <View>
+        {showDateDivider && (
+          <View style={styles.dateDividerRow}>
+            <Text style={styles.dateDividerText}>{formatChatDateDivider(item.createdAt)}</Text>
           </View>
         )}
-        <View style={{ flex: 1 }}>
+        <View style={[
+          styles.messageContainer,
+          isOwnMessage ? styles.ownMessage : styles.otherMessage,
+          actionPlan ? styles.actionPlanMessageContainer : null,
+          actionPlan && isOwnMessage ? styles.ownActionPlanMessage : null,
+          actionPlan && !isOwnMessage ? styles.otherActionPlanMessage : null,
+        ]}>
           {!isOwnMessage && (
-            <Text style={styles.senderName}>{item.senderName}</Text>
+            <View style={styles.otherUserAvatar}>
+              <Ionicons
+                name={userRole === 'doctor' ? 'person' : 'medical'}
+                size={Math.min(hp(3), wp(6.4))}
+                color={colors.primary}
+              />
+            </View>
           )}
-          <View style={[
-            styles.messageBubble,
-            isOwnMessage ? styles.ownBubble : styles.otherBubble
-          ]}>
-            <Text style={[
-              styles.messageText,
-              isOwnMessage ? styles.ownMessageText : styles.otherMessageText
+          <View style={{ flex: 1 }}>
+            {!isOwnMessage && (
+              <Text style={styles.senderName}>{item.senderName}</Text>
+            )}
+            <View style={[
+              styles.messageBubble,
+              isOwnMessage ? styles.ownBubble : styles.otherBubble,
+              actionPlan ? styles.actionPlanBubble : null,
             ]}>
-              {item.message}
-            </Text>
-            <View style={styles.messageFooter}>
-              <Text style={[
-                styles.messageTime,
-                isOwnMessage ? styles.ownMessageTime : styles.otherMessageTime
-              ]}>
-                {new Date(item.createdAt).toLocaleTimeString([], { 
-                  hour: '2-digit', 
-                  minute: '2-digit' 
-                })}
-              </Text>
-              {getMessageStatusIcon()}
+              {actionPlan ? (
+                renderActionPlanCard(actionPlan, isOwnMessage)
+              ) : (
+                <Text style={[
+                  styles.messageText,
+                  isOwnMessage ? styles.ownMessageText : styles.otherMessageText
+                ]}>
+                  {item.message}
+                </Text>
+              )}
+              <View style={styles.messageFooter}>
+                <Text style={[
+                  styles.messageTime,
+                  isOwnMessage ? styles.ownMessageTime : styles.otherMessageTime
+                ]}>
+                  {new Date(item.createdAt).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </Text>
+                {getMessageStatusIcon()}
+              </View>
             </View>
           </View>
         </View>
@@ -769,18 +1205,7 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
           <Text style={styles.closedReason}>{closedReason}</Text>
           <TouchableOpacity 
             style={styles.goBackButton}
-            onPress={() => {
-              // Prefer navigation goBack when possible
-              try {
-                // @ts-ignore
-                const navigation = require('@react-navigation/native').useNavigation();
-                if (navigation && typeof (navigation as any).canGoBack === 'function' && (navigation as any).canGoBack()) {
-                  (navigation as any).goBack();
-                  return;
-                }
-              } catch (e) {}
-              router.back();
-            }}
+            onPress={() => router.back()}
           >
             <Text style={styles.backButtonText}>Go Back</Text>
           </TouchableOpacity>
@@ -833,21 +1258,22 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
           size={Math.min(hp(3), wp(6.4))}
         />
         
-        {/* Patient Stats Button - Doctor Only */}
+        {/* Action Plan Button - Doctor Only */}
         {userRole === 'doctor' && (
-          <TouchableOpacity 
-            style={styles.statsButton} 
-            onPress={fetchPatientStats}
+          <TouchableOpacity
+            style={styles.statsButton}
+            onPress={() => setShowActionPlanModal(true)}
             activeOpacity={0.7}
+            disabled={!canSend || chatClosed}
           >
-            {loadingStats ? (
+            {sendingActionPlan ? (
               <ActivityIndicator size="small" color={colors.textOnPrimary} />
             ) : (
-              <Ionicons name="bar-chart-outline" size={Math.min(hp(3), wp(6.4))} color={colors.textOnPrimary} />
+              <Ionicons name="clipboard-outline" size={Math.min(hp(3), wp(6.4))} color={colors.textOnPrimary} />
             )}
           </TouchableOpacity>
         )}
-        
+
         {/* Diet Plan Button - Doctor Only */}
         {userRole === 'doctor' && (
           <TouchableOpacity 
@@ -927,12 +1353,68 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
         {/* Typing Indicator */}
         {otherUserTyping && (
           <View style={styles.typingContainer}>
-            <Text style={styles.typingText}>Typing...</Text>
+            <View style={styles.typingBubble}>
+              <Text style={styles.typingText}>{typingUserName || otherUserName || 'They'} typing</Text>
+              <View style={styles.typingDots}>
+                <View style={styles.typingDot} />
+                <View style={styles.typingDot} />
+                <View style={styles.typingDot} />
+              </View>
+            </View>
           </View>
         )}
 
         {/* Input Area */}
-        <View style={[styles.composerContainer, { marginBottom: keyboardLift }]}>
+        <View
+          style={[
+            styles.composerContainer,
+            isKeyboardVisible && keyboardLift > 0 ? { marginBottom: keyboardLift } : null,
+          ]}
+        >
+          {canSend && !chatClosed && inputText.trim().length === 0 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.quickReplyRow}
+              keyboardShouldPersistTaps="handled"
+            >
+              {userRole === 'user' && (
+                <AnimatedPressable
+                  style={[
+                    styles.quickReplyChip,
+                    styles.progressShareChip,
+                    (sharingProgress || sending) && styles.quickReplyChipDisabled,
+                  ]}
+                  onPress={handleShareProgress}
+                  disabled={sharingProgress || sending}
+                  activeScale={0.96}
+                >
+                  {sharingProgress ? (
+                    <ActivityIndicator size="small" color={colors.textOnPrimary} />
+                  ) : (
+                    <Ionicons
+                      name="stats-chart-outline"
+                      size={Math.min(hp(1.9), wp(4.2))}
+                      color={colors.textOnPrimary}
+                    />
+                  )}
+                  <Text style={[styles.quickReplyText, styles.progressShareText]}>
+                    Share Progress
+                  </Text>
+                </AnimatedPressable>
+              )}
+              {quickReplies.map((reply) => (
+                <AnimatedPressable
+                  key={reply}
+                  style={styles.quickReplyChip}
+                  onPress={() => handleQuickReplyPress(reply)}
+                  activeScale={0.96}
+                >
+                  <Text style={styles.quickReplyText}>{reply}</Text>
+                </AnimatedPressable>
+              ))}
+            </ScrollView>
+          )}
           <View style={[styles.inputContainer, { paddingBottom: inputBottomPadding }]}>
             <TextInput
               style={styles.input}
@@ -944,122 +1426,27 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
               maxLength={1000}
               editable={!chatClosed && canSend}
             />
-            <TouchableOpacity 
+            <AnimatedPressable 
               style={[
                 styles.sendButton,
                 (!inputText.trim() || sending || chatClosed || !canSend) && styles.sendButtonDisabled
               ]}
               onPress={sendMessage}
               disabled={!inputText.trim() || sending || chatClosed || !canSend}
-              activeOpacity={0.8}
+              activeScale={0.94}
             >
               {sending ? (
                 <ActivityIndicator size="small" color={colors.textOnPrimary} />
               ) : (
                 <Ionicons name="send" size={Math.min(hp(3), wp(6.4))} color={colors.textOnPrimary} />
               )}
-            </TouchableOpacity>
+            </AnimatedPressable>
           </View>
           {androidNavigationBarHeight > 0 && (
             <View style={[styles.androidNavigationBarBackground, { height: androidNavigationBarHeight }]} />
           )}
         </View>
       </KeyboardAvoidingView>
-
-
-
-      {/* Patient Stats Modal */}
-      <Modal
-        visible={showStatsModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowStatsModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Patient Health Overview</Text>
-              <TouchableOpacity onPress={() => setShowStatsModal(false)}>
-                <Ionicons name="close" size={Math.min(hp(3), wp(6.4))} color={colors.textPrimary} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-              {patientStats ? (
-                <>
-                  <View style={styles.statsCard}>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statLabel}>Weight</Text>
-                      <Text style={styles.statValue}>{patientStats.weight || '--'} kg</Text>
-                    </View>
-                    <View style={styles.statDivider} />
-                    <View style={styles.statItem}>
-                      <Text style={styles.statLabel}>Height</Text>
-                      <Text style={styles.statValue}>{patientStats.height || '--'} cm</Text>
-                    </View>
-                    <View style={styles.statDivider} />
-                    <View style={styles.statItem}>
-                      <Text style={styles.statLabel}>BMI</Text>
-                      <Text style={styles.statValue}>{patientStats.bmi || '--'}</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.sectionContainer}>
-                    <Text style={styles.sectionTitle}>Daily Calorie Goal</Text>
-                    <View style={styles.goalCard}>
-                      <Ionicons name="flame" size={Math.min(hp(3), wp(6.4))} color="#FF9500" />
-                      <View style={styles.goalInfo}>
-                        <Text style={styles.goalValue}>{patientStats.goalCalories || 'Not set'} kcal</Text>
-                        <Text style={styles.goalLabel}>Daily Target</Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  <View style={styles.sectionContainer}>
-                    <Text style={styles.sectionTitle}>Recent Intake (Last 7 Days)</Text>
-                    {patientStats.recentLogs && patientStats.recentLogs.length > 0 ? (
-                      patientStats.recentLogs.map((log: any, index: number) => (
-                        <View key={index} style={styles.logItem}>
-                          <View style={styles.logHeader}>
-                            <Text style={styles.logDate}>
-                              {new Date(log.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-                            </Text>
-                            <Text style={styles.logValues}>
-                              {log.achievedCalories} / {log.targetCalories} kcal
-                            </Text>
-                          </View>
-                          <View style={styles.logBarContainer}>
-                            <View 
-                              style={[
-                                styles.logBar, 
-                                { 
-                                  width: `${Math.min((log.achievedCalories / (log.targetCalories || 2000)) * 100, 100)}%`,
-                                  backgroundColor: log.achievedCalories > log.targetCalories ? '#FF3B30' : colors.primary 
-                                }
-                              ]} 
-                            />
-                          </View>
-                        </View>
-                      ))
-                    ) : (
-                      <View style={styles.emptyContainer}>
-                        <Ionicons name="calendar-outline" size={Math.min(hp(5.9), wp(12.8))} color={colors.textTertiary} />
-                        <Text style={styles.emptyText}>No recent tracking logs found</Text>
-                      </View>
-                    )}
-                  </View>
-                </>
-              ) : (
-                <View style={[styles.loadingContainer, { height: hp(37) }]}>
-                  <ActivityIndicator size="large" color={colors.primary} />
-                  <Text style={styles.loadingText}>Loading health data...</Text>
-                </View>
-              )}
-              <View style={{ height: hp(3.7) }} />
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
 
       {/* Diet Plan Modal */}
       <DietPlanModal 
@@ -1070,6 +1457,12 @@ export default function AppointmentChat({ appointmentId }: AppointmentChatProps)
         patientName={otherUserName}
         loading={loadingDietPlan}
         setLoading={setLoadingDietPlan}
+      />
+      <DoctorActionPlanModal
+        visible={showActionPlanModal}
+        loading={sendingActionPlan}
+        onClose={() => setShowActionPlanModal(false)}
+        onSend={handleSendActionPlan}
       />
     </SafeAreaView>
   );
@@ -1149,6 +1542,22 @@ const getStyles = (colors: any) => StyleSheet.create({
     padding: theme.spacing.lg,
     paddingBottom: theme.spacing.sm
   },
+  dateDividerRow: {
+    alignItems: 'center',
+    marginBottom: hp(1.5),
+  },
+  dateDividerText: {
+    overflow: 'hidden',
+    backgroundColor: colors.backgroundHeader,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: wp(4),
+    paddingHorizontal: wp(3.2),
+    paddingVertical: hp(0.65),
+    color: colors.textSecondary,
+    fontSize: Math.min(hp(1.35), wp(3)),
+    fontWeight: '800',
+  },
   messageContainer: {
     marginBottom: theme.spacing.lg,
     maxWidth: '78%',
@@ -1161,6 +1570,17 @@ const getStyles = (colors: any) => StyleSheet.create({
   otherMessage: {
     alignSelf: 'flex-start',
     marginRight: '22%'
+  },
+  actionPlanMessageContainer: {
+    width: wp(88),
+    maxWidth: wp(88),
+    marginBottom: hp(1.2),
+  },
+  ownActionPlanMessage: {
+    marginLeft: wp(4),
+  },
+  otherActionPlanMessage: {
+    marginRight: wp(2),
   },
   otherUserAvatar: {
     marginRight: wp(2.7),
@@ -1186,6 +1606,11 @@ const getStyles = (colors: any) => StyleSheet.create({
     ...theme.shadows.small,
     minWidth: wp(21.3)
   },
+  actionPlanBubble: {
+    width: '100%',
+    paddingHorizontal: wp(3.4),
+    paddingVertical: hp(1.35),
+  },
   ownBubble: {
     backgroundColor: colors.primary,
     borderBottomRightRadius: wp(1.1)
@@ -1206,6 +1631,57 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   otherMessageText: {
     color: colors.textPrimary
+  },
+  actionPlanCard: {
+    width: '100%',
+    gap: hp(0.68),
+  },
+  actionPlanHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(2.4),
+    marginBottom: hp(0.35),
+  },
+  actionPlanIcon: {
+    width: Math.min(hp(3.8), wp(8.2)),
+    height: Math.min(hp(3.8), wp(8.2)),
+    borderRadius: Math.min(hp(1.9), wp(4.1)),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.textOnPrimary,
+  },
+  actionPlanTitleWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  actionPlanTitle: {
+    fontSize: Math.min(hp(1.75), wp(4.15)),
+    fontWeight: '900',
+  },
+  actionPlanSubtitle: {
+    fontSize: Math.min(hp(1.24), wp(2.95)),
+    fontWeight: '800',
+    marginTop: hp(0.15),
+  },
+  actionPlanRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: wp(2.2),
+  },
+  actionPlanRowCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  actionPlanRowLabel: {
+    fontSize: Math.min(hp(1.08), wp(2.6)),
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  actionPlanRowValue: {
+    fontSize: Math.min(hp(1.38), wp(3.3)),
+    lineHeight: Math.min(hp(2.05), wp(4.85)),
+    fontWeight: '700',
+    marginTop: hp(0.12),
   },
   messageFooter: {
     flexDirection: 'row',
@@ -1246,18 +1722,74 @@ const getStyles = (colors: any) => StyleSheet.create({
     top: 0
   },
   typingContainer: {
-    padding: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: hp(0.8),
     paddingLeft: theme.spacing.xl,
     backgroundColor: 'transparent'
+  },
+  typingBubble: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.cardBackground,
+    borderRadius: wp(5),
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: wp(3.4),
+    paddingVertical: hp(0.9),
+    gap: wp(2),
   },
   typingText: {
     fontSize: theme.typography.fontSize.sm,
     color: colors.primary,
-    fontStyle: 'italic',
     fontWeight: theme.typography.fontWeight.semiBold as any
+  },
+  typingDots: {
+    flexDirection: 'row',
+    gap: wp(0.8),
+  },
+  typingDot: {
+    width: hp(0.65),
+    height: hp(0.65),
+    borderRadius: hp(0.33),
+    backgroundColor: colors.primary,
+    opacity: 0.7,
   },
   composerContainer: {
     backgroundColor: colors.primary,
+  },
+  quickReplyRow: {
+    gap: wp(2),
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: hp(1),
+    paddingBottom: hp(0.8),
+    backgroundColor: colors.cardBackground,
+  },
+  quickReplyChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: wp(1.2),
+    borderRadius: wp(5),
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft || `${colors.primary}18`,
+    paddingHorizontal: wp(3.5),
+    paddingVertical: hp(0.9),
+  },
+  progressShareChip: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  quickReplyChipDisabled: {
+    opacity: 0.7,
+  },
+  quickReplyText: {
+    color: colors.primary,
+    fontSize: Math.min(hp(1.45), wp(3.2)),
+    fontWeight: '800',
+  },
+  progressShareText: {
+    color: colors.textOnPrimary,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -1402,136 +1934,5 @@ const getStyles = (colors: any) => StyleSheet.create({
   statsButton: {
     padding: theme.spacing.sm,
     marginRight: wp(1.1)
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: colors.cardBackground,
-    borderTopLeftRadius: wp(6.4),
-    borderTopRightRadius: wp(6.4),
-    height: '85%',
-    padding: theme.spacing.xl,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing.xl,
-  },
-  modalTitle: {
-    fontSize: Math.min(hp(2.7), wp(5.9)),
-    fontWeight: 'bold',
-    color: colors.textPrimary,
-  },
-  modalBody: {
-    flex: 1,
-  },
-  statsCard: {
-    flexDirection: 'row',
-    backgroundColor: colors.backgroundHeader,
-    borderRadius: wp(4.3),
-    padding: theme.spacing.lg,
-    marginBottom: theme.spacing.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    justifyContent: 'space-around',
-    alignItems: 'center',
-  },
-  statItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statDivider: {
-    width: wp(0.25),
-    height: '60%',
-    backgroundColor: colors.border,
-  },
-  statLabel: {
-    fontSize: Math.min(hp(1.5), wp(3.2)),
-    color: colors.textSecondary,
-    marginBottom: hp(0.5),
-    textTransform: 'uppercase',
-    letterSpacing: 0,
-  },
-  statValue: {
-    fontSize: Math.min(hp(2.2), wp(4.8)),
-    fontWeight: 'bold',
-    color: colors.primary,
-  },
-  sectionContainer: {
-    marginBottom: hp(3),
-  },
-  sectionTitle: {
-    fontSize: Math.min(hp(2), wp(4.3)),
-    fontWeight: 'bold',
-    color: colors.textPrimary,
-    marginBottom: hp(1.5),
-  },
-  goalCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF4E5',
-    padding: wp(4.3),
-    borderRadius: wp(3.2),
-    borderWidth: 1,
-    borderColor: '#FFE0B2',
-  },
-  goalInfo: {
-    marginLeft: wp(3.2),
-  },
-  goalValue: {
-    fontSize: Math.min(hp(2.5), wp(5.4)),
-    fontWeight: 'bold',
-    color: '#E65100',
-  },
-  goalLabel: {
-    fontSize: Math.min(hp(1.5), wp(3.2)),
-    color: '#F57C00',
-  },
-  logItem: {
-    marginBottom: hp(2),
-  },
-  logHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: hp(0.7),
-  },
-  logDate: {
-    fontSize: Math.min(hp(1.8), wp(3.8)),
-    fontWeight: '500',
-    color: colors.textSecondary,
-  },
-  logValues: {
-    fontSize: Math.min(hp(1.8), wp(3.8)),
-    fontWeight: 'bold',
-    color: colors.textPrimary,
-  },
-  logBarContainer: {
-    height: hp(1),
-    backgroundColor: colors.border,
-    borderRadius: hp(0.5),
-    overflow: 'hidden',
-  },
-  logBar: {
-    height: '100%',
-    borderRadius: hp(0.5),
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    padding: wp(8.5),
-    backgroundColor: colors.backgroundHeader,
-    borderRadius: wp(3.2),
-    borderStyle: 'dashed',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  emptyText: {
-    marginTop: hp(1.5),
-    color: colors.textSecondary,
-    fontSize: Math.min(hp(1.8), wp(3.8)),
   }
 });

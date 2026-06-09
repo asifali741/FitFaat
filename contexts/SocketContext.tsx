@@ -1,7 +1,7 @@
 import { tokenStorage } from '@/utils/auth/tokenStorage';
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { getBackendBaseUrl } from '@/utils/config';
+import { getBackendBaseUrl, isRealtimeSocketEnabled } from '@/utils/config';
 
 interface SocketContextType {
   socket: Socket | null;
@@ -25,6 +25,11 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     const initSocket = async () => {
       try {
+        if (!isRealtimeSocketEnabled()) {
+          setIsConnected(false);
+          return;
+        }
+
         const token = await tokenStorage.getToken();
         if (!token) {
           console.log('⚠️ [SOCKET PROVIDER] No auth token, skipping socket init');

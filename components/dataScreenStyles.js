@@ -77,6 +77,34 @@ export const createDataScreenStyles = (themeColors = fallbackColors) => {
     marginBottom: hp(1.5),
     letterSpacing: 0.3,
   },
+  setupExplainer: {
+    backgroundColor: colors.backgroundHeader,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: hp(1.5),
+    marginBottom: hp(1.2),
+  },
+  setupExplainerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: wp(2),
+    marginBottom: hp(0.6),
+  },
+  setupExplainerTitle: {
+    color: colors.textPrimary,
+    fontSize: hp(1.55),
+    fontWeight: "800",
+    fontFamily: "LoraRegular",
+  },
+  setupExplainerText: {
+    color: colors.textSecondary,
+    fontSize: hp(1.25),
+    lineHeight: hp(1.85),
+    fontWeight: "600",
+    fontFamily: "LoraRegular",
+    marginTop: hp(0.35),
+  },
 
   // Form Labels
   subHeading: {
@@ -95,6 +123,14 @@ export const createDataScreenStyles = (themeColors = fallbackColors) => {
     fontFamily: "LoraRegular",
     marginBottom: hp(0.6),
     letterSpacing: 0.2,
+  },
+  fieldHint: {
+    color: colors.textSecondary,
+    fontSize: hp(1.15),
+    lineHeight: hp(1.65),
+    fontWeight: "600",
+    fontFamily: "LoraRegular",
+    marginTop: hp(0.4),
   },
   genderHeading: {
     fontSize: hp(1.6),
@@ -135,19 +171,29 @@ export const createDataScreenStyles = (themeColors = fallbackColors) => {
 
   // Gender Selection
   genderSelection: {
-    height: hp(7),
-    width: hp(8),
+    height: hp(8.4),
+    width: hp(8.8),
     backgroundColor: colors.backgroundHeader,
     borderWidth: 1.5,
     borderColor: colors.border,
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
+    paddingVertical: hp(0.7),
+    gap: hp(0.25),
     shadowColor: colors.shadowLight,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
+  },
+  genderLabel: {
+    fontSize: hp(1.15),
+    fontWeight: "700",
+    fontFamily: "LoraRegular",
+    textAlign: "center",
+    includeFontPadding: false,
+    maxWidth: "100%",
   },
 
   // Date of Birth
@@ -210,6 +256,67 @@ export const createDataScreenStyles = (themeColors = fallbackColors) => {
     marginLeft: hp(1),
     fontFamily: "LoraRegular",
     fontWeight: "500",
+  },
+
+  targetModeGroup: {
+    marginTop: hp(1),
+    gap: hp(1),
+  },
+  targetModeOption: {
+    backgroundColor: colors.backgroundHeader,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: 12,
+    padding: hp(1.4),
+  },
+  targetModeOptionActive: {
+    backgroundColor: `${colors.primary}10`,
+    borderColor: colors.primary,
+    borderWidth: 2,
+  },
+  targetModeHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: wp(1.6),
+  },
+  targetModeTitle: {
+    color: colors.textPrimary,
+    fontSize: hp(1.55),
+    fontWeight: "800",
+    fontFamily: "LoraRegular",
+    flexShrink: 1,
+  },
+  targetModePill: {
+    minHeight: hp(2.2),
+    borderRadius: hp(1.1),
+    paddingHorizontal: wp(2),
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: `${colors.primary}18`,
+    marginLeft: "auto",
+  },
+  targetModePillText: {
+    color: colors.primary,
+    fontSize: hp(0.95),
+    fontWeight: "800",
+    fontFamily: "LoraRegular",
+    textTransform: "uppercase",
+  },
+  targetModeBody: {
+    color: colors.textSecondary,
+    fontSize: hp(1.2),
+    lineHeight: hp(1.75),
+    fontWeight: "600",
+    fontFamily: "LoraRegular",
+    marginTop: hp(0.55),
+  },
+  targetModeExample: {
+    color: colors.primary,
+    fontSize: hp(1.1),
+    lineHeight: hp(1.55),
+    fontWeight: "800",
+    fontFamily: "LoraRegular",
+    marginTop: hp(0.45),
   },
 
   // Button

@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 export interface Appointment {
   id: string;
@@ -38,18 +38,9 @@ interface AppointmentProviderProps {
 
 export const AppointmentProvider: React.FC<AppointmentProviderProps> = ({ children }) => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const hasLoadedRef = useRef(false);
 
-  // Load appointments from AsyncStorage on mount
-  useEffect(() => {
-    loadAppointments();
-  }, []);
-
-  // Save appointments to AsyncStorage whenever appointments change
-  useEffect(() => {
-    saveAppointments();
-  }, [appointments]);
-
-  const loadAppointments = async () => {
+  const loadAppointments = useCallback(async () => {
     try {
       const stored = await AsyncStorage.getItem('appointments');
       if (stored) {
@@ -61,57 +52,74 @@ export const AppointmentProvider: React.FC<AppointmentProviderProps> = ({ childr
       }
     } catch (error) {
       console.error('Error loading appointments:', error);
+    } finally {
+      hasLoadedRef.current = true;
     }
-  };
+  }, []);
 
-  const saveAppointments = async () => {
+  const saveAppointments = useCallback(async () => {
     try {
       await AsyncStorage.setItem('appointments', JSON.stringify(appointments));
     } catch (error) {
       console.error('Error saving appointments:', error);
     }
-  };
+  }, [appointments]);
 
-  const addAppointment = (appointmentData: Omit<Appointment, 'status'>) => {
+  // Load appointments from AsyncStorage on mount
+  useEffect(() => {
+    loadAppointments();
+  }, [loadAppointments]);
+
+  // Save appointments to AsyncStorage whenever appointments change
+  useEffect(() => {
+    if (hasLoadedRef.current) {
+      saveAppointments();
+    }
+  }, [saveAppointments]);
+
+  const addAppointment = useCallback((appointmentData: Omit<Appointment, 'status'>) => {
     const newAppointment: Appointment = {
       ...appointmentData,
       id: appointmentData.id || Date.now().toString(),
       status: 'scheduled'
     };
     setAppointments(prev => [...prev, newAppointment]);
-  };
+  }, []);
 
-  const updateAppointmentStatus = (id: string, status: Appointment['status']) => {
+  const updateAppointmentStatus = useCallback((id: string, status: Appointment['status']) => {
     setAppointments(prev => 
       prev.map(apt => 
         apt.id === id ? { ...apt, status } : apt
       )
     );
-  };
+  }, []);
 
-  const getUpcomingAppointments = () => {
+  const getUpcomingAppointments = useCallback(() => {
     const now = new Date();
     return appointments
       .filter(apt => apt.appointmentDateTime > now && apt.status === 'scheduled')
       .sort((a, b) => a.appointmentDateTime.getTime() - b.appointmentDateTime.getTime());
-  };
+  }, [appointments]);
 
-  const getActiveAppointments = () => {
+  const getActiveAppointments = useCallback(() => {
     const now = new Date();
     return appointments.filter(apt => 
       apt.status === 'scheduled' && 
       apt.appointmentDateTime <= now && 
       apt.appointmentDateTime.getTime() + (2 * 60 * 60 * 1000) > now.getTime() // 2 hours window
     );
-  };
+  }, [appointments]);
 
-  const value: AppointmentContextType = {
-    appointments,
-    addAppointment,
-    updateAppointmentStatus,
-    getUpcomingAppointments,
-    getActiveAppointments
-  };
+  const value: AppointmentContextType = useMemo(
+    () => ({
+      appointments,
+      addAppointment,
+      updateAppointmentStatus,
+      getUpcomingAppointments,
+      getActiveAppointments,
+    }),
+    [addAppointment, appointments, getActiveAppointments, getUpcomingAppointments, updateAppointmentStatus]
+  );
 
   return (
     <AppointmentContext.Provider value={value}>

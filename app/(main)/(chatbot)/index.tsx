@@ -1,15 +1,16 @@
 import AppHeader from "@/components/AppHeader";
 import { useTheme } from "@/contexts/ThemeContext";
+import { FREE_PLAN_LIMITS } from "@/utils/featureAccess";
 import * as SystemUI from "expo-system-ui";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Image, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 const FullText =
-  "Hi, I am HeaLora, your AI-powered health companion. I’m designed to support you on your journey toward better well-being by combining advanced technology with personalized care.";
+  "Hi, I am HeaLora, your AI-powered health companion. I use your FitFaat goal, score, recent logs, hydration, and steps to suggest the next useful action.";
 export default function Index() {
   const { colors } = useTheme();
   const [visibleText, setVisibleText] = useState("");
@@ -46,20 +47,28 @@ export default function Index() {
     }, [colors.screenColor])
   );
 
+  const handleStartConversation = () => {
+    router.push("/(main)/(chatbot)/baat" as any);
+  };
+
   const styles = getStyles(colors);
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} />
       <View style={styles.container}>
       <AppHeader
-        title="AI Health Assistant"
+        title="HeaLora"
         showStepIndicator={false}
         showBackButton={false}
         showMenuButton={true}
       />
 
       {/* Main Content */}
-      <View style={styles.content}>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomSpace }]}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.titleSection}>
           <Text style={styles.mainTitle}>
             Conversations Redefined: {"\n"}
@@ -77,11 +86,14 @@ export default function Index() {
           </View>
         </View>
 
-        {/* Start Button */}
-        <View style={[styles.buttonContainer, { marginBottom: bottomSpace }] }>
-          <TouchableOpacity 
+        <Text style={styles.freeLimitText}>
+          Free includes {FREE_PLAN_LIMITS.aiCoachDailyMessages} HeaLora messages per day. Premium unlocks unlimited coach conversations.
+        </Text>
+
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
             style={styles.gradientButtonContainer}
-            onPress={() => router.push("/baat")}
+            onPress={handleStartConversation}
             activeOpacity={0.8}
           >
             <LinearGradient
@@ -90,11 +102,11 @@ export default function Index() {
               end={{ x: 1, y: 0 }}
               style={styles.gradientButton}
             >
-              <Text style={styles.gradientButtonText}>Start Conversation 💬</Text>
+              <Text style={styles.gradientButtonText}>Start Conversation</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
-      </View>
+      </ScrollView>
       </View>
     </SafeAreaView>
   )
@@ -112,6 +124,8 @@ const getStyles = (colors: any) => StyleSheet.create({
   content: {
     flex: 1,
     backgroundColor: colors.screenColor,
+  },
+  scrollContent: {
     paddingTop: hp(3),
     paddingHorizontal: wp(6),
   },
@@ -129,8 +143,8 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   aiSection: {
     alignItems: "center",
-    flex: 1,
     justifyContent: "center",
+    marginBottom: hp(2),
   },
   aiImage: {
     width: Math.min(hp(18), wp(36)),
@@ -153,6 +167,15 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   buttonContainer: {
     paddingBottom: hp(3),
+  },
+  freeLimitText: {
+    marginHorizontal: wp(4),
+    marginBottom: hp(2),
+    color: colors.textSecondary,
+    fontSize: Math.min(hp(1.55), wp(3.65)),
+    fontWeight: "700",
+    lineHeight: hp(2.2),
+    textAlign: "center",
   },
   gradientButtonContainer: {
     borderRadius: 30,

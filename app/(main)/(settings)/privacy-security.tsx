@@ -1,7 +1,14 @@
 import AppHeader from "@/components/AppHeader";
+import { legalDocuments } from "@/constants/legalContent";
+import {
+  backupAccountScopedStorageLocally,
+  backupAccountScopedStorageToCloud,
+} from "@/utils/auth/accountScopedStorage";
+import { getDashboardPendingMutationCount } from "@/utils/dashboardPendingMutations";
+import { loadBackupHistory, type BackupHistoryRecord } from "@/utils/localBackupHistory";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -13,10 +20,29 @@ import {
 } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { theme } from "@/constants/theme";
 import { useTheme } from '@/contexts/ThemeContext';
+import { useRouter } from "expo-router";
+
+const formatStatusDate = (value?: string | null) => {
+  if (!value) return "Not checked yet";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Not checked yet";
+  return date.toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
+
+const getBackupStatusCopy = (record: BackupHistoryRecord | null) => {
+  if (!record) return "No local backup yet";
+  const action = record.action === "export" ? "Export" : record.action === "import" ? "Import" : "Test";
+  return `${action} ${record.status} on ${formatStatusDate(record.createdAt)}`;
+};
 
 export default function PrivacySecurity() {
+  const router = useRouter();
   const { colors } = useTheme();
   const styles = getStyles(colors);
   const [privacySettings, setPrivacySettings] = useState({
@@ -32,10 +58,35 @@ export default function PrivacySecurity() {
     loginNotifications: true,
     sessionTimeout: true,
   });
+  const [latestBackup, setLatestBackup] = useState<BackupHistoryRecord | null>(null);
+  const [pendingSyncChanges, setPendingSyncChanges] = useState(0);
+  const [syncRefreshedAt, setSyncRefreshedAt] = useState<string | null>(null);
+  const [syncRefreshing, setSyncRefreshing] = useState(false);
 
   useEffect(() => {
     loadSettings();
   }, []);
+
+  const refreshPrivacyCenter = useCallback(async () => {
+    setSyncRefreshing(true);
+    try {
+      const [history, pendingCount] = await Promise.all([
+        loadBackupHistory(),
+        getDashboardPendingMutationCount(),
+      ]);
+      setLatestBackup(history[0] || null);
+      setPendingSyncChanges(pendingCount);
+      setSyncRefreshedAt(new Date().toISOString());
+    } catch (error) {
+      console.log("Error loading privacy center status:", error);
+    } finally {
+      setSyncRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshPrivacyCenter();
+  }, [refreshPrivacyCenter]);
 
   const loadSettings = async () => {
     try {
@@ -62,41 +113,27 @@ export default function PrivacySecurity() {
     saveSettings(newSettings);
   };
 
-  const handleManageData = () => {
-    Alert.alert(
-      "Manage Your Data",
-      "Choose what you want to do with your data",
-      [
-        { text: "Export Data", onPress: exportData },
-        { text: "Delete All Data", onPress: confirmDeleteData, style: "destructive" },
-        { text: "Cancel", style: "cancel" }
-      ]
-    );
+  const showLegalDocument = (document: typeof legalDocuments[keyof typeof legalDocuments]) => {
+    Alert.alert(document.title, document.body, [{ text: "OK" }]);
+  };
+
+  const handleRetrySync = async () => {
+    setSyncRefreshing(true);
+    try {
+      await backupAccountScopedStorageLocally();
+      await backupAccountScopedStorageToCloud();
+      await refreshPrivacyCenter();
+      Alert.alert("Sync Checked", "FitFaat refreshed the local backup snapshot and attempted cloud sync.");
+    } catch (error) {
+      console.log("Error retrying account sync:", error);
+      Alert.alert("Sync Check Failed", "FitFaat could not retry sync right now. Try again later.");
+    } finally {
+      setSyncRefreshing(false);
+    }
   };
 
   const exportData = () => {
-    Alert.alert(
-      "Export Data",
-      "Your data export has been initiated. You will receive an email with a download link within 24 hours.",
-      [{ text: "OK" }]
-    );
-  };
-
-  const confirmDeleteData = () => {
-    Alert.alert(
-      "Delete All Data",
-      "This will permanently delete all your health data, workout history, and preferences. This action cannot be undone. Are you sure?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Delete", 
-          style: "destructive",
-          onPress: () => {
-            Alert.alert("Data Deleted", "All your data has been permanently deleted.");
-          }
-        }
-      ]
-    );
+    router.push("/(main)/(settings)/backup-center" as any);
   };
 
   const handleBlockedUsers = () => {
@@ -146,8 +183,40 @@ export default function PrivacySecurity() {
           thumbColor={value ? colors.primary : colors.textSecondary}
         />
       ) : (
-        <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+        <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
       )}
+    </TouchableOpacity>
+  );
+
+  const StatusRow = ({
+    icon,
+    title,
+    value,
+    subtitle,
+    onPress,
+  }: {
+    icon: string;
+    title: string;
+    value: string;
+    subtitle: string;
+    onPress?: () => void;
+  }) => (
+    <TouchableOpacity
+      style={styles.statusRow}
+      activeOpacity={onPress ? 0.78 : 1}
+      onPress={onPress}
+      disabled={!onPress}
+    >
+      <View style={styles.statusIcon}>
+        <Ionicons name={icon as any} size={22} color={colors.primary} />
+      </View>
+      <View style={styles.statusCopy}>
+        <Text style={styles.statusTitle}>{title}</Text>
+        <Text style={styles.statusSubtitle}>{subtitle}</Text>
+      </View>
+      <Text style={styles.statusValue} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.72}>
+        {value}
+      </Text>
     </TouchableOpacity>
   );
 
@@ -162,6 +231,52 @@ export default function PrivacySecurity() {
 
       <View style={styles.content}>
         <ScrollView showsVerticalScrollIndicator={false}>
+          <View style={styles.centerPanel}>
+            <View style={styles.centerHeader}>
+              <View>
+                <Text style={styles.centerEyebrow}>Privacy Center</Text>
+                <Text style={styles.centerTitle}>Data, permissions, and sync</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.refreshButton}
+                onPress={refreshPrivacyCenter}
+                disabled={syncRefreshing}
+              >
+                <Ionicons
+                  name={syncRefreshing ? "sync-outline" : "refresh-outline"}
+                  size={18}
+                  color={colors.textOnPrimary}
+                />
+                <Text style={styles.refreshButtonText}>{syncRefreshing ? "Checking" : "Refresh"}</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.centerBody}>
+              FitFaat keeps health data controls visible here: export, app permissions, backup history, and pending local changes.
+            </Text>
+            <StatusRow
+              icon="cloud-done-outline"
+              title="Sync status"
+              subtitle={getBackupStatusCopy(latestBackup)}
+              value={pendingSyncChanges ? `${pendingSyncChanges} pending` : "Up to date"}
+              onPress={handleRetrySync}
+            />
+            <StatusRow
+              icon="key-outline"
+              title="Permission status"
+              subtitle="Camera, mic, photos, notifications, and step access"
+              value="Open"
+              onPress={() => router.push("/(main)/(settings)/permissions" as any)}
+            />
+            <StatusRow
+              icon="archive-outline"
+              title="Local backup"
+              subtitle="Export, preview, test, and restore encrypted backups"
+              value={latestBackup ? latestBackup.status : "Set up"}
+              onPress={() => router.push("/(main)/(settings)/backup-center" as any)}
+            />
+            <Text style={styles.centerFootnote}>Last checked {formatStatusDate(syncRefreshedAt)}</Text>
+          </View>
+
           {/* Privacy Section */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Privacy</Text>
@@ -279,10 +394,18 @@ export default function PrivacySecurity() {
             
             <SettingItem
               icon="folder-outline"
-              title="Manage Your Data"
-              subtitle="Export or delete your data"
+              title="Export Data"
+              subtitle="Create a local encrypted FitFaat backup"
               showToggle={false}
-              onPress={handleManageData}
+              onPress={exportData}
+            />
+
+            <SettingItem
+              icon="sync-outline"
+              title="Sync & Backup Center"
+              subtitle="Check backup history and retry sync"
+              showToggle={false}
+              onPress={() => router.push("/(main)/(settings)/backup-center" as any)}
             />
             
             <SettingItem
@@ -306,7 +429,7 @@ export default function PrivacySecurity() {
               title="App Permissions"
               subtitle="Manage app permissions"
               showToggle={false}
-              onPress={() => Alert.alert("App Permissions", "Camera, Gallery, and Notifications are enabled")}
+              onPress={() => router.push("/(main)/(settings)/permissions" as any)}
             />
           </View>
 
@@ -314,18 +437,27 @@ export default function PrivacySecurity() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Legal</Text>
             
-            <TouchableOpacity style={styles.legalButton}>
+            <TouchableOpacity
+              style={styles.legalButton}
+              onPress={() => showLegalDocument(legalDocuments.privacy)}
+            >
               <Text style={styles.legalButtonText}>Privacy Policy</Text>
               <Ionicons name="open-outline" size={18} color={colors.primary} />
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.legalButton}>
+            <TouchableOpacity
+              style={styles.legalButton}
+              onPress={() => showLegalDocument(legalDocuments.terms)}
+            >
               <Text style={styles.legalButtonText}>Terms of Service</Text>
               <Ionicons name="open-outline" size={18} color={colors.primary} />
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.legalButton}>
-              <Text style={styles.legalButtonText}>Cookie Policy</Text>
+            <TouchableOpacity
+              style={styles.legalButton}
+              onPress={() => showLegalDocument(legalDocuments.licenses)}
+            >
+              <Text style={styles.legalButtonText}>Licenses</Text>
               <Ionicons name="open-outline" size={18} color={colors.primary} />
             </TouchableOpacity>
           </View>
@@ -352,6 +484,101 @@ const getStyles = (colors: any) => StyleSheet.create({
     marginTop: hp(2),
     marginHorizontal: wp(5),
   },
+  centerPanel: {
+    marginTop: hp(2),
+    marginHorizontal: wp(5),
+    backgroundColor: colors.cardBackground,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.cardBorder || colors.border,
+    padding: wp(4),
+  },
+  centerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: wp(3),
+  },
+  centerEyebrow: {
+    color: colors.primary,
+    fontSize: Math.min(hp(1.15), wp(2.8)),
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  centerTitle: {
+    color: colors.textPrimary,
+    fontSize: Math.min(hp(2), wp(4.6)),
+    fontWeight: "900",
+    marginTop: hp(0.2),
+  },
+  centerBody: {
+    color: colors.textSecondary,
+    fontSize: Math.min(hp(1.28), wp(3.05)),
+    lineHeight: hp(1.9),
+    fontWeight: "700",
+    marginTop: hp(0.8),
+    marginBottom: hp(0.7),
+  },
+  refreshButton: {
+    minHeight: hp(3.7),
+    borderRadius: 8,
+    paddingHorizontal: wp(2.4),
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: wp(1),
+    backgroundColor: colors.primary,
+  },
+  refreshButtonText: {
+    color: colors.textOnPrimary,
+    fontSize: Math.min(hp(1.1), wp(2.65)),
+    fontWeight: "900",
+  },
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: wp(2.5),
+    borderTopWidth: 1,
+    borderTopColor: colors.cardBorder || colors.border,
+    paddingVertical: hp(1.05),
+  },
+  statusIcon: {
+    width: hp(4.5),
+    height: hp(4.5),
+    borderRadius: hp(2.25),
+    backgroundColor: colors.primarySoft || `${colors.primary}14`,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statusCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  statusTitle: {
+    color: colors.textPrimary,
+    fontSize: Math.min(hp(1.35), wp(3.2)),
+    fontWeight: "900",
+  },
+  statusSubtitle: {
+    color: colors.textSecondary,
+    fontSize: Math.min(hp(1.08), wp(2.55)),
+    lineHeight: hp(1.55),
+    fontWeight: "700",
+    marginTop: hp(0.2),
+  },
+  statusValue: {
+    width: wp(22),
+    color: colors.primary,
+    fontSize: Math.min(hp(1.12), wp(2.65)),
+    fontWeight: "900",
+    textAlign: "right",
+  },
+  centerFootnote: {
+    color: colors.textTertiary || colors.textSecondary,
+    fontSize: Math.min(hp(1.02), wp(2.45)),
+    fontWeight: "800",
+    marginTop: hp(0.5),
+  },
   sectionTitle: {
     fontSize: hp(2),
     fontWeight: 'bold',
@@ -363,7 +590,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'white',
+    backgroundColor: colors.cardBackground,
     paddingVertical: hp(2),
     paddingHorizontal: wp(4),
     marginBottom: hp(1),
@@ -405,7 +632,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'white',
+    backgroundColor: colors.cardBackground,
     paddingVertical: hp(2),
     paddingHorizontal: wp(4),
     marginBottom: hp(1),

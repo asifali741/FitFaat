@@ -1,34 +1,28 @@
 import { useTheme } from "@/contexts/ThemeContext";
+import { useRequirePremiumWorkoutAccess } from "@/hooks/useRequirePremiumWorkoutAccess";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useState } from "react";
-import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, FlatList, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { TrashIcon } from "react-native-heroicons/outline";
 import {
     heightPercentageToDP as hp,
     widthPercentageToDP as wp,
 } from "react-native-responsive-screen";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function FavoritesScreen() {
-  const { colors } = useTheme();
+  const { colors, isDarkMode } = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [favorites, setFavorites] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const navigation = require('@react-navigation/native').useNavigation();
+  const checkingPremiumAccess = useRequirePremiumWorkoutAccess();
 
   const handleBackPress = () => {
-    try {
-      if (navigation && (navigation as any).canGoBack && (navigation as any).canGoBack()) {
-        (navigation as any).goBack();
-        return;
-      }
-    } catch (e) {}
-
-    router.push('/(main)/(exercises)/workout');
+    router.replace('/(main)/(exercises)/workout');
   };
 
   useFocusEffect(
@@ -97,7 +91,9 @@ export default function FavoritesScreen() {
         marginHorizontal: wp(4),
         marginBottom: hp(2),
         borderRadius: hp(2),
-        shadowColor: '#000',
+        borderWidth: 1,
+        borderColor: colors.cardBorder,
+        shadowColor: colors.shadowLight,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
@@ -149,7 +145,7 @@ export default function FavoritesScreen() {
             style={{
               width: hp(5),
               height: hp(5),
-              backgroundColor: '#FFE5E5',
+              backgroundColor: colors.error + '18',
               borderRadius: hp(2.5),
               justifyContent: 'center',
               alignItems: 'center',
@@ -158,7 +154,7 @@ export default function FavoritesScreen() {
           >
             <TrashIcon 
               size={hp(2.5)} 
-              color="#FF6B6B" 
+              color={colors.error} 
               strokeWidth={2}
             />
           </TouchableOpacity>
@@ -167,39 +163,47 @@ export default function FavoritesScreen() {
     );
   };
 
-  const styles = getStyles(colors);
+  const statusBarBackground = isDarkMode ? colors.screenColor : "#FFFFFF";
+  const statusBarStyle = isDarkMode ? "light-content" : "dark-content";
+  const styles = getStyles(colors, insets.top, statusBarBackground);
 
-  if (loading) {
+  if (loading || checkingPremiumAccess) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
+        <StatusBar barStyle={statusBarStyle} backgroundColor={statusBarBackground} translucent={false} />
+        <View style={styles.statusBarSpacer} />
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity 
             style={styles.backButton}
             onPress={handleBackPress}
           >
-            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+            <Ionicons name="arrow-back" size={24} color={colors.textOnPrimary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>My Favorites ❤️</Text>
           <View style={styles.spacer} />
         </View>
 
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.screenColor }}>
-          <Text style={{ fontSize: hp(2), color: colors.textSecondary }}>Loading favorites...</Text>
+          <Text style={{ fontSize: hp(2), color: colors.textSecondary }}>
+            {checkingPremiumAccess ? 'Checking access...' : 'Loading favorites...'}
+          </Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
+      <StatusBar barStyle={statusBarStyle} backgroundColor={statusBarBackground} translucent={false} />
+      <View style={styles.statusBarSpacer} />
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
           onPress={handleBackPress}
         >
-          <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          <Ionicons name="arrow-back" size={24} color={colors.textOnPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>My Favorites ❤️</Text>
         <View style={styles.spacer} />
@@ -248,10 +252,14 @@ export default function FavoritesScreen() {
   );
 }
 
-const getStyles = (colors: any) => StyleSheet.create({
+const getStyles = (colors: any, topInset: number, statusBarBackground: string) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.screenColor,
+  },
+  statusBarSpacer: {
+    height: topInset,
+    backgroundColor: statusBarBackground,
   },
   header: {
     flexDirection: "row",
@@ -261,7 +269,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     paddingVertical: Math.min(hp(2), 16),
     backgroundColor: colors.primary,
     minHeight: hp(8),
-    shadowColor: '#000',
+    shadowColor: colors.shadowLight,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -314,19 +322,19 @@ const getStyles = (colors: any) => StyleSheet.create({
     lineHeight: hp(2.5),
   },
   exploreButton: {
-    backgroundColor: '#FF6B6B',
+    backgroundColor: colors.error,
     paddingHorizontal: wp(8),
     paddingVertical: hp(1.8),
     borderRadius: hp(2.5),
     marginTop: hp(3),
-    shadowColor: '#000',
+    shadowColor: colors.error,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
     shadowRadius: 5,
     elevation: 6,
   },
   exploreButtonText: {
-    color: 'white',
+    color: colors.buttonText,
     fontSize: hp(2),
     fontWeight: 'bold',
   },

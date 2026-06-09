@@ -13,8 +13,9 @@ import Constants from "expo-constants";
 const FALLBACKS: Record<string, string> = {
   EXPO_PUBLIC_BACKEND_API_URL: "",
   EXPO_PUBLIC_STRIPE_PK: "",
-  CLARIFAI_API_KEY: "",
+  CLARIFAI_API_KEY: "06c9f866dede42d0add51a34242ac601",
   OPENROUTER_API_KEY: "",
+  GROQ_API_KEY: "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",
   ZEGO_APP_ID: "",
   ZEGO_APP_SIGN: "",
 };
@@ -36,18 +37,30 @@ export function getConfigValue(key: string): string {
   return FALLBACKS[key] || "";
 }
 
+const trimTrailingSlashes = (value: string): string => value.replace(/\/+$/, "");
+
+const getConfiguredBackendRoot = (): string => {
+  const configuredUrl = trimTrailingSlashes(getConfigValue("EXPO_PUBLIC_BACKEND_API_URL"));
+  return configuredUrl.replace(/\/api$/i, "");
+};
+
 /**
  * Get the backend API URL, guaranteed to return a valid string.
  */
 export function getBackendUrl(): string {
-  return getConfigValue("EXPO_PUBLIC_BACKEND_API_URL");
+  const backendRoot = getConfiguredBackendRoot();
+  return backendRoot ? `${backendRoot}/api` : "";
 }
 
 /**
  * Get the backend base URL (without /api suffix), for socket connections etc.
  */
 export function getBackendBaseUrl(): string {
-  return getBackendUrl().replace(/\/api\/?$/, "");
+  return getConfiguredBackendRoot();
+}
+
+export function isRealtimeSocketEnabled(): boolean {
+  return Boolean(getBackendBaseUrl());
 }
 
 /**

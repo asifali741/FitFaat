@@ -1,9 +1,15 @@
 import AppHeader from '@/components/AppHeader';
 import ChatButton from '@/components/ChatButton';
+import SmartEmptyState from '@/components/common/SmartEmptyState';
+import StatusNoticeBanner from '@/components/common/StatusNoticeBanner';
 import { theme } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import { authApi } from '@/utils/auth/authApi';
+import { tokenStorage } from '@/utils/auth/tokenStorage';
+import { buildChatAccessGrantedNotificationPayload } from '@/utils/chatAccessNotifications';
+import { getBackendBaseUrl, isRealtimeSocketEnabled } from '@/utils/config';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -12,20 +18,77 @@ import {
     Dimensions,
     FlatList,
     Modal,
+    Platform,
     ScrollView,
     StyleSheet,
+    StatusBar,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
+import * as NavigationBar from 'expo-navigation-bar';
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from 'react-native-responsive-screen';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { io } from 'socket.io-client';
 
 const { width } = Dimensions.get('window');
+const DOCTOR_APPOINTMENTS_CACHE_KEY = 'doctorPatientManagementAppointments';
+
+const emitChatAccessGrantedToPatient = async (appointmentId: string) => {
+  if (!isRealtimeSocketEnabled()) return;
+
+  const token = await tokenStorage.getToken();
+  if (!token) return;
+
+  await new Promise<void>((resolve) => {
+    const socket = io(getBackendBaseUrl(), {
+      auth: { token },
+      forceNew: true,
+      timeout: 5000,
+      transports: ['websocket'],
+    });
+    let finished = false;
+    let accessEventSent = false;
+    let closeTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      if (closeTimer) clearTimeout(closeTimer);
+      socket.disconnect();
+      resolve();
+    };
+
+    const sendAccessEvent = () => {
+      if (accessEventSent) return;
+      accessEventSent = true;
+      socket.emit('access-granted', { appointmentId });
+      closeTimer = setTimeout(finish, 350);
+    };
+
+    const fallbackTimer = setTimeout(finish, 5000);
+
+    socket.on('connect', () => {
+      socket.emit('join-appointment', { appointmentId });
+      setTimeout(sendAccessEvent, 500);
+    });
+
+    socket.on('joined', sendAccessEvent);
+    socket.on('connect_error', (error) => {
+      console.warn('Unable to emit chat access notification:', error.message);
+      clearTimeout(fallbackTimer);
+      finish();
+    });
+    socket.on('disconnect', () => {
+      clearTimeout(fallbackTimer);
+    });
+  });
+};
 
 export default function PatientManagementScreen() {
   const { colors } = useTheme();
-  const styles = getStyles(colors);
+  const insets = useSafeAreaInsets();
+  const styles = getStyles(colors, insets.top, insets.bottom);
   const router = useRouter();
   const [appointments, setAppointments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -36,13 +99,28 @@ export default function PatientManagementScreen() {
   const [doctorId, setDoctorId] = useState<string | null>(null);
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [confirmationType, setConfirmationType] = useState<'approve' | 'reject' | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [usingCachedAppointments, setUsingCachedAppointments] = useState(false);
 
   useEffect(() => {
     fetchDoctorAppointments();
   }, []);
 
+  useEffect(() => {
+    StatusBar.setBarStyle('dark-content');
+
+    if (Platform.OS !== 'android') return;
+
+    StatusBar.setBackgroundColor('#FFFFFF');
+    StatusBar.setTranslucent(false);
+    NavigationBar.setButtonStyleAsync('dark').catch(() => {});
+    NavigationBar.setStyle('light');
+  }, []);
+
   const fetchDoctorAppointments = async () => {
     setIsLoading(true);
+    setLoadError(null);
+    setUsingCachedAppointments(false);
     try {
       // First, get the doctor status to get the doctor ID
       const doctorStatusResponse = await authApi.getDoctorStatus();
@@ -59,13 +137,27 @@ export default function PatientManagementScreen() {
       // Then fetch appointments for this doctor
       const appointmentsResponse = await authApi.getDoctorAppointments(doctorIdValue);
       if (appointmentsResponse.success) {
-        setAppointments(appointmentsResponse.appointments || []);
+        const appointmentList = appointmentsResponse.appointments || [];
+        setAppointments(appointmentList);
+        await AsyncStorage.setItem(DOCTOR_APPOINTMENTS_CACHE_KEY, JSON.stringify(appointmentList));
       } else {
-        Alert.alert('Error', 'Failed to load appointment requests');
+        setLoadError('Failed to load appointment requests');
       }
     } catch (error) {
       console.error('Failed to fetch appointments:', error);
-      Alert.alert('Error', 'Failed to load appointment requests');
+      setLoadError('Failed to load appointment requests. Please check your connection and retry.');
+      try {
+        const cached = await AsyncStorage.getItem(DOCTOR_APPOINTMENTS_CACHE_KEY);
+        const parsed = cached ? JSON.parse(cached) : [];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setAppointments(parsed);
+          setUsingCachedAppointments(true);
+        } else {
+          setAppointments([]);
+        }
+      } catch {
+        setAppointments([]);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -151,10 +243,17 @@ export default function PatientManagementScreen() {
 
   const grantChatAccess = async (appointmentId: string) => {
     try {
-      const response = await authApi.grantChatAccess(appointmentId);
+      const notificationPayload = buildChatAccessGrantedNotificationPayload(
+        appointmentId,
+        selectedAppointment
+      );
+      const response = await authApi.grantChatAccess(appointmentId, notificationPayload);
       
       if (response.success) {
         Alert.alert('Success', 'Chat access granted to user');
+        emitChatAccessGrantedToPatient(appointmentId).catch((error) => {
+          console.warn('Failed to emit chat access socket event:', error);
+        });
         fetchDoctorAppointments();
         if (selectedAppointment && selectedAppointment._id === appointmentId) {
           setSelectedAppointment({
@@ -269,11 +368,16 @@ export default function PatientManagementScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <AppHeader
-          title="Appointment Management"
-          showStepIndicator={false}
-        />
+      <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} />
+        <View style={styles.headerSafeArea}>
+          <AppHeader
+            title="Appointment Management"
+            showStepIndicator={false}
+            titleMinimumFontScale={1}
+            compactTitleSpacing
+          />
+        </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
@@ -282,13 +386,32 @@ export default function PatientManagementScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <AppHeader
-        title="Appointment Management"
-        showStepIndicator={false}
-      />
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} />
+      <View style={styles.headerSafeArea}>
+        <AppHeader
+          title="Appointment Management"
+          showStepIndicator={false}
+          titleMinimumFontScale={1}
+          compactTitleSpacing
+        />
+      </View>
 
       <View style={styles.content}>
+        {loadError ? (
+          <StatusNoticeBanner
+            tone={usingCachedAppointments ? 'cached' : 'offline'}
+            title={usingCachedAppointments ? 'Showing Cached Requests' : 'Could Not Refresh Requests'}
+            message={usingCachedAppointments
+              ? 'Latest refresh failed, so these appointments are from saved data.'
+              : loadError}
+            actionLabel="Retry"
+            onAction={fetchDoctorAppointments}
+            colors={colors}
+            style={styles.noticeBanner}
+          />
+        ) : null}
+
         {/* Filter Buttons */}
         <View style={styles.filterContainer}>
           {renderFilterButton('all', 'All Requests')}
@@ -298,21 +421,19 @@ export default function PatientManagementScreen() {
 
         {/* Appointments List */}
         {filteredAppointments.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons
-              name="list-outline"
-              size={64}
-              color={colors.textSecondary}
-            />
-            <Text style={styles.emptyTitle}>No Requests</Text>
-            <Text style={styles.emptySubtitle}>
-              {filterStatus === 'all'
-                ? 'You have no patient requests yet'
-                : filterStatus === 'pending'
-                ? 'No pending requests'
-                : 'No approved appointments'}
-            </Text>
-          </View>
+          <SmartEmptyState
+            icon={filterStatus === 'pending' ? 'hourglass-outline' : 'list-outline'}
+            title="No Requests"
+            message={filterStatus === 'all'
+              ? 'New patient appointment requests will appear here when patients book you.'
+              : filterStatus === 'pending'
+              ? 'No pending requests need your review right now.'
+              : 'Approved appointments will appear here after you accept requests.'}
+            actionLabel="Refresh"
+            onAction={fetchDoctorAppointments}
+            colors={colors}
+            style={styles.smartEmptyState}
+          />
         ) : (
           <FlatList
             data={filteredAppointments}
@@ -693,17 +814,19 @@ export default function PatientManagementScreen() {
   );
 }
 
-const getStyles = (colors: any) =>
+const getStyles = (colors: any, topInset = 0, bottomInset = 0) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.primary,
+      backgroundColor: colors.screenColor,
+    },
+    headerSafeArea: {
+      paddingTop: topInset,
+      backgroundColor: '#FFFFFF',
     },
     content: {
       flex: 1,
       backgroundColor: '#F8F9FB',
-      borderTopLeftRadius: 30,
-      borderTopRightRadius: 30,
       paddingTop: hp(2),
     },
     filterContainer: {
@@ -737,6 +860,16 @@ const getStyles = (colors: any) =>
       justifyContent: 'center',
       alignItems: 'center',
     },
+    noticeBanner: {
+      marginHorizontal: wp(4),
+      marginTop: hp(1.2),
+      marginBottom: hp(1),
+    },
+    smartEmptyState: {
+      width: width - wp(8),
+      alignSelf: 'center',
+      marginTop: hp(3),
+    },
     emptyContainer: {
       flex: 1,
       justifyContent: 'center',
@@ -758,7 +891,7 @@ const getStyles = (colors: any) =>
     listContainer: {
       paddingHorizontal: wp(4),
       paddingVertical: hp(1),
-      paddingBottom: hp(3),
+      paddingBottom: Math.max(hp(3), bottomInset + hp(2)),
     },
     // Card Styles
     requestCard: {

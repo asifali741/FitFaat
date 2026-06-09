@@ -3,8 +3,10 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
-import Constants from "expo-constants";
-import React, { useCallback, useState } from "react";
+import { CardField, useStripe } from "@stripe/stripe-react-native";
+import React, { useCallback, useState, useEffect } from "react";
+import { StatusBar } from 'expo-status-bar';
+import * as NavigationBar from 'expo-navigation-bar';
 import {
     ActivityIndicator,
     Alert,
@@ -13,7 +15,6 @@ import {
     ScrollView,
     StyleSheet,
     Text,
-    TextInput,
     TouchableOpacity,
     View,
 } from "react-native";
@@ -33,32 +34,28 @@ interface PaymentMethod {
   isDefault: boolean;
   expiryMonth?: string;
   expiryYear?: string;
+  stripePaymentMethodId?: string | null;
   addedAt: string;
 }
 
 export default function PaymentMethods() {
   const { colors } = useTheme();
+  const { createPaymentMethod } = useStripe();
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(false);
+  const [savingCard, setSavingCard] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [cardDetails, setCardDetails] = useState({
-    cardNumber: "",
-    expiryDate: "",
-    cvv: "",
-    cardholderName: "",
-    zipCode: "",
-  });
+  const [cardDetails, setCardDetails] = useState<{
+    complete: boolean;
+    last4?: string;
+    brand?: string;
+    expiryMonth?: number;
+    expiryYear?: number;
+  } | null>(null);
 
-  const ENV = Constants.expoConfig?.extra;
   const API_URL = getBackendBaseUrl();
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchPaymentMethods();
-    }, [])
-  );
-
-  const fetchPaymentMethods = async () => {
+  const fetchPaymentMethods = useCallback(async () => {
     try {
       setLoading(true);
       const token = await tokenStorage.getToken();
@@ -90,59 +87,42 @@ export default function PaymentMethods() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [API_URL]);
 
-  const getCardIcon = (brand?: string) => {
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      NavigationBar.setButtonStyleAsync('dark').catch(() => {});
+      NavigationBar.setStyle('light');
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchPaymentMethods();
+    }, [fetchPaymentMethods])
+  );
+
+  const getCardIcon = (brand?: string): keyof typeof Ionicons.glyphMap => {
     switch (brand?.toLowerCase()) {
       case "visa":
-        return "💳";
+        return "card-outline";
       case "mastercard":
-        return "💳";
+        return "card-outline";
       case "amex":
-        return "💳";
+        return "card-outline";
       default:
-        return "💳";
+        return "card-outline";
     }
-  };
-
-  const formatCardNumber = (text: string) => {
-    const cleaned = text.replace(/\s/g, "");
-    const match = cleaned.match(/.{1,4}/g);
-    return match ? match.join(" ") : cleaned;
-  };
-
-  const formatExpiryDate = (text: string) => {
-    const cleaned = text.replace(/\D/g, "");
-    if (cleaned.length >= 2) {
-      return cleaned.slice(0, 2) + "/" + cleaned.slice(2, 4);
-    }
-    return cleaned;
-  };
-
-  const validateCard = () => {
-    if (cardDetails.cardNumber.replace(/\s/g, "").length !== 16) {
-      Alert.alert("Invalid Card", "Please enter a valid 16-digit card number");
-      return false;
-    }
-    if (cardDetails.expiryDate.length !== 5) {
-      Alert.alert("Invalid Expiry", "Please enter expiry date in MM/YY format");
-      return false;
-    }
-    if (cardDetails.cvv.length < 3) {
-      Alert.alert("Invalid CVV", "Please enter a valid CVV");
-      return false;
-    }
-    if (cardDetails.cardholderName.length < 3) {
-      Alert.alert("Invalid Name", "Please enter the cardholder name");
-      return false;
-    }
-    return true;
   };
 
   const handleAddCard = async () => {
-    if (!validateCard()) return;
+    if (!cardDetails?.complete) {
+      Alert.alert("Incomplete Card", "Please enter complete card details");
+      return;
+    }
 
     try {
+      setSavingCard(true);
       const token = await tokenStorage.getToken();
 
       if (!token) {
@@ -150,8 +130,25 @@ export default function PaymentMethods() {
         return;
       }
 
-      const [month, year] = cardDetails.expiryDate.split("/");
-      const cardBrand = "visa";
+      const { paymentMethod, error } = await createPaymentMethod({
+        paymentMethodType: "Card",
+      });
+
+      if (error || !paymentMethod) {
+        Alert.alert("Card Error", error?.message || "Failed to validate card with Stripe");
+        return;
+      }
+
+      const stripeCard = paymentMethod.Card;
+      const cardBrand = stripeCard?.brand || cardDetails.brand || "card";
+      const last4 = stripeCard?.last4 || cardDetails.last4;
+      const expiryMonth = stripeCard?.expMonth || cardDetails.expiryMonth;
+      const expiryYear = stripeCard?.expYear || cardDetails.expiryYear;
+
+      if (!last4 || !expiryMonth || !expiryYear) {
+        Alert.alert("Card Error", "Stripe did not return complete card metadata");
+        return;
+      }
 
       const response = await fetch(`${API_URL}/api/payment/methods/add`, {
         method: "POST",
@@ -161,10 +158,10 @@ export default function PaymentMethods() {
         },
         body: JSON.stringify({
           cardBrand,
-          last4: cardDetails.cardNumber.slice(-4),
-          expiryMonth: month,
-          expiryYear: year,
-          stripePaymentMethodId: null,
+          last4,
+          expiryMonth: String(expiryMonth).padStart(2, "0"),
+          expiryYear: String(expiryYear).slice(-2),
+          stripePaymentMethodId: paymentMethod.id,
         }),
       });
 
@@ -173,13 +170,7 @@ export default function PaymentMethods() {
       if (data.success) {
         Alert.alert("Success", "Card added successfully");
         setShowAddModal(false);
-        setCardDetails({
-          cardNumber: "",
-          expiryDate: "",
-          cvv: "",
-          cardholderName: "",
-          zipCode: "",
-        });
+        setCardDetails(null);
         fetchPaymentMethods();
       } else {
         Alert.alert("Error", data.message || "Failed to add card");
@@ -187,6 +178,8 @@ export default function PaymentMethods() {
     } catch (error: any) {
       console.error("Error adding card:", error.message);
       Alert.alert("Error", "Failed to add card");
+    } finally {
+      setSavingCard(false);
     }
   };
 
@@ -271,10 +264,15 @@ export default function PaymentMethods() {
   const PaymentCard = ({ method }: { method: PaymentMethod }) => (
     <View style={[styles.paymentCard, { borderColor: colors.primary }]}>
       <View style={styles.cardLeft}>
-        <Text style={styles.cardIcon}>{getCardIcon(method.cardBrand)}</Text>
+        <Ionicons
+          name={getCardIcon(method.cardBrand)}
+          size={Math.min(hp(3.1), wp(7))}
+          color={colors.primary}
+          style={styles.cardIcon}
+        />
         <View style={styles.cardInfo}>
           <Text style={[styles.cardBrand, { color: colors.textPrimary }]}>
-            {method.cardBrand} •••• {method.last4}
+            {method.cardBrand || "Card"} ending {method.last4}
           </Text>
           <Text style={styles.cardExpiry}>
             Expires {method.expiryMonth}/{method.expiryYear}
@@ -305,6 +303,7 @@ export default function PaymentMethods() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
       <AppHeader title="Payment Methods" />
 
       <View style={styles.content}>
@@ -392,102 +391,84 @@ export default function PaymentMethods() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={styles.inputGroup}>
-                <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>
-                  Card Number
-                </Text>
-                <TextInput
-                  style={[styles.input, { color: colors.textPrimary, borderColor: colors.primary }]}
-                  value={cardDetails.cardNumber}
-                  onChangeText={(text) =>
+              <View style={styles.stripeCardInputBox}>
+                <View style={styles.stripeCardHeader}>
+                  <View style={[styles.cardInputIconBox, { backgroundColor: colors.primary + "14" }]}>
+                    <Ionicons name="card-outline" size={22} color={colors.primary} />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>
+                      Card Information
+                    </Text>
+                    <Text style={styles.inputHelpText}>
+                      Card details are handled securely by Stripe.
+                    </Text>
+                  </View>
+                </View>
+
+                <CardField
+                  postalCodeEnabled={false}
+                  placeholders={{
+                    number: "4242 4242 4242 4242",
+                    expiration: "MM/YY",
+                    cvc: "CVC",
+                  }}
+                  cardStyle={{
+                    backgroundColor: "#F8FAFC",
+                    borderColor: "#E2E8F0",
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    cursorColor: colors.primary,
+                    fontSize: 16,
+                    placeholderColor: "#94A3B8",
+                    textColor: "#0F172A",
+                    textErrorColor: colors.error,
+                  }}
+                  onCardChange={(details: any) => {
                     setCardDetails({
-                      ...cardDetails,
-                      cardNumber: formatCardNumber(text),
-                    })
-                  }
-                  placeholder="1234 5678 9012 3456"
-                  placeholderTextColor={colors.primary + "60"}
-                  keyboardType="numeric"
-                  maxLength={19}
+                      complete: details.complete,
+                      last4: details.last4,
+                      brand: details.brand,
+                      expiryMonth: details.expiryMonth,
+                      expiryYear: details.expiryYear,
+                    });
+                  }}
+                  style={styles.stripeCardField}
                 />
-              </View>
 
-              <View style={styles.row}>
-                <View style={[styles.inputGroup, { flex: 1, marginRight: wp(2) }]}>
-                  <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>
-                    Expiry Date
-                  </Text>
-                  <TextInput
-                    style={[styles.input, { color: colors.textPrimary, borderColor: colors.primary }]}
-                    value={cardDetails.expiryDate}
-                    onChangeText={(text) =>
-                      setCardDetails({
-                        ...cardDetails,
-                        expiryDate: formatExpiryDate(text),
-                      })
-                    }
-                    placeholder="MM/YY"
-                    placeholderTextColor={colors.primary + "60"}
-                    keyboardType="numeric"
-                    maxLength={5}
+                <View style={styles.cardValidationRow}>
+                  <Ionicons
+                    name={cardDetails?.complete ? "checkmark-circle" : "information-circle-outline"}
+                    size={16}
+                    color={cardDetails?.complete ? colors.success : colors.textSecondary}
                   />
-                </View>
-
-                <View style={[styles.inputGroup, { flex: 1 }]}>
-                  <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>
-                    CVV
+                  <Text
+                    style={[
+                      styles.cardValidationText,
+                      { color: cardDetails?.complete ? colors.success : colors.textSecondary },
+                    ]}
+                  >
+                    {cardDetails?.complete
+                      ? "Card ready to save"
+                      : "Enter card number, expiry date and CVC"}
                   </Text>
-                  <TextInput
-                    style={[styles.input, { color: colors.textPrimary, borderColor: colors.primary }]}
-                    value={cardDetails.cvv}
-                    onChangeText={(text) =>
-                      setCardDetails({ ...cardDetails, cvv: text })
-                    }
-                    placeholder="123"
-                    placeholderTextColor={colors.primary + "60"}
-                    keyboardType="numeric"
-                    maxLength={4}
-                    secureTextEntry
-                  />
                 </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>
-                  Cardholder Name
-                </Text>
-                <TextInput
-                  style={[styles.input, { color: colors.textPrimary, borderColor: colors.primary }]}
-                  value={cardDetails.cardholderName}
-                  onChangeText={(text) =>
-                    setCardDetails({ ...cardDetails, cardholderName: text })
-                  }
-                  placeholder="John Doe"
-                  placeholderTextColor={colors.primary + "60"}
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>
-                  ZIP/Postal Code
-                </Text>
-                <TextInput
-                  style={[styles.input, { color: colors.textPrimary, borderColor: colors.primary }]}
-                  value={cardDetails.zipCode}
-                  onChangeText={(text) =>
-                    setCardDetails({ ...cardDetails, zipCode: text })
-                  }
-                  placeholder="12345"
-                  placeholderTextColor={colors.primary + "60"}
-                  keyboardType="numeric"
-                />
               </View>
 
               <TouchableOpacity
-                style={[styles.saveButton, { backgroundColor: colors.primary }]}
+                style={[
+                  styles.saveButton,
+                  { backgroundColor: colors.primary },
+                  (!cardDetails?.complete || savingCard) && styles.disabledButton,
+                ]}
                 onPress={handleAddCard}
+                disabled={!cardDetails?.complete || savingCard}
               >
-                <Text style={styles.saveButtonText}>Add Card</Text>
+                {savingCard ? (
+                  <ActivityIndicator color="white" size="small" />
+                ) : (
+                  <Text style={styles.saveButtonText}>Add Card</Text>
+                )}
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -501,11 +482,11 @@ const getStyles = (colors: any) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: colors.screenColor || '#FFFFFF',
     },
     content: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: colors.screenColor || '#FFFFFF',
     },
     centerContent: {
       flex: 1,
@@ -696,6 +677,57 @@ const getStyles = (colors: any) =>
       paddingVertical: hp(1.6),
       fontSize: hp(1.8),
     },
+    stripeCardInputBox: {
+      borderWidth: 1.5,
+      borderColor: "#E2E8F0",
+      borderRadius: hp(1.8),
+      backgroundColor: "#FFFFFF",
+      padding: wp(4),
+      marginTop: hp(1),
+      marginBottom: hp(2.5),
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.08,
+      shadowRadius: 5,
+      elevation: 2,
+    },
+    stripeCardHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: hp(1.5),
+      gap: wp(3),
+    },
+    cardInputIconBox: {
+      width: hp(4.6),
+      height: hp(4.6),
+      borderRadius: hp(1.4),
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    inputHelpText: {
+      color: "#94A3B8",
+      fontSize: hp(1.45),
+      fontWeight: "600",
+      lineHeight: hp(2),
+    },
+    stripeCardField: {
+      width: "100%",
+      height: Math.max(hp(6.4), 54),
+      borderRadius: hp(1.5),
+      backgroundColor: "#F8FAFC",
+      marginBottom: hp(1),
+    },
+    cardValidationRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: wp(1.5),
+    },
+    cardValidationText: {
+      flex: 1,
+      minWidth: 0,
+      fontSize: hp(1.45),
+      fontWeight: "700",
+    },
     row: {
       flexDirection: "row",
     },
@@ -715,5 +747,8 @@ const getStyles = (colors: any) =>
       fontSize: hp(2),
       fontWeight: "800",
       letterSpacing: 0.3,
+    },
+    disabledButton: {
+      opacity: 0.55,
     },
   });

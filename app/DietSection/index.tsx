@@ -37,6 +37,21 @@ const mission = [
   },
 ];
 
+const trackingHighlights = [
+  {
+    id: "free",
+    icon: "checkmark-circle-outline",
+    label: "Free includes everyday tools",
+    text: "Calories, hydration, full steps, charts, meal planning, and mindfulness are ready from the start.",
+  },
+  {
+    id: "premium",
+    icon: "diamond-outline",
+    label: "Premium adds deeper support",
+    text: "Workouts, adaptive goals, exports, and unlimited coaching add richer context.",
+  },
+];
+
 export default function Index() {
   const router = useRouter();
   const { colors } = useTheme();
@@ -88,6 +103,27 @@ export default function Index() {
             <StepItem number="2" text="Set your fitness goals" icon="target-outline" styles={screenStyles} colors={colors} />
             <StepItem number="3" text="Enter your details" icon="person-outline" styles={screenStyles} colors={colors} />
             <StepItem number="4" text="Get personalized plan" icon="flash-outline" styles={screenStyles} colors={colors} />
+          </View>
+        </View>
+
+        {/* Tracking Preview */}
+        <View style={screenStyles.planPreviewCard}>
+          <View style={screenStyles.sectionHeader}>
+            <Ionicons name="pulse-outline" size={hp(2.8)} color={colors.primary} />
+            <Text style={screenStyles.instructionTitle}>What FitFaat Tracks</Text>
+          </View>
+          <View style={screenStyles.planPreviewList}>
+            {trackingHighlights.map((item) => (
+              <View key={item.id} style={screenStyles.planPreviewRow}>
+                <View style={screenStyles.planPreviewIcon}>
+                  <Ionicons name={item.icon as keyof typeof Ionicons.glyphMap} size={hp(2.3)} color={colors.primary} />
+                </View>
+                <View style={screenStyles.planPreviewCopy}>
+                  <Text style={screenStyles.planPreviewLabel}>{item.label}</Text>
+                  <Text style={screenStyles.planPreviewText}>{item.text}</Text>
+                </View>
+              </View>
+            ))}
           </View>
         </View>
 

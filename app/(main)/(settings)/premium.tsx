@@ -2,12 +2,22 @@ import AppHeader from "@/components/AppHeader";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
+import {
+  FREE_PLAN_LIMITS,
+  type PremiumFeature,
+} from "@/utils/featureAccess";
+import {
+  getGoalExperience,
+} from "@/utils/goalExperience";
+import { getGoalOutcomePremiumCopy } from "@/utils/goalAdaptivePlan";
+import { loadGoalSpineKey, type GoalSpineKey } from "@/utils/goalSpine";
+import { isPremiumStatusActive } from "@/utils/premiumAccess";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { CardField, useStripe } from "@stripe/stripe-react-native";
-import Constants from "expo-constants";
-import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { StatusBar } from 'expo-status-bar';
+import * as NavigationBar from 'expo-navigation-bar';
 import {
   ActivityIndicator,
   Alert,
@@ -28,25 +38,59 @@ import { getBackendBaseUrl } from '@/utils/config';
 interface PaymentMethod {
   id: string;
   last4: string;
+  type?: "card" | "bank";
   cardBrand?: string;
   expiryMonth?: string;
   expiryYear?: string;
+  stripePaymentMethodId?: string | null;
   isDefault: boolean;
 }
 
+const getSavedPaymentMethodStripeId = (method?: PaymentMethod | null) => {
+  if (!method) return null;
+  if (method.stripePaymentMethodId) return method.stripePaymentMethodId;
+  return method.id?.startsWith("pm_") ? method.id : null;
+};
+
+const formatCardBrand = (brand?: string) => {
+  if (!brand) return "Card";
+  return brand.charAt(0).toUpperCase() + brand.slice(1).toLowerCase();
+};
+
+const isPaymentIntentSucceeded = (status?: string | null) =>
+  String(status || "").toLowerCase() === "succeeded";
+
+const PREMIUM_PLAN_PRICE_DOLLARS = 10;
+const PREMIUM_PLAN_PRICE_LABEL = `$${PREMIUM_PLAN_PRICE_DOLLARS}`;
+const PREMIUM_PLAN_PRICE_WITH_CENTS = `$${PREMIUM_PLAN_PRICE_DOLLARS.toFixed(2)}`;
+
+const premiumFeatureItems: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  feature: PremiumFeature;
+  text?: string;
+}[] = [
+  { icon: 'trending-up-outline', title: 'Weekly Goal Adjustment Plan', feature: 'adaptiveGoalsPro' },
+  { icon: 'analytics-outline', title: 'Deep Nutrition Insights', feature: 'nutritionInsights' },
+  { icon: 'barbell-outline', title: 'Goal-Based Workout Progression', feature: 'workoutModule' },
+  { icon: 'document-text-outline', title: 'Reports Export', feature: 'reportsExport' },
+  { icon: 'download-outline', title: 'Chat History Export', feature: 'chatExport', text: 'Export HeaLora chat history when you need a saved record.' },
+  { icon: 'chatbubbles-outline', title: 'Unlimited AI Coach', feature: 'aiCoach', text: `Send more than ${FREE_PLAN_LIMITS.aiCoachDailyMessages} HeaLora messages per day.` },
+  { icon: 'calendar-outline', title: 'Unlimited Doctor Bookings', feature: 'appointments', text: `Keep more than ${FREE_PLAN_LIMITS.activeDoctorAppointments} active doctor appointment at a time.` },
+];
+
 export default function PremiumScreen() {
   const { colors } = useTheme();
-  const router = useRouter();
   const { confirmPayment } = useStripe();
   const { sendSubscriptionAlert } = useNotifications();
   const cardFieldRef = useRef(null);
 
-  // Get correct API URL based on platform
-  const ENV = Constants.expoConfig?.extra;
   const API_URL = getBackendBaseUrl();
 
   const [loading, setLoading] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
+  const [goalKey, setGoalKey] = useState<GoalSpineKey>("unset");
+  const [premiumStatusData, setPremiumStatusData] = useState<any>(null);
   const [processing, setProcessing] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
@@ -54,23 +98,16 @@ export default function PremiumScreen() {
   const [useNewCard, setUseNewCard] = useState(false);
   const [cardDetails, setCardDetails] = useState<{
     complete: boolean;
-    validCVC: boolean;
-    validExpiryDate: boolean;
-    validNumber: boolean;
+    validCVC?: unknown;
+    validExpiryDate?: unknown;
+    validNumber?: unknown;
+    last4?: string;
+    brand?: string;
+    expiryMonth?: number;
+    expiryYear?: number;
   } | null>(null);
 
-  useEffect(() => {
-    checkPremiumStatus();
-    fetchPaymentMethods();
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      fetchPaymentMethods();
-    }, [])
-  );
-
-  const fetchPaymentMethods = async () => {
+  const fetchPaymentMethods = useCallback(async () => {
     try {
       const token = await tokenStorage.getToken();
 
@@ -96,9 +133,18 @@ export default function PremiumScreen() {
     } catch (error: any) {
       console.error("Error fetching payment methods:", error.message);
     }
-  };
+  }, [API_URL]);
 
-  const checkPremiumStatus = async () => {
+  const refreshGoalContext = useCallback(async () => {
+    try {
+      setGoalKey(await loadGoalSpineKey());
+    } catch (error) {
+      console.log("Premium goal context unavailable:", error);
+      setGoalKey("unset");
+    }
+  }, []);
+
+  const checkPremiumStatus = useCallback(async () => {
     try {
       setLoading(true);
       const token = await tokenStorage.getToken();
@@ -123,22 +169,78 @@ export default function PremiumScreen() {
       console.log("Premium status data:", data);
 
       if (data.success) {
-        setIsPremium(data.isPremium);
+        setPremiumStatusData(data);
+        setIsPremium(isPremiumStatusActive(data));
+      } else {
+        setPremiumStatusData(data);
       }
     } catch (error: any) {
       console.error("Error checking premium status:", error.message);
     } finally {
       setLoading(false);
     }
-  };
+  }, [API_URL]);
+
+  useEffect(() => {
+    checkPremiumStatus();
+    fetchPaymentMethods();
+    refreshGoalContext();
+    if (Platform.OS === 'android') {
+      NavigationBar.setButtonStyleAsync('dark').catch(() => {});
+      NavigationBar.setStyle('light');
+    }
+  }, [checkPremiumStatus, fetchPaymentMethods, refreshGoalContext]);
+
+  useFocusEffect(
+    useCallback(() => {
+      checkPremiumStatus();
+      fetchPaymentMethods();
+      refreshGoalContext();
+    }, [checkPremiumStatus, fetchPaymentMethods, refreshGoalContext])
+  );
+
+  useEffect(() => {
+    if (paymentMethods.length === 0) {
+      setSelectedPaymentMethodId(null);
+      setUseNewCard(true);
+      return;
+    }
+
+    setSelectedPaymentMethodId((currentId) => {
+      const stillExists = paymentMethods.some((method) => method.id === currentId);
+      if (stillExists) return currentId;
+      return paymentMethods.find((method) => method.isDefault)?.id || paymentMethods[0].id;
+    });
+    setUseNewCard(false);
+  }, [paymentMethods]);
 
   const handlePurchasePremium = async () => {
     try {
       setProcessing(true);
-      
-      // Validate card details are complete (we always use the card field)
-      if (!cardDetails?.complete) {
+
+      const selectedPaymentMethod = paymentMethods.find(
+        (method) => method.id === selectedPaymentMethodId
+      );
+      const selectedStripePaymentMethodId = getSavedPaymentMethodStripeId(selectedPaymentMethod);
+
+      if (useNewCard && !cardDetails?.complete) {
         Alert.alert("Error", "Please enter complete card details");
+        setProcessing(false);
+        return;
+      }
+
+      if (!useNewCard && !selectedPaymentMethod) {
+        Alert.alert("Error", "Please select a saved card or use a new card");
+        setProcessing(false);
+        return;
+      }
+
+      if (!useNewCard && !selectedStripePaymentMethodId) {
+        Alert.alert(
+          "Card Needs Re-Entry",
+          "This saved card does not have a Stripe payment token yet. Please choose Use a new card to complete this premium upgrade."
+        );
+        setUseNewCard(true);
         setProcessing(false);
         return;
       }
@@ -154,6 +256,10 @@ export default function PremiumScreen() {
       console.log("🔵 Step 1: Creating PaymentIntent on backend...");
 
       // Step 1: Create PaymentIntent on backend
+      const createIntentBody = useNewCard
+        ? undefined
+        : JSON.stringify({ paymentMethodId: selectedStripePaymentMethodId });
+
       const createIntentResponse = await fetch(
         `${API_URL}/api/payment/create-payment-intent`,
         {
@@ -162,6 +268,7 @@ export default function PremiumScreen() {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
+          body: createIntentBody,
         }
       );
 
@@ -177,10 +284,17 @@ export default function PremiumScreen() {
       console.log("✅ Step 1 Complete: PaymentIntent created");
       console.log("🔵 Step 2: Calling Stripe confirmPayment...");
 
-      // Step 2: Use Stripe SDK to confirm payment with CardField data
-      const { paymentIntent, error } = await confirmPayment(clientSecret, {
-        paymentMethodType: "Card",
-      });
+      const confirmParams = useNewCard
+        ? { paymentMethodType: "Card" as const }
+        : {
+            paymentMethodType: "Card" as const,
+            paymentMethodData: {
+              paymentMethodId: selectedStripePaymentMethodId as string,
+            },
+          };
+
+      // Step 2: Use Stripe SDK to confirm payment with a saved card or CardField data.
+      const { paymentIntent, error } = await confirmPayment(clientSecret, confirmParams);
 
       if (error) {
         console.error("❌ Stripe payment failed:", error.message);
@@ -204,7 +318,7 @@ export default function PremiumScreen() {
       console.log("Payment ID:", paymentIntent.id);
 
       // Only proceed if payment actually succeeded
-      if (paymentIntent.status !== "Succeeded") {
+      if (!isPaymentIntentSucceeded(paymentIntent.status)) {
         console.error("❌ Payment status is not Succeeded:", paymentIntent.status);
         Alert.alert(
           "Payment Incomplete",
@@ -216,18 +330,7 @@ export default function PremiumScreen() {
 
       console.log("🔵 Step 3: Confirming payment on backend...");
 
-      // Prepare card details to send if new card is used
-      let cardDetailsToSave = null;
-      if (useNewCard && cardDetails) {
-        // Note: We can't extract exact card details from CardField
-        // but we can infer last4 from Stripe's payment intent payment method
-        cardDetailsToSave = {
-          last4: "****",
-          cardBrand: "visa",
-          expiryMonth: "12",
-          expiryYear: "25",
-        };
-      }
+      const confirmPaymentPayload = { paymentIntentId: paymentIntent.id };
 
       // Step 3: Notify backend that payment was successful
       const confirmBackendResponse = await fetch(
@@ -238,10 +341,7 @@ export default function PremiumScreen() {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            paymentIntentId: paymentIntent.id,
-            cardDetails: cardDetailsToSave,
-          }),
+          body: JSON.stringify(confirmPaymentPayload),
         }
       );
 
@@ -258,14 +358,28 @@ export default function PremiumScreen() {
       console.log("🎉 Payment completed successfully!");
 
       setIsPremium(true);
+      setPremiumStatusData((current: any) => ({
+        ...(current || {}),
+        success: true,
+        isPremium: true,
+        memberSince: current?.memberSince || current?.premiumSince || new Date().toISOString(),
+      }));
       setShowPaymentForm(false);
       setCardDetails(null);
       setUseNewCard(false);
       await fetchPaymentMethods();
+      setTimeout(() => {
+        checkPremiumStatus();
+      }, 1500);
+      setTimeout(() => {
+        checkPremiumStatus();
+      }, 5000);
       await sendSubscriptionAlert(
         'Premium Activated',
         'Your FitFaat Premium membership is active.'
-      );
+      ).catch((error) => {
+        console.log('Premium activation notification unavailable:', error);
+      });
 
       Alert.alert(
         "Success! 🎉",
@@ -274,7 +388,9 @@ export default function PremiumScreen() {
           {
             text: "OK",
             onPress: () => {
-              checkPremiumStatus();
+              setTimeout(() => {
+                checkPremiumStatus();
+              }, 1000);
             },
           },
         ]
@@ -305,6 +421,11 @@ export default function PremiumScreen() {
               setProcessing(true);
               const token = await tokenStorage.getToken();
 
+              if (!token) {
+                Alert.alert("Error", "Authentication token not found. Please login again.");
+                return;
+              }
+
               const response = await fetch(`${API_URL}/api/payment/cancel-premium`, {
                 method: "POST",
                 headers: {
@@ -316,10 +437,20 @@ export default function PremiumScreen() {
               const data = await response.json();
               if (data.success) {
                 setIsPremium(false);
+                setPremiumStatusData((current: any) => ({
+                  ...(current || {}),
+                  success: true,
+                  isPremium: false,
+                  status: "cancelled",
+                }));
+                setShowPaymentForm(false);
+                setCardDetails(null);
                 await sendSubscriptionAlert(
                   'Premium Cancelled',
                   'Your FitFaat Premium subscription has been cancelled.'
-                );
+                ).catch((error) => {
+                  console.log('Premium cancellation notification unavailable:', error);
+                });
                 Alert.alert("Cancelled", "Premium subscription has been cancelled");
               } else {
                 Alert.alert("Error", data.message);
@@ -337,11 +468,35 @@ export default function PremiumScreen() {
   };
 
   const styles = getStyles(colors);
+  const goalExperience = getGoalExperience(goalKey);
+  const upgradeButtonIconSize = Math.min(hp(3.2), wp(7));
+  const upgradeButtonChevronSize = Math.min(hp(2.8), wp(6.2));
+  const selectedPaymentMethod = paymentMethods.find(
+    (method) => method.id === selectedPaymentMethodId
+  );
+  const selectedSavedPaymentStripeId = getSavedPaymentMethodStripeId(selectedPaymentMethod);
+  const canPayForPremium = useNewCard
+    ? Boolean(cardDetails?.complete)
+    : Boolean(selectedSavedPaymentStripeId);
+  const subscriptionStatusLabel = isPremium ? "Premium Active" : "Free Plan";
+  const subscriptionStatusText = isPremium
+    ? "Workouts, deeper insights, exports, unlimited AI, and unlimited active bookings are active."
+    : `Free includes the dashboard, steps, charts, meal planning, grocery lists, and mindfulness for ${goalExperience.label}.`;
+  const goalPremiumFeatureItems = premiumFeatureItems.map((feature) => ({
+    ...feature,
+    text: feature.text || getGoalOutcomePremiumCopy(goalKey, feature.feature),
+  }));
+  const memberSince =
+    premiumStatusData?.memberSince ||
+    premiumStatusData?.premiumSince ||
+    premiumStatusData?.subscription?.createdAt ||
+    premiumStatusData?.subscription?.startedAt;
 
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <AppHeader title="Premium" />
+        <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
+        <AppHeader title="Premium Membership" />
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
@@ -351,68 +506,126 @@ export default function PremiumScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
       <AppHeader title="Premium Membership" />
 
       <ScrollView showsVerticalScrollIndicator={false} style={styles.content}>
+        {!showPaymentForm || isPremium ? (
+          <>
+            <View style={styles.membershipHero}>
+              <View style={styles.heroTopRow}>
+                <View style={styles.heroIcon}>
+                  <Ionicons name="diamond-outline" size={Math.min(hp(3.8), wp(8.4))} color={colors.textOnPrimary || "#FFFFFF"} />
+                </View>
+                <View style={styles.heroCopy}>
+                  <Text style={styles.heroEyebrow}>FitFaat Premium</Text>
+                  <Text
+                    numberOfLines={2}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.84}
+                    style={styles.heroTitle}
+                  >
+                    {goalExperience.premium.headline}
+                  </Text>
+                  <Text style={styles.heroSubtitle}>
+                    {goalExperience.premium.body}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.heroStatsRow}>
+                <View style={styles.heroStat}>
+                  <Text style={styles.heroStatValue}>{subscriptionStatusLabel}</Text>
+                  <Text style={styles.heroStatLabel}>{subscriptionStatusText}</Text>
+                </View>
+                <View style={styles.heroStat}>
+                  <Text style={styles.heroStatValue}>{PREMIUM_PLAN_PRICE_LABEL}/mo</Text>
+                  <Text style={styles.heroStatLabel}>
+                    {isPremium ? "membership active" : `${premiumFeatureItems.length} focused upgrades`}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.goalPremiumCard}>
+              <View style={styles.goalPremiumHeader}>
+                <View style={[styles.goalPremiumIcon, { backgroundColor: `${goalExperience.color}18` }]}>
+                  <Ionicons
+                    name={goalExperience.icon as keyof typeof Ionicons.glyphMap}
+                    size={Math.min(hp(2.8), wp(6.2))}
+                    color={goalExperience.color}
+                  />
+                </View>
+                <View style={styles.goalPremiumCopy}>
+                  <Text style={[styles.goalPremiumEyebrow, { color: goalExperience.color }]}>
+                    Premium for {goalExperience.label}
+                  </Text>
+                  <Text style={styles.goalPremiumTitle}>{goalExperience.premium.headline}</Text>
+                  <Text style={styles.goalPremiumBody}>{goalExperience.premium.body}</Text>
+                </View>
+              </View>
+              <View style={styles.goalPremiumFeatureList}>
+                {goalPremiumFeatureItems.slice(0, 5).map((feature) => (
+                  <View key={feature.feature} style={styles.goalPremiumFeatureRow}>
+                    <Ionicons
+                      name={feature.icon}
+                      size={Math.min(hp(2), wp(4.5))}
+                      color={goalExperience.color}
+                    />
+                    <Text style={styles.goalPremiumFeatureText}>
+                      {feature.text}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+          </>
+        ) : null}
+
         {!isPremium ? (
           <>
-           
-            {/* Price Card */}
-            <View style={[styles.card, { borderColor: colors.primary }]}>
-              <Text style={styles.priceLabel}>Monthly Plan</Text>
-              <View style={styles.priceContainer}>
-                <Text style={styles.currency}>$</Text>
-                <Text style={styles.price}>10</Text>
-                <Text style={styles.period}>/month</Text>
-              </View>
-              <Text style={styles.priceDescription}>
-                Get lifetime access to all premium features
-              </Text>
-            </View>
+            {!showPaymentForm ? (
+              <>
+                {/* Price Card */}
+                <View style={[styles.card, { borderColor: colors.primary }]}>
+                  <Text style={styles.priceLabel}>Monthly Plan</Text>
+                  <View style={styles.priceContainer}>
+                    <Text style={styles.currency}>$</Text>
+                    <Text style={styles.price}>{PREMIUM_PLAN_PRICE_DOLLARS}</Text>
+                    <Text style={styles.period}>/month</Text>
+                  </View>
+                  <Text style={styles.priceDescription}>
+                    Free users already get dashboard journey tools, steps, charts, meal planning, grocery lists, and mindfulness. Premium adds guided workouts, deeper goal review, exports, unlimited AI coaching, and unlimited active bookings.
+                  </Text>
+                </View>
 
-            {/* Features List */}
-            <View style={styles.featuresContainer}>
-              <Text style={styles.featuresTitle}>Premium Features Include:</Text>
+                {/* Features List */}
+                <View style={styles.featuresContainer}>
+                  <Text style={styles.featuresTitle}>Premium Benefits Include:</Text>
+                  {goalPremiumFeatureItems.map((feature) => (
+                    <View key={feature.title} style={styles.featureItem}>
+                      <View style={styles.featureIconWrap}>
+                        <Ionicons name={feature.icon as any} size={Math.min(hp(2.35), wp(5.2))} color={colors.primary} />
+                      </View>
+                      <View style={styles.featureCopy}>
+                        <Text style={styles.featureText}>{feature.title}</Text>
+                        <Text style={styles.featureDescription}>{feature.text}</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
 
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                <Text style={styles.featureText}>Advanced Workout Plans</Text>
-              </View>
-
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                <Text style={styles.featureText}>Personalized Nutrition Guidance</Text>
-              </View>
-
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                <Text style={styles.featureText}>Priority Doctor Consultations</Text>
-              </View>
-
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                <Text style={styles.featureText}>Unlimited Food Analysis</Text>
-              </View>
-
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                <Text style={styles.featureText}>Weekly Progress Reports</Text>
-              </View>
-
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                <Text style={styles.featureText}>Ad-Free Experience</Text>
-              </View>
-            </View>
-
-            {/* Payment Info */}
-            <View style={styles.card}>
-              <Text style={styles.infoLabel}>Payment Method</Text>
-              <Text style={styles.infoValue}>Credit/Debit Card</Text>
-              <Text style={styles.infoDescription}>
-                We accept all major credit cards. Your payment is processed securely by Stripe.
-              </Text>
-            </View>
+                {/* Payment Info */}
+                <View style={styles.card}>
+                  <Text style={styles.infoLabel}>Payment Method</Text>
+                  <Text style={styles.infoValue}>Credit/Debit Card</Text>
+                  <Text style={styles.infoDescription}>
+                    We accept all major credit cards. Your payment is processed securely by Stripe.
+                  </Text>
+                </View>
+              </>
+            ) : null}
 
             {/* Payment Form */}
             {showPaymentForm ? (
@@ -434,12 +647,90 @@ export default function PremiumScreen() {
                   <Text style={styles.securityText}>Your payment is encrypted and secure</Text>
                 </View>
 
-                {/* Saved Cards Section - REMOVED for simplicity */}
+                {paymentMethods.length > 0 && (
+                  <View style={styles.savedCardsSection}>
+                    <View style={styles.paymentSectionHeader}>
+                      <Text style={styles.cardInputLabel}>Saved Cards</Text>
+                      <Text style={styles.paymentSectionHint}>From Payment Methods</Text>
+                    </View>
 
-                {/* Card Input Section */}
-                <View style={styles.cardInputSection}>
+                    {paymentMethods.map((method) => {
+                      const isSelected = !useNewCard && selectedPaymentMethodId === method.id;
+                      const hasStripeToken = Boolean(getSavedPaymentMethodStripeId(method));
+
+                      return (
+                        <TouchableOpacity
+                          key={method.id}
+                          style={[
+                            styles.savedCardOption,
+                            isSelected && styles.selectedPaymentOption,
+                            !hasStripeToken && styles.unavailablePaymentOption,
+                          ]}
+                          onPress={() => {
+                            setSelectedPaymentMethodId(method.id);
+                            setUseNewCard(false);
+                          }}
+                          activeOpacity={0.85}
+                        >
+                          <View style={styles.cardCheckbox}>
+                            {isSelected && <View style={styles.cardCheckboxDot} />}
+                          </View>
+                          <View style={styles.savedCardIcon}>
+                            <Ionicons name="card" size={22} color={colors.primary} />
+                          </View>
+                          <View style={styles.cardInfo}>
+                            <Text
+                              numberOfLines={1}
+                              adjustsFontSizeToFit
+                              minimumFontScale={0.78}
+                              style={styles.cardBrand}
+                            >
+                              {formatCardBrand(method.cardBrand)} ending {method.last4}
+                            </Text>
+                            <Text style={styles.cardExpiry}>
+                              Expires {method.expiryMonth || "--"}/{method.expiryYear || "--"}
+                            </Text>
+                          </View>
+                          {method.isDefault && (
+                            <View style={styles.defaultBadge}>
+                              <Text style={styles.defaultBadgeText}>Default</Text>
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
+
+                    <TouchableOpacity
+                      style={[
+                        styles.useNewCardOption,
+                        useNewCard && styles.selectedPaymentOption,
+                      ]}
+                      onPress={() => setUseNewCard(true)}
+                      activeOpacity={0.85}
+                    >
+                      <View style={styles.cardCheckbox}>
+                        {useNewCard && <View style={styles.cardCheckboxDot} />}
+                      </View>
+                      <Ionicons name="add-circle-outline" size={22} color={colors.primary} />
+                      <Text style={styles.useNewCardText}>Use a new card</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {!useNewCard && selectedPaymentMethod && !selectedSavedPaymentStripeId && (
+                  <View style={styles.legacyCardNotice}>
+                    <Ionicons name="alert-circle-outline" size={18} color={colors.warning} />
+                    <Text style={styles.legacyCardNoticeText}>
+                      This saved card needs to be re-entered once before it can be used for Premium.
+                    </Text>
+                  </View>
+                )}
+
+                {/* Direct Card Input Section */}
+                {(useNewCard || paymentMethods.length === 0) && (
+                  <View style={styles.cardInputSection}>
                     <Text style={styles.cardInputLabel}>
-                      {paymentMethods.length > 0 ? "New Card Information" : "Card Information"}
+                      Card Information
                     </Text>
                     
                     {/* Stripe CardField Component */}
@@ -451,23 +742,63 @@ export default function PremiumScreen() {
                         expiration: "MM/YY",
                         cvc: "•••",
                       }}
+                      cardStyle={{
+                        backgroundColor: "#F8FAFC",
+                        borderColor: "#E2E8F0",
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        cursorColor: colors.primary,
+                        fontSize: 16,
+                        placeholderColor: "#94A3B8",
+                        textColor: "#0F172A",
+                        textErrorColor: colors.error,
+                      }}
                       onCardChange={(details: any) => {
                         console.log("🔍 Card details updated:", {
                           complete: details.complete,
                           validCVC: details.validCVC,
                           validExpiryDate: details.validExpiryDate,
                           validNumber: details.validNumber,
+                          last4: details.last4,
+                          brand: details.brand,
+                          expiryMonth: details.expiryMonth,
+                          expiryYear: details.expiryYear,
                         });
                         setCardDetails({
                           complete: details.complete,
                           validCVC: details.validCVC,
                           validExpiryDate: details.validExpiryDate,
                           validNumber: details.validNumber,
+                          last4: details.last4,
+                          brand: details.brand,
+                          expiryMonth: details.expiryMonth,
+                          expiryYear: details.expiryYear,
                         });
                       }}
                       style={styles.cardField}
                     />
                   </View>
+                )}
+
+                {useNewCard && (
+                  <View style={styles.cardStatusRow}>
+                    <Ionicons
+                      name={cardDetails?.complete ? "checkmark-circle" : "information-circle-outline"}
+                      size={16}
+                      color={cardDetails?.complete ? colors.success : colors.textSecondary}
+                    />
+                    <Text
+                      style={[
+                        styles.cardStatusText,
+                        { color: cardDetails?.complete ? colors.success : colors.textSecondary },
+                      ]}
+                    >
+                      {cardDetails?.complete
+                        ? "Card ready for secure payment"
+                        : "Add card number, expiry date and CVC"}
+                    </Text>
+                  </View>
+                )}
 
                 {/* Price Summary */}
                 <View style={styles.priceSummary}>
@@ -475,24 +806,26 @@ export default function PremiumScreen() {
                     <Text style={styles.summaryLabel}>Premium Plan</Text>
                     <Text style={styles.summaryDescription}>Monthly subscription</Text>
                   </View>
-                  <Text style={styles.summaryPrice}>$10.00</Text>
+                  <Text style={styles.summaryPrice}>{PREMIUM_PLAN_PRICE_WITH_CENTS}</Text>
                 </View>
 
                 {/* Debug: Show card validation status */}
+                {false && useNewCard && (
                 <View style={{paddingHorizontal: 16, marginBottom: 8}}>
                   <Text style={{fontSize: 12, color: cardDetails?.complete ? '#4CAF50' : '#FF6B6B'}}>
                     {cardDetails?.complete ? '✅ Card complete - ready to pay' : '❌ Card incomplete - fill all fields'}
                   </Text>
                 </View>
+                )}
 
                 {/* Pay Button */}
                 <TouchableOpacity
                   style={[
                     styles.payButton,
-                    (!cardDetails?.complete || processing) && styles.disabledButton,
+                    (!canPayForPremium || processing) && styles.disabledButton,
                   ]}
                   onPress={handlePurchasePremium}
-                  disabled={!cardDetails?.complete || processing}
+                  disabled={!canPayForPremium || processing}
                 >
                   {processing ? (
                     <>
@@ -502,7 +835,7 @@ export default function PremiumScreen() {
                   ) : (
                     <>
                       <Ionicons name="card" size={22} color="white" />
-                      <Text style={styles.payButtonText}>Pay $10.00</Text>
+                      <Text style={styles.payButtonText}>Pay {PREMIUM_PLAN_PRICE_WITH_CENTS}</Text>
                     </>
                   )}
                 </TouchableOpacity>
@@ -532,12 +865,26 @@ export default function PremiumScreen() {
                   <ActivityIndicator color="white" />
                 ) : (
                   <View style={styles.upgradeButtonContent}>
-                    <Ionicons name="star" size={28} color="white" />
+                    <Ionicons name="star" size={upgradeButtonIconSize} color={colors.buttonText} />
                     <View style={styles.upgradeButtonTextContainer}>
-                      <Text style={styles.upgradeButtonText}>Upgrade to Premium</Text>
-                      <Text style={styles.upgradeButtonSubtext}>Get exclusive benefits</Text>
+                      <Text
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.72}
+                        style={styles.upgradeButtonText}
+                      >
+                        Upgrade to Premium
+                      </Text>
+                      <Text
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.78}
+                        style={styles.upgradeButtonSubtext}
+                      >
+                        Unlock deeper tools
+                      </Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={24} color="#FFFFFF" />
+                    <Ionicons name="chevron-forward" size={upgradeButtonChevronSize} color={colors.buttonText} />
                   </View>
                 )}
               </TouchableOpacity>
@@ -555,7 +902,7 @@ export default function PremiumScreen() {
                 <Text style={styles.premiumActiveTitle}>You're a Premium Member!</Text>
               </View>
               <Text style={styles.premiumActiveSubtitle}>
-                Enjoy all the benefits of premium membership
+                Your Premium benefits are active: FitFaat now adds guided workouts, deeper paid insights, exports, unlimited AI coaching, adaptive goal review, and unlimited active bookings.
               </Text>
             </View>
 
@@ -567,49 +914,30 @@ export default function PremiumScreen() {
               <View style={styles.divider} />
 
               <Text style={styles.infoLabel}>Plan</Text>
-              <Text style={styles.infoValue}>Premium Monthly - $10/month</Text>
+              <Text style={styles.infoValue}>Premium Monthly - {PREMIUM_PLAN_PRICE_LABEL}/month</Text>
 
               <View style={styles.divider} />
 
               <Text style={styles.infoLabel}>Member Since</Text>
               <Text style={styles.infoValue}>
-                {new Date().toLocaleDateString()}
+                {memberSince ? new Date(memberSince).toLocaleDateString() : "Active now"}
               </Text>
             </View>
 
             {/* Premium Features Available */}
             <View style={styles.featuresContainer}>
               <Text style={styles.featuresTitle}>Your Premium Benefits:</Text>
-
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                <Text style={styles.featureText}>Advanced Workout Plans</Text>
-              </View>
-
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                <Text style={styles.featureText}>Personalized Nutrition Guidance</Text>
-              </View>
-
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                <Text style={styles.featureText}>Priority Doctor Consultations</Text>
-              </View>
-
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                <Text style={styles.featureText}>Unlimited Food Analysis</Text>
-              </View>
-
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                <Text style={styles.featureText}>Weekly Progress Reports</Text>
-              </View>
-
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                <Text style={styles.featureText}>Ad-Free Experience</Text>
-              </View>
+              {goalPremiumFeatureItems.map((feature) => (
+                <View key={feature.title} style={styles.featureItem}>
+                  <View style={styles.featureIconWrap}>
+                    <Ionicons name={feature.icon as any} size={Math.min(hp(2.35), wp(5.2))} color={colors.primary} />
+                  </View>
+                  <View style={styles.featureCopy}>
+                    <Text style={styles.featureText}>{feature.title}</Text>
+                    <Text style={styles.featureDescription}>{feature.text}</Text>
+                  </View>
+                </View>
+              ))}
             </View>
 
             {/* Cancel Button */}
@@ -632,7 +960,7 @@ const getStyles = (colors: any) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: colors.screenColor || '#FFFFFF',
     },
     content: {
       flex: 1,
@@ -661,6 +989,523 @@ const getStyles = (colors: any) =>
       fontWeight: "bold",
       color: colors.primary,
       marginTop: hp(1),
+    },
+    membershipHero: {
+      backgroundColor: colors.primary,
+      borderRadius: hp(2.4),
+      padding: wp(5),
+      marginTop: hp(0.5),
+      marginBottom: hp(2),
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.26,
+      shadowRadius: 14,
+      elevation: 6,
+    },
+    heroTopRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: wp(3),
+    },
+    heroIcon: {
+      width: Math.min(hp(6.4), wp(14)),
+      height: Math.min(hp(6.4), wp(14)),
+      borderRadius: hp(1.8),
+      backgroundColor: "rgba(255, 255, 255, 0.16)",
+      borderWidth: 1,
+      borderColor: "rgba(255, 255, 255, 0.28)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    heroCopy: {
+      flex: 1,
+      minWidth: 0,
+    },
+    heroEyebrow: {
+      color: "rgba(255, 255, 255, 0.78)",
+      fontSize: Math.min(hp(1.45), wp(3.25)),
+      fontWeight: "800",
+      letterSpacing: 0,
+      textTransform: "uppercase",
+    },
+    heroTitle: {
+      marginTop: hp(0.45),
+      color: colors.textOnPrimary || "#FFFFFF",
+      fontSize: Math.min(hp(3), wp(6.4)),
+      lineHeight: hp(3.45),
+      fontWeight: "900",
+      letterSpacing: 0,
+    },
+    heroSubtitle: {
+      marginTop: hp(0.8),
+      color: "rgba(255, 255, 255, 0.82)",
+      fontSize: Math.min(hp(1.5), wp(3.35)),
+      lineHeight: hp(2.15),
+      fontWeight: "600",
+    },
+    heroStatsRow: {
+      flexDirection: "row",
+      gap: wp(2.5),
+      marginTop: hp(2),
+    },
+    heroStat: {
+      flex: 1,
+      minWidth: 0,
+      borderRadius: hp(1.6),
+      paddingHorizontal: wp(3),
+      paddingVertical: hp(1.4),
+      backgroundColor: "rgba(255, 255, 255, 0.13)",
+      borderWidth: 1,
+      borderColor: "rgba(255, 255, 255, 0.2)",
+    },
+    heroStatValue: {
+      color: colors.textOnPrimary || "#FFFFFF",
+      fontSize: Math.min(hp(1.75), wp(3.9)),
+      fontWeight: "900",
+      letterSpacing: 0,
+    },
+    heroStatLabel: {
+      marginTop: hp(0.45),
+      color: "rgba(255, 255, 255, 0.78)",
+      fontSize: Math.min(hp(1.22), wp(2.85)),
+      lineHeight: hp(1.65),
+      fontWeight: "700",
+    },
+    goalPremiumCard: {
+      backgroundColor: colors.cardBackground || "#FFFFFF",
+      borderRadius: hp(2),
+      padding: wp(4),
+      marginBottom: hp(2),
+      borderWidth: 1,
+      borderColor: colors.cardBorder || "#E8EEF3",
+      gap: hp(1.2),
+    },
+    goalPremiumHeader: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: wp(2.8),
+    },
+    goalPremiumIcon: {
+      width: Math.min(hp(5.2), wp(11.5)),
+      height: Math.min(hp(5.2), wp(11.5)),
+      borderRadius: Math.min(hp(2.6), wp(5.75)),
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0,
+    },
+    goalPremiumCopy: {
+      flex: 1,
+      minWidth: 0,
+    },
+    goalPremiumEyebrow: {
+      fontSize: Math.min(hp(1.08), wp(2.55)),
+      fontWeight: "900",
+      textTransform: "uppercase",
+    },
+    goalPremiumTitle: {
+      color: colors.textPrimary,
+      fontSize: Math.min(hp(1.75), wp(4)),
+      lineHeight: hp(2.35),
+      fontWeight: "900",
+      marginTop: hp(0.25),
+    },
+    goalPremiumBody: {
+      color: colors.textSecondary,
+      fontSize: Math.min(hp(1.22), wp(2.85)),
+      lineHeight: hp(1.75),
+      fontWeight: "700",
+      marginTop: hp(0.35),
+    },
+    goalPremiumFeatureList: {
+      gap: hp(0.75),
+    },
+    goalPremiumFeatureRow: {
+      minHeight: hp(4.6),
+      borderRadius: hp(1.25),
+      backgroundColor: colors.primarySoft || `${colors.primary}12`,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: wp(2),
+      paddingHorizontal: wp(2.6),
+      paddingVertical: hp(0.75),
+    },
+    goalPremiumFeatureText: {
+      flex: 1,
+      minWidth: 0,
+      color: colors.textPrimary,
+      fontSize: Math.min(hp(1.1), wp(2.65)),
+      lineHeight: hp(1.55),
+      fontWeight: "800",
+    },
+    trialCard: {
+      backgroundColor: colors.cardBackground || "#FFFFFF",
+      borderRadius: hp(2),
+      padding: wp(4),
+      marginBottom: hp(2),
+      borderWidth: 1,
+      borderColor: colors.cardBorder || "#E8EEF3",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.08,
+      shadowRadius: 8,
+      elevation: 3,
+    },
+    trialHeader: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: wp(3),
+      marginBottom: hp(1.3),
+    },
+    trialTitle: {
+      color: colors.textPrimary,
+      fontSize: Math.min(hp(2), wp(4.5)),
+      fontWeight: "900",
+      letterSpacing: 0,
+    },
+    trialSubtitle: {
+      marginTop: hp(0.5),
+      color: colors.textSecondary,
+      fontSize: Math.min(hp(1.32), wp(3.05)),
+      lineHeight: hp(1.9),
+      fontWeight: "600",
+      maxWidth: wp(62),
+    },
+    trialCountPill: {
+      minWidth: wp(13),
+      borderRadius: hp(1.5),
+      paddingHorizontal: wp(2.3),
+      paddingVertical: hp(0.8),
+      backgroundColor: `${colors.primary}12`,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: `${colors.primary}26`,
+    },
+    trialCountText: {
+      color: colors.primary,
+      fontSize: Math.min(hp(2), wp(4.4)),
+      fontWeight: "900",
+      lineHeight: hp(2.2),
+    },
+    trialCountLabel: {
+      color: colors.primary,
+      fontSize: Math.min(hp(1.1), wp(2.5)),
+      fontWeight: "800",
+      textTransform: "uppercase",
+    },
+    trialRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: hp(1.1),
+      borderTopWidth: 1,
+      borderTopColor: colors.border || "#EEF2F7",
+      gap: wp(2.4),
+    },
+    trialIconWrap: {
+      width: Math.min(hp(4.4), wp(9.5)),
+      height: Math.min(hp(4.4), wp(9.5)),
+      borderRadius: hp(1.3),
+      backgroundColor: `${colors.primary}12`,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    trialCopy: {
+      flex: 1,
+      minWidth: 0,
+    },
+    trialFeatureName: {
+      color: colors.textPrimary,
+      fontSize: Math.min(hp(1.68), wp(3.8)),
+      fontWeight: "900",
+      letterSpacing: 0,
+    },
+    trialFeatureMeta: {
+      marginTop: hp(0.25),
+      color: colors.textSecondary,
+      fontSize: Math.min(hp(1.24), wp(2.9)),
+      fontWeight: "700",
+      lineHeight: hp(1.7),
+    },
+    trialBadge: {
+      maxWidth: wp(39),
+      minWidth: wp(29),
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: wp(1),
+      borderRadius: hp(1.3),
+      paddingHorizontal: wp(2),
+      paddingVertical: hp(0.75),
+      backgroundColor: "#F8FAFC",
+      borderWidth: 1,
+      borderColor: "#E2E8F0",
+    },
+    trialBadgeActive: {
+      backgroundColor: `${colors.primary}10`,
+      borderColor: `${colors.primary}30`,
+    },
+    trialBadgePending: {
+      backgroundColor: `${colors.primary}0D`,
+      borderColor: `${colors.primary}24`,
+    },
+    trialBadgePremium: {
+      backgroundColor: `${colors.success || colors.primary}12`,
+      borderColor: `${colors.success || colors.primary}30`,
+    },
+    trialBadgeLocked: {
+      backgroundColor: "#F8FAFC",
+      borderColor: "#E2E8F0",
+    },
+    trialBadgeText: {
+      flex: 1,
+      minWidth: 0,
+      color: colors.textSecondary,
+      fontSize: Math.min(hp(1.18), wp(2.75)),
+      fontWeight: "900",
+      letterSpacing: 0,
+      textAlign: "center",
+    },
+    trialBadgeTextActive: {
+      color: colors.primary,
+    },
+    trialBadgeTextPremium: {
+      color: colors.success || colors.primary,
+    },
+    trialBadgeTextLocked: {
+      color: colors.textSecondary,
+    },
+    previewHeader: {
+      marginBottom: hp(1.5),
+      paddingHorizontal: wp(1),
+    },
+    previewTitle: {
+      fontSize: Math.min(hp(2.8), wp(6)),
+      fontWeight: "900",
+      color: colors.textPrimary,
+      letterSpacing: 0,
+    },
+    previewSubtitle: {
+      marginTop: hp(0.5),
+      fontSize: Math.min(hp(1.6), wp(3.55)),
+      color: colors.textSecondary,
+      fontWeight: "600",
+      lineHeight: hp(2.3),
+    },
+    previewGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "space-between",
+      marginBottom: hp(2),
+      gap: wp(2),
+    },
+    previewCard: {
+      width: "48%",
+      minHeight: hp(17),
+      backgroundColor: colors.cardBackground || "#FFFFFF",
+      borderRadius: hp(1.5),
+      padding: wp(3.5),
+      borderWidth: 1,
+      borderColor: colors.cardBorder || "#F0F0F0",
+      overflow: "hidden",
+      justifyContent: "flex-start",
+    },
+    previewCardTitle: {
+      marginTop: hp(1),
+      fontSize: Math.min(hp(1.75), wp(3.9)),
+      fontWeight: "900",
+      color: colors.textPrimary,
+    },
+    previewCardText: {
+      marginTop: hp(0.5),
+      fontSize: Math.min(hp(1.35), wp(3)),
+      color: colors.textSecondary,
+      lineHeight: hp(1.9),
+      fontWeight: "600",
+    },
+    previewLockOverlay: {
+      position: "absolute",
+      top: wp(2.2),
+      right: wp(2.2),
+      width: hp(3.5),
+      height: hp(3.5),
+      borderRadius: hp(1.75),
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: colors.primary,
+      overflow: "hidden",
+    },
+    comparisonCard: {
+      backgroundColor: colors.cardBackground || "#FFFFFF",
+      borderRadius: hp(2.1),
+      padding: wp(4),
+      marginBottom: hp(2.2),
+      borderWidth: 1,
+      borderColor: colors.cardBorder || "#E8EEF3",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 10,
+      elevation: 4,
+    },
+    comparisonHeader: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: wp(3),
+      marginBottom: hp(1.4),
+    },
+    comparisonTitleWrap: {
+      flex: 1,
+      minWidth: 0,
+    },
+    comparisonEyebrow: {
+      color: colors.primary,
+      fontSize: Math.min(hp(1.12), wp(2.7)),
+      fontWeight: "900",
+      letterSpacing: 0,
+      textTransform: "uppercase",
+    },
+    comparisonTitle: {
+      marginTop: hp(0.25),
+      fontSize: Math.min(hp(2), wp(4.4)),
+      fontWeight: "900",
+      color: colors.textPrimary,
+      letterSpacing: 0,
+    },
+    comparisonSubtitle: {
+      marginTop: hp(0.55),
+      color: colors.textSecondary,
+      fontSize: Math.min(hp(1.28), wp(3)),
+      lineHeight: hp(1.85),
+      fontWeight: "700",
+    },
+    comparisonHeaderIcon: {
+      width: Math.min(hp(4.8), wp(10.6)),
+      height: Math.min(hp(4.8), wp(10.6)),
+      borderRadius: hp(1.45),
+      backgroundColor: `${colors.primary}12`,
+      borderWidth: 1,
+      borderColor: `${colors.primary}28`,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    comparisonLegend: {
+      flexDirection: "row",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: wp(1.5),
+      paddingVertical: hp(1),
+      paddingHorizontal: wp(2.4),
+      borderRadius: hp(1.5),
+      backgroundColor: colors.surface || "#F8FAFC",
+      borderWidth: 1,
+      borderColor: colors.border || "#EEF2F7",
+      marginBottom: hp(1.4),
+    },
+    comparisonPlanHeader: {
+      flexDirection: "row",
+      gap: wp(2.4),
+      marginBottom: hp(1.2),
+    },
+    comparisonPlanHeaderCell: {
+      flex: 1,
+      minWidth: 0,
+      borderRadius: hp(1.5),
+      paddingHorizontal: wp(3),
+      paddingVertical: hp(1.15),
+      backgroundColor: colors.surface || "#F8FAFC",
+      borderWidth: 1,
+      borderColor: colors.border || "#EEF2F7",
+    },
+    comparisonPlanHeaderPremiumCell: {
+      backgroundColor: `${colors.primary}0F`,
+      borderColor: `${colors.primary}2E`,
+    },
+    comparisonPlanKicker: {
+      color: colors.textSecondary,
+      fontSize: Math.min(hp(1.08), wp(2.55)),
+      fontWeight: "900",
+      textTransform: "uppercase",
+      letterSpacing: 0,
+    },
+    comparisonPlanName: {
+      marginTop: hp(0.25),
+      color: colors.textPrimary,
+      fontSize: Math.min(hp(1.48), wp(3.35)),
+      fontWeight: "900",
+    },
+    comparisonRow: {
+      paddingTop: hp(1.25),
+      marginTop: hp(0.3),
+      borderTopWidth: 1,
+      borderTopColor: colors.border || "#EEF2F7",
+      gap: hp(0.9),
+    },
+    comparisonFeatureHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: wp(2.1),
+    },
+    comparisonFeatureIcon: {
+      width: Math.min(hp(3.6), wp(8)),
+      height: Math.min(hp(3.6), wp(8)),
+      borderRadius: hp(1.1),
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: `${colors.primary}12`,
+    },
+    comparisonLabel: {
+      flex: 1,
+      minWidth: 0,
+      color: colors.textPrimary,
+      fontSize: Math.min(hp(1.52), wp(3.45)),
+      fontWeight: "900",
+    },
+    comparisonAccessGrid: {
+      flexDirection: "row",
+      alignItems: "stretch",
+      gap: wp(2.4),
+    },
+    comparisonAccessCell: {
+      flex: 1,
+      minWidth: 0,
+      borderRadius: hp(1.45),
+      paddingHorizontal: wp(2.7),
+      paddingVertical: hp(1.15),
+      backgroundColor: colors.surface || "#F8FAFC",
+      borderWidth: 1,
+      borderColor: colors.border || "#EEF2F7",
+    },
+    comparisonPremiumAccessCell: {
+      backgroundColor: `${colors.primary}0B`,
+      borderColor: `${colors.primary}24`,
+    },
+    comparisonAccessHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: wp(1.4),
+      marginBottom: hp(0.7),
+    },
+    comparisonAccessPlan: {
+      flexShrink: 1,
+      color: colors.textSecondary,
+      fontSize: Math.min(hp(1.08), wp(2.55)),
+      fontWeight: "900",
+      textTransform: "uppercase",
+      letterSpacing: 0,
+    },
+    comparisonFree: {
+      color: colors.textSecondary,
+      fontSize: Math.min(hp(1.28), wp(3)),
+      fontWeight: "700",
+      lineHeight: hp(1.75),
+    },
+    comparisonPremium: {
+      color: colors.textPrimary,
+      fontSize: Math.min(hp(1.28), wp(3)),
+      fontWeight: "800",
+      lineHeight: hp(1.75),
     },
     card: {
       backgroundColor: "white",
@@ -718,21 +1563,41 @@ const getStyles = (colors: any) =>
       elevation: 3,
     },
     featuresTitle: {
-      fontSize: hp(2.2),
-      fontWeight: "bold",
-      color: colors.text,
+      fontSize: Math.min(hp(2.2), wp(4.8)),
+      fontWeight: "900",
+      color: colors.textPrimary || colors.text,
       marginBottom: hp(2),
     },
     featureItem: {
       flexDirection: "row",
+      alignItems: "flex-start",
+      marginBottom: hp(1.7),
+      gap: wp(2.6),
+    },
+    featureIconWrap: {
+      width: Math.min(hp(4.4), wp(9.8)),
+      height: Math.min(hp(4.4), wp(9.8)),
+      borderRadius: hp(1.25),
+      backgroundColor: `${colors.primary}14`,
       alignItems: "center",
-      marginBottom: hp(1.5),
+      justifyContent: "center",
+    },
+    featureCopy: {
+      flex: 1,
+      minWidth: 0,
     },
     featureText: {
-      fontSize: hp(1.9),
-      color: colors.text,
-      marginLeft: wp(3),
+      fontSize: Math.min(hp(1.78), wp(4)),
+      color: colors.textPrimary || colors.text,
+      fontWeight: "900",
       flex: 1,
+    },
+    featureDescription: {
+      marginTop: hp(0.35),
+      fontSize: Math.min(hp(1.34), wp(3.05)),
+      color: colors.textSecondary || "#666",
+      fontWeight: "600",
+      lineHeight: hp(1.95),
     },
     paymentFormCard: {
       marginBottom: hp(2),
@@ -793,33 +1658,65 @@ const getStyles = (colors: any) =>
     },
     savedCardsSection: {
       marginBottom: hp(2.5),
-      paddingHorizontal: wp(2),
+      paddingHorizontal: 0,
+    },
+    paymentSectionHeader: {
+      flexDirection: "row",
+      alignItems: "baseline",
+      justifyContent: "space-between",
+      gap: wp(2),
+      marginBottom: hp(1.2),
+    },
+    paymentSectionHint: {
+      flexShrink: 1,
+      color: "#94A3B8",
+      fontSize: hp(1.35),
+      fontWeight: "600",
+      textAlign: "right",
     },
     savedCardOption: {
       flexDirection: "row",
       alignItems: "center",
-      paddingHorizontal: wp(4),
-      paddingVertical: hp(1.5),
+      paddingHorizontal: wp(3.2),
+      paddingVertical: hp(1.35),
       marginBottom: hp(1),
-      borderRadius: hp(1.2),
+      borderRadius: hp(1.4),
       borderWidth: 2,
-      borderColor: "#E0E0E0",
-      backgroundColor: "#FAFAFA",
+      borderColor: "#E2E8F0",
+      backgroundColor: "#F8FAFC",
     },
-    selectedCard: {
+    selectedPaymentOption: {
       borderColor: colors.primary,
-      backgroundColor: `${colors.primary}08`,
+      backgroundColor: `${colors.primary}10`,
+    },
+    unavailablePaymentOption: {
+      opacity: 0.7,
     },
     cardCheckbox: {
-      width: hp(2.8),
-      height: hp(2.8),
-      borderRadius: hp(1.4),
+      width: hp(2.5),
+      height: hp(2.5),
+      borderRadius: hp(1.25),
       borderWidth: 2,
       borderColor: colors.primary,
       backgroundColor: "white",
       justifyContent: "center",
       alignItems: "center",
-      marginRight: wp(3),
+      marginRight: wp(2.4),
+    },
+    cardCheckboxDot: {
+      width: hp(1.15),
+      height: hp(1.15),
+      borderRadius: hp(0.58),
+      backgroundColor: colors.primary,
+    },
+    savedCardIcon: {
+      width: hp(4.2),
+      height: hp(4.2),
+      borderRadius: hp(1.2),
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: `${colors.primary}14`,
+      marginRight: wp(2.6),
     },
     cardInfo: {
       flex: 1,
@@ -840,6 +1737,7 @@ const getStyles = (colors: any) =>
       paddingVertical: hp(0.5),
       borderRadius: hp(0.8),
       backgroundColor: colors.primary,
+      marginLeft: wp(1.5),
     },
     defaultBadgeText: {
       fontSize: hp(1.3),
@@ -854,31 +1752,78 @@ const getStyles = (colors: any) =>
     useNewCardOption: {
       flexDirection: "row",
       alignItems: "center",
-      paddingHorizontal: wp(4),
-      paddingVertical: hp(1.5),
-      borderRadius: hp(1.2),
+      paddingHorizontal: wp(3.2),
+      paddingVertical: hp(1.35),
+      borderRadius: hp(1.4),
       borderWidth: 2,
-      borderColor: "#E0E0E0",
-      backgroundColor: "#FAFAFA",
+      borderColor: "#E2E8F0",
+      backgroundColor: "#F8FAFC",
+    },
+    useNewCardText: {
+      flex: 1,
+      minWidth: 0,
+      marginLeft: wp(2.4),
+      color: colors.textPrimary,
+      fontSize: hp(1.75),
+      fontWeight: "800",
     },
     cardInputSection: {
       marginBottom: hp(2.5),
+      backgroundColor: "#FFFFFF",
+      borderRadius: hp(1.8),
+      borderWidth: 1.5,
+      borderColor: "#E2E8F0",
+      padding: wp(4),
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.08,
+      shadowRadius: 5,
+      elevation: 2,
     },
     cardInputLabel: {
       fontSize: hp(1.95),
       fontWeight: "700",
-      color: colors.text,
+      color: colors.textPrimary,
       marginBottom: hp(1.2),
       letterSpacing: 0.2,
     },
     cardField: {
       width: "100%",
-      height: hp(10),
-      marginVertical: hp(0.5),
+      height: Math.max(hp(6.4), 54),
+      marginTop: hp(0.3),
+      marginBottom: hp(0.6),
       borderRadius: hp(1.5),
       backgroundColor: "#FAFAFA",
-      borderWidth: 2,
-      borderColor: "#E0E0E0",
+    },
+    legacyCardNotice: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: wp(2),
+      padding: wp(3),
+      borderRadius: hp(1.2),
+      backgroundColor: `${colors.warning}12`,
+      marginBottom: hp(2),
+    },
+    legacyCardNoticeText: {
+      flex: 1,
+      minWidth: 0,
+      color: colors.textSecondary,
+      fontSize: hp(1.45),
+      fontWeight: "600",
+      lineHeight: hp(2),
+    },
+    cardStatusRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: wp(1.5),
+      paddingHorizontal: wp(1),
+      marginBottom: hp(1.4),
+    },
+    cardStatusText: {
+      flex: 1,
+      minWidth: 0,
+      fontSize: hp(1.45),
+      fontWeight: "700",
     },
     priceSummary: {
       flexDirection: "row",
@@ -953,11 +1898,14 @@ const getStyles = (colors: any) =>
     upgradeButton: {
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "space-between",
-      paddingHorizontal: wp(5),
-      paddingVertical: hp(2.5),
+      justifyContent: "center",
+      alignSelf: "center",
+      width: "100%",
+      minHeight: hp(8.2),
+      paddingHorizontal: wp(4),
+      paddingVertical: hp(1.8),
       marginBottom: hp(3),
-      marginHorizontal: wp(-5),
+      marginHorizontal: 0,
       marginTop: hp(2),
       backgroundColor: colors.primary,
       borderWidth: 2,
@@ -967,29 +1915,41 @@ const getStyles = (colors: any) =>
       shadowOpacity: 0.4,
       shadowRadius: 12,
       elevation: 8,
+      overflow: "hidden",
     },
     upgradeButtonContent: {
+      flex: 1,
+      minWidth: 0,
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "space-between",
+      justifyContent: "center",
       width: "100%",
-      paddingHorizontal: wp(2),
+      gap: wp(2.4),
+      paddingHorizontal: 0,
     },
     upgradeButtonTextContainer: {
       flex: 1,
-      marginHorizontal: wp(3),
+      minWidth: 0,
+      justifyContent: "center",
     },
     upgradeButtonText: {
-      fontSize: hp(2.4),
+      width: "100%",
+      fontSize: hp(2.35),
       fontWeight: "800",
-      color: "white",
-      letterSpacing: 0.4,
+      color: colors.buttonText,
+      includeFontPadding: false,
+      lineHeight: hp(2.75),
+      letterSpacing: 0,
     },
     upgradeButtonSubtext: {
+      width: "100%",
       fontSize: hp(1.6),
       color: "rgba(255, 255, 255, 0.85)",
       marginTop: hp(0.5),
       fontWeight: "500",
+      includeFontPadding: false,
+      lineHeight: hp(1.9),
+      letterSpacing: 0,
     },
     testCardInfo: {
       backgroundColor: "#F0F7FF",

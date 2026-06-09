@@ -23,7 +23,6 @@ allprojects {
 
 def reactNativeNewArchCodegenProjects = [
   'react-native-webview',
-  'sayem314_react-native-keep-awake',
 ]
 
 subprojects { subproject ->

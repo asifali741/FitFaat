@@ -1,39 +1,72 @@
 import { theme } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
+import { cachedRequestJson } from '@/utils/apiHelper';
 import { authApi } from '@/utils/auth/authApi';
 import { tokenStorage } from '@/utils/auth/tokenStorage';
+import {
+  clearCachedProfileImage,
+  buildStableBackendProfileImageUrl,
+  getBackendProfileImageUrl,
+  getGmailProfileImageUrl,
+  getProfileImageUserKey,
+  readCachedProfileImage,
+  resolveBackendImageUrl,
+  writeCachedProfileImage,
+} from '@/utils/profileImage';
+import { profileImageEvents, type ProfileImageUpdateEvent } from '@/utils/profileImageEvents';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from "expo-constants";
 import { usePathname, useRouter, useSegments } from "expo-router";
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Image, Keyboard, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import { io, Socket } from 'socket.io-client';
+import { isRealtimeSocketEnabled } from '@/utils/config';
 
 type TabType = 'dashboard' | 'chatbot' | 'conference' | 'doctor-portal' | 'profile';
 
+const FAST_READ_CONFIG = {
+  timeoutMs: 6000,
+  retries: 1,
+  retryDelayMs: 500,
+  allowStaleOnError: true,
+  maxWaitForFreshMs: 1800,
+  refreshCacheInBackground: true,
+};
+
 export function BottomTabBar() {
   const { colors } = useTheme();
-  const styles = getStyles(colors);
+  const styles = useMemo(() => getStyles(colors), [colors]);
   const router = useRouter();
   const pathname = usePathname();
   const segments = useSegments();
   const insets = useSafeAreaInsets();
+  const latestProfileImageEvent = profileImageEvents.getLatest();
+  const initialProfileImageUrl =
+    latestProfileImageEvent && !latestProfileImageEvent.removed
+      ? latestProfileImageEvent.displayImageUrl ||
+        latestProfileImageEvent.backendImageUrl ||
+        latestProfileImageEvent.gmailImageUrl ||
+        null
+      : null;
   const [isDoctor, setIsDoctor] = useState(false);
-  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(initialProfileImageUrl);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
   const socketRef = useRef<Socket | null>(null);
+  const unreadRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastProfileImageEventAt = useRef(0);
+  const profileImageUserKeyRef = useRef<string | null>(null);
 
-  const API_URL = (() => {
+  const API_URL = useMemo(() => {
     const ENV = Constants.expoConfig?.extra;
     if (ENV?.EXPO_PUBLIC_BACKEND_API_URL) {
       return ENV.EXPO_PUBLIC_BACKEND_API_URL.replace(/\/api\/?$/, '');
     }
     const defaultHost = Constants.expoConfig?.hostUri?.split(':')[0] || 'localhost';
     return `http://${defaultHost}:5001`;
-  })();
+  }, []);
 
   useEffect(() => {
     const checkDoctorStatus = async () => {
@@ -49,19 +82,75 @@ export function BottomTabBar() {
 
     const fetchProfilePicture = async () => {
       try {
+        const fetchStartedAt = Date.now();
+        const user = await tokenStorage.getUser();
+        profileImageUserKeyRef.current = getProfileImageUserKey(user);
+        const cachedProfileImage = await readCachedProfileImage(user);
+        const userBackendImageUrl = getBackendProfileImageUrl(API_URL, user);
+        const userGmailImageUrl = getGmailProfileImageUrl(user);
+        const immediateImageUrl =
+          cachedProfileImage?.backendImageUrl ||
+          userBackendImageUrl ||
+          cachedProfileImage?.gmailImageUrl ||
+          userGmailImageUrl;
+
+        const fallbackGmailImageUrl = cachedProfileImage?.gmailImageUrl || userGmailImageUrl;
+
+        if (immediateImageUrl) {
+          setProfileImageUrl(immediateImageUrl);
+        }
+
         const token = await tokenStorage.getToken();
         if (token) {
-          const response = await fetch(`${API_URL}/api/user/profile-picture`, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${token}`,
+          const cacheUserKey = profileImageUserKeyRef.current || user?._id || user?.id || user?.email || 'current';
+          const data = await cachedRequestJson<any>(
+            `bottom-tab:profile-picture:${cacheUserKey}`,
+            `${API_URL}/api/user/profile-picture`,
+            {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+              },
             },
-          });
+            {
+              ...FAST_READ_CONFIG,
+              cacheTtlMs: 5 * 60 * 1000,
+              maxStaleMs: 24 * 60 * 60 * 1000,
+            }
+          );
+          if (fetchStartedAt < lastProfileImageEventAt.current) {
+            return;
+          }
 
-          if (response.ok) {
-            const data = await response.json();
-            if (data.success && data.data.imageUrl) {
-              setProfileImageUrl(`${API_URL}${data.data.imageUrl}`);
+          if (data.success && data.data?.imageUrl) {
+            const versionSeed =
+              data.data.updatedAt ||
+              data.data.updated_at ||
+              data.data.profileImageUpdatedAt ||
+              data.data.profilePictureUpdatedAt ||
+              null;
+            const imageUrl = buildStableBackendProfileImageUrl(
+              API_URL,
+              resolveBackendImageUrl(API_URL, data.data.imageUrl),
+              cachedProfileImage,
+              versionSeed
+            );
+            setProfileImageUrl(imageUrl);
+            await writeCachedProfileImage(user, {
+              backendImageUrl: imageUrl,
+              gmailImageUrl: fallbackGmailImageUrl || null,
+            }, imageUrl === cachedProfileImage?.backendImageUrl
+              ? cachedProfileImage.updatedAt
+              : String(versionSeed || new Date().toISOString()));
+          } else if (data.success) {
+            setProfileImageUrl(fallbackGmailImageUrl || null);
+            if (fallbackGmailImageUrl) {
+              await writeCachedProfileImage(user, {
+                backendImageUrl: null,
+                gmailImageUrl: fallbackGmailImageUrl,
+              });
+            } else {
+              await clearCachedProfileImage(user);
             }
           }
         }
@@ -70,23 +159,54 @@ export function BottomTabBar() {
       }
     };
 
+    const handleProfileImageUpdate = (event?: ProfileImageUpdateEvent) => {
+      if (!event) {
+        fetchProfilePicture();
+        return;
+      }
+
+      lastProfileImageEventAt.current = Date.now();
+      if (
+        event.userKey &&
+        profileImageUserKeyRef.current &&
+        event.userKey !== profileImageUserKeyRef.current
+      ) {
+        return;
+      }
+
+      setProfileImageUrl(
+        event.displayImageUrl ||
+        event.backendImageUrl ||
+        event.gmailImageUrl ||
+        null
+      );
+    };
+
     const fetchUnreadCount = async () => {
       try {
         const token = await tokenStorage.getToken();
+        const user = await tokenStorage.getUser();
+        const cacheUserKey = user?._id || user?.id || user?.userId || 'current';
         if (token) {
-          const response = await fetch(`${API_URL}/api/chat/unread-count`, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
+          const data = await cachedRequestJson<any>(
+            `bottom-tab:unread-count:${cacheUserKey}`,
+            `${API_URL}/api/chat/unread-count`,
+            {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
             },
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            if (data.success && typeof data.unreadCount === 'number') {
-              setUnreadCount(data.unreadCount);
+            {
+              ...FAST_READ_CONFIG,
+              cacheTtlMs: 30 * 1000,
+              maxStaleMs: 10 * 60 * 1000,
             }
+          );
+
+          if (data.success && typeof data.unreadCount === 'number') {
+            setUnreadCount(data.unreadCount);
           }
         }
       } catch (error) {
@@ -94,16 +214,27 @@ export function BottomTabBar() {
       }
     };
 
+    const scheduleUnreadRefresh = () => {
+      if (unreadRefreshTimerRef.current) return;
+      unreadRefreshTimerRef.current = setTimeout(() => {
+        unreadRefreshTimerRef.current = null;
+        fetchUnreadCount();
+      }, 900);
+    };
+
     checkDoctorStatus();
     fetchProfilePicture();
     fetchUnreadCount();
+    const unsubscribeProfileImage = profileImageEvents.subscribe(handleProfileImageUpdate);
 
-    // Refresh unread count every 30 seconds
-    const interval = setInterval(fetchUnreadCount, 30000);
+    // Socket events handle most updates; this slower poll keeps badges accurate on poor networks.
+    const interval = setInterval(fetchUnreadCount, 60000);
 
     // Setup socket to get real-time updates for incoming messages
     (async () => {
       try {
+        if (!isRealtimeSocketEnabled()) return;
+
         const token = await tokenStorage.getToken();
         if (!token) return;
 
@@ -112,8 +243,10 @@ export function BottomTabBar() {
           auth: { token },
           reconnection: true,
           reconnectionDelay: 1000,
-          reconnectionDelayMax: 5000,
+          reconnectionDelayMax: 10000,
           reconnectionAttempts: Infinity,
+          randomizationFactor: 0.5,
+          timeout: 8000,
         });
 
         socketRef.current = socket;
@@ -134,7 +267,7 @@ export function BottomTabBar() {
 
         // When a new message is broadcasted in an appointment room (server emits 'new-message')
         socket.on('new-message', (payload) => {
-          fetchUnreadCount();
+          scheduleUnreadRefresh();
         });
 
         // When the server notifies this specific user about a new message
@@ -144,19 +277,19 @@ export function BottomTabBar() {
             setUnreadCount(payload.totalUnreadCount);
           } else if (payload && typeof payload.unreadCount === 'number') {
             // Fallback to per-appointment count - better to refetch for accuracy
-            fetchUnreadCount();
+            scheduleUnreadRefresh();
           } else {
-            fetchUnreadCount();
+            scheduleUnreadRefresh();
           }
         });
 
         // Other events that may affect unread counts
         socket.on('message-status-update', () => {
-          fetchUnreadCount();
+          scheduleUnreadRefresh();
         });
 
         socket.on('messages-read', () => {
-          fetchUnreadCount();
+          scheduleUnreadRefresh();
         });
 
       } catch (error) {
@@ -175,17 +308,22 @@ export function BottomTabBar() {
 
     return () => {
       clearInterval(interval);
+      if (unreadRefreshTimerRef.current) {
+        clearTimeout(unreadRefreshTimerRef.current);
+        unreadRefreshTimerRef.current = null;
+      }
       keyboardDidShowListener.remove();
       keyboardDidHideListener.remove();
+      unsubscribeProfileImage();
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
       }
     };
-  }, []);
+  }, [API_URL]);
 
   // Determine which tab is active based on segments and pathname
-  const getActiveTab = (): TabType => {
+  const activeTab: TabType = useMemo(() => {
     const segmentsStr = segments.join('/');
 
     // Profile check
@@ -219,18 +357,31 @@ export function BottomTabBar() {
     }
 
     return 'dashboard' as const;
-  };
+  }, [pathname, segments]);
 
-  const isOnChatTab = (): boolean => {
-    return pathname.includes('all-chats');
-  };
-
-  const activeTab: TabType = getActiveTab();
+  const isOnChatTab = useCallback((): boolean => pathname.includes('all-chats'), [pathname]);
 
   // Function to check if we should show the tab bar
-  const shouldShowTabBar = () => {
+  const shouldShowTabBar = useMemo(() => {
     if (isKeyboardVisible) return false;
     if (pathname.includes('/profile')) return false;
+
+    const segmentsStr = segments.join('/');
+    const hiddenTabRouteMarkers = [
+      'doctor-report',
+      '(doctor-report)',
+      'weekly-insights',
+      '(weekly-insights)',
+      'meal-planner',
+      '(meal-planner)',
+    ];
+    if (
+      hiddenTabRouteMarkers.some(
+        (marker) => pathname.includes(marker) || segmentsStr.includes(marker)
+      )
+    ) {
+      return false;
+    }
 
     // Define root screens where tab bar should be visible
     const rootPaths = [
@@ -258,9 +409,9 @@ export function BottomTabBar() {
     }
 
     return false;
-  };
+  }, [isKeyboardVisible, pathname, segments]);
 
-  if (!shouldShowTabBar()) {
+  if (!shouldShowTabBar) {
     return null;
   }
 
@@ -271,23 +422,7 @@ export function BottomTabBar() {
         bottom: insets.bottom > 0 ? insets.bottom + hp(1) : hp(2),
       }
     ]}>
-      {/* Home Tab */}
-      <TouchableOpacity
-        style={[styles.tabItem, activeTab === 'dashboard' && styles.activeTabItem]}
-        onPress={() => router.push('/(main)/(dashboard)')}
-        activeOpacity={0.6}
-      >
-        <View style={[styles.pill, activeTab === 'dashboard' && styles.activePill]}>
-          <Ionicons
-            name={activeTab === 'dashboard' ? "home" : "home-outline"}
-            size={22}
-            color={activeTab === 'dashboard' ? colors.primary : colors.textSecondary}
-          />
-          {activeTab === 'dashboard' && <Text style={styles.pillText} numberOfLines={1}>Home</Text>}
-        </View>
-      </TouchableOpacity>
-
-      {/* Chatbot Tab */}
+      {/* HeaLora Tab */}
       <TouchableOpacity
         style={[styles.tabItem, activeTab === 'chatbot' && styles.activeTabItem]}
         onPress={() => router.push('/(main)/(chatbot)/baat')}
@@ -303,7 +438,7 @@ export function BottomTabBar() {
         </View>
       </TouchableOpacity>
 
-      {/* Appointments Tab */}
+      {/* Doctors Tab */}
       <TouchableOpacity
         style={[styles.tabItem, (activeTab === 'conference' || (activeTab === 'doctor-portal' && !isOnChatTab())) && styles.activeTabItem]}
         onPress={() => {
@@ -321,7 +456,23 @@ export function BottomTabBar() {
             size={22}
             color={activeTab === 'conference' || (activeTab === 'doctor-portal' && !isOnChatTab()) ? colors.primary : colors.textSecondary}
           />
-          {(activeTab === 'conference' || (activeTab === 'doctor-portal' && !isOnChatTab())) && <Text style={styles.pillText} numberOfLines={1}>Booking</Text>}
+          {(activeTab === 'conference' || (activeTab === 'doctor-portal' && !isOnChatTab())) && <Text style={styles.pillText} numberOfLines={1}>Doctors</Text>}
+        </View>
+      </TouchableOpacity>
+
+      {/* Home Tab */}
+      <TouchableOpacity
+        style={[styles.tabItem, activeTab === 'dashboard' && styles.activeTabItem]}
+        onPress={() => router.push('/(main)/(dashboard)')}
+        activeOpacity={0.6}
+      >
+        <View style={[styles.pill, activeTab === 'dashboard' && styles.activePill]}>
+          <Ionicons
+            name={activeTab === 'dashboard' ? "home" : "home-outline"}
+            size={22}
+            color={activeTab === 'dashboard' ? colors.primary : colors.textSecondary}
+          />
+          {activeTab === 'dashboard' && <Text style={styles.pillText} numberOfLines={1}>Home</Text>}
         </View>
       </TouchableOpacity>
 
@@ -365,8 +516,10 @@ export function BottomTabBar() {
         <View style={[styles.pill, activeTab === 'profile' && styles.activePill]}>
           {profileImageUrl ? (
             <Image
+              key={profileImageUrl}
               source={{ uri: profileImageUrl }}
               style={[styles.profileImage, activeTab === 'profile' && styles.activeProfileImage]}
+              fadeDuration={0}
             />
           ) : (
             <Ionicons
@@ -435,9 +588,10 @@ const getStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
   },
   profileImage: {
-    width: hp(3.5),
-    height: hp(3.5),
-    borderRadius: hp(1.75),
+    width: hp(4),
+    height: hp(4),
+    borderRadius: hp(2),
+    backgroundColor: colors.primary + '15',
   },
   activeProfileImage: {
     borderWidth: 2,

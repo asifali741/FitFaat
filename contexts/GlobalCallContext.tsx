@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import { io, Socket } from 'socket.io-client';
-import { getBackendBaseUrl } from '@/utils/config';
+import { getBackendBaseUrl, isRealtimeSocketEnabled } from '@/utils/config';
 
 interface IncomingCall {
   callerId: string;
@@ -42,6 +42,8 @@ export const GlobalCallProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   useEffect(() => {
     const initSocket = async () => {
       try {
+        if (!isRealtimeSocketEnabled()) return;
+
         const token = await tokenStorage.getToken();
         if (!token) return;
 

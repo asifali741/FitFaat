@@ -27,7 +27,7 @@ export default function ConferenceScreen() {
         params: { appointmentId: activeOrScheduled[0].id }
       });
     }
-  }, [appointments]);
+  }, [appointments, router]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>

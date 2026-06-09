@@ -3,10 +3,11 @@ import { useNotifications } from "@/contexts/NotificationContext";
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAppointmentBooking } from "@/hooks/useAppointmentBooking";
 import { tokenStorage } from "@/utils/auth/tokenStorage";
+import { FREE_PLAN_LIMITS } from "@/utils/featureAccess";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Modal, Platform, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -70,12 +71,7 @@ export default function AppointmentSummaryScreen() {
     return appointmentDate;
   };
 
-  // Check appointment limit on mount
-  useEffect(() => {
-    checkAppointmentLimit();
-  }, []);
-
-  const checkAppointmentLimit = async () => {
+  const checkAppointmentLimit = useCallback(async () => {
     try {
       const token = await tokenStorage.getToken();
       if (!token) return;
@@ -96,7 +92,12 @@ export default function AppointmentSummaryScreen() {
     } catch (error) {
       console.error('Error checking appointment limit:', error);
     }
-  };
+  }, [API_URL]);
+
+  // Check appointment limit on mount
+  useEffect(() => {
+    checkAppointmentLimit();
+  }, [checkAppointmentLimit]);
 
   const handleConfirmAppointment = async () => {
     if (!doctorId || !date || !time || fee === undefined) {
@@ -439,14 +440,14 @@ export default function AppointmentSummaryScreen() {
 
             {/* Subtitle */}
             <Text style={styles.appointmentModalSubtitle}>
-              {activeAppointmentCount === 1 
-                ? "You have 1 active appointment scheduled" 
+              {activeAppointmentCount === FREE_PLAN_LIMITS.activeDoctorAppointments
+                ? `You have ${FREE_PLAN_LIMITS.activeDoctorAppointments} active appointment scheduled`
                 : `You have ${activeAppointmentCount} appointments scheduled`}
             </Text>
 
             {/* Description */}
             <Text style={styles.appointmentModalDescription}>
-              Free users can book only 1 active appointment at a time. Upgrade to Premium for unlimited appointments!
+              Free includes {FREE_PLAN_LIMITS.activeDoctorAppointments} active appointment at a time. Premium adds unlimited appointments.
             </Text>
 
             {/* Features List */}

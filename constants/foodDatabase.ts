@@ -1,3 +1,176 @@
+export type DietType = 'vegetarian' | 'nonVegetarian';
+export type DietPreference = 'all' | DietType;
+
+export const DIET_PREFERENCE_STORAGE_KEY = 'fitfaat_diet_preference';
+
+const nonVegetarianKeywords = [
+  'achar gosht',
+  'beef',
+  'beefy',
+  'brain',
+  'carbonara',
+  'charga',
+  'chargha',
+  'chicken',
+  'dumba',
+  'egg',
+  'eggs',
+  'fish',
+  'gosht',
+  'haleem',
+  'katakat',
+  'keema',
+  'kheema',
+  'maghaz',
+  'meat',
+  'murgh',
+  'murghi',
+  'mutton',
+  'nihari',
+  'paya',
+  'prawn',
+  'qeema',
+  'rogan josh',
+  'salmon',
+  'seafood',
+  'shrimp',
+  'steak',
+  'trotters',
+  'tuna',
+  'turkey',
+  'yakhni',
+  'anda',
+  'anday',
+  'andey',
+];
+
+const genericNonVegetarianDishKeywords = [
+  'bbq',
+  'boti',
+  'burger',
+  'handi',
+  'kabab',
+  'kebab',
+  'karahi',
+  'kofta',
+  'korma',
+  'qorma',
+  'sajji',
+  'shawarma',
+  'tikka',
+];
+
+const vegetarianIdentityKeywords = [
+  'aloo',
+  'baingan',
+  'beans',
+  'bhindi',
+  'chana',
+  'chickpea',
+  'daal',
+  'dahi',
+  'dal',
+  'gobi',
+  'kadoo',
+  'kaddu',
+  'lauki',
+  'lentil',
+  'lentils',
+  'lobia',
+  'matar',
+  'milk',
+  'mooli',
+  'palak',
+  'paneer',
+  'potato',
+  'rajma',
+  'sabzi',
+  'saag',
+  'spinach',
+  'tofu',
+  'veg',
+  'veggie',
+  'vegetable',
+  'vegetarian',
+  'soy',
+  'soya',
+  'yogurt',
+];
+
+const nonVegetarianCategoryKeywords = [
+  'bbq',
+  'meat',
+  'meatballs',
+  'meat mix',
+  'meat patty',
+  'seafood',
+  'whole chicken',
+];
+
+const escapeRegExp = (value: string) =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const hasWholeTerm = (text: string, terms: string[]) =>
+  terms.some((term) => new RegExp(`(^|[^a-z])${escapeRegExp(term)}([^a-z]|$)`, 'i').test(text));
+
+export const dietPreferenceOptions: {
+  label: string;
+  value: DietPreference;
+  icon: 'restaurant-outline' | 'leaf-outline' | 'flame-outline';
+}[] = [
+  { label: 'All', value: 'all', icon: 'restaurant-outline' },
+  { label: 'Veg', value: 'vegetarian', icon: 'leaf-outline' },
+  { label: 'Non-Veg', value: 'nonVegetarian', icon: 'flame-outline' },
+];
+
+export const getDietPreferenceLabel = (preference: DietPreference) => {
+  if (preference === 'vegetarian') return 'Vegetarian';
+  if (preference === 'nonVegetarian') return 'Non-Veg';
+  return 'All Foods';
+};
+
+export const getDietTypeForFood = (food: any): DietType => {
+  if (food?.dietType === 'vegetarian' || food?.dietType === 'nonVegetarian') {
+    return food.dietType;
+  }
+
+  const ingredients = Array.isArray(food?.ingredients)
+    ? food.ingredients.map((ingredient: any) => ingredient?.name || ingredient).join(' ')
+    : '';
+  const nameAndIngredientText = [
+    food?.name,
+    food?.food_name,
+    food?.foodName,
+    food?.recipeName,
+    ingredients,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  const categoryText = String(food?.category || '').toLowerCase();
+
+  const hasVegetarianIdentity = hasWholeTerm(nameAndIngredientText, vegetarianIdentityKeywords);
+  const hasExplicitNonVegetarian = hasWholeTerm(nameAndIngredientText, nonVegetarianKeywords);
+  const hasNonVegetarianCategory = hasWholeTerm(categoryText, nonVegetarianCategoryKeywords);
+  const hasGenericNonVegetarianDish = hasWholeTerm(
+    nameAndIngredientText,
+    genericNonVegetarianDishKeywords
+  );
+
+  return hasExplicitNonVegetarian ||
+    ((hasNonVegetarianCategory || hasGenericNonVegetarianDish) && !hasVegetarianIdentity)
+    ? 'nonVegetarian'
+    : 'vegetarian';
+};
+
+export const filterFoodsByDietPreference = <T>(
+  foods: T[],
+  preference: DietPreference
+) => {
+  if (preference === 'all') return foods;
+  return foods.filter((food) => getDietTypeForFood(food) === preference);
+};
+
 // Food database with calorie information per standard portion
 export const foodDatabase = {
   // Proteins
@@ -78,34 +251,46 @@ export const goalBasedSuggestions = {
   1: { // Weight Loss (Deficit)
     name: 'Weight Loss',
     foods: [
-      { name: 'Grilled Chicken Breast', calories: 165, reason: 'High protein, low calorie' },
-      { name: 'Salmon', calories: 208, reason: 'Lean protein with omega-3' },
-      { name: 'Spinach Salad', calories: 50, reason: 'Very low calorie, nutritious' },
-      { name: 'Grilled Turkey Breast', calories: 135, reason: 'Lean protein source' },
-      { name: 'Broccoli with Chicken', calories: 199, reason: 'High protein, low calorie' },
-      { name: 'Tuna Salad', calories: 180, reason: 'Lean protein, healthy option' },
+      { name: 'Grilled Chicken Breast', calories: 165, reason: 'High protein, low calorie', dietType: 'nonVegetarian' },
+      { name: 'Salmon', calories: 208, reason: 'Lean protein with omega-3', dietType: 'nonVegetarian' },
+      { name: 'Spinach Salad', calories: 50, reason: 'Very low calorie, nutritious', dietType: 'vegetarian' },
+      { name: 'Grilled Turkey Breast', calories: 135, reason: 'Lean protein source', dietType: 'nonVegetarian' },
+      { name: 'Broccoli with Chicken', calories: 199, reason: 'High protein, low calorie', dietType: 'nonVegetarian' },
+      { name: 'Tuna Salad', calories: 180, reason: 'Lean protein, healthy option', dietType: 'nonVegetarian' },
+      { name: 'Lentil Soup with Salad', calories: 220, reason: 'Fiber-rich and filling', dietType: 'vegetarian' },
+      { name: 'Tofu Veggie Bowl', calories: 260, reason: 'Plant protein with vegetables', dietType: 'vegetarian' },
+      { name: 'Greek Yogurt with Berries', calories: 190, reason: 'Light protein snack', dietType: 'vegetarian' },
+      { name: 'Chickpea Cucumber Salad', calories: 240, reason: 'High fiber, moderate calories', dietType: 'vegetarian' },
     ]
   },
   2: { // Muscle Gain (Surplus)
     name: 'Muscle Gain',
     foods: [
-      { name: 'Chicken Breast with Rice', calories: 465, reason: 'Protein + carbs for muscle' },
-      { name: 'Salmon with Sweet Potato', calories: 410, reason: 'Protein + carbs + healthy fats' },
-      { name: 'Beef Steak with Pasta', calories: 580, reason: 'High protein and calories' },
-      { name: 'Protein Shake with Banana', calories: 255, reason: 'Quick protein + carbs' },
-      { name: 'Chicken with Quinoa', calories: 487, reason: 'Complete protein meal' },
-      { name: 'Eggs with Toast', calories: 270, reason: 'Protein-rich breakfast' },
+      { name: 'Chicken Breast with Rice', calories: 465, reason: 'Protein + carbs for muscle', dietType: 'nonVegetarian' },
+      { name: 'Salmon with Sweet Potato', calories: 410, reason: 'Protein + carbs + healthy fats', dietType: 'nonVegetarian' },
+      { name: 'Beef Steak with Pasta', calories: 580, reason: 'High protein and calories', dietType: 'nonVegetarian' },
+      { name: 'Protein Shake with Banana', calories: 255, reason: 'Quick protein + carbs', dietType: 'vegetarian' },
+      { name: 'Chicken with Quinoa', calories: 487, reason: 'Complete protein meal', dietType: 'nonVegetarian' },
+      { name: 'Eggs with Toast', calories: 270, reason: 'Protein-rich breakfast', dietType: 'nonVegetarian' },
+      { name: 'Paneer Rice Bowl', calories: 520, reason: 'Vegetarian protein + carbs', dietType: 'vegetarian' },
+      { name: 'Tofu with Quinoa', calories: 430, reason: 'Plant protein and complete carbs', dietType: 'vegetarian' },
+      { name: 'Greek Yogurt Oats Bowl', calories: 390, reason: 'Protein-rich vegetarian meal', dietType: 'vegetarian' },
+      { name: 'Lentils with Brown Rice', calories: 455, reason: 'Balanced vegetarian muscle meal', dietType: 'vegetarian' },
     ]
   },
-  3: { // Maintenance
-    name: 'Maintenance',
+  3: { // Weight Gain
+    name: 'Weight Gain',
     foods: [
-      { name: 'Grilled Chicken with Brown Rice', calories: 380, reason: 'Balanced meal' },
-      { name: 'Salmon with Vegetables', calories: 350, reason: 'Balanced and nutritious' },
-      { name: 'Turkey Sandwich', calories: 320, reason: 'Easy balanced option' },
-      { name: 'Pasta with Vegetables', calories: 400, reason: 'Balanced carbs and veggies' },
-      { name: 'Buddha Bowl', calories: 550, reason: 'Complete balanced meal' },
-      { name: 'Grilled Fish with Salad', calories: 300, reason: 'Light and balanced' },
+      { name: 'Grilled Chicken with Brown Rice', calories: 380, reason: 'Balanced meal', dietType: 'nonVegetarian' },
+      { name: 'Salmon with Vegetables', calories: 350, reason: 'Balanced and nutritious', dietType: 'nonVegetarian' },
+      { name: 'Turkey Sandwich', calories: 320, reason: 'Easy balanced option', dietType: 'nonVegetarian' },
+      { name: 'Pasta with Vegetables', calories: 400, reason: 'Balanced carbs and veggies', dietType: 'vegetarian' },
+      { name: 'Buddha Bowl', calories: 550, reason: 'Complete balanced meal', dietType: 'vegetarian' },
+      { name: 'Grilled Fish with Salad', calories: 300, reason: 'Light and balanced', dietType: 'nonVegetarian' },
+      { name: 'Peanut Butter Banana Toast', calories: 410, reason: 'Calorie-dense vegetarian snack', dietType: 'vegetarian' },
+      { name: 'Paneer Paratha with Yogurt', calories: 560, reason: 'High-calorie vegetarian meal', dietType: 'vegetarian' },
+      { name: 'Avocado Cheese Sandwich', calories: 480, reason: 'Healthy fats and calories', dietType: 'vegetarian' },
+      { name: 'Chickpea Rice Bowl', calories: 520, reason: 'Energy-dense vegetarian bowl', dietType: 'vegetarian' },
     ]
   }
 };

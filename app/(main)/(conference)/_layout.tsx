@@ -1,9 +1,8 @@
 import { ScreenSceneWrapper } from "@/components/common/ScreenTiltAnimation";
-import { usePathname } from "expo-router";
-import { Slot } from "expo-router";
+import { Slot, usePathname } from "expo-router";
 import { View, useWindowDimensions } from "react-native";
 
-export default function DashboardLayout() {
+export default function ConferenceLayout() {
   const { width, height } = useWindowDimensions();
   const pathname = usePathname();
 

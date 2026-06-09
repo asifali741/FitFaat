@@ -2,14 +2,19 @@ import AppHeader from "@/components/AppHeader";
 import { useNotifications, NotificationToggleKey } from "@/contexts/NotificationContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View, Linking, Platform } from "react-native";
 import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+type NotificationSettingRow = {
+  key: NotificationToggleKey;
+  icon: string;
+  title: string;
+  description: string;
+};
+
 export default function NotificationSettingsScreen() {
-  const router = useRouter();
   const { colors } = useTheme();
   const { 
     permissionStatus, 
@@ -107,12 +112,7 @@ export default function NotificationSettingsScreen() {
     );
   };
 
-  const reminderRows: Array<{
-    key: NotificationToggleKey;
-    icon: string;
-    title: string;
-    description: string;
-  }> = [
+  const reminderRows: NotificationSettingRow[] = [
     {
       key: 'appointmentReminders',
       icon: 'calendar',
@@ -124,12 +124,6 @@ export default function NotificationSettingsScreen() {
       icon: 'videocam',
       title: 'Video Call Reminders',
       description: 'Upcoming consultation and call alerts',
-    },
-    {
-      key: 'workoutReminders',
-      icon: 'barbell',
-      title: 'Workout Reminders',
-      description: 'Daily and weekly exercise reminders',
     },
     {
       key: 'mealReminders',
@@ -144,12 +138,6 @@ export default function NotificationSettingsScreen() {
       description: 'Water, sleep, steps, and calorie target alerts',
     },
     {
-      key: 'missedActivity',
-      icon: 'alert-circle',
-      title: 'Missed Activity',
-      description: 'Alerts for workouts or logs you missed',
-    },
-    {
       key: 'motivationalQuotes',
       icon: 'sparkles',
       title: 'Motivational Quotes',
@@ -157,12 +145,7 @@ export default function NotificationSettingsScreen() {
     },
   ];
 
-  const coachingRows: Array<{
-    key: NotificationToggleKey;
-    icon: string;
-    title: string;
-    description: string;
-  }> = [
+  const coachingRows: NotificationSettingRow[] = [
     {
       key: 'chatMessages',
       icon: 'chatbubbles',
@@ -170,37 +153,14 @@ export default function NotificationSettingsScreen() {
       description: 'Notifications for new appointment chat messages',
     },
     {
-      key: 'trainerMessages',
-      icon: 'person',
-      title: 'Trainer Messages',
-      description: 'New feedback from trainers, doctors, or coaches',
-    },
-    {
       key: 'dietPlanUpdates',
       icon: 'nutrition',
       title: 'Diet Plan Updates',
       description: 'New or changed meal plans',
     },
-    {
-      key: 'workoutPlanUpdates',
-      icon: 'walk',
-      title: 'Workout Plan Updates',
-      description: 'New exercises and workout schedule changes',
-    },
-    {
-      key: 'goalProgress',
-      icon: 'trophy',
-      title: 'Goal Progress',
-      description: 'Weight, calories, streak, and milestone updates',
-    },
   ];
 
-  const accountRows: Array<{
-    key: NotificationToggleKey;
-    icon: string;
-    title: string;
-    description: string;
-  }> = [
+  const accountRows: NotificationSettingRow[] = [
     {
       key: 'bookingUpdates',
       icon: 'checkmark-circle',
@@ -212,30 +172,6 @@ export default function NotificationSettingsScreen() {
       icon: 'card',
       title: 'Subscription Alerts',
       description: 'Payment, renewal, and premium status updates',
-    },
-    {
-      key: 'communityActivity',
-      icon: 'people',
-      title: 'Community Activity',
-      description: 'Likes, comments, follows, and invites',
-    },
-    {
-      key: 'challengeUpdates',
-      icon: 'flame',
-      title: 'Challenges and Streaks',
-      description: 'Challenge reminders and leaderboard updates',
-    },
-    {
-      key: 'securityAlerts',
-      icon: 'shield-checkmark',
-      title: 'Security Alerts',
-      description: 'Login, password, and OTP updates',
-    },
-    {
-      key: 'adminAnnouncements',
-      icon: 'megaphone',
-      title: 'Announcements',
-      description: 'Maintenance, offers, and app updates',
     },
     {
       key: 'newsUpdates',
